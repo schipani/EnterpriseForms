@@ -32,8 +32,7 @@ public sealed class ArchiveProcessor(IAuthorityStore store, ISecurityEventArchiv
                 // non-canonical storage path. Never deliver unverifiable evidence; quarantine instead of repairing.
                 entry.ArchiveDeliveryState = ArchiveDeliveryStates.VerificationFailed;
                 entry.LastArchiveErrorCode = JournalBodyDigestMismatch;
-                state.IntegrityQuarantineEnabled = true;
-                state.IntegrityQuarantineReasonCode = JournalBodyDigestMismatch;
+                OrganizationQuarantine.Set(state, JournalBodyDigestMismatch);
                 break;
             }
 
@@ -51,8 +50,7 @@ public sealed class ArchiveProcessor(IAuthorityStore store, ISecurityEventArchiv
             {
                 entry.ArchiveDeliveryState = ArchiveDeliveryStates.VerificationFailed;
                 entry.LastArchiveErrorCode = "ARCHIVE_BODY_MISMATCH";
-                state.IntegrityQuarantineEnabled = true;
-                state.IntegrityQuarantineReasonCode = "ARCHIVE_BODY_MISMATCH";
+                OrganizationQuarantine.Set(state, "ARCHIVE_BODY_MISMATCH");
                 break;
             }
             catch (ArchiveUnavailableException ex)

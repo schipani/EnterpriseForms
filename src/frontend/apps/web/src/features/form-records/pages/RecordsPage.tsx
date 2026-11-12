@@ -4,7 +4,7 @@ import { ActionIcons, Badge, Button, Card, Checkbox, DataTable, EmptyState, help
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { AdvancedFieldSearch, presentSearchFailure, toFieldSearchRequest, type ConditionDraft, type SearchFailure } from "../../search";
+import { AdvancedFieldSearch, presentSearchFailure, resultBasisCopy, toFieldSearchRequest, type ConditionDraft, type SearchFailure } from "../../search";
 import { ErrorPanel } from "../../support";
 import { formatDateTime, parseLookupInput, recordStatusLabel, referenceFor, RECORD_STATUSES, SORT_CHOICES, sortChoiceFor, type RecordsSearch } from "../components/recordList";
 
@@ -315,8 +315,9 @@ export function RecordsPage() {
 }
 
 /**
- * Advanced-search outcome in the My Records table (Phase C7). A result is shown only when the server returned a complete,
- * verified answer; a failure is explained and is never presented as "no records match".
+ * Advanced-search outcome in the My Records table (Phase C7). A result is shown only when the server returned a complete answer;
+ * a failure is explained and is never presented as "no records match". IX-4: an indexed result (resultBasis
+ * AuthorityAcceptedContent) is never described as verified; its scope statement says what was checked (design §6.2, §6.6).
  */
 function FieldSearchResults({ state, busy, onRetry, onPage, onClear }: { state: { result?: FieldSearchResponse; failure?: SearchFailure }; busy: boolean; onRetry: () => void; onPage: (cursor: string) => void; onClear: () => void }) {
   useFormatter();
@@ -352,11 +353,13 @@ function FieldSearchResults({ state, busy, onRetry, onPage, onClear }: { state: 
   return (
     <>
       <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
-        <p className="text-sm text-muted">{result.scopeStatement}</p>
+        <p className="text-sm text-muted" data-result-basis={result.resultBasis ?? "VerifiedScan"}>
+          {result.scopeStatement}
+        </p>
         {clear}
       </div>
       {total === 0 ? (
-        <EmptyState title="No records match these conditions">The search was complete and verified for the records you can access.</EmptyState>
+        <EmptyState title="No records match these conditions">{resultBasisCopy(result.resultBasis).emptyMessage}</EmptyState>
       ) : (
         <>
           <DataTable caption="My Records" rowKey={(row) => row.formRecordId} rows={[...result.items]} stickyActions columns={recordColumns()} />

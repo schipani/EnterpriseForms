@@ -5,6 +5,8 @@ using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.PlatformOperators;
+using AuthorizationAuthority.Domain.Features.SearchAccess;
+using AuthorizationAuthority.Domain.Features.SearchIndex;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
 using Microsoft.EntityFrameworkCore;
@@ -47,6 +49,8 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
     public DbSet<RecordManifestCommit> ManifestCommits => Set<RecordManifestCommit>();
 
     public DbSet<RecordManifestLeaf> ManifestLeaves => Set<RecordManifestLeaf>();
+
+    public DbSet<ContentItemIdentity> ContentItemIdentities => Set<ContentItemIdentity>();
 
     public DbSet<ContentIntegrityCheckpoint> ContentCheckpoints => Set<ContentIntegrityCheckpoint>();
 
@@ -93,6 +97,49 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
     public DbSet<OrganizationOwnerRecoveryApproval> OwnerRecoveryApprovals => Set<OrganizationOwnerRecoveryApproval>();
 
     public DbSet<OrganizationRecoveredOwnerProbation> RecoveredOwnerProbations => Set<OrganizationRecoveredOwnerProbation>();
+
+    // IX-1: Authority-owned search index (schema authority_search).
+    public DbSet<SearchProjectionState> SearchProjectionStates => Set<SearchProjectionState>();
+
+    public DbSet<SearchFieldCoverage> SearchFieldCoverages => Set<SearchFieldCoverage>();
+
+    public DbSet<SearchRecordEntry> SearchRecordEntries => Set<SearchRecordEntry>();
+
+    public DbSet<SearchStringPosting> SearchStringPostings => Set<SearchStringPosting>();
+
+    public DbSet<SearchIntegerPosting> SearchIntegerPostings => Set<SearchIntegerPosting>();
+
+    public DbSet<SearchDecimalPosting> SearchDecimalPostings => Set<SearchDecimalPosting>();
+
+    public DbSet<SearchDatePosting> SearchDatePostings => Set<SearchDatePosting>();
+
+    public DbSet<SearchDateTimePosting> SearchDateTimePostings => Set<SearchDateTimePosting>();
+
+    public DbSet<SearchBooleanPosting> SearchBooleanPostings => Set<SearchBooleanPosting>();
+
+    public DbSet<SearchOptionPosting> SearchOptionPostings => Set<SearchOptionPosting>();
+
+    public DbSet<SearchRecordFieldAnomaly> SearchRecordFieldAnomalies => Set<SearchRecordFieldAnomaly>();
+
+    public DbSet<SearchFormState> SearchFormStates => Set<SearchFormState>();
+
+    public DbSet<SearchResultSnapshot> SearchResultSnapshots => Set<SearchResultSnapshot>();
+
+    public DbSet<SearchResultSnapshotEntry> SearchResultSnapshotEntries => Set<SearchResultSnapshotEntry>();
+
+    public DbSet<SearchAccessCheckpoint> SearchAccessCheckpoints => Set<SearchAccessCheckpoint>();
+
+    public DbSet<SearchAccessEdge> SearchAccessEdges => Set<SearchAccessEdge>();
+
+    public DbSet<SearchAccessRecordGrant> SearchAccessRecordGrants => Set<SearchAccessRecordGrant>();
+
+    public DbSet<SearchAccessFieldItemGrant> SearchAccessFieldItemGrants => Set<SearchAccessFieldItemGrant>();
+
+    public DbSet<SearchAccessValuePosting> SearchAccessValuePostings => Set<SearchAccessValuePosting>();
+
+    public DbSet<SearchAccessVerificationState> SearchAccessVerificationStates => Set<SearchAccessVerificationState>();
+
+    public DbSet<SearchAccessShadowSample> SearchAccessShadowSamples => Set<SearchAccessShadowSample>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

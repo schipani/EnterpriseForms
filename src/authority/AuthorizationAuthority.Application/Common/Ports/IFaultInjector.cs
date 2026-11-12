@@ -10,4 +10,7 @@ public interface IFaultInjector
 
     /// <summary>Testing only: waits at a named pause point while it is armed (bounded); a no-op everywhere else.</summary>
     Task PauseIfArmedAsync(string faultName, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>Testing only: whether the named crash point is armed; always false outside the Testing implementation.</summary>
+    bool IsArmed(string faultName) => false;
 }

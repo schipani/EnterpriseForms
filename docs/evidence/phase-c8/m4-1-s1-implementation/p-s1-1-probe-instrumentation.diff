@@ -1,0 +1,142 @@
+diff --git a/src/authority/AuthorizationAuthority.Application/Common/ProjectionIntegrityVerifier.cs b/src/authority/AuthorizationAuthority.Application/Common/ProjectionIntegrityVerifier.cs
+index 07bcd8f..81f57da 100644
+--- a/src/authority/AuthorizationAuthority.Application/Common/ProjectionIntegrityVerifier.cs
++++ b/src/authority/AuthorizationAuthority.Application/Common/ProjectionIntegrityVerifier.cs
+@@ -98,7 +98,10 @@ public sealed class ProjectionIntegrityVerifier(IAuthorityStore store, ISpiceDbP
+         snapshot.RequireOpen();
+         try
+         {
+-            return await spiceDb.CheckAsync(check, snapshot, cancellationToken).ConfigureAwait(false);
++            var p0 = Stopwatch.GetTimestamp();
++            var r0 = await spiceDb.CheckAsync(check, snapshot, cancellationToken).ConfigureAwait(false);
++            if (P1Probe.Current.Value is { } pr0) { pr0.SpiceTicks += Stopwatch.GetTimestamp() - p0; pr0.SpiceCalls++; pr0.SpiceItems++; }
++            return r0;
+         }
+         catch (Exception ex) when (ex is SpiceDbSnapshotException or SpiceDbSchemaMissingException or SpiceDbUnavailableException)
+         {
+@@ -113,7 +116,10 @@ public sealed class ProjectionIntegrityVerifier(IAuthorityStore store, ISpiceDbP
+         snapshot.RequireOpen();
+         try
+         {
+-            return await spiceDb.CheckBulkAsync(checks, snapshot, cancellationToken).ConfigureAwait(false);
++            var p1 = Stopwatch.GetTimestamp();
++            var r1 = await spiceDb.CheckBulkAsync(checks, snapshot, cancellationToken).ConfigureAwait(false);
++            if (P1Probe.Current.Value is { } pr1) { pr1.SpiceTicks += Stopwatch.GetTimestamp() - p1; pr1.SpiceCalls++; pr1.SpiceItems += checks.Count; }
++            return r1;
+         }
+         catch (Exception ex) when (ex is SpiceDbSnapshotException or SpiceDbSchemaMissingException or SpiceDbUnavailableException)
+         {
+diff --git a/src/authority/AuthorizationAuthority.Application/Features/Catalogue/SearchCatalogueService.cs b/src/authority/AuthorizationAuthority.Application/Features/Catalogue/SearchCatalogueService.cs
+index ce6ebbd..e1ef314 100644
+--- a/src/authority/AuthorizationAuthority.Application/Features/Catalogue/SearchCatalogueService.cs
++++ b/src/authority/AuthorizationAuthority.Application/Features/Catalogue/SearchCatalogueService.cs
+@@ -77,6 +77,7 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ProjectionInte
+         var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
+         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
+ 
++        var catStart = System.Diagnostics.Stopwatch.GetTimestamp();
+         var projectionSnapshot = await verifier.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
+         IReadOnlyList<string> lookedUp;
+         try
+@@ -94,6 +95,7 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ProjectionInte
+         {
+             throw AuthorityException.NotReady("authorization state moved during catalogue issuance");
+         }
++        Console.WriteLine(System.FormattableString.Invariant($"P1PROBE catalogue lookedUp={lookedUp.Count} pinLookupComplete={(System.Diagnostics.Stopwatch.GetTimestamp() - catStart) * 1000.0 / System.Diagnostics.Stopwatch.Frequency:F1}"));
+ 
+         var discoverable = lookedUp.Select(v => Guid.TryParse(v, out var id) ? id : Guid.Empty).Where(id => id != Guid.Empty).ToHashSet();
+         var resources = (await scope.GetFormRecordResourcesAsync(state.OrganizationId, request.FormDefinitionId, UserScopeStates, cancellationToken).ConfigureAwait(false))
+diff --git a/src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs b/src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs
+index 469c419..d3ef2e6 100644
+--- a/src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs
++++ b/src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs
+@@ -604,7 +604,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider
+         var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
+         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
+ 
++        var probe = new P1Probe(); P1Probe.Current.Value = probe; var probeStart = System.Diagnostics.Stopwatch.GetTimestamp();
+         var snapshot = await verifier.PinAsync(scope, state, organizationLocked: true, correlationId, cancellationToken).ConfigureAwait(false);
++        probe.PinTicks = System.Diagnostics.Stopwatch.GetTimestamp() - probeStart; var loopStart = System.Diagnostics.Stopwatch.GetTimestamp();
+         var results = new List<BatchVerificationResult>(request.Records.Count);
+         var anyQuarantined = false;
+         foreach (var item in request.Records)
+@@ -629,8 +631,11 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider
+             }
+         }
+ 
++        probe.LoopTicks = System.Diagnostics.Stopwatch.GetTimestamp() - loopStart; var completeStart = System.Diagnostics.Stopwatch.GetTimestamp();
+         // Decisive marker re-read after every record's decision (S1); a mismatch quarantines and commits any head quarantines too.
+         await verifier.CompleteAsync(snapshot, "verify_projections", cancellationToken).ConfigureAwait(false);
++        probe.CompleteTicks = System.Diagnostics.Stopwatch.GetTimestamp() - completeStart;
++        Console.WriteLine(System.FormattableString.Invariant($"P1PROBE verify records={request.Records.Count} total={P1Probe.Ms(System.Diagnostics.Stopwatch.GetTimestamp() - probeStart):F1} pin={P1Probe.Ms(probe.PinTicks):F1} loop={P1Probe.Ms(probe.LoopTicks):F1} complete={P1Probe.Ms(probe.CompleteTicks):F1} spiceCalls={probe.SpiceCalls} spiceItems={probe.SpiceItems} spiceMs={P1Probe.Ms(probe.SpiceTicks):F1} macCalls={probe.MacCalls} macMs={P1Probe.Ms(probe.MacTicks):F1}"));
+         var after = await scope.ReadOrganizationAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
+         var moved = after is null || after.AuthorizationRevision != state.AuthorizationRevision || after.ProjectionAppliedRevision != state.ProjectionAppliedRevision;
+         if (anyQuarantined)
+@@ -1004,7 +1009,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider
+             bool valid;
+             try
+             {
++                var m0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                 valid = await macProvider.VerifyAsync(keyReference, bytes, signature, cancellationToken).ConfigureAwait(false);
++                if (P1Probe.Current.Value is { } pm) { pm.MacTicks += System.Diagnostics.Stopwatch.GetTimestamp() - m0; pm.MacCalls++; }
+             }
+             catch (IntegrityProviderUnavailableException ex)
+             {
+diff --git a/src/backend/EnterpriseForms.Application/Features/Search/Verification/TrustedScopeVerifier.cs b/src/backend/EnterpriseForms.Application/Features/Search/Verification/TrustedScopeVerifier.cs
+index 1d5cb3a..78f1094 100644
+--- a/src/backend/EnterpriseForms.Application/Features/Search/Verification/TrustedScopeVerifier.cs
++++ b/src/backend/EnterpriseForms.Application/Features/Search/Verification/TrustedScopeVerifier.cs
+@@ -53,7 +53,9 @@ public sealed class TrustedScopeVerifier(IAuthorizationAuthorityClient authority
+         try
+         {
+             calls++;
++            long readTicks = 0, verifyTicks = 0; var catT = System.Diagnostics.Stopwatch.GetTimestamp();
+             var catalogue = await authority.IssueSearchCatalogueAsync(user, new SearchCatalogueRequest(context.OrganizationId, formDefinitionId, limits.MaximumEligibleRecords), deadline.Token).ConfigureAwait(false);
++            var catalogueTicks = System.Diagnostics.Stopwatch.GetTimestamp() - catT;
+             catalogueIssued?.Invoke(catalogue.SearchCatalogueSnapshotId);
+             if (catalogue.Entries.Any(e => e.ContentHeadQuarantined || e.ResourceQuarantined))
+             {
+@@ -68,7 +70,9 @@ public sealed class TrustedScopeVerifier(IAuthorizationAuthorityClient authority
+                 var contents = new Dictionary<Guid, AcceptedRecordContent>(chunk.Length);
+                 foreach (var entry in chunk)
+                 {
++                    var rT = System.Diagnostics.Stopwatch.GetTimestamp();
+                     var content = await records.ReadAcceptedContentAsync(entry.FormRecordId, entry.CommittedOperationId!.Value, deadline.Token).ConfigureAwait(false);
++                    readTicks += System.Diagnostics.Stopwatch.GetTimestamp() - rT;
+                     bytes += content.Items.Sum(i => ((long)i.CanonicalBytesBase64.Length * 3 / 4) + ((long)i.RowSignatureBase64.Length * 3 / 4));
+                     if (bytes > limits.MaximumVerifiedBytes)
+                     {
+@@ -81,7 +85,9 @@ public sealed class TrustedScopeVerifier(IAuthorizationAuthorityClient authority
+ 
+                 calls++;
+                 batches++;
++                var vT = System.Diagnostics.Stopwatch.GetTimestamp();
+                 var response = await authority.VerifyRecordProjectionsAsync(user, new VerifyRecordProjectionsRequest(context.OrganizationId, items), deadline.Token).ConfigureAwait(false);
++                verifyTicks += System.Diagnostics.Stopwatch.GetTimestamp() - vT;
+                 if (response.AuthorizationRevision != catalogue.AuthorizationRevision)
+                 {
+                     throw SearchException.SnapshotChanged();
+@@ -121,6 +127,8 @@ public sealed class TrustedScopeVerifier(IAuthorizationAuthorityClient authority
+                     : SearchException.SnapshotChanged();
+             }
+ 
++            static double Ms(long t) => t * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
++            Console.WriteLine(System.FormattableString.Invariant($"P1PROBE scope records={contentful.Count} total={clock.GetElapsedTime(started).TotalMilliseconds:F1} catalogue={Ms(catalogueTicks):F1} businessRead={Ms(readTicks):F1} authorityVerify={Ms(verifyTicks):F1} batches={batches}"));
+             return new VerifiedScope(catalogue.SearchCatalogueSnapshotId, formDefinitionId, catalogue.AuthorizationRevision, catalogue.ContentIntegrityRevision, catalogue.Entries.Count, catalogue.Entries.Count - contentful.Count,
+                 verified, new ScopeVerificationMetrics(calls, batches, bytes, clock.GetElapsedTime(started)), catalogue.SnapshotExpiresOn);
+         }
+diff --git a/src/authority/AuthorizationAuthority.Application/Common/P1Probe.cs b/src/authority/AuthorizationAuthority.Application/Common/P1Probe.cs
+new file mode 100644
+index 0000000..d70108a
+--- /dev/null
++++ b/src/authority/AuthorizationAuthority.Application/Common/P1Probe.cs
+@@ -0,0 +1,9 @@
++namespace AuthorizationAuthority.Application.Common;
++
++// THROWAWAY P-S1-1 timing probe (never committed).
++internal sealed class P1Probe
++{
++    public static readonly System.Threading.AsyncLocal<P1Probe?> Current = new();
++    public long SpiceTicks, SpiceCalls, SpiceItems, MacTicks, MacCalls, PinTicks, CompleteTicks, LoopTicks;
++    public static double Ms(long ticks) => ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
++}

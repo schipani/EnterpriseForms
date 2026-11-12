@@ -1,7 +1,7 @@
 import type { MemberCommandRequest, OrganizationMemberResponse, OwnerProposalResponse } from "@enterpriseforms/api-client";
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { Button, Checkbox, Dialog, StatusMessage, TextInput, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button, Checkbox, Dialog, FieldShell, StatusMessage, TextArea, TextInput, getActiveFormatter, inputClass, useFormatter } from "@enterpriseforms/ui";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
 import { MEMBER_ACTION_LABELS, memberName, type MemberAction } from "./MemberTable";
@@ -73,6 +73,20 @@ function describe(change: MemberChange): { title: string; description: string; c
         confirm: "Remove administrator",
         danger: true,
       };
+    case "AppointSecurityAuditor":
+      return {
+        title: `Make ${name} a Security Auditor`,
+        description: "Security Auditors can review the organization's security audit trail. The role gives no access to records, no Form Designer rights and no administration rights.",
+        confirm: "Appoint",
+        danger: false,
+      };
+    case "RemoveSecurityAuditor":
+      return {
+        title: `Remove ${name} as Security Auditor`,
+        description: "They lose access to the security audit trail on their next request. Nothing else about their account changes.",
+        confirm: "Remove auditor",
+        danger: true,
+      };
     default:
       return {
         title: `Propose: ${CHANGE_LABELS[PROPOSALS[change.action] ?? ""] ?? MEMBER_ACTION_LABELS[change.action]} (${name})`,
@@ -82,6 +96,9 @@ function describe(change: MemberChange): { title: string; description: string; c
       };
   }
 }
+
+const NOTE_LIMIT = 500;
+const AUDITOR_NOTE_HELP = "Encrypted before it is sent and kept only as ciphertext with the command. It cannot be read back in this application, is never shown to Security Auditors and is not stored in this application's audit log.";
 
 /**
  * One dialog for every People change (C8 M2): reason (recorded with the Authority command), the development-only step-up,
@@ -107,6 +124,16 @@ export function MemberChangeDialog({
   const queryClient = useQueryClient();
   const [reason, setReason] = useState("");
   const [stepUp, setStepUp] = useState(false);
+  const [reasonCode, setReasonCode] = useState("");
+  const [reasonTouched, setReasonTouched] = useState(false);
+  const [note, setNote] = useState("");
+  const auditorAction = change?.kind === "member" && (change.action === "AppointSecurityAuditor" || change.action === "RemoveSecurityAuditor") ? change.action : null;
+  const reasonCodes = useQuery({
+    queryKey: ["organization", "security-auditors", "reason-codes"],
+    queryFn: async ({ signal }) => (await api.organization.securityAuditorReasonCodes(signal)).result,
+    enabled: auditorAction !== null,
+  });
+  const reasonOptions = (auditorAction === "RemoveSecurityAuditor" ? reasonCodes.data?.removal : reasonCodes.data?.appointment) ?? [];
   const mutation = useMutation({
     mutationFn: async (target: MemberChange): Promise<string> => {
       const request: MemberCommandRequest = { reason: reason.trim(), useDevelopmentStepUp: stepUp };
@@ -135,6 +162,12 @@ export function MemberChangeDialog({
         case "RemoveSecurityAdministrator":
           await api.organization.removeSecurityAdministrator(member.userId, { reason: request.reason, useDevelopmentStepUp: stepUp });
           return `${name} is no longer a Security Administrator.`;
+        case "AppointSecurityAuditor":
+          await api.organization.appointSecurityAuditor({ userId: member.userId, reasonCode, reasonNote: note.trim() || null, useDevelopmentStepUp: stepUp });
+          return `${name} is now a Security Auditor.`;
+        case "RemoveSecurityAuditor":
+          await api.organization.removeSecurityAuditor(member.userId, { reasonCode, reasonNote: note.trim() || null, useDevelopmentStepUp: stepUp });
+          return `${name} is no longer a Security Auditor.`;
         default: {
           const proposal = (await api.organization.proposeOwnerChange(member.userId, { change: PROPOSALS[action]!, ...request })).result;
           return `Proposal recorded for ${name}. Another organization owner must approve it before ${getActiveFormatter().instant(proposal.expiresOn ?? Date.now())}.`;
@@ -151,11 +184,14 @@ export function MemberChangeDialog({
   const close = () => {
     setReason("");
     setStepUp(false);
+    setReasonCode("");
+    setReasonTouched(false);
+    setNote("");
     mutation.reset();
     onClose();
   };
   const text = change ? describe(change) : null;
-  const reasonValid = reason.trim().length >= 3;
+  const reasonValid = auditorAction ? reasonCode !== "" : reason.trim().length >= 3;
   return (
     <Dialog
       open={change !== null}
@@ -174,14 +210,55 @@ export function MemberChangeDialog({
         </>
       }
     >
-      <TextInput
-        label="Reason"
-        value={reason}
-        required
-        maxLength={500}
-        helpText="Recorded with the change by the Authorization Authority (3 to 500 characters)."
-        onChange={(event) => setReason(event.target.value)}
-      />
+      {auditorAction ? (
+        <>
+          <FieldShell
+            label="Reason"
+            required
+            helpText="Choose the reason recorded with this change."
+            error={reasonCodes.isError ? "The reasons could not be loaded. Close this dialog and try again." : reasonTouched && reasonCode === "" ? "Choose a reason to continue." : undefined}
+          >
+            {({ inputId, describedBy, invalid }) => (
+              <select
+                id={inputId}
+                aria-describedby={describedBy}
+                aria-invalid={invalid || undefined}
+                aria-required="true"
+                required
+                className={inputClass}
+                value={reasonCode}
+                onChange={(event) => setReasonCode(event.target.value)}
+                onBlur={() => setReasonTouched(true)}
+              >
+                <option value="">Select a reason</option>
+                {reasonOptions.map((option) => (
+                  <option key={option.reasonCode} value={option.reasonCode}>
+                    {option.reasonLabel}
+                  </option>
+                ))}
+              </select>
+            )}
+          </FieldShell>
+          <TextArea
+            label="Note (optional)"
+            value={note}
+            maxLength={NOTE_LIMIT}
+            rows={3}
+            helpText={AUDITOR_NOTE_HELP}
+            note={`${note.length} / ${NOTE_LIMIT}`}
+            onChange={(event) => setNote(event.target.value.slice(0, NOTE_LIMIT))}
+          />
+        </>
+      ) : (
+        <TextInput
+          label="Reason"
+          value={reason}
+          required
+          maxLength={500}
+          helpText="Recorded with the change by the Authorization Authority (3 to 500 characters)."
+          onChange={(event) => setReason(event.target.value)}
+        />
+      )}
       {operational ? (
         <Checkbox
           label="Confirm with the development-only step-up"

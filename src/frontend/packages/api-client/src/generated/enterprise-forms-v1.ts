@@ -1766,8 +1766,59 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective; self-removal allowed while another remains. */
+        /** Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective. Nobody removes themself (403 SELF_CHANGE_FORBIDDEN, D8-62a): another Security Administrator performs the removal. */
         post: operations["RemoveSecurityAdministrator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/security-auditors/reason-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The owner-approved Security Auditor appointment and removal reason codes with their labels (C-110). The Authority validates every submitted code exactly. */
+        get: operations["GetSecurityAuditorReasonCodes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/security-auditors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Appoints a verified member as Security Auditor (GrantSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up (unavailable in staging and production until PB-08) and an appointment reason code; an optional reason note (at most 500 characters) is encrypted by this API before it is sent and cannot be read back in the application (503 ENCRYPTION_UNAVAILABLE when no key provider is configured). The role grants audit viewing and no record content. 204 once Effective. */
+        post: operations["AppointSecurityAuditor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/security-auditors/{userId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Removes a Security Auditor (RevokeSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up and a removal reason code. There is no last-auditor rule. 204 once Effective. */
+        post: operations["RemoveSecurityAuditor"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1868,7 +1919,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Advanced field search over one selected form: up to five conditions combined with AND, each on a field from the capability list with an allowed operator and a typed invariant value, plus the My Records metadata filters. A result is returned only when every eligible record was independently enumerated and verified at one snapshot; otherwise a typed failure (SEARCH_FIELD_NOT_ALLOWED, SEARCH_OPERATOR_NOT_SUPPORTED, SEARCH_VERIFICATION_LIMIT, SEARCH_SNAPSHOT_CHANGED, SEARCH_VERIFICATION_UNAVAILABLE), never a partial page. Each condition is first authorized against the Authority's capabilities (422 SEARCH_FIELD_NOT_ALLOWED / SEARCH_OPERATOR_NOT_SUPPORTED). Phase C7 M3: executed only where the fail-closed execution gate is on (isolated Development/Testing); otherwise 503 SEARCH_VERIFICATION_UNAVAILABLE (TRUSTED_SEARCH_NOT_ENABLED). Overload: 503 SEARCH_VERIFICATION_UNAVAILABLE (SEARCH_CAPACITY_EXCEEDED, retryable). */
+        /** Advanced field search over one selected form: up to five conditions combined with AND, each on a field from the capability list with an allowed operator and a typed invariant value, plus the My Records metadata filters. A result is returned only when every eligible record was independently enumerated and evaluated at one snapshot — verified record by record (resultBasis VerifiedScan) or, with the IX-4 indexed engine, evaluated on the content the Authority last accepted for each record (resultBasis AuthorityAcceptedContent; the business copy is verified when a record is opened); otherwise a typed failure (SEARCH_FIELD_NOT_ALLOWED, SEARCH_OPERATOR_NOT_SUPPORTED, SEARCH_VERIFICATION_LIMIT, SEARCH_SNAPSHOT_CHANGED, SEARCH_VERIFICATION_UNAVAILABLE), never a partial page. Each condition is first authorized against the Authority's capabilities (422 SEARCH_FIELD_NOT_ALLOWED / SEARCH_OPERATOR_NOT_SUPPORTED). Phase C7 M3: executed only where the fail-closed execution gate is on (isolated Development/Testing); otherwise 503 SEARCH_VERIFICATION_UNAVAILABLE (TRUSTED_SEARCH_NOT_ENABLED). Overload: 503 SEARCH_VERIFICATION_UNAVAILABLE (SEARCH_CAPACITY_EXCEEDED, retryable). */
         post: operations["SearchFormRecordsByFieldValues"];
         delete?: never;
         options?: never;
@@ -1978,6 +2029,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organization/search-index/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** IX-2 SearchProjectionRebuild, security administrators (administer_security) only: the Authority purges the organization's search index, returns every searchable-field coverage to Building and marks the index Rebuilding, journaled with the reason code. The only way to clear a search-index quarantine; the index serves nothing until it has been rebuilt and attested. Refused (423) while the organization's authorization is quarantined; 404 SEARCH_INDEX_NOT_PRESENT where no index is maintained. Step-up (PB-08) not yet available. */
+        post: operations["RebuildSearchProjection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/security/incidents": {
         parameters: {
             query?: never;
@@ -2072,6 +2140,14 @@ export interface components {
             /** Format: uuid */
             userId: string;
             reason: null | string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
+        AppointSecurityAuditorRequest: {
+            /** Format: uuid */
+            userId: string;
+            reasonCode: null | string;
+            reasonNote?: null | string;
             /** @default false */
             useDevelopmentStepUp: boolean;
         };
@@ -2784,6 +2860,7 @@ export interface components {
             scopeStatement: string;
             continuationToken?: null | string;
             previousToken?: null | string;
+            resultBasis?: null | string;
         };
         FieldSearchStatusResponse: {
             /** Format: uuid */
@@ -3568,6 +3645,12 @@ export interface components {
             /** @default false */
             useDevelopmentStepUp: boolean;
         };
+        RemoveSecurityAuditorRequest: {
+            reasonCode: null | string;
+            reasonNote?: null | string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
         RenameFormDefinitionRequest: {
             formDefinitionName: string;
             /** Format: int64 */
@@ -3652,6 +3735,18 @@ export interface components {
             expectedDraftRevision: number | string;
             layoutJson: string;
         };
+        SearchProjectionRebuildRequest: {
+            rebuildReasonCode: null | string;
+        };
+        SearchProjectionRebuildResponse: {
+            previousProjectionStatus: string;
+            previousStatusReasonCode: null | string;
+            projectionStatus: string;
+            /** Format: int32 */
+            entriesPurged: number | string;
+            /** Format: int32 */
+            coveragesReturnedToBuilding: number | string;
+        };
         SecurityAdministratorCandidateResponse: {
             /** Format: uuid */
             userId: string;
@@ -3675,6 +3770,14 @@ export interface components {
             appointmentUnavailableReason: string;
             administrators: components["schemas"]["SecurityAdministratorResponse"][];
             candidates: components["schemas"]["SecurityAdministratorCandidateResponse"][];
+        };
+        SecurityAuditorReasonCodeResponse: {
+            reasonCode: string;
+            reasonLabel: string;
+        };
+        SecurityAuditorReasonCodesResponse: {
+            appointment: components["schemas"]["SecurityAuditorReasonCodeResponse"][];
+            removal: components["schemas"]["SecurityAuditorReasonCodeResponse"][];
         };
         SecurityIncidentBucketResponse: {
             bucketStartDate: string;
@@ -7394,6 +7497,108 @@ export interface operations {
             };
         };
     };
+    GetSecurityAuditorReasonCodes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityAuditorReasonCodesResponse"];
+                };
+            };
+        };
+    };
+    AppointSecurityAuditor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppointSecurityAuditorRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RemoveSecurityAuditor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoveSecurityAuditorRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetOrganizationOverview: {
         parameters: {
             query?: never;
@@ -7778,6 +7983,57 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RebuildSearchProjection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchProjectionRebuildRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchProjectionRebuildResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Locked */
+            423: {
                 headers: {
                     [name: string]: unknown;
                 };

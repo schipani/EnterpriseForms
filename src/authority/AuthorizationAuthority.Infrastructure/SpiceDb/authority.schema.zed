@@ -4,7 +4,7 @@
 
 definition user {}
 
-// Cursor marker objects: "step-<organization uuid>-<revision>". Never a permission subject.
+// Cursor marker objects: "step-<organization uuid>-<revision>-<authorization journal digest hex>" (C8 M4 S1). Never a permission subject.
 definition projection_step {}
 
 definition team {
@@ -16,10 +16,14 @@ definition organization {
     relation organization_owner: user
     relation system_administrator: user
     relation designer: user
+    // C8 M4 (AC-8, C-110): Security Auditor. Appointed and removed only by Security Administrators (GrantSystemRole /
+    // RevokeSystemRole); confers view_audit and nothing else — no record content, design or configuration rights.
+    relation security_auditor: user
     relation projection_cursor: projection_step
     permission manage_configuration = organization_owner
     permission administer_security = system_administrator
     permission create_form = designer
+    permission view_audit = security_auditor
 }
 
 definition form_definition {

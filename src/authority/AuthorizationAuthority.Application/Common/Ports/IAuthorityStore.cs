@@ -24,10 +24,33 @@ public interface IAuthorityStore
 
     /// <summary>Organizations that have pending projection or archive work (used by background processors, outside a scope).</summary>
     Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken cancellationToken);
+
+    /// <summary>C8 M4 S1: every registered organization (the startup marker transition and the periodic integrity check, outside a scope).</summary>
+    Task<IReadOnlyList<Guid>> GetAllOrganizationIdsAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// C-149 (R-55): every registered organization with its three committed journal revisions, in one read-only statement outside
+    /// a scope (no row lock). A background processor compares them with the revisions it last saw settled, to find organizations
+    /// whose state may have moved; the markers are never trusted as the state itself.
+    /// </summary>
+    Task<IReadOnlyList<OrganizationChangeMarker>> GetOrganizationChangeMarkersAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// C-149 (R-55): an organization's committed authorization, content-integrity and audit journal revisions. Every security command,
+/// content commit and audited administrative change (including Tier 1 attestations, reconciliations, rebuilds and Tier 2
+/// rebuilds and quarantines) advances one of them in its own transaction.
+/// </summary>
+public sealed record OrganizationChangeMarker(Guid OrganizationId, long AuthorizationRevision, long ContentIntegrityRevision, long AuditJournalRevision);
 
 public interface IAuthorityScope : IAsyncDisposable
 {
+    /// <summary>IX-1: the Authority-owned search index, in this scope's transaction.</summary>
+    ISearchIndexStore SearchIndex { get; }
+
+    /// <summary>IX-5a: the Tier 2 access projection (schema authority_search_access), in this scope's transaction.</summary>
+    ISearchAccessStore SearchAccess { get; }
+
     /// <summary>SELECT ... FOR UPDATE on the organization state row: serializes every mutation of that organization (A6).</summary>
     Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
 
@@ -78,6 +101,15 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>All currently active desired-state edges of the organization (normalized authoritative graph).</summary>
     Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid organizationId, CancellationToken cancellationToken);
 
+    /// <summary>R-53: the permanent identity bindings of the given item ids, in every organization.</summary>
+    Task<List<ContentItemIdentity>> FindItemIdentitiesAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken);
+
+    /// <summary>R-53: inserts identity bindings (never updated or deleted; the unique item id refuses a second binding).</summary>
+    void AddItemIdentities(IEnumerable<ContentItemIdentity> identities);
+
+    /// <summary>R-53: the given item ids that appear in any accepted manifest of any organization (identities predating the bindings).</summary>
+    Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken);
+
     void AddEdge(AuthorityRelationshipEdge edge);
 
     /// <summary>Phase C8 AC-9: every desired-state edge (active and removed) of one exact relationship, read-only.</summary>
@@ -87,6 +119,9 @@ public interface IAuthorityScope : IAsyncDisposable
     Task<Dictionary<Guid, long?>> GetCommittedRevisionsAsync(Guid organizationId, IReadOnlyCollection<Guid> securityCommandIds, CancellationToken cancellationToken);
 
     Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken);
+
+    /// <summary>C8 M4 M1 (V10): stored payloads of the organization's non-rejected commands of the given kinds (note-id uniqueness, read under the organization lock).</summary>
+    Task<List<string>> GetCommandPayloadsAsync(Guid organizationId, IReadOnlyCollection<string> commandKinds, CancellationToken cancellationToken);
 
     Task<SecurityCommand?> FindCommandAsync(Guid securityCommandId, CancellationToken cancellationToken);
 

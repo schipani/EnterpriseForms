@@ -560,6 +560,14 @@ public sealed class MembershipAdministrationTests : IDisposable
         Assert.Equal(MembershipRequestStates.Pending, foreign.RequestStateName);
     }
 
+    /// <summary>R-54: a well-formed digest that always differs from <paramref name="digest"/> (its first hex digit replaced by a different one).</summary>
+    private static string Stale(string digest)
+    {
+        var stale = (digest[0] == '0' ? '1' : '0') + digest[1..];
+        Assert.NotEqual(digest, stale);
+        return stale;
+    }
+
     [Fact]
     public async Task StaleDigestsExpiredAndDecidedRequestsAreRefusedAndNothingChanges()
     {
@@ -576,7 +584,7 @@ public sealed class MembershipAdministrationTests : IDisposable
 
         // A digest of the right request but an older reading is refused too (the edited content changed the digest).
         Assert.Equal(AuthorityErrorCodes.MembershipRequestChanged, await RefusedAsync(() => CancelRequestAsync(OwnerA, replacement, digest: readByBothOwners)));
-        Assert.Equal(AuthorityErrorCodes.MembershipRequestChanged, await RefusedAsync(() => CancelRequestAsync(OwnerA, replacement, digest: "00" + MembershipRequestDigest.Compute(replacement)[2..])));
+        Assert.Equal(AuthorityErrorCodes.MembershipRequestChanged, await RefusedAsync(() => CancelRequestAsync(OwnerA, replacement, digest: Stale(MembershipRequestDigest.Compute(replacement)))));
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => CancelRequestAsync(OwnerA, replacement, digest: " ")));
 
         // An already approved request cannot be cancelled or replaced.

@@ -17,14 +17,35 @@ namespace EnterpriseForms.Application.Features.FormRecords.ListRecords;
 /// record the caller may not discover and never shows field values, but it does not independently verify metadata.
 /// </para>
 /// </summary>
-public sealed class ListRecordsHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, IOpaqueCursorProtector cursors)
+/// <para>
+/// IX-6 (IX-D12): with <c>RecordList:Engine=Indexed</c> (Development/Testing), the Authority answers a supported listing from verified
+/// index entries (<see cref="RecordListIndexedEngine"/>); this listing answers otherwise, unchanged. The first page decides the engine
+/// and its cursor keeps it, so one listing never combines both.
+/// </para>
+public sealed class ListRecordsHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, IOpaqueCursorProtector cursors, RecordListIndexedEngine? indexed = null)
 {
     public const int MaximumUnavailableIdsReported = 50;
 
-    public async Task<RecordListResponse> HandleAsync(RequestContext context, RecordListQuery query, string? continuationToken, CancellationToken cancellationToken)
+    /// <param name="engineOverride">Testing only (the endpoint passes it only in the Testing environment): <c>Indexed</c> or <c>VerifiedScan</c> instead of the configured engine.</param>
+    public async Task<RecordListResponse> HandleAsync(RequestContext context, RecordListQuery query, string? continuationToken, CancellationToken cancellationToken, string? engineOverride = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(query);
+        var cursor = string.IsNullOrEmpty(continuationToken) ? null : RecordListCursor.DecodeAny(cursors, continuationToken, context, query);
+        var useIndexed = indexed is not null && (engineOverride is null ? indexed.Enabled : engineOverride == RecordListOptions.EngineIndexed);
+        if (indexed is not null && (cursor is null || cursor.Engine == RecordListIndexedEngine.CursorEngine))
+        {
+            if (cursor is not null && !useIndexed)
+            {
+                throw new BusinessException("LIST_CHANGED", 409, "the list changed since this page was loaded; reload the list from the first page");
+            }
+
+            if (useIndexed && await indexed.TryListAsync(context, query, cursor, cancellationToken).ConfigureAwait(false) is { } answered)
+            {
+                return answered;
+            }
+        }
+
         var user = context.ToDelegatedUser();
         var authorized = await AuthorizedRecordEnumerator.EnumerateAsync(authority, user, context.OrganizationId, cancellationToken).ConfigureAwait(false);
         // Unified exact search: the ids that match are decided from the authority's complete discoverable set (never from the

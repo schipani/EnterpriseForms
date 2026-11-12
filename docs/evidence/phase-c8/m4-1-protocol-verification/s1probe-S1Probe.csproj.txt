@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Throwaway S1 protocol verification probe (C-116). Scratchpad only; never part of the product. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.36.2" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.84.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.84.0" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="/protos/authzed/api/v1/core.proto" ProtoRoot="/protos" GrpcServices="None" />
+    <Protobuf Include="/protos/authzed/api/v1/debug.proto" ProtoRoot="/protos" GrpcServices="None" />
+    <Protobuf Include="/protos/authzed/api/v1/error_reason.proto" ProtoRoot="/protos" GrpcServices="None" />
+    <Protobuf Include="/protos/authzed/api/v1/openapi.proto" ProtoRoot="/protos" GrpcServices="None" />
+    <Protobuf Include="/protos/authzed/api/v1/permission_service.proto" ProtoRoot="/protos" GrpcServices="Client" />
+    <Protobuf Include="/protos/buf/validate/validate.proto" ProtoRoot="/protos" GrpcServices="None" />
+    <Protobuf Include="/protos/google/api/annotations.proto" ProtoRoot="/protos" GrpcServices="None" />
+    <Protobuf Include="/protos/google/api/http.proto" ProtoRoot="/protos" GrpcServices="None" />
+    <Protobuf Include="/protos/google/rpc/status.proto" ProtoRoot="/protos" GrpcServices="None" />
+    <Protobuf Include="/protos/validate/validate.proto" ProtoRoot="/protos" GrpcServices="None" />
+    <Protobuf Include="/protos/protoc-gen-openapiv2/options/annotations.proto" ProtoRoot="/protos" GrpcServices="None" />
+    <Protobuf Include="/protos/protoc-gen-openapiv2/options/openapiv2.proto" ProtoRoot="/protos" GrpcServices="None" />
+  </ItemGroup>
+</Project>

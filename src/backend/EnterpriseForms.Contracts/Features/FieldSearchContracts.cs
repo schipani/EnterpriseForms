@@ -66,6 +66,12 @@ public sealed record FieldSearchPageRequest(string? Cursor);
 /// A complete, verified result page (returned only when every eligible record was authenticated at one snapshot; anything
 /// else is a typed failure, never a partial page). Rows reuse the My Records item so results render in the same table.
 /// </summary>
+/// <remarks>
+/// IX-4 (design §6.6): <c>ResultBasis</c> names the engine. <c>VerifiedScan</c>: every record in scope was read and verified at search
+/// time (rows carry <c>ProjectionVerified=true</c>). <c>AuthorityAcceptedContent</c>: the Authority's index evaluated the content it
+/// last accepted for each record; the business copy was not checked by the search (rows carry <c>ProjectionVerified=false</c>) and
+/// is fully verified when a record is opened. Optional; older clients ignore it.
+/// </remarks>
 public sealed record FieldSearchResponse(
     IReadOnlyList<RecordListItemResponse> Items,
     int TotalCount,
@@ -76,7 +82,8 @@ public sealed record FieldSearchResponse(
     string Completeness,
     string ScopeStatement,
     string? ContinuationToken = null,
-    string? PreviousToken = null);
+    string? PreviousToken = null,
+    string? ResultBasis = null);
 
 /// <summary>
 /// Testing environment only (Phase C7 M1 proof, never part of the published API): outcome and cost of verifying the caller's
@@ -98,6 +105,12 @@ public sealed record SearchScopeVerificationResponse(
     double ElapsedMilliseconds);
 
 public sealed record SearchScopeVerificationRequest(Guid FormDefinitionId);
+
+/// <summary>IX-2 Testing only: O-2 parity of the per-record and the set-based content reader over the caller's own catalogue (counts only).</summary>
+/// <summary>IX-3 (Testing only): V1's answer and the shadow comparison for one search — ids and counts only, never values.</summary>
+public sealed record FieldSearchShadowTestingResponse(int? VerifiedScanTotal, string? VerifiedScanError, string Classification, string? SkippedReason, int? IndexedTotal, string? IndexedError, int? FirstDifferingPosition, long ShadowElapsedMilliseconds);
+
+public sealed record AcceptedContentReaderParityResponse(int RecordsCompared, int ItemsCompared, int ValuesCompared, int Mismatches, double PerRecordMilliseconds, double SetBasedMilliseconds);
 
 // ---- Phase C7 M2 (AC-6): search approval configuration (Form Designer "Search" section). Decisions are the Authority's.
 
@@ -133,3 +146,9 @@ public sealed record FieldSearchAdministrationFormResponse(Guid FormDefinitionId
 
 /// <summary><c>ApprovalOperational</c> false (with <c>ApprovalUnavailableReason</c>) where approvals cannot be accepted (production and staging until PB-08).</summary>
 public sealed record FieldSearchAdministrationResponse(bool PlaintextSearchPermitted, bool ApprovalOperational, string ApprovalUnavailableReason, IReadOnlyList<FieldSearchAdministrationFormResponse> Forms);
+
+/// <summary>IX-2 SearchProjectionRebuild: an upper-case reason code (3..64 characters: A-Z, 0-9, _), journaled with the request.</summary>
+public sealed record SearchProjectionRebuildRequest(string? RebuildReasonCode);
+
+/// <summary>IX-2: the index state before and after the rebuild request (Rebuilding until the builder and the Authority's attestations complete).</summary>
+public sealed record SearchProjectionRebuildResponse(string PreviousProjectionStatus, string? PreviousStatusReasonCode, string ProjectionStatus, int EntriesPurged, int CoveragesReturnedToBuilding);

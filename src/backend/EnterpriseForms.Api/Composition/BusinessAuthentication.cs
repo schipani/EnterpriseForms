@@ -268,7 +268,11 @@ public static partial class BusinessAuthentication
         }
 
         var correlation = Guid.TryParse(context.Request.Headers[CorrelationHeader].ToString(), out var id) ? id : Guid.CreateVersion7();
-        return new RequestContext(organizationId, localUserId, issuer, subject, user.FindFirstValue("name") ?? subject, raw, correlation);
+        var secret = user.FindFirstValue(SessionSecretClaim);
+        return new RequestContext(organizationId, localUserId, issuer, subject, user.FindFirstValue("name") ?? subject, raw, correlation)
+        {
+            SessionDigestBase64 = string.IsNullOrEmpty(secret) ? null : SessionDigest(secret), // IX-3 session binding
+        };
     }
 
     /// <summary>

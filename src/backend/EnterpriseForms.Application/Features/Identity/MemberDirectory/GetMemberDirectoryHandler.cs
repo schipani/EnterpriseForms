@@ -23,12 +23,15 @@ public sealed class GetMemberDirectoryHandler(IBusinessStore store, IAuthorizati
     public const string FallbackSource = "business directory only (the Authorization Authority roster is unavailable)";
 
     public const string SecurityAdministratorRole = "SecurityAdministrator";
+    public const string SecurityAuditorRole = "SecurityAuditor";
     public const string OrganizationOwnerRole = "OrganizationOwner";
     public const string DesignerRole = "Designer";
     public const string NoRole = "None";
 
     public const string AppointSecurityAdministrator = "AppointSecurityAdministrator";
     public const string RemoveSecurityAdministrator = "RemoveSecurityAdministrator";
+    public const string AppointSecurityAuditor = "AppointSecurityAuditor";
+    public const string RemoveSecurityAuditor = "RemoveSecurityAuditor";
     public const string GrantDesigner = "GrantDesigner";
     public const string RevokeDesigner = "RevokeDesigner";
     public const string ProposeOwnerGrant = "ProposeOwnerGrant";
@@ -39,7 +42,7 @@ public sealed class GetMemberDirectoryHandler(IBusinessStore store, IAuthorizati
     public const string ProposeOwnerEnable = "ProposeOwnerEnable";
     public const string EditProfile = "EditProfile";
 
-    public static readonly IReadOnlyList<string> RoleFilters = [OrganizationOwnerRole, DesignerRole, SecurityAdministratorRole, NoRole];
+    public static readonly IReadOnlyList<string> RoleFilters = [OrganizationOwnerRole, DesignerRole, SecurityAdministratorRole, SecurityAuditorRole, NoRole];
 
     public static readonly IReadOnlyList<string> SignInStatuses = ["SignedIn", "NotRecorded", "NeverSignedIn"];
 
@@ -54,6 +57,7 @@ public sealed class GetMemberDirectoryHandler(IBusinessStore store, IAuthorizati
         ["organization_owner"] = OrganizationOwnerRole,
         ["designer"] = DesignerRole,
         ["system_administrator"] = SecurityAdministratorRole,
+        ["security_auditor"] = SecurityAuditorRole,
     };
 
     public async Task<OrganizationMemberDirectoryResponse> GetAsync(RequestContext context, MemberDirectoryQuery query, CancellationToken cancellationToken)
@@ -137,7 +141,10 @@ public sealed class GetMemberDirectoryHandler(IBusinessStore store, IAuthorizati
             authorityRoster?.OperatorApprovalOperational == true, authorityRoster?.OrganizationIdentityIssuer, proposals, requests);
     }
 
-    /// <summary>Hints only, mirroring the Authority (owners for membership and owner/designer roles, Security Administrators for their role; never oneself).</summary>
+    /// <summary>
+    /// Hints only, mirroring the Authority (owners for membership and owner/designer roles, Security Administrators for their own
+    /// role and the Security Auditor role; never oneself — D8-62a, enforced by the Authority, which also refuses direct calls).
+    /// </summary>
     private static List<string> ActionsFor(AuthorityOrganizationRoster roster, AuthorityRosterMember member, List<string> roles, Guid me, List<AuthorityOwnerProposal> pending, int enabledAdministrators, bool hasProfile)
     {
         var actions = new List<string>();
@@ -181,7 +188,7 @@ public sealed class GetMemberDirectoryHandler(IBusinessStore store, IAuthorizati
             }
         }
 
-        if (roster.CanAdministerSecurity)
+        if (roster.CanAdministerSecurity && !self)
         {
             if (roles.Contains(SecurityAdministratorRole))
             {
@@ -193,6 +200,16 @@ public sealed class GetMemberDirectoryHandler(IBusinessStore store, IAuthorizati
             else if (member.MembershipEnabled)
             {
                 actions.Add(AppointSecurityAdministrator);
+            }
+
+            // C8 M4 (AC-8.1): a disabled auditor can still be removed; only enabled members can be appointed.
+            if (roles.Contains(SecurityAuditorRole))
+            {
+                actions.Add(RemoveSecurityAuditor);
+            }
+            else if (member.MembershipEnabled)
+            {
+                actions.Add(AppointSecurityAuditor);
             }
         }
 

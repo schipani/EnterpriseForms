@@ -34,6 +34,8 @@ public sealed class Program
             return migrateExitCode;
         }
 
+        // IX-7 ST-PERF-7: the seal-throughput harness runs on the fully composed host (same signer, policy and pin), then exits.
+        var measureSeal = SealThroughputCommand.Requested(args, out var sealCount, out var sealConcurrency, out args);
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.ConfigureHttpJsonOptions(options => AuthorityJson.Configure(options.SerializerOptions));
@@ -54,6 +56,11 @@ public sealed class Program
 
         builder.Services.AddAuthorityInfrastructure(builder.Configuration, builder.Environment);
         builder.Services.AddSigningProviderConfiguration(builder.Configuration, builder.Environment);
+        // IX-1 (C-126): Authority-owned search index; Disabled unless configured, Dark (no query path) only in Development/Testing.
+        builder.Services.AddSearchIndex(builder.Configuration, builder.Environment);
+        builder.Services.AddSearchAccessProjection(builder.Configuration, builder.Environment); // IX-5a: dark Tier 2 access projection
+        // C-137 (R-37): optional phase-duration diagnostics; off unless configured, Development/Testing only.
+        builder.Services.AddOperationTiming(builder.Configuration, builder.Environment);
         // Phase C5 (D10): field-scoped contributor writes; off unless the deployment sets exactly "true"; refused in Production.
         builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.Content.ShareContributorWriteSwitch.Create(
             builder.Configuration[AuthorizationAuthority.Application.Features.Content.ShareContributorWriteSwitch.ConfigurationKey],
@@ -92,8 +99,23 @@ public sealed class Program
         builder.Services.AddSingleton<SpiceDbSchemaInitializer>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<SpiceDbSchemaInitializer>());
         builder.Services.AddHostedService<AuthorityWorkLoop>();
+        // C-150 R56-B: every instance listens for committed authorization changes (any instance's commit wakes all loops).
+        var authorityWork = builder.Configuration.GetSection(AuthorizationAuthority.Application.Common.AuthorityWorkOptions.SectionName).Get<AuthorizationAuthority.Application.Common.AuthorityWorkOptions>() ?? new AuthorizationAuthority.Application.Common.AuthorityWorkOptions();
+        if (authorityWork.CommitWakeupEnabled && builder.Configuration.GetConnectionString("AuthorityDb") is { Length: > 0 } workListenerConnection)
+        {
+            builder.Services.AddHostedService(sp => new AuthorityWorkNotificationListener(workListenerConnection, sp.GetRequiredService<AuthorizationAuthority.Application.Common.AuthorityWorkSignal>(),
+                sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILogger<AuthorityWorkNotificationListener>>()));
+        }
+        // C8 M4 S1 (S2): periodic projection-integrity check; it complements, never replaces, the decision-time protocol.
+        builder.Services.AddSingleton(builder.Configuration.GetSection(ProjectionIntegrityOptions.SectionName).Get<ProjectionIntegrityOptions>() ?? new ProjectionIntegrityOptions());
+        builder.Services.AddHostedService<ProjectionIntegrityMonitorLoop>();
 
         var app = builder.Build();
+        if (measureSeal)
+        {
+            return SealThroughputCommand.Run(app.Services, app.Environment, sealCount, sealConcurrency);
+        }
+
 
         app.UseMiddleware<ReconcilerLookupRefusalMiddleware>(); // outermost: observes the final status of AC-9 refusals
         app.UseExceptionHandler();
@@ -101,6 +123,10 @@ public sealed class Program
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseRateLimiter();
+        if (app.Environment.IsEnvironment("Testing"))
+        {
+            AuthorizationAuthority.Api.Features.Health.SpiceDbCallCountingEndpoints.UseSpiceDbCallAttribution(app); // C-149 P-2 (when enabled)
+        }
 
         if (app.Environment.IsDevelopment())
         {
@@ -111,6 +137,10 @@ public sealed class Program
         if (app.Environment.IsEnvironment("Testing"))
         {
             app.MapTestStackIdentityEndpoints();
+            AuthorizationAuthority.Api.Features.SearchIndex.IndexedSearchEndpoints.MapIndexedSearchTestingEndpoints(app); // IX-3 plan-shape test
+            AuthorizationAuthority.Api.Features.SearchIndex.SearchAccessTestingEndpoints.MapSearchAccessTestingEndpoints(app); // IX-5a
+            AuthorizationAuthority.Api.Features.Health.SpiceDbCallCountingEndpoints.MapSpiceDbCallCountingEndpoints(app); // C-149 P-2
+            AuthorizationAuthority.Api.Features.Health.AuthorityWorkTestingEndpoints.MapAuthorityWorkTestingEndpoints(app); // C-150 R56-B
         }
 
         app.MapAuthorizationEndpoints();
@@ -125,6 +155,8 @@ public sealed class Program
         AuthorizationAuthority.Api.Features.PlatformOperators.OwnerRecoveryEndpoints.MapOwnerRecoveryEndpoints(app);
         app.MapSessionEndpoints();
         app.MapFieldSearchEndpoints();
+        AuthorizationAuthority.Api.Features.SearchIndex.SearchIndexBuilderEndpoints.MapSearchIndexBuilderEndpoints(app);
+        AuthorizationAuthority.Api.Features.SearchIndex.IndexedSearchEndpoints.MapIndexedSearchEndpoints(app); // IX-3
         AuthorizationAuthority.Api.Features.Membership.MembershipEndpoints.MapMembershipEndpoints(app);
 
         app.Run();

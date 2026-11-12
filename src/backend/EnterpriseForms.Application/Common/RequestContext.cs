@@ -11,6 +11,12 @@ namespace EnterpriseForms.Application.Common;
 public sealed record RequestContext(Guid OrganizationId, Guid LocalUserId, string IssuerUri, string SubjectIdentifier, string DisplayName, string RawAssertion, Guid CorrelationId)
 {
     public DelegatedUserContext ToDelegatedUser() => new(IssuerUri, SubjectIdentifier, OrganizationId, RawAssertion);
+
+    /// <summary>
+    /// IX-3: SHA-256 (base64) of the browser session secret when the request is authenticated by the session cookie; null for bearer
+    /// callers. The Authority binds indexed-search result snapshots to that session (design §18.4); without one there is none.
+    /// </summary>
+    public string? SessionDigestBase64 { get; init; }
 }
 
 /// <summary>Application-level failure mapped to RFC 9457 Problem Details by the host.</summary>

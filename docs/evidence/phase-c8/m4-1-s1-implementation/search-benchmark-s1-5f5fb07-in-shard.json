@@ -1,0 +1,53 @@
+{
+  "measuredOn": "2026-11-05T01:09:51.3835805+00:00",
+  "environment": "GitHub-hosted isolated Docker stack (compose.security-test)",
+  "note": "provisional engineering measurement; small sample sizes; p99 of n<=15 runs is the maximum; extracted from the search-catalogue shard log at 5f5fb07: the 480-record scope was refused (SEARCH_VERIFICATION_LIMIT, time) and has no entry",
+  "scenarios": [
+    {
+      "records": 50,
+      "runs": 15,
+      "serverMilliseconds": {
+        "p50": 1327.4,
+        "p95": 1497.8,
+        "p99": 1497.8,
+        "max": 1497.8,
+        "samples": 15
+      },
+      "clientMilliseconds": {
+        "p50": 1329.4,
+        "p95": 1499.7,
+        "p99": 1499.7,
+        "max": 1499.7,
+        "samples": 15
+      },
+      "catalogueEntries": 50,
+      "recordsWithoutContent": 0,
+      "authorityCalls": 3,
+      "verificationBatches": 1,
+      "verifiedBytes": 183450
+    },
+    {
+      "records": 150,
+      "runs": 12,
+      "serverMilliseconds": {
+        "p50": 4276.2,
+        "p95": 4824.2,
+        "p99": 4824.2,
+        "max": 4824.2,
+        "samples": 12
+      },
+      "clientMilliseconds": {
+        "p50": 4278.5,
+        "p95": 4825.7,
+        "p99": 4825.7,
+        "max": 4825.7,
+        "samples": 12
+      },
+      "catalogueEntries": 150,
+      "recordsWithoutContent": 0,
+      "authorityCalls": 5,
+      "verificationBatches": 3,
+      "verifiedBytes": 550350
+    }
+  ]
+}

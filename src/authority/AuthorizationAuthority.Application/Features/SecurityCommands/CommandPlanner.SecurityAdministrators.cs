@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Contracts.V1;
@@ -8,16 +9,20 @@ namespace AuthorizationAuthority.Application.Features.SecurityCommands;
 /// <summary>
 /// Phase C7 (owner message 7): appointment and removal of Security Administrators inside an organization. "Security
 /// Administrator" is the existing organization relation <c>system_administrator</c>, whose only SpiceDB permission is
-/// <c>administer_security</c>; no second role system. These commands only ever touch that relation.
+/// <c>administer_security</c>; no second role system. C8 M4 (AC-8.1, C-110) adds the Security Auditor
+/// (<c>security_auditor</c>, permission <c>view_audit</c>) to the same two commands, selected by <c>role_name</c>.
 /// <list type="bullet">
-/// <item>Only an existing Security Administrator of the same organization may appoint or remove one — an organization owner
-/// cannot appoint anyone (or themselves) through ownership.</item>
+/// <item>Only an existing Security Administrator of the same organization may appoint or remove either role — an organization
+/// owner, a designer or an auditor cannot appoint anyone (or themselves).</item>
+/// <item>Nobody may appoint or remove themself, for either role (D8-62a: Security Administrator self-removal, allowed before
+/// C-110, is refused).</item>
 /// <item>The appointee must be an enabled identity binding of this organization (verified issuer/subject); never an email
 /// address, a business row or a client flag.</item>
 /// <item>Fresh step-up is required (the Authority's PB-08 gate: unavailable in staging and production, so these
 /// commands are refused there until PB-08 exists; the synthetic development path elsewhere).</item>
-/// <item>The last Security Administrator who can still sign in (enabled identity) cannot be removed (the organization would
-/// need the operator-plane recovery path, DR-C7-3). An administrator whose identity was disabled can still be removed.</item>
+/// <item>Security Administrator: free-text reason (1..500); the last Security Administrator who can still sign in (enabled
+/// identity) cannot be removed. Security Auditor: an owner-approved reason code for the direction and an optional note
+/// (never shown to auditors); there is no last-holder rule, an organization may have no auditor.</item>
 /// </list>
 /// The first Security Administrator of an organization without one comes from the operator plane (organization bootstrap
 /// today; post-bootstrap appointment and recovery is decision DR-C7-3).
@@ -26,16 +31,17 @@ public static partial class CommandPlanner
 {
     private static async Task<CommandPlan> SecurityAdministratorAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, FieldSearchApprovalGate gate, bool appoint, CancellationToken cancellationToken)
     {
-        var payload = CanonicalJson.Deserialize<SecurityAdministratorPayload>(request.CommandPayload);
-        RequireResource(request, ResourceKind.Organization, organizationId);
-        if (!graph.HasOrganizationRole(organizationId, actor.AuthorityUserId, OrganizationRoleNames.SystemAdministrator))
+        if (string.Equals(RoleCommandEvidence.RoleNameOf(request.CommandPayload), OrganizationRoleNames.SecurityAuditor, StringComparison.Ordinal))
         {
-            throw AuthorityException.Forbidden("appointing or removing a Security Administrator requires administer_security in this organization");
+            return await SecurityAuditorAsync(scope, organizationId, actor, request, graph, gate, appoint, cancellationToken).ConfigureAwait(false);
         }
 
+        var payload = CanonicalJson.Deserialize<SecurityAdministratorPayload>(request.CommandPayload);
+        RequireResource(request, ResourceKind.Organization, organizationId);
+        RequireSecurityAdministrator(graph, organizationId, actor);
         if (!string.Equals(payload.RoleName, OrganizationRoleNames.SystemAdministrator, StringComparison.Ordinal))
         {
-            throw AuthorityException.Invalid("only the system_administrator (Security Administrator) role is managed by these commands");
+            throw AuthorityException.Invalid("only the system_administrator (Security Administrator) and security_auditor (Security Auditor) roles are managed by these commands");
         }
 
         if (payload.AuthorityUserId == Guid.Empty || string.IsNullOrWhiteSpace(payload.Reason) || payload.Reason.Length > 500)
@@ -43,9 +49,9 @@ public static partial class CommandPlanner
             throw AuthorityException.Invalid("authority_user_id and a reason (1..500 characters) are required");
         }
 
+        RefuseSelfRoleChange(actor, payload.AuthorityUserId);
         gate.RequireStepUp(payload.StepUpEvidence);
-        var holders = graph.EdgesOf(ResourceTypeNames.Organization, organizationId, OrganizationRoleNames.SystemAdministrator)
-            .Where(e => e.SubjectTypeName == ResourceTypeNames.User).ToList();
+        var holders = RoleHolders(graph, organizationId, OrganizationRoleNames.SystemAdministrator);
         var existing = holders.FirstOrDefault(e => e.SubjectEntityId == payload.AuthorityUserId);
         var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload with { StepUpEvidence = null }) };
         if (appoint)
@@ -75,4 +81,114 @@ public static partial class CommandPlanner
         plan.RemoveEdges.Add(existing);
         return plan;
     }
+
+    /// <summary>C8 M4 (AC-8.1, rules A1–A9): Security Auditor appointment and removal, with an optional sealed reason note (M1).</summary>
+    private static async Task<CommandPlan> SecurityAuditorAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, FieldSearchApprovalGate gate, bool appoint, CancellationToken cancellationToken)
+    {
+        // Plaintext notes are refused permanently (D8-72) and an explicit null envelope is refused (V2/V3), on the raw body so
+        // the refusal is explicit; the rejected row and its evidence keep validated identifiers only.
+        AuditorReasonNoteEnvelopeValidation.RequireNoPlaintextNote(request.CommandPayload);
+
+        // Strict binding: a free-text "reason" (the Security Administrator shape) or any other unknown member is rejected.
+        var payload = CanonicalJson.Deserialize<SecurityAuditorPayload>(request.CommandPayload);
+        RequireResource(request, ResourceKind.Organization, organizationId);
+        RequireSecurityAdministrator(graph, organizationId, actor);
+        if (payload.AuthorityUserId == Guid.Empty)
+        {
+            throw AuthorityException.Invalid("authority_user_id is required");
+        }
+
+        if (!SecurityAuditorReasonCodes.IsValid(payload.ReasonCode, appoint))
+        {
+            // The submitted value is never echoed: it is caller-supplied text that failed validation.
+            throw AuthorityException.Invalid(appoint
+                ? "reason_code must be one of the Security Auditor appointment codes: " + string.Join(", ", SecurityAuditorReasonCodes.Appointment)
+                : "reason_code must be one of the Security Auditor removal codes: " + string.Join(", ", SecurityAuditorReasonCodes.Removal));
+        }
+
+        RefuseSelfRoleChange(actor, payload.AuthorityUserId);
+        gate.RequireStepUp(payload.StepUpEvidence);
+        if (payload.ReasonNoteEnvelope is { } envelope)
+        {
+            // C8 M4 M1 (V4–V10): structure and sizes, then note-id uniqueness under the organization lock the command holds. The
+            // Authority holds no key; the AAD context (organization, target, role, direction) is the command's, not the envelope's.
+            var noteId = AuditorReasonNoteEnvelopeValidation.Validate(envelope);
+            var used = await scope.GetCommandPayloadsAsync(organizationId, [nameof(SecurityCommandKind.GrantSystemRole), nameof(SecurityCommandKind.RevokeSystemRole)], cancellationToken).ConfigureAwait(false);
+            AuditorReasonNoteEnvelopeValidation.RequireUnusedNoteId(noteId, used);
+        }
+
+        var existing = RoleHolders(graph, organizationId, OrganizationRoleNames.SecurityAuditor).FirstOrDefault(e => e.SubjectEntityId == payload.AuthorityUserId);
+        var plan = new CommandPlan
+        {
+            NormalizedPayloadJson = CanonicalJson.Serialize(payload with { ReasonNote = null, StepUpEvidence = null }),
+            CommandReasonOverride = payload.ReasonCode,
+        };
+        if (appoint)
+        {
+            if (existing is not null)
+            {
+                throw AuthorityException.Invalid("the user is already a Security Auditor");
+            }
+
+            await RequireUserBindingAsync(scope, organizationId, payload.AuthorityUserId, cancellationToken).ConfigureAwait(false);
+            plan.AddEdges.Add((ResourceTypeNames.Organization, organizationId, OrganizationRoleNames.SecurityAuditor, ResourceTypeNames.User, payload.AuthorityUserId, string.Empty));
+            return plan;
+        }
+
+        // No last-holder rule (A5); removal works for a disabled identity too (A3).
+        plan.RemoveEdges.Add(existing ?? throw AuthorityException.Invalid("the user is not a Security Auditor"));
+        return plan;
+    }
+
+    private static void RequireSecurityAdministrator(DesiredStateGraph graph, Guid organizationId, BoundActor actor)
+    {
+        if (!graph.HasOrganizationRole(organizationId, actor.AuthorityUserId, OrganizationRoleNames.SystemAdministrator))
+        {
+            throw AuthorityException.Forbidden("appointing or removing a Security Administrator or Security Auditor requires administer_security in this organization");
+        }
+    }
+
+    /// <summary>D8-62a / A2: enforced here, in the Authority; UI hints are only a convenience.</summary>
+    private static void RefuseSelfRoleChange(BoundActor actor, Guid targetUserId)
+    {
+        if (targetUserId == actor.AuthorityUserId)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.SelfChangeForbidden, 403, false, "nobody may appoint or remove themself as Security Administrator or Security Auditor");
+        }
+    }
+
+    private static List<Domain.Features.SecurityCommands.AuthorityRelationshipEdge> RoleHolders(DesiredStateGraph graph, Guid organizationId, string role) =>
+        graph.EdgesOf(ResourceTypeNames.Organization, organizationId, role).Where(e => e.SubjectTypeName == ResourceTypeNames.User).ToList();
+}
+
+/// <summary>
+/// C8 M4 (C-110): the only facts a refused GrantSystemRole / RevokeSystemRole may leave behind — on the rejected command row
+/// and in its audit-stream entry. Validated identifiers only: never free text, a reason note or its sealed envelope, step-up
+/// evidence or an invalid submitted reason value.
+/// </summary>
+public static class RoleCommandEvidence
+{
+    public sealed record Facts(Guid? TargetAuthorityUserId, string? RoleName, string? ReasonCode, bool? ReasonCodeValid);
+
+    public static string? RoleNameOf(JsonElement payload) =>
+        payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("role_name", out var role) && role.ValueKind == JsonValueKind.String ? role.GetString() : null;
+
+    public static Facts From(JsonElement payload, bool appointment)
+    {
+        var raw = RoleNameOf(payload);
+        var role = raw is OrganizationRoleNames.SystemAdministrator or OrganizationRoleNames.SecurityAuditor ? raw : null;
+        Guid? target = payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("authority_user_id", out var id) && id.ValueKind == JsonValueKind.String && Guid.TryParse(id.GetString(), out var parsed) ? parsed : null;
+        if (role != OrganizationRoleNames.SecurityAuditor)
+        {
+            return new Facts(target, role, null, null);
+        }
+
+        var code = payload.TryGetProperty("reason_code", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString() : null;
+        var valid = SecurityAuditorReasonCodes.IsValid(code, appointment);
+        return new Facts(target, role, valid ? code : null, valid);
+    }
+
+    /// <summary>The payload stored on a rejected role command (replaces the raw request body).</summary>
+    public static string SanitizedPayloadJson(Facts facts) =>
+        CanonicalJson.Serialize(new { authority_user_id = facts.TargetAuthorityUserId, role_name = facts.RoleName, reason_code = facts.ReasonCode, reason_code_valid = facts.ReasonCodeValid });
 }

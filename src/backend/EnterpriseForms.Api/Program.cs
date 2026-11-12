@@ -68,9 +68,17 @@ public sealed class Program
             builder.Configuration.GetValue<bool>(EnterpriseForms.Application.Features.FormRecords.Lifecycle.LifecycleTestingHooks.ConfigurationKey), builder.Environment.EnvironmentName));
         builder.Services.AddBusinessAuthentication(builder.Configuration, builder.Environment);
         builder.Services.AddWriteFaultInjection(builder.Configuration, builder.Environment);
+        // C-137 (R-37): optional phase-duration diagnostics of record creation; off unless configured, Development/Testing only.
+        builder.Services.AddOperationTiming(builder.Configuration, builder.Environment);
         builder.Services.AddBusinessDataProtection(builder.Configuration);
         // My Records cursors (C-29) use the host's Data Protection key ring, like the session cookie; only the API serves lists.
         builder.Services.AddSingleton<EnterpriseForms.Application.Common.IOpaqueCursorProtector, DataProtectionCursorProtector>();
+        // IX-6 (IX-D12): My Records engine (configuration RecordList; Indexed is refused outside Development/Testing at startup).
+        var recordList = builder.Configuration.GetSection(EnterpriseForms.Application.Features.FormRecords.ListRecords.RecordListOptions.SectionName).Get<EnterpriseForms.Application.Features.FormRecords.ListRecords.RecordListOptions>() ?? new EnterpriseForms.Application.Features.FormRecords.ListRecords.RecordListOptions();
+        recordList.Validate(builder.Environment.EnvironmentName);
+        builder.Services.AddSingleton(recordList);
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.ListRecords.IRecordListEngineObserver, EnterpriseForms.Api.Features.FormRecords.RecordListEngineLogging>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.ListRecords.RecordListIndexedEngine>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.ListRecords.ListRecordsHandler>();
         // Dashboard sections and security incident lists page with the same opaque cursors (API only; the Worker serves no lists).
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Dashboard.DashboardSectionHandlers>();
@@ -87,6 +95,14 @@ public sealed class Program
         fieldSearchLimits.ValidateEnvironment(builder.Environment.EnvironmentName);
         builder.Services.AddSingleton(fieldSearchLimits);
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchAdmission>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.IFieldSearchShadowObserver, EnterpriseForms.Api.Features.Search.FieldSearchShadowLogging>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchShadowComparer>(); // IX-3 (inactive unless Engine=Shadow)
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.IFieldSearchEngineObserver, EnterpriseForms.Api.Features.Search.FieldSearchEngineLogging>();
+        // C-150 R56-A: bounded jittered backoff for transient Authority search refusals (shared by the handler and the indexed engine).
+        builder.Services.AddSingleton(sp => new EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchRetryPolicy(
+            sp.GetRequiredService<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchLimits>(), sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<EnterpriseForms.Application.Features.Search.FieldSearch.IFieldSearchEngineObserver>()));
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchIndexedEngine>(); // IX-4 (inactive unless Engine=Indexed)
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchHandler>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.Verification.TrustedScopeVerifier>();
         builder.Services.Configure<DocumentProcessingHostOptions>(builder.Configuration.GetSection(DocumentProcessingHostOptions.SectionName));

@@ -20,8 +20,11 @@ namespace AuthorizationAuthority.Application.Features.Content;
 /// commit proves the staged bytes equal the approved candidate and CAS-advances the trusted head, verify compares an
 /// observed projection with the complete accepted leaf index. No generic signing path exists (A9).
 /// </summary>
-public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ISpiceDbProjection spiceDb, IFaultInjector faultInjector, TimeProvider clock, ShareContributorWriteSwitch contributorWrites)
+public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ProjectionIntegrityVerifier verifier, IFaultInjector faultInjector, TimeProvider clock, ShareContributorWriteSwitch contributorWrites, AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator? revisionCoordinator = null, IOperationTimingObserver? timing = null)
 {
+    // IX-1 (INV-R): the only way the content-integrity revision advances; without a configured index it still keeps INV-R.
+    private readonly AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator revisions = revisionCoordinator ?? AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator.WithoutIndex;
+
     private const int MaxCandidateItems = 500;
     private static readonly TimeSpan OperationLifetime = TimeSpan.FromMinutes(10);
 
@@ -38,6 +41,30 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     public async Task<PreparedContentOperation> PrepareAsync(VerifiedActor? actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var timer = new LockTiming();
+        var outcome = "Completed";
+        try
+        {
+            return await PrepareCoreAsync(actor, request, idempotencyKey, correlationId, timer, cancellationToken).ConfigureAwait(false);
+        }
+        catch (AuthorityException ex)
+        {
+            outcome = ex.ErrorCode;
+            throw;
+        }
+        catch (Exception ex)
+        {
+            outcome = ex.GetType().Name;
+            throw;
+        }
+        finally
+        {
+            timing?.ContentOperation(new ContentOperationTiming(request.OrganizationId, "Prepare", outcome, timer.LockedMilliseconds ?? 0, timer.ElapsedMilliseconds));
+        }
+    }
+
+    private async Task<PreparedContentOperation> PrepareCoreAsync(VerifiedActor? actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, LockTiming timer, CancellationToken cancellationToken)
+    {
         if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length is < 8 or > 128)
         {
             throw AuthorityException.Invalid("Idempotency-Key must be 8..128 characters");
@@ -48,6 +75,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        timer.Locked();
         var (bound, reprotection) = await ResolveActorAsync(scope, state, actor, request.ReprotectionCommandId, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
@@ -108,6 +136,12 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
 
         var parsed = ParseCandidate(request, state.OrganizationId, key.CurrentSigningKeyVersion);
+
+        // R-53 (C-148): the complete current snapshot is proven equal to the accepted head on every write path, and the
+        // candidate's item identities are checked against it and against the permanent bindings (ContentItemIdentityRules).
+        var current = await BindAcceptedSnapshotAsync(scope, state, request, currentLeaves, head, key, bound, correlationId, cancellationToken).ConfigureAwait(false);
+        await ContentItemIdentityRules.EnforceAtPrepareAsync(scope, state.OrganizationId, request.FormRecordId,
+            current.Select(i => (i.Kind, i.ItemId, i.Document)).ToList(), parsed.Select(p => (p.Kind, p.ItemId, p.Document)).ToList(), cancellationToken).ConfigureAwait(false);
         Dictionary<string, string> mutations;
         if (reprotection is null)
         {
@@ -121,7 +155,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             {
                 // Phase C5 share editor: switch, scope, current-snapshot proof (D4) and column-class classification (D14/D15).
                 RequireShareEditor(graph, bound, request.FormRecordId);
-                mutations = await ClassifyShareScopedAsync(scope, state, request, parsed, currentLeaves, head, key, graph, bound, operationId, candidateRevision, correlationId, cancellationToken).ConfigureAwait(false);
+                mutations = ClassifyShareScoped(request, parsed, current, head, state.OrganizationId, graph, bound, operationId, candidateRevision);
             }
 
             AuthorizeMutations(graph, bound, request.FormRecordId, mutations);
@@ -201,6 +235,30 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     public async Task<ContentRevision> CommitAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var timer = new LockTiming();
+        var outcome = "Completed";
+        try
+        {
+            return await CommitCoreAsync(actor, operationId, request, correlationId, timer, cancellationToken).ConfigureAwait(false);
+        }
+        catch (AuthorityException ex)
+        {
+            outcome = ex.ErrorCode;
+            throw;
+        }
+        catch (Exception ex)
+        {
+            outcome = ex.GetType().Name;
+            throw;
+        }
+        finally
+        {
+            timing?.ContentOperation(new ContentOperationTiming(request.OrganizationId, "Commit", outcome, timer.LockedMilliseconds ?? 0, timer.ElapsedMilliseconds));
+        }
+    }
+
+    private async Task<ContentRevision> CommitCoreAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, LockTiming timer, CancellationToken cancellationToken)
+    {
 
         // Testing only (no-op elsewhere): holds a commit before it takes the organization lock, so integration tests can
         // revoke a grant between prepare and commit deterministically (Phase C5 revocation-race tests).
@@ -208,6 +266,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        timer.Locked();
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
         var operation = await scope.FindOperationAsync(operationId, cancellationToken).ConfigureAwait(false);
@@ -218,10 +277,12 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         // A reprotection operation is committed by the workload under its command; a user operation by the same user.
         var (bound, reprotection) = await ResolveActorAsync(scope, state, actor, operation.ReprotectionCommandId, cancellationToken).ConfigureAwait(false);
+        Guid? registeredFormDefinitionId = null; // the record's form from the Authority registry, reused by the index derivation (IX-1 remediation)
         if (reprotection is null)
         {
             // Atomic cutover (Amendment A1 req. 7): a candidate prepared before a protection command became effective may not commit rows of the old form.
             var recordResource = await scope.FindResourceAsync(state.OrganizationId, ResourceTypeNames.FormRecord, request.FormRecordId, cancellationToken).ConfigureAwait(false);
+            registeredFormDefinitionId = recordResource?.ParentResourceEntityId;
             await EnforceProtectionBarrierAsync(scope, state.OrganizationId, recordResource?.ParentResourceEntityId, request.StagedItems.Select(i => (i.ItemKind, (ReadOnlyMemory<byte>)Convert.FromBase64String(i.CanonicalBytesBase64))), cancellationToken).ConfigureAwait(false);
         }
         if (operation.ActorIdentityBindingId != bound.Binding.IdentityBindingId)
@@ -305,6 +366,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             throw new AuthorityException(AuthorityErrorCodes.CandidateMismatch, 409, false, verified);
         }
 
+        // R-53 (C-148): every committed item matches its permanent identity binding; new items are bound in this transaction.
+        var stagedDocuments = request.StagedItems.Select(i => (i.ItemKind, i.ItemId, RowCanonicalDecoder.Decode(Convert.FromBase64String(i.CanonicalBytesBase64)))).ToList();
+        var newIdentities = await ContentItemIdentityRules.BindAtCommitAsync(scope, state.OrganizationId, request.FormRecordId, operationId, stagedDocuments, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false);
+
         if (shareEditorOperation)
         {
             // AC-2 at commit, on the verified staged header (equal to the accepted header except the operation binding, D15).
@@ -342,6 +407,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             ManifestCommittedOn = now,
         };
         scope.AddManifestCommit(commit);
+        scope.AddItemIdentities(newIdentities);
         scope.AddManifestLeaves(candidateLeaves.OrderBy(l => l.ManifestItemKey, UnsignedByteComparer.Instance).Select((l, position) => new RecordManifestLeaf
         {
             RecordManifestLeafId = Guid.CreateVersion7(),
@@ -365,7 +431,16 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         operation.OperationStateName = ContentOperationStates.Committed;
         operation.OperationCommittedOn = now;
 
-        state.ContentIntegrityRevision++;
+        // W1 (IX-1): derive and seal the record's search index from the bytes verified above, then advance both revisions (INV-R).
+        await revisions.AdvanceForCommitAsync(scope, state, new AuthorizationAuthority.Application.Features.SearchIndex.CommitIndexInput(request.FormRecordId, head, request.StagedItems, now, registeredFormDefinitionId), cancellationToken).ConfigureAwait(false);
+        if (faultInjector.IsArmed(FaultNames.CrashAfterSearchIndexDerivation))
+        {
+            // Testing only (D-IX1-8, revised by the IX-1 remediation): with the crash point armed, the queued index rows are first
+            // written inside the transaction, so the crash proves they roll back with the head (IX-64). Unarmed, they are written
+            // by the commit's final SaveChanges in the same transaction, which saves one round trip.
+            await scope.FlushAsync(cancellationToken).ConfigureAwait(false);
+            faultInjector.CrashIfArmed(FaultNames.CrashAfterSearchIndexDerivation);
+        }
         var checkpointBody = new ContentCheckpointBody(request.FormRecordId, head.CommittedContentRevision, operationId, Convert.ToHexStringLower(head.CommittedManifestRoot), Convert.ToHexStringLower(commit.ManifestLeafIndexDigest), commit.ManifestLeafCount, operation.CandidateKeyVersion, bound.AuthorityUserId, state.AuthorizationRevision, correlationId);
         var journal = JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "ContentHeadCommitted", checkpointBody, null, operationId, clock);
         scope.AddJournalEntry(journal);
@@ -415,7 +490,13 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             return await ToRevisionAsync(scope, state, head, correlationId, cancellationToken).ConfigureAwait(false);
         }
 
-        var discover = await spiceDb.CheckAsync(new SpiceDbCheck(ResourceTypeNames.FormRecord, formRecordId.ToString("D"), "discover", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D")), state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
+        var snapshot = await verifier.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
+        var discover = await verifier.CheckAsync(snapshot, new SpiceDbCheck(ResourceTypeNames.FormRecord, formRecordId.ToString("D"), "discover", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D")), cancellationToken).ConfigureAwait(false);
+        if (!await verifier.CompleteAsync(snapshot, "head", cancellationToken).ConfigureAwait(false))
+        {
+            throw AuthorityException.NotReady("authorization state moved during head lookup");
+        }
+
         if (discover != SpiceDbCheckOutcome.Allowed)
         {
             throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false); // concealment-safe
@@ -458,7 +539,13 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         // History is part of the record's content: only a full reader now (V1, architecture section 3.3), never a share reader,
         // a revoked recipient or a former owner, whatever they could see when a revision was accepted.
-        var read = await spiceDb.CheckAsync(new SpiceDbCheck(ResourceTypeNames.FormRecord, formRecordId.ToString("D"), "read", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D")), state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
+        var snapshot = await verifier.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
+        var read = await verifier.CheckAsync(snapshot, new SpiceDbCheck(ResourceTypeNames.FormRecord, formRecordId.ToString("D"), "read", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D")), cancellationToken).ConfigureAwait(false);
+        if (!await verifier.CompleteAsync(snapshot, "history", cancellationToken).ConfigureAwait(false))
+        {
+            throw AuthorityException.NotReady("authorization state moved during history");
+        }
+
         if (read != SpiceDbCheckOutcome.Allowed)
         {
             throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false); // concealment-safe
@@ -530,7 +617,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
-        var (result, quarantined) = await VerifyRecordCoreAsync(scope, state, bound, request.FormRecordId, request.RequestedAction, request.ObservedItems, request.HistoricCommittedOperationId, null, includeEditable: true, correlationId, cancellationToken).ConfigureAwait(false);
+        var snapshot = await verifier.PinAsync(scope, state, organizationLocked: true, correlationId, cancellationToken).ConfigureAwait(false);
+        var (result, quarantined) = await VerifyRecordCoreAsync(scope, state, snapshot, bound, request.FormRecordId, request.RequestedAction, request.ObservedItems, request.HistoricCommittedOperationId, null, includeEditable: true, correlationId, cancellationToken).ConfigureAwait(false);
         if (quarantined)
         {
             // Tamper evidence is committed and the failure returned (the authorization re-read cannot change that outcome).
@@ -542,6 +630,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         {
             return result;
         }
+
+        // The organization lock is held, so the state cannot move; the decisive marker re-read still runs (S1).
+        await verifier.CompleteAsync(snapshot, "verify_projection", cancellationToken).ConfigureAwait(false);
 
         var after = await scope.ReadOrganizationAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
         if (after is null || after.AuthorizationRevision != state.AuthorizationRevision || after.ProjectionAppliedRevision != state.ProjectionAppliedRevision)
@@ -588,13 +679,14 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
+        var snapshot = await verifier.PinAsync(scope, state, organizationLocked: true, correlationId, cancellationToken).ConfigureAwait(false);
         var results = new List<BatchVerificationResult>(request.Records.Count);
         var anyQuarantined = false;
         foreach (var item in request.Records)
         {
             try
             {
-                var (result, quarantined) = await VerifyRecordCoreAsync(scope, state, bound, item.FormRecordId, RequestedAction.Read, item.ObservedItems ?? [], null, item.ExpectedCommittedOperationId, includeEditable: false, correlationId, cancellationToken).ConfigureAwait(false);
+                var (result, quarantined) = await VerifyRecordCoreAsync(scope, state, snapshot, bound, item.FormRecordId, RequestedAction.Read, item.ObservedItems ?? [], null, item.ExpectedCommittedOperationId, includeEditable: false, correlationId, cancellationToken).ConfigureAwait(false);
                 anyQuarantined |= quarantined;
                 var readable = !result.Verified ? [] : result.IsCompleteProjection ? result.AuthorizedItems : result.ReadableItems ?? [];
                 results.Add(new BatchVerificationResult(item.FormRecordId, result.Verified, result.FailureReasonCode, result.CommittedContentRevision, result.CommittedOperationId, result.IsCompleteProjection, readable));
@@ -612,6 +704,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             }
         }
 
+        // Decisive marker re-read after every record's decision (S1); a mismatch quarantines and commits any head quarantines too.
+        await verifier.CompleteAsync(snapshot, "verify_projections", cancellationToken).ConfigureAwait(false);
         var after = await scope.ReadOrganizationAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
         var moved = after is null || after.AuthorizationRevision != state.AuthorizationRevision || after.ProjectionAppliedRevision != state.ProjectionAppliedRevision;
         if (anyQuarantined)
@@ -648,6 +742,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     /// same wrapped key. Integrity failures quarantine the head and journal a minimal incident naming the workload, exactly
     /// like a user verification; nothing is repaired or re-signed. Provider outages throw (the caller's whole call fails).
     /// The caller holds the organization lock and commits the scope when <c>Quarantined</c> is true.
+    /// IX-2: the verification itself is <see cref="VerifyWorkloadObservedContentAsync"/>, shared with the search-index builder.
     /// </summary>
     public async Task<ProtectionCensusVerification> VerifyForProtectionCensusAsync(
         IAuthorityScope scope,
@@ -663,62 +758,14 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         Guid correlationId,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(scope);
-        ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(observedItems);
-        ProtectionCensusVerification Failed(string code, long revision = 0, Guid? operation = null, bool quarantined = false) => new(code, revision, operation, 0, 0, 0, null, quarantined);
-
-        var resource = await scope.FindResourceAsync(state.OrganizationId, ResourceTypeNames.FormRecord, formRecordId, cancellationToken).ConfigureAwait(false);
-        if (resource is null || resource.ParentResourceEntityId != formDefinitionId || resource.ResourceLifecycleState == ResourceLifecycleStates.Revoked)
+        var verification = await VerifyWorkloadObservedContentAsync(scope, state, formDefinitionId, formRecordId, expectedCommittedOperationId, observedItems, new WorkloadVerificationContext(workloadName, scopingSecurityCommandId, correlationId), cancellationToken).ConfigureAwait(false);
+        if (!verification.Verified)
         {
-            return Failed(NotInScope);
+            return new ProtectionCensusVerification(verification.Outcome, verification.CommittedContentRevision, verification.CommittedOperationId, 0, 0, 0, null, verification.Quarantined);
         }
 
-        var head = await scope.FindContentHeadAsync(state.OrganizationId, formRecordId, lockForUpdate: true, cancellationToken).ConfigureAwait(false);
-        if (resource.ResourceLifecycleState == ResourceLifecycleStates.Quarantined || head?.ContentHeadQuarantined == true)
-        {
-            return Failed("QUARANTINED", head?.CommittedContentRevision ?? 0, head?.CommittedOperationId);
-        }
-
-        if (resource.ResourceLifecycleState != ResourceLifecycleStates.Active || head is null || head.CommittedContentRevision == 0 || head.CurrentRecordManifestCommitId is null)
-        {
-            return Failed("NO_COMMITTED_CONTENT");
-        }
-
-        if (head.CommittedOperationId != expectedCommittedOperationId)
-        {
-            return Failed(HeadChanged, head.CommittedContentRevision, head.CommittedOperationId);
-        }
-
-        var checkpointJournal = await FindContentJournalForHeadAsync(scope, state.OrganizationId, head, cancellationToken).ConfigureAwait(false);
-        if (checkpointJournal is null || checkpointJournal.ArchiveDeliveryState != ArchiveDeliveryStates.Anchored)
-        {
-            return Failed("AWAITING_ARCHIVE", head.CommittedContentRevision, head.CommittedOperationId);
-        }
-
-        var key = await scope.FindKeyRegistrationAsync(state.OrganizationId, IntegrityKeyPurposes.RowIntegrityV1, cancellationToken).ConfigureAwait(false)
-                  ?? throw new AuthorityException(AuthorityErrorCodes.KeyUnavailable, 503, true, "organization integrity key unavailable");
-        if (head.SignatureKeyVersion < key.MinimumVerificationKeyVersion)
-        {
-            // A retired verification key: the revision can no longer be verified, so it is reported, never assumed compliant.
-            return Failed(AuthorityErrorCodes.KeyUnavailable, head.CommittedContentRevision, head.CommittedOperationId);
-        }
-
-        var keyReference = new IntegrityKeyReference(state.OrganizationId, key.KeyPurposeName, key.ProviderKeyName, head.SignatureKeyVersion);
-        var expected = await scope.GetManifestLeavesAsync(head.CurrentRecordManifestCommitId.Value, cancellationToken).ConfigureAwait(false);
-        var failure = await VerifyStagedAgainstLeavesAsync(observedItems, expected.Select(l => (l.ManifestItemKey, l.ManifestItemKindCode, l.ManifestItemId, l.CanonicalPayloadDigest, l.RowSignature)).ToList(), state.OrganizationId, keyReference, head.CommittedContentRevision, head.CommittedOperationId!.Value, head.CommittedManifestRoot, cancellationToken).ConfigureAwait(false);
-        if (failure is not null)
-        {
-            // Tamper evidence (same rule as every verified read): quarantine the head, journal a minimal incident, never repair.
-            head.ContentHeadQuarantined = true;
-            head.QuarantineReasonCode = failure;
-            head.ContentHeadModifiedOn = clock.GetUtcNow();
-            state.ContentIntegrityRevision++;
-            var incident = new VerifierIntegrityIncidentBody(formRecordId, head.CommittedContentRevision, head.CommittedOperationId, failure, workloadName, scopingSecurityCommandId, correlationId);
-            scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "IntegrityVerificationFailed", incident, null, head.CommittedOperationId, clock));
-            return Failed(failure, head.CommittedContentRevision, head.CommittedOperationId, quarantined: true);
-        }
-
+        var head = verification.Head!;
         // The bytes are now exactly the accepted, signed rows of this revision: count from them alone.
         int occurrences = 0, oldForm = 0, envelopeIssues = 0;
         string? status = null;
@@ -754,6 +801,96 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         return new ProtectionCensusVerification(Domain.Features.Catalogue.ProtectionCensusOutcomes.Verified, head.CommittedContentRevision, head.CommittedOperationId, occurrences, oldForm, envelopeIssues, status, false);
     }
 
+    /// <summary>Who submitted observed bytes on the workload plane (journaled with an integrity incident; never contents).</summary>
+    /// <param name="ScopingSecurityCommandId">G19 census: the protection decision; null for the IX-2 search-index builder.</param>
+    public sealed record WorkloadVerificationContext(string WorkloadName, Guid? ScopingSecurityCommandId, Guid CorrelationId);
+
+    /// <summary>The result of verifying workload-submitted bytes against the current accepted head (no user, no SpiceDB).</summary>
+    public sealed record WorkloadContentVerification(string Outcome, long CommittedContentRevision, Guid? CommittedOperationId, bool Quarantined, RecordContentHead? Head)
+    {
+        public bool Verified => Outcome == Domain.Features.Catalogue.ProtectionCensusOutcomes.Verified;
+    }
+
+    /// <summary>
+    /// The shared verification of the workload plane (G19 census; IX-2 search-index backfill and deep sweep): one registered
+    /// record of <paramref name="formDefinitionId"/> is checked exactly as a user verification checks it — registry, quarantine,
+    /// archive receipt, verification key, complete leaf set, every HMAC, root — against the head the caller expects (a moved head
+    /// is <c>HEAD_CHANGED</c>, never verified). Integrity failures quarantine the head (W2, INV-R) and journal a minimal incident
+    /// naming the workload; nothing is repaired or re-signed. Provider outages throw. The caller holds the organization lock and
+    /// commits the scope when <c>Quarantined</c> is true. On success the observed items are exactly the accepted signed rows.
+    /// </summary>
+    public async Task<WorkloadContentVerification> VerifyWorkloadObservedContentAsync(
+        IAuthorityScope scope,
+        OrganizationAuthorizationState state,
+        Guid formDefinitionId,
+        Guid formRecordId,
+        Guid expectedCommittedOperationId,
+        IReadOnlyList<StagedContentItem> observedItems,
+        WorkloadVerificationContext context,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(observedItems);
+        ArgumentNullException.ThrowIfNull(context);
+        WorkloadContentVerification Failed(string code, long revision = 0, Guid? operation = null, bool quarantined = false, RecordContentHead? at = null) => new(code, revision, operation, quarantined, at);
+
+        var resource = await scope.FindResourceAsync(state.OrganizationId, ResourceTypeNames.FormRecord, formRecordId, cancellationToken).ConfigureAwait(false);
+        if (resource is null || resource.ParentResourceEntityId != formDefinitionId || resource.ResourceLifecycleState == ResourceLifecycleStates.Revoked)
+        {
+            return Failed(NotInScope);
+        }
+
+        var head = await scope.FindContentHeadAsync(state.OrganizationId, formRecordId, lockForUpdate: true, cancellationToken).ConfigureAwait(false);
+        if (resource.ResourceLifecycleState == ResourceLifecycleStates.Quarantined || head?.ContentHeadQuarantined == true)
+        {
+            return Failed("QUARANTINED", head?.CommittedContentRevision ?? 0, head?.CommittedOperationId, at: head);
+        }
+
+        if (resource.ResourceLifecycleState != ResourceLifecycleStates.Active || head is null || head.CommittedContentRevision == 0 || head.CurrentRecordManifestCommitId is null)
+        {
+            return Failed("NO_COMMITTED_CONTENT");
+        }
+
+        if (head.CommittedOperationId != expectedCommittedOperationId)
+        {
+            return Failed(HeadChanged, head.CommittedContentRevision, head.CommittedOperationId, at: head);
+        }
+
+        var checkpointJournal = await FindContentJournalForHeadAsync(scope, state.OrganizationId, head, cancellationToken).ConfigureAwait(false);
+        if (checkpointJournal is null || checkpointJournal.ArchiveDeliveryState != ArchiveDeliveryStates.Anchored)
+        {
+            return Failed("AWAITING_ARCHIVE", head.CommittedContentRevision, head.CommittedOperationId, at: head);
+        }
+
+        var key = await scope.FindKeyRegistrationAsync(state.OrganizationId, IntegrityKeyPurposes.RowIntegrityV1, cancellationToken).ConfigureAwait(false)
+                  ?? throw new AuthorityException(AuthorityErrorCodes.KeyUnavailable, 503, true, "organization integrity key unavailable");
+        if (head.SignatureKeyVersion < key.MinimumVerificationKeyVersion)
+        {
+            // A retired verification key: the revision can no longer be verified, so it is reported, never assumed compliant.
+            return Failed(AuthorityErrorCodes.KeyUnavailable, head.CommittedContentRevision, head.CommittedOperationId, at: head);
+        }
+
+        var keyReference = new IntegrityKeyReference(state.OrganizationId, key.KeyPurposeName, key.ProviderKeyName, head.SignatureKeyVersion);
+        var expected = await scope.GetManifestLeavesAsync(head.CurrentRecordManifestCommitId.Value, cancellationToken).ConfigureAwait(false);
+        var failure = await VerifyStagedAgainstLeavesAsync(observedItems, expected.Select(l => (l.ManifestItemKey, l.ManifestItemKindCode, l.ManifestItemId, l.CanonicalPayloadDigest, l.RowSignature)).ToList(), state.OrganizationId, keyReference, head.CommittedContentRevision, head.CommittedOperationId!.Value, head.CommittedManifestRoot, cancellationToken).ConfigureAwait(false);
+        if (failure is not null)
+        {
+            // Tamper evidence (same rule as every verified read): quarantine the head, journal a minimal incident, never repair.
+            head.ContentHeadQuarantined = true;
+            head.QuarantineReasonCode = failure;
+            head.ContentHeadModifiedOn = clock.GetUtcNow();
+            await revisions.AdvanceWithoutIndexChangeAsync(scope, state, cancellationToken).ConfigureAwait(false); // W2 (IX-1, INV-R)
+            object incident = context.ScopingSecurityCommandId is { } command
+                ? new VerifierIntegrityIncidentBody(formRecordId, head.CommittedContentRevision, head.CommittedOperationId, failure, context.WorkloadName, command, context.CorrelationId)
+                : new WorkloadIntegrityIncidentBody(formRecordId, head.CommittedContentRevision, head.CommittedOperationId, failure, context.WorkloadName, context.CorrelationId);
+            scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "IntegrityVerificationFailed", incident, null, head.CommittedOperationId, clock));
+            return Failed(failure, head.CommittedContentRevision, head.CommittedOperationId, quarantined: true, at: head);
+        }
+
+        return new WorkloadContentVerification(Domain.Features.Catalogue.ProtectionCensusOutcomes.Verified, head.CommittedContentRevision, head.CommittedOperationId, false, head);
+    }
+
     /// <summary>
     /// Shape of a target-form AEAD envelope as far as the Authority can judge without keys: the approved algorithm, a 96-bit
     /// nonce, a 128-bit tag, non-empty ciphertext, wrapped data key and key reference, and no (wrapped key, nonce) pair seen
@@ -784,6 +921,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     private async Task<(VerifyRecordProjectionResult Result, bool Quarantined)> VerifyRecordCoreAsync(
         IAuthorityScope scope,
         OrganizationAuthorizationState state,
+        VerifiedProjectionSnapshot snapshot,
         BoundActor bound,
         Guid formRecordId,
         RequestedAction requestedAction,
@@ -803,10 +941,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         var subject = bound.AuthorityUserId.ToString("D");
         var recordId = formRecordId.ToString("D");
-        var fullRead = await spiceDb.CheckAsync(new SpiceDbCheck(ResourceTypeNames.FormRecord, recordId, requestedAction == RequestedAction.Edit ? "edit" : "read", ResourceTypeNames.User, subject), state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false) == SpiceDbCheckOutcome.Allowed;
+        var fullRead = await verifier.CheckAsync(snapshot, new SpiceDbCheck(ResourceTypeNames.FormRecord, recordId, requestedAction == RequestedAction.Edit ? "edit" : "read", ResourceTypeNames.User, subject), cancellationToken).ConfigureAwait(false) == SpiceDbCheckOutcome.Allowed;
         if (!fullRead)
         {
-            var discover = await spiceDb.CheckAsync(new SpiceDbCheck(ResourceTypeNames.FormRecord, recordId, "discover", ResourceTypeNames.User, subject), state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
+            var discover = await verifier.CheckAsync(snapshot, new SpiceDbCheck(ResourceTypeNames.FormRecord, recordId, "discover", ResourceTypeNames.User, subject), cancellationToken).ConfigureAwait(false);
             if (discover != SpiceDbCheckOutcome.Allowed)
             {
                 throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
@@ -878,7 +1016,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             head.ContentHeadQuarantined = true;
             head.QuarantineReasonCode = failure;
             head.ContentHeadModifiedOn = clock.GetUtcNow();
-            state.ContentIntegrityRevision++;
+            await revisions.AdvanceWithoutIndexChangeAsync(scope, state, cancellationToken).ConfigureAwait(false); // W3 (IX-1, INV-R)
             var incident = new IntegrityIncidentBody(formRecordId, verifiedRevision, verifiedOperationId, failure, bound.AuthorityUserId, correlationId);
             scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "IntegrityVerificationFailed", incident, null, head.CommittedOperationId, clock));
             return (new VerifyRecordProjectionResult(false, failure, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, [], fullRead, correlationId), true);
@@ -896,15 +1034,15 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             // Field-level shares scope value leaves and selection leaves (a plaintext dropdown / multi-select stores one selection leaf per option) by the same field-item edges.
             // Phase C5 (D7): both the readable and the editable subsets are returned, so a partial editor needs one verification; advisory only — prepare/commit decide.
             var fieldLeaves = expected.Where(l => l.ManifestItemKindCode is (byte)ManifestItemKind.FieldValue or (byte)ManifestItemKind.FieldSelection).ToList();
-            readable = await CheckFieldLeavesAsync(fieldLeaves, "read", subject, state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
-            editable = includeEditable ? await CheckFieldLeavesAsync(fieldLeaves, "edit", subject, state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false) : [];
+            readable = await CheckFieldLeavesAsync(snapshot, fieldLeaves, "read", subject, cancellationToken).ConfigureAwait(false);
+            editable = includeEditable ? await CheckFieldLeavesAsync(snapshot, fieldLeaves, "edit", subject, cancellationToken).ConfigureAwait(false) : [];
             authorized = requestedAction == RequestedAction.Edit ? editable : readable;
         }
 
         return (new VerifyRecordProjectionResult(true, null, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, authorized, fullRead, correlationId, readable, editable, contributorWrites.Enabled), false);
     }
 
-    private async Task<List<VerifiedProjectionItem>> CheckFieldLeavesAsync(List<RecordManifestLeaf> fieldLeaves, string permission, string subject, string zedToken, CancellationToken cancellationToken)
+    private async Task<List<VerifiedProjectionItem>> CheckFieldLeavesAsync(VerifiedProjectionSnapshot snapshot, List<RecordManifestLeaf> fieldLeaves, string permission, string subject, CancellationToken cancellationToken)
     {
         if (fieldLeaves.Count == 0)
         {
@@ -912,7 +1050,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
 
         var checks = fieldLeaves.Select(l => new SpiceDbCheck(ResourceTypeNames.FieldItem, l.ManifestItemId.ToString("D"), permission, ResourceTypeNames.User, subject)).ToList();
-        var outcomes = await spiceDb.CheckBulkAsync(checks, zedToken, cancellationToken).ConfigureAwait(false);
+        var outcomes = await verifier.CheckBulkAsync(snapshot, checks, cancellationToken).ConfigureAwait(false);
         return fieldLeaves.Where((_, i) => outcomes[i] == SpiceDbCheckOutcome.Allowed).Select(l => new VerifiedProjectionItem((ManifestItemKind)l.ManifestItemKindCode, l.ManifestItemId)).ToList();
     }
 
@@ -1182,12 +1320,27 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     /// digest); a mismatch journals a minimal integrity incident and signs nothing. Then every candidate item is classified
     /// by the column-class rules (D14/D15) against its bound current item.
     /// </summary>
-    private async Task<Dictionary<string, string>> ClassifyShareScopedAsync(IAuthorityScope scope, OrganizationAuthorizationState state, PrepareContentChangeRequest request, IReadOnlyList<ParsedCandidateItem> parsed,
-        IReadOnlyList<RecordManifestLeaf> currentLeaves, RecordContentHead head, IntegrityKeyRegistration key, DesiredStateGraph graph, BoundActor bound, Guid operationId, long candidateRevision, Guid correlationId, CancellationToken cancellationToken)
+    /// <summary>
+    /// Decision D4, applied to every write since R-53 (C-148): for a record with accepted content, the request must carry the
+    /// complete current snapshot, proven equal to the accepted head (coverage, digests, bindings, root, leaf index). A mismatch
+    /// is journaled as an integrity incident and refused. A record without content has an empty current snapshot.
+    /// </summary>
+    private async Task<List<ContentDeltaRules.DecodedItem>> BindAcceptedSnapshotAsync(IAuthorityScope scope, OrganizationAuthorizationState state, PrepareContentChangeRequest request,
+        IReadOnlyList<RecordManifestLeaf> currentLeaves, RecordContentHead head, IntegrityKeyRegistration key, BoundActor bound, Guid correlationId, CancellationToken cancellationToken)
     {
+        if (head.CommittedContentRevision == 0 && head.CurrentRecordManifestCommitId is null)
+        {
+            if (request.CurrentItems is { Count: > 0 })
+            {
+                throw AuthorityException.Invalid("CURRENT_SNAPSHOT_UNEXPECTED: the record has no accepted content");
+            }
+
+            return [];
+        }
+
         if (request.CurrentItems is null || request.CurrentItems.Count == 0)
         {
-            throw AuthorityException.Invalid("CURRENT_SNAPSHOT_REQUIRED: a share-scoped write must carry the complete current snapshot");
+            throw AuthorityException.Invalid("CURRENT_SNAPSHOT_REQUIRED: a write to a record with accepted content must carry the complete current snapshot");
         }
 
         if (head.CommittedOperationId is not { } headOperation || head.CurrentRecordManifestCommitId is null || head.CommittedContentRevision == 0)
@@ -1212,18 +1365,29 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         var (failure, current) = ContentDeltaRules.BindCurrentSnapshot(request.CurrentItems, accepted, state.OrganizationId);
         if (failure is not null)
         {
-            state.ContentIntegrityRevision++;
+            await revisions.AdvanceWithoutIndexChangeAsync(scope, state, cancellationToken).ConfigureAwait(false); // W4 (IX-1, INV-R)
             var incident = new IntegrityIncidentBody(request.FormRecordId, head.CommittedContentRevision, headOperation, failure, bound.AuthorityUserId, correlationId);
             scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "CurrentSnapshotMismatch", incident, null, headOperation, clock));
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             throw new AuthorityException(AuthorityErrorCodes.CurrentSnapshotMismatch, 409, false, failure);
         }
 
+        return current;
+    }
+
+    private static Dictionary<string, string> ClassifyShareScoped(PrepareContentChangeRequest request, IReadOnlyList<ParsedCandidateItem> parsed, List<ContentDeltaRules.DecodedItem> current,
+        RecordContentHead head, Guid organizationId, DesiredStateGraph graph, BoundActor bound, Guid operationId, long candidateRevision)
+    {
+        if (current.Count == 0 || head.CommittedOperationId is not { } headOperation)
+        {
+            throw AuthorityException.Invalid("record has no accepted content");
+        }
+
         // AC-2: the lifecycle lock, decided from the signed header of the accepted head (the snapshot was just bound to it).
         RequireShareEditableStatus(current.Where(i => i.Kind == ManifestItemKind.RecordHeader).Select(i => i.Document).SingleOrDefault(), "prepare");
 
         var candidate = parsed.Select(p => new ContentDeltaRules.DecodedItem(p.Kind, p.ItemId, p.Key, p.Document, p.Digest)).ToList();
-        var shareScope = new ContentDeltaRules.ShareScope(state.OrganizationId, request.FormRecordId, head.CommittedContentRevision, headOperation, candidateRevision, operationId,
+        var shareScope = new ContentDeltaRules.ShareScope(organizationId, request.FormRecordId, head.CommittedContentRevision, headOperation, candidateRevision, operationId,
             graph.EditableFieldItemsViaShares(bound.AuthorityUserId, request.FormRecordId));
         return ContentDeltaRules.ClassifyShareScoped(current, candidate, shareScope);
     }
@@ -1392,6 +1556,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
     /// <summary>Phase C7 M4: the same minimal incident, observed by the verifier workload during a protection census.</summary>
     private sealed record VerifierIntegrityIncidentBody(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, string FailureReasonCode, string ObservedByWorkloadName, Guid ScopingSecurityCommandId, Guid CorrelationId);
+
+    /// <summary>IX-2: an integrity incident found on bytes submitted by the search-index builder (no protection decision scopes it).</summary>
+    private sealed record WorkloadIntegrityIncidentBody(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, string FailureReasonCode, string ObservedByWorkloadName, Guid CorrelationId);
 
     private sealed class UnsignedByteComparer : IComparer<byte[]>
     {

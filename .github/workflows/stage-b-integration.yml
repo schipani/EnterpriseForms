@@ -1,45 +1,80 @@
-# Stage B Accused vertical-slice integration gate (B-10).
-# Brings up the same disposable security-test stack as security-gate-a PLUS the Stage B services (ClamAV clamd, durable
-# worker, Azurite documents account, dev-seed personas) and runs tests/integration/EnterpriseForms.StageBTests against it,
-# then the browser end-to-end workflow with Playwright against the Vite dev server proxying to that stack.
-# Zero discovered tests is a failed run. Synthetic credentials only; no customer data.
+# Stage B integration — RELEASE-ONLY (permanent owner policy C-131, docs/testing/STAGE_B_RELEASE_ONLY_POLICY.md).
 #
-# Structure (CI-speed work): the integration tests are sharded into groups (tests/integration/EnterpriseForms.StageBTests/
-# stage-b-groups.json; scripts/ci/stage_b_groups.py proves every test runs exactly once) and run, together with the browser
-# tests, CONCURRENTLY, each on its OWN freshly started, clean-state stack. The job named
-# "Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e" is kept as the aggregate
-# result so the existing status-check name is unchanged; it succeeds only when BOTH parallel jobs executed and passed.
+# Stage B runs ONLY when the owner explicitly authorizes release testing and someone starts this workflow by hand
+# (workflow_dispatch). It has no push, pull-request, schedule, tag, release or workflow_call trigger, and no other workflow
+# invokes it. Ordinary development, pull requests and feature acceptance never run it.
+#
+# What it runs: the Stage B integration groups of tests/integration/EnterpriseForms.StageBTests/stage-b-groups.json (all seven,
+# or the groups selected below), each on its own runner and freshly started clean stack, plus (optionally) the browser
+# end-to-end job. Each group keeps its own test results, logs and artifacts, so a failed group can be rerun on its own ("Re-run
+# failed jobs", or a new dispatch naming only that group). Zero discovered tests is a failed run; nothing is skipped silently.
+#
+# Owner-only execution is NOT enforced by workflow_dispatch alone (anyone with write access can dispatch). The `plan` job runs in
+# the GitHub environment `stage-b-release`; when the owner configures that environment with required reviewers (repository
+# Settings > Environments), every run waits for the owner's approval before any stack starts. Until then the environment only
+# records the deployment. See the policy document for the required repository-administration action.
 name: stage-b-integration
 
 on:
   workflow_dispatch:
-  pull_request:
-    branches: [stage-a/level2-security-foundation, main]
-  schedule:
-    - cron: "47 3 * * 1-5"
+    inputs:
+      release_authorization:
+        description: "Owner release-testing authorization reference (for example the decision-log id authorizing this Stage B run). Required."
+        required: true
+        type: string
+      groups:
+        description: "Stage B groups: 'all', or a comma-separated list of group names from stage-b-groups.json"
+        required: true
+        default: all
+        type: string
+      browser:
+        description: "Also run the Stage B browser end-to-end job"
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
 
-# A newer push to the same PR supersedes an obsolete run; scheduled and manual runs are never cancelled.
+# Release runs are never cancelled by a newer run.
 concurrency:
   group: stage-b-integration-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 jobs:
-  # Plan: build once, discover every Stage B test, and prove the group manifest assigns each test class to exactly one
-  # group (a new, unassigned, duplicated, stale or empty group fails here, before any stack is started). The matrix of
-  # shards comes from the manifest, so the manifest is the single source of truth.
+  # Plan: record the owner's authorization, build once, discover every Stage B test, prove the group manifest assigns each test
+  # class to exactly one group (a new, unassigned, duplicated, stale or empty group fails here, before any stack is started), and
+  # emit the matrix of the SELECTED groups. The manifest stays the single source of truth.
   plan:
-    name: Stage B integration plan (test discovery and group coverage)
+    name: Stage B integration plan (release authorization, test discovery and group coverage)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    environment: stage-b-release
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
+      all_groups: ${{ steps.plan.outputs.all_groups }}
     env:
       DOTNET_NOLOGO: "1"
       DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      RELEASE_AUTHORIZATION: ${{ inputs.release_authorization }}
+      STAGE_B_GROUPS: ${{ inputs.groups }}
+      BROWSER_SELECTED: ${{ inputs.browser }}
+      RUN_ACTOR: ${{ github.actor }}
+      RUN_REF: ${{ github.ref_name }}
+      RUN_SHA: ${{ github.sha }}
     steps:
+      - name: Record the owner's release-testing authorization (a run without one is refused)
+        run: |
+          if ! printf '%s' "$RELEASE_AUTHORIZATION" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9 ._:/#()-]{2,119}$'; then
+            echo "A release-testing authorization reference (3..120 characters) is required: Stage B is release-only (C-131)." >&2
+            exit 1
+          fi
+          {
+            echo "### Stage B release run"
+            echo "- Authorization reference: \`$RELEASE_AUTHORIZATION\`"
+            echo "- Groups: \`$STAGE_B_GROUPS\`; browser end-to-end: \`$BROWSER_SELECTED\`"
+            echo "- Started by: \`$RUN_ACTOR\` on \`$RUN_REF\` at \`$RUN_SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
@@ -51,14 +86,15 @@ jobs:
         run: dotnet build tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release
       - name: Checker self-tests
         run: python -m unittest scripts/ci/test_stage_b_groups.py
-      - name: Discover every test and verify the group manifest covers each exactly once
+      - name: Discover every test, verify the group manifest covers each exactly once, select the requested groups
         id: plan
         run: |
           set -o pipefail
           mkdir -p artifacts/stage-b-plan
           dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj --no-build -c Release --list-tests > artifacts/stage-b-plan/all-tests.txt
-          python scripts/ci/stage_b_groups.py plan --list artifacts/stage-b-plan/all-tests.txt --matrix-out artifacts/stage-b-plan/matrix.json | tee -a "$GITHUB_STEP_SUMMARY"
+          python scripts/ci/stage_b_groups.py plan --list artifacts/stage-b-plan/all-tests.txt --groups "$STAGE_B_GROUPS" --matrix-out artifacts/stage-b-plan/matrix.json | tee -a "$GITHUB_STEP_SUMMARY"
           echo "matrix=$(cat artifacts/stage-b-plan/matrix.json)" >> "$GITHUB_OUTPUT"
+          if [ "$(printf '%s' "$STAGE_B_GROUPS" | tr -d ' ')" = "all" ]; then echo "all_groups=true" >> "$GITHUB_OUTPUT"; else echo "all_groups=false" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         if: always()
         with:
@@ -66,8 +102,8 @@ jobs:
           path: artifacts/stage-b-plan
           if-no-files-found: error
 
-  # One shard per group: own runner, own freshly started clean stack, only that group's test classes. fail-fast is off so a
-  # failed group never cancels the others and every group reports independently while the workflow runs.
+  # One shard per selected group: own runner, own freshly started clean stack, only that group's test classes. fail-fast is off so
+  # a failed group never cancels the others and every group reports independently.
   integration-shard:
     name: Stage B integration shard (${{ matrix.group }})
     needs: plan
@@ -145,14 +181,18 @@ jobs:
         working-directory: infrastructure/docker
         run: docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env down -v --remove-orphans
 
-  # Aggregate: keeps the original check name. Passes only if the plan and EVERY shard succeeded and the downloaded results
-  # prove each discovered test ran exactly once in its assigned group and passed.
+  # Aggregate. For a run of all groups: every discovered test ran exactly once, passed, in its assigned group, with the total at
+  # least the baseline (verify-all). For a selection: each selected group's executed population equals its expected population and
+  # passed (verify-group per group). Never relies on exit codes; missing, stale, empty or failed results fail.
   integration:
     name: Stage B integration tests (real stack)
     needs: [plan, integration-shard]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      ALL_GROUPS: ${{ needs.plan.outputs.all_groups }}
+      MATRIX: ${{ needs.plan.outputs.matrix }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -166,11 +206,20 @@ jobs:
         with:
           pattern: stage-b-evidence-*
           path: shards
-      - name: Every test executed exactly once, passed, in its group (missing, stale, empty or failed results fail)
+      - name: Every selected test executed exactly once and passed, in its group
         if: always()
         run: |
           set -o pipefail
-          python scripts/ci/stage_b_groups.py verify-all --list plan/all-tests.txt --results shards | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$ALL_GROUPS" = "true" ]; then
+            python scripts/ci/stage_b_groups.py verify-all --list plan/all-tests.txt --results shards | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            status=0
+            for g in $(printf '%s' "$MATRIX" | python -c "import json,sys; print(' '.join(i['group'] for i in json.load(sys.stdin)['include']))"); do
+              python scripts/ci/stage_b_groups.py verify-group --group "$g" --list "shards/stage-b-evidence-$g/group-tests.txt" --results "shards/stage-b-evidence-$g/test-results" | tee -a "$GITHUB_STEP_SUMMARY" || status=1
+            done
+            echo "Partial Stage B selection: groups not selected were not run." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit $status
+          fi
       - name: Per-group slowest tests
         if: always()
         run: python scripts/ci/summarize_trx.py shards --top 10
@@ -185,6 +234,8 @@ jobs:
 
   browser:
     name: Stage B browser end-to-end (real stack)
+    needs: plan
+    if: ${{ inputs.browser }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -273,10 +324,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Both parallel jobs must have executed and succeeded (skipped, cancelled or failed all fail this gate)
+      - name: The integration aggregate and (when selected) the browser job must have executed and succeeded
         env:
           INTEGRATION: ${{ needs.integration.result }}
           BROWSER: ${{ needs.browser.result }}
+          BROWSER_SELECTED: ${{ inputs.browser }}
         run: |
-          echo "integration=$INTEGRATION browser=$BROWSER"
-          [ "$INTEGRATION" = "success" ] && [ "$BROWSER" = "success" ]
+          echo "integration=$INTEGRATION browser=$BROWSER browser_selected=$BROWSER_SELECTED"
+          [ "$INTEGRATION" = "success" ] || exit 1
+          if [ "$BROWSER_SELECTED" = "true" ]; then [ "$BROWSER" = "success" ]; else echo "Browser end-to-end not selected for this release run."; fi

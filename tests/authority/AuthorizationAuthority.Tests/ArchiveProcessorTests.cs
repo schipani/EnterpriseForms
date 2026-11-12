@@ -98,6 +98,10 @@ public sealed class ArchiveProcessorTests
 
     private sealed class FakeStore(Guid organizationId) : IAuthorityStore, IAuthorityScope
     {
+        public ISearchIndexStore SearchIndex => throw new NotSupportedException();
+
+        public ISearchAccessStore SearchAccess => throw new NotSupportedException();
+
         public OrganizationAuthorizationState State { get; } = new() { OrganizationId = organizationId };
 
         public List<SecurityJournalEntry> Entries { get; } = [];
@@ -114,6 +118,10 @@ public sealed class ArchiveProcessorTests
         public Task<IAuthorityScope> BeginReadOnlySnapshotScopeAsync(CancellationToken ct) => throw new NotSupportedException();
 
         public Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Guid>>([organizationId]);
+
+        public Task<IReadOnlyList<Guid>> GetAllOrganizationIdsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Guid>>([organizationId]);
+
+        public Task<IReadOnlyList<OrganizationChangeMarker>> GetOrganizationChangeMarkersAsync(CancellationToken ct) => throw new NotSupportedException();
 
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid org, CancellationToken ct) => Task.FromResult<OrganizationAuthorizationState?>(org == organizationId ? State : null);
 
@@ -279,6 +287,8 @@ public sealed class ArchiveProcessorTests
 
         public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid org, string key, CancellationToken ct) => throw new NotSupportedException();
 
+        public Task<List<string>> GetCommandPayloadsAsync(Guid organizationId, IReadOnlyCollection<string> commandKinds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task<SecurityCommand?> FindCommandAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
 
         public void AddCommand(SecurityCommand command) => throw new NotSupportedException();
@@ -312,6 +322,12 @@ public sealed class ArchiveProcessorTests
         public void AddManifestCommit(RecordManifestCommit commit) => throw new NotSupportedException();
 
         public void AddManifestLeaves(IEnumerable<RecordManifestLeaf> leaves) => throw new NotSupportedException();
+
+        public Task<List<ContentItemIdentity>> FindItemIdentitiesAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddItemIdentities(IEnumerable<ContentItemIdentity> identities) => throw new NotSupportedException();
+
+        public Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public Task<List<RecordManifestLeaf>> GetManifestLeavesAsync(Guid commitId, CancellationToken ct) => throw new NotSupportedException();
 

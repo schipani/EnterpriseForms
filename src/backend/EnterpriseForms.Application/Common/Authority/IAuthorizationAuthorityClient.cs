@@ -33,6 +33,9 @@ public enum ProtectedAction
 
     /// <summary>Organization security administration (system administrators); Amendment A1 governance routes accept it alongside ManageOrganization.</summary>
     AdministerSecurity,
+
+    /// <summary>C8 M4 (AC-8): read organization audit (Authority <c>view_audit</c>: Security Auditors). Grants no record content.</summary>
+    ViewAudit,
 }
 
 public enum SecurityCommandKind

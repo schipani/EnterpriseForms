@@ -1,0 +1,50 @@
+// M1 known-answer vector exactly per Design A §1.2 (C-116 contract). Throwaway; scratchpad only.
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+using System.Text;
+
+static byte[] Seq(int start, int count) => Enumerable.Range(start, count).Select(i => (byte)i).ToArray();
+byte[] kek = Seq(0x00, 32), dek = Seq(0x20, 32), wrapNonce = Seq(0x40, 12), nonce = Seq(0x50, 12);
+const string keyRef = "local-dev-kek-v1";
+var org = Guid.Parse("019a5b2c-1111-7000-8000-000000000001");
+var target = Guid.Parse("019a5b2c-2222-7000-8000-000000000002");
+var noteId = Guid.Parse("019a5b2c-3333-7000-8000-000000000003");
+const string role = "security_auditor", direction = "appoint";
+var note = "Covers the Q4 audit cycle.\nContact: Le\u0301a".Trim().Normalize(NormalizationForm.FormC);
+
+// AAD
+var label = Encoding.ASCII.GetBytes("DynamicForms/AuditorReasonNote/v1");
+var r = Encoding.ASCII.GetBytes(role); var d = Encoding.ASCII.GetBytes(direction);
+var aad = new byte[label.Length + 4 + 48 + 4 + r.Length + 4 + d.Length];
+var o = 0; label.CopyTo(aad, o); o += label.Length;
+BinaryPrimitives.WriteInt32BigEndian(aad.AsSpan(o, 4), 1); o += 4;
+foreach (var id in new[] { org, target, noteId }) { id.TryWriteBytes(aad.AsSpan(o, 16), bigEndian: true, out _); o += 16; }
+BinaryPrimitives.WriteInt32BigEndian(aad.AsSpan(o, 4), r.Length); o += 4; r.CopyTo(aad, o); o += r.Length;
+BinaryPrimitives.WriteInt32BigEndian(aad.AsSpan(o, 4), d.Length); o += 4; d.CopyTo(aad, o);
+
+// Padded plaintext P = UInt16BE(L) || UTF-8 || 0x00 to 2048
+var utf8 = new UTF8Encoding(false, true).GetBytes(note);
+var p = new byte[2048];
+BinaryPrimitives.WriteUInt16BigEndian(p.AsSpan(0, 2), (ushort)utf8.Length);
+utf8.CopyTo(p, 2);
+
+var ct = new byte[2048]; var tag = new byte[16];
+using (var aes = new AesGcm(dek, 16)) aes.Encrypt(nonce, p, ct, tag, aad);
+// DEK wrap exactly as LocalDevelopmentKeyProvider (nonce || cipher || tag, AAD "DynamicForms/DekWrap/v1:" + keyRef)
+var wc = new byte[32]; var wt = new byte[16];
+using (var aes = new AesGcm(kek, 16)) aes.Encrypt(wrapNonce, dek, wc, wt, Encoding.ASCII.GetBytes("DynamicForms/DekWrap/v1:" + keyRef));
+byte[] wrapped = [.. wrapNonce, .. wc, .. wt];
+
+string H(byte[] b) => Convert.ToHexStringLower(b);
+Console.WriteLine($"note_utf8_hex={H(utf8)}");
+Console.WriteLine($"note_utf8_length={utf8.Length}");
+Console.WriteLine($"aad_hex={H(aad)}");
+Console.WriteLine($"aad_length={aad.Length}");
+Console.WriteLine($"plaintext_sha256={H(SHA256.HashData(p))}");
+Console.WriteLine($"ciphertext_sha256={H(SHA256.HashData(ct))}");
+Console.WriteLine($"ciphertext_first32_hex={H(ct[..32])}");
+Console.WriteLine($"tag_hex={H(tag)}");
+Console.WriteLine($"wrapped_data_key_hex={H(wrapped)}");
+Console.WriteLine($"nonce_b64={Convert.ToBase64String(nonce)}");
+Console.WriteLine($"tag_b64={Convert.ToBase64String(tag)}");
+Console.WriteLine($"wrapped_data_key_b64={Convert.ToBase64String(wrapped)}");

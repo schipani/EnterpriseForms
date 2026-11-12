@@ -28,6 +28,8 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<RecordContentHead> Heads { get; } = [];
     public List<RecordManifestCommit> Commits { get; } = [];
     public List<RecordManifestLeaf> ManifestLeaves { get; } = [];
+
+    public List<ContentItemIdentity> ItemIdentities { get; } = [];
     public List<SecurityJournalEntry> Journal { get; } = [];
     public List<ContentIntegrityCheckpoint> Checkpoints { get; } = [];
     public List<IntegrityKeyRegistration> Keys { get; } = [];
@@ -38,6 +40,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<SearchCatalogueSnapshotEntry> SnapshotEntries { get; } = [];
 
     public List<AuthenticatedSession> Sessions { get; } = [];
+
+    /// <summary>C-133 PD-3 fault injection: the next commit throws this exception (once).</summary>
+    public Exception? FailNextCommit { get; set; }
     public List<PublishedFormVersion> PublishedVersions { get; } = [];
     public List<FieldSearchApproval> Approvals { get; } = [];
     public List<OrganizationProtectionPolicy> Policies { get; } = [];
@@ -60,7 +65,23 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<OrganizationRecoveredOwnerProbation> RecoveryProbations { get; } = [];
     public int ScopeCommitCount { get; private set; }
 
-    public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
+    /// <summary>IX-1: the in-memory search index shared by every scope of this store.</summary>
+    public InMemorySearchIndexStore SearchIndex => searchIndex ??= new InMemorySearchIndexStore(this);
+
+    private InMemorySearchIndexStore? searchIndex;
+
+    public InMemorySearchAccessStore SearchAccess => searchAccess ??= new InMemorySearchAccessStore();
+
+    private InMemorySearchAccessStore? searchAccess;
+
+    /// <summary>C-149: number of read-write scopes opened.</summary>
+    public int ScopeCount { get; private set; }
+
+    public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken)
+    {
+        ScopeCount++;
+        return Task.FromResult<IAuthorityScope>(new Scope(this));
+    }
 
     /// <summary>Phase C8 AC-9: number of read-only snapshot scopes opened; such a scope refuses to commit.</summary>
     public int ReadOnlyScopeCount { get; private set; }
@@ -73,8 +94,22 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
     public Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<Guid>>([]);
 
+    public Task<IReadOnlyList<Guid>> GetAllOrganizationIdsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<Guid>>(Organizations.Select(o => o.OrganizationId).ToList());
+
+    public int ChangeMarkerReadCount { get; private set; }
+
+    public Task<IReadOnlyList<OrganizationChangeMarker>> GetOrganizationChangeMarkersAsync(CancellationToken cancellationToken)
+    {
+        ChangeMarkerReadCount++;
+        return Task.FromResult<IReadOnlyList<OrganizationChangeMarker>>(Organizations.OrderBy(o => o.OrganizationId).Select(o => new OrganizationChangeMarker(o.OrganizationId, o.AuthorizationRevision, o.ContentIntegrityRevision, o.AuditJournalRevision)).ToList());
+    }
+
     private sealed class Scope(InMemoryAuthorityStore s, bool readOnly = false) : IAuthorityScope
     {
+        public ISearchIndexStore SearchIndex => s.SearchIndex;
+
+        public ISearchAccessStore SearchAccess => s.SearchAccess;
+
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(s.Organizations.FirstOrDefault(o => o.OrganizationId == organizationId));
 
         public Task<OrganizationAuthorizationState?> ReadOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(s.Organizations.FirstOrDefault(o => o.OrganizationId == organizationId));
@@ -142,13 +177,16 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken) =>
             Task.FromResult(s.Commands.FirstOrDefault(c => c.OrganizationId == organizationId && c.CommandIdempotencyKey == idempotencyKey));
 
+        public Task<List<string>> GetCommandPayloadsAsync(Guid organizationId, IReadOnlyCollection<string> commandKinds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Commands.Where(c => c.OrganizationId == organizationId && commandKinds.Contains(c.CommandKindName) && c.CommandStateName != SecurityCommandStates.Rejected).Select(c => c.CommandPayloadJson).ToList());
+
         public Task<SecurityCommand?> FindCommandAsync(Guid securityCommandId, CancellationToken cancellationToken) => Task.FromResult(s.Commands.FirstOrDefault(c => c.SecurityCommandId == securityCommandId));
 
         public void AddCommand(SecurityCommand command) => s.Commands.Add(command);
 
         public void AddOutboxEvent(ProjectionOutboxEvent outboxEvent) => s.Outbox.Add(outboxEvent);
 
-        public Task<ProjectionOutboxEvent?> FindOutboxEventAsync(Guid organizationId, long targetAuthorizationRevision, CancellationToken cancellationToken) => Task.FromResult<ProjectionOutboxEvent?>(null);
+        public Task<ProjectionOutboxEvent?> FindOutboxEventAsync(Guid organizationId, long targetAuthorizationRevision, CancellationToken cancellationToken) => Task.FromResult(s.Outbox.FirstOrDefault(o => o.OrganizationId == organizationId && o.TargetAuthorizationRevision == targetAuthorizationRevision));
 
         public void AddJournalEntry(SecurityJournalEntry entry) => s.Journal.Add(entry);
 
@@ -184,6 +222,25 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public void AddManifestCommit(RecordManifestCommit commit) => s.Commits.Add(commit);
 
         public void AddManifestLeaves(IEnumerable<RecordManifestLeaf> leaves) => s.ManifestLeaves.AddRange(leaves);
+
+        public Task<List<ContentItemIdentity>> FindItemIdentitiesAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.ItemIdentities.Where(i => manifestItemIds.Contains(i.ManifestItemId)).ToList());
+
+        public void AddItemIdentities(IEnumerable<ContentItemIdentity> identities)
+        {
+            foreach (var identity in identities)
+            {
+                if (s.ItemIdentities.Any(i => i.ManifestItemId == identity.ManifestItemId))
+                {
+                    throw new InvalidOperationException("uq_content_item_identity_item");
+                }
+
+                s.ItemIdentities.Add(identity);
+            }
+        }
+
+        public Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.ManifestLeaves.Where(l => manifestItemIds.Contains(l.ManifestItemId)).Select(l => l.ManifestItemId).Distinct().ToList());
 
         public Task<List<RecordManifestLeaf>> GetManifestLeavesAsync(Guid recordManifestCommitId, CancellationToken cancellationToken) =>
             Task.FromResult(s.ManifestLeaves.Where(l => l.RecordManifestCommitId == recordManifestCommitId).OrderBy(l => l.ManifestLeafPosition).ToList());
@@ -558,6 +615,12 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
             if (readOnly)
             {
                 throw new InvalidOperationException("read-only snapshot scope cannot commit");
+            }
+
+            if (s.FailNextCommit is { } failure)
+            {
+                s.FailNextCommit = null;
+                throw failure;
             }
 
             s.ScopeCommitCount++;

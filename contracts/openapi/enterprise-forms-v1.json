@@ -4888,7 +4888,7 @@
         "tags": [
           "Organizations"
         ],
-        "summary": "Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective; self-removal allowed while another remains.",
+        "summary": "Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective. Nobody removes themself (403 SELF_CHANGE_FORBIDDEN, D8-62a): another Security Administrator performs the removal.",
         "operationId": "RemoveSecurityAdministrator",
         "parameters": [
           {
@@ -4927,6 +4927,126 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/security-auditors/reason-codes": {
+      "get": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "The owner-approved Security Auditor appointment and removal reason codes with their labels (C-110). The Authority validates every submitted code exactly.",
+        "operationId": "GetSecurityAuditorReasonCodes",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityAuditorReasonCodesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/security-auditors": {
+      "post": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Appoints a verified member as Security Auditor (GrantSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up (unavailable in staging and production until PB-08) and an appointment reason code; an optional reason note (at most 500 characters) is encrypted by this API before it is sent and cannot be read back in the application (503 ENCRYPTION_UNAVAILABLE when no key provider is configured). The role grants audit viewing and no record content. 204 once Effective.",
+        "operationId": "AppointSecurityAuditor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointSecurityAuditorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/security-auditors/{userId}/remove": {
+      "post": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Removes a Security Auditor (RevokeSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up and a removal reason code. There is no last-auditor rule. 204 once Effective.",
+        "operationId": "RemoveSecurityAuditor",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveSecurityAuditorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5123,7 +5243,7 @@
         "tags": [
           "Search"
         ],
-        "summary": "Advanced field search over one selected form: up to five conditions combined with AND, each on a field from the capability list with an allowed operator and a typed invariant value, plus the My Records metadata filters. A result is returned only when every eligible record was independently enumerated and verified at one snapshot; otherwise a typed failure (SEARCH_FIELD_NOT_ALLOWED, SEARCH_OPERATOR_NOT_SUPPORTED, SEARCH_VERIFICATION_LIMIT, SEARCH_SNAPSHOT_CHANGED, SEARCH_VERIFICATION_UNAVAILABLE), never a partial page. Each condition is first authorized against the Authority's capabilities (422 SEARCH_FIELD_NOT_ALLOWED / SEARCH_OPERATOR_NOT_SUPPORTED). Phase C7 M3: executed only where the fail-closed execution gate is on (isolated Development/Testing); otherwise 503 SEARCH_VERIFICATION_UNAVAILABLE (TRUSTED_SEARCH_NOT_ENABLED). Overload: 503 SEARCH_VERIFICATION_UNAVAILABLE (SEARCH_CAPACITY_EXCEEDED, retryable).",
+        "summary": "Advanced field search over one selected form: up to five conditions combined with AND, each on a field from the capability list with an allowed operator and a typed invariant value, plus the My Records metadata filters. A result is returned only when every eligible record was independently enumerated and evaluated at one snapshot — verified record by record (resultBasis VerifiedScan) or, with the IX-4 indexed engine, evaluated on the content the Authority last accepted for each record (resultBasis AuthorityAcceptedContent; the business copy is verified when a record is opened); otherwise a typed failure (SEARCH_FIELD_NOT_ALLOWED, SEARCH_OPERATOR_NOT_SUPPORTED, SEARCH_VERIFICATION_LIMIT, SEARCH_SNAPSHOT_CHANGED, SEARCH_VERIFICATION_UNAVAILABLE), never a partial page. Each condition is first authorized against the Authority's capabilities (422 SEARCH_FIELD_NOT_ALLOWED / SEARCH_OPERATOR_NOT_SUPPORTED). Phase C7 M3: executed only where the fail-closed execution gate is on (isolated Development/Testing); otherwise 503 SEARCH_VERIFICATION_UNAVAILABLE (TRUSTED_SEARCH_NOT_ENABLED). Overload: 503 SEARCH_VERIFICATION_UNAVAILABLE (SEARCH_CAPACITY_EXCEEDED, retryable).",
         "operationId": "SearchFormRecordsByFieldValues",
         "requestBody": {
           "content": {
@@ -5449,6 +5569,67 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/search-index/rebuild": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "IX-2 SearchProjectionRebuild, security administrators (administer_security) only: the Authority purges the organization's search index, returns every searchable-field coverage to Building and marks the index Rebuilding, journaled with the reason code. The only way to clear a search-index quarantine; the index serves nothing until it has been rebuilt and attested. Refused (423) while the organization's authorization is quarantined; 404 SEARCH_INDEX_NOT_PRESENT where no index is maintained. Step-up (PB-08) not yet available.",
+        "operationId": "RebuildSearchProjection",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchProjectionRebuildRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchProjectionRebuildResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5793,6 +5974,35 @@
             "format": "uuid"
           },
           "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "AppointSecurityAuditorRequest": {
+        "required": [
+          "userId",
+          "reasonCode"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reasonNote": {
             "type": [
               "null",
               "string"
@@ -8642,6 +8852,12 @@
             ]
           },
           "previousToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "resultBasis": {
             "type": [
               "null",
               "string"
@@ -11638,6 +11854,30 @@
           }
         }
       },
+      "RemoveSecurityAuditorRequest": {
+        "required": [
+          "reasonCode"
+        ],
+        "type": "object",
+        "properties": {
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reasonNote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
       "RenameFormDefinitionRequest": {
         "required": [
           "formDefinitionName",
@@ -11986,6 +12226,60 @@
           }
         }
       },
+      "SearchProjectionRebuildRequest": {
+        "required": [
+          "rebuildReasonCode"
+        ],
+        "type": "object",
+        "properties": {
+          "rebuildReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SearchProjectionRebuildResponse": {
+        "required": [
+          "previousProjectionStatus",
+          "previousStatusReasonCode",
+          "projectionStatus",
+          "entriesPurged",
+          "coveragesReturnedToBuilding"
+        ],
+        "type": "object",
+        "properties": {
+          "previousProjectionStatus": {
+            "type": "string"
+          },
+          "previousStatusReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "projectionStatus": {
+            "type": "string"
+          },
+          "entriesPurged": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "coveragesReturnedToBuilding": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "SecurityAdministratorCandidateResponse": {
         "required": [
           "userId",
@@ -12072,6 +12366,42 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SecurityAdministratorCandidateResponse"
+            }
+          }
+        }
+      },
+      "SecurityAuditorReasonCodeResponse": {
+        "required": [
+          "reasonCode",
+          "reasonLabel"
+        ],
+        "type": "object",
+        "properties": {
+          "reasonCode": {
+            "type": "string"
+          },
+          "reasonLabel": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityAuditorReasonCodesResponse": {
+        "required": [
+          "appointment",
+          "removal"
+        ],
+        "type": "object",
+        "properties": {
+          "appointment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAuditorReasonCodeResponse"
+            }
+          },
+          "removal": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAuditorReasonCodeResponse"
             }
           }
         }

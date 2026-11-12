@@ -72,3 +72,35 @@ public sealed class ContentIntegrityCheckpoint
 
     public DateTimeOffset CheckpointCreatedOn { get; set; }
 }
+
+/// <summary>
+/// R-53 (C-148): the permanent identity of one content item id, recorded when the item is first accepted. An item id is bound
+/// for its whole life to one organization, record, item kind and identity anchor (field and group occurrence for values,
+/// field for attachments, group definition for group entries, form for the record header). It is never updated or deleted:
+/// a removed item's id stays bound, so it can never be reintroduced (which could revive shares that name it) or moved.
+/// Unique across organizations, because SpiceDB item objects are global.
+/// </summary>
+public sealed class ContentItemIdentity
+{
+    public Guid ContentItemIdentityId { get; set; }
+
+    public Guid ManifestItemId { get; set; }
+
+    public Guid OrganizationId { get; set; }
+
+    public Guid FormRecordId { get; set; }
+
+    public byte ManifestItemKindCode { get; set; }
+
+    public Guid? BoundFieldDefinitionId { get; set; }
+
+    public Guid? BoundFormRecordGroupId { get; set; }
+
+    public Guid? BoundGroupDefinitionId { get; set; }
+
+    public Guid? BoundFormDefinitionId { get; set; }
+
+    public Guid FirstCommittedOperationId { get; set; }
+
+    public DateTimeOffset IdentityBoundOn { get; set; }
+}

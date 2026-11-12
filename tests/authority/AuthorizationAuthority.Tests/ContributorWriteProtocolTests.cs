@@ -22,7 +22,7 @@ namespace AuthorizationAuthority.Tests;
 /// revocation and switch changes between prepare and commit (commit-time authorization), concurrent writes, replay,
 /// tampered current snapshots and staged candidates. Lock ordering against PostgreSQL is covered by the Docker tests.
 /// </summary>
-public sealed class ContributorWriteProtocolTests
+public sealed partial class ContributorWriteProtocolTests
 {
     private const string Issuer = "https://issuer.test";
 
@@ -54,7 +54,7 @@ public sealed class ContributorWriteProtocolTests
             var mac = new LocalHmacProvider();
             mac.ProvisionKeyAsync(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", CancellationToken.None).GetAwaiter().GetResult();
             Switch = new ShareContributorWriteSwitch(contributorWritesEnabled, testingOverrideAllowed: true);
-            Service = new ContentService(Store, mac, ThrowingProxy.Create<ISpiceDbProjection>(), new NoOpFaultInjector(), TimeProvider.System, Switch);
+            Service = new ContentService(Store, mac, TestProjection.Verifier(Store, ThrowingProxy.Create<ISpiceDbProjection>()), new NoOpFaultInjector(), TimeProvider.System, Switch);
             State = new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous };
             Store.Organizations.Add(State);
             foreach (var user in new[] { Owner, Contributor })
@@ -139,7 +139,7 @@ public sealed class ContributorWriteProtocolTests
 
         public async Task<Harness> CreatedAsync()
         {
-            await WriteAsync(Owner, Rows(), withCurrent: false);
+            await WriteAsync(Owner, Rows(), withCurrent: true);
             return this;
         }
     }
@@ -150,13 +150,13 @@ public sealed class ContributorWriteProtocolTests
     public async Task OwnerWritesAreUnchangedAndPassIdentityBinding()
     {
         var h = await new Harness().CreatedAsync();
-        var revision = await h.WriteAsync(h.Owner, Change(h.Rows(), h.Other, r => r.With("string_value", RowValue.Text("owner edit"))), withCurrent: false);
+        var revision = await h.WriteAsync(h.Owner, Change(h.Rows(), h.Other, r => r.With("string_value", RowValue.Text("owner edit"))), withCurrent: true);
         Assert.Equal(2, revision.CommittedContentRevision);
 
         // An owner candidate whose value row names another record is refused by identity binding (D8 applies to owners too).
         var forged = Change(h.Rows(), h.Other, r => r.With("form_record_id", RowValue.Uuid(Guid.CreateVersion7())));
         var operation = Guid.CreateVersion7();
-        var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.PrepareAsync(h.Owner, operation, h.Stage(forged, operation), withCurrent: false));
+        var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.PrepareAsync(h.Owner, operation, h.Stage(forged, operation), withCurrent: true));
         Assert.Contains("IDENTITY_BINDING", ex.Message, StringComparison.Ordinal);
     }
 
@@ -200,7 +200,7 @@ public sealed class ContributorWriteProtocolTests
         Assert.DoesNotContain(h.Store.Operations, o => o.ContentChangeOperationId == operation);
 
         // Owner writes are unaffected by the switch.
-        Assert.Equal(2, (await h.WriteAsync(h.Owner, Change(h.Rows(), h.Other, r => r.With("string_value", RowValue.Text("owner"))), withCurrent: false)).CommittedContentRevision);
+        Assert.Equal(2, (await h.WriteAsync(h.Owner, Change(h.Rows(), h.Other, r => r.With("string_value", RowValue.Text("owner"))), withCurrent: true)).CommittedContentRevision);
     }
 
     [Fact]
@@ -298,7 +298,7 @@ public sealed class ContributorWriteProtocolTests
         h.ShareWithContributor();
 
         // The owner's lifecycle transition is an ordinary owner content write and stays allowed.
-        Assert.Equal(2, (await h.WriteAsync(h.Owner, WithStatus(h.Rows(), h.Record, locked), withCurrent: false)).CommittedContentRevision);
+        Assert.Equal(2, (await h.WriteAsync(h.Owner, WithStatus(h.Rows(), h.Record, locked), withCurrent: true)).CommittedContentRevision);
 
         // The contributor's candidate is otherwise perfect: the accepted header unchanged, only the shared value edited.
         var operation = Guid.CreateVersion7();
@@ -316,7 +316,7 @@ public sealed class ContributorWriteProtocolTests
         Assert.Equal(AuthorityErrorCodes.RecordNotEditable, (await Assert.ThrowsAsync<AuthorityException>(() => h.PrepareAsync(h.Contributor, unlock, flip, withCurrent: true))).ErrorCode);
 
         // Once the owner returns the record to Draft, the same contributor write is accepted (the lock is the only difference).
-        await h.WriteAsync(h.Owner, h.Rows(), withCurrent: false);
+        await h.WriteAsync(h.Owner, h.Rows(), withCurrent: true);
         var allowed = Guid.CreateVersion7();
         var accepted = h.Stage(Change(h.Rows(), h.Shared, r => r.With("string_value", RowValue.Text("after unlock"))), allowed);
         var prepared = await h.PrepareAsync(h.Contributor, allowed, accepted, withCurrent: true);
@@ -334,7 +334,7 @@ public sealed class ContributorWriteProtocolTests
 
         var submit = Guid.CreateVersion7();
         var submitCandidate = h.Stage(WithStatus(h.Rows(), h.Record, "Submitted"), submit);
-        await h.CommitAsync(h.Owner, await h.PrepareAsync(h.Owner, submit, submitCandidate, withCurrent: false), submitCandidate);
+        await h.CommitAsync(h.Owner, await h.PrepareAsync(h.Owner, submit, submitCandidate, withCurrent: true), submitCandidate);
 
         var stale = await Assert.ThrowsAsync<AuthorityException>(() => h.CommitAsync(h.Contributor, prepared, candidate));
         Assert.Equal(AuthorityErrorCodes.ContentRevisionConflict, stale.ErrorCode);
@@ -365,7 +365,7 @@ public sealed class ContributorWriteProtocolTests
         var h = await new Harness().CreatedAsync();
         foreach (var status in new[] { "Submitted", "Draft", "Archived", "Submitted" })
         {
-            await h.WriteAsync(h.Owner, WithStatus(h.Rows(), h.Record, status), withCurrent: false);
+            await h.WriteAsync(h.Owner, WithStatus(h.Rows(), h.Record, status), withCurrent: true);
         }
 
         Assert.Equal(5, h.Head.CommittedContentRevision);
@@ -373,7 +373,7 @@ public sealed class ContributorWriteProtocolTests
         // Switch off: a contributor is refused for the switch first, whatever the status (the default stays fail-closed).
         var off = await new Harness(contributorWritesEnabled: false).CreatedAsync();
         off.ShareWithContributor();
-        await off.WriteAsync(off.Owner, WithStatus(off.Rows(), off.Record, "Submitted"), withCurrent: false);
+        await off.WriteAsync(off.Owner, WithStatus(off.Rows(), off.Record, "Submitted"), withCurrent: true);
         var operation = Guid.CreateVersion7();
         var candidate = off.Stage(WithStatus(Change(off.Rows(), off.Shared, r => r.With("string_value", RowValue.Text("x"))), off.Record, "Submitted"), operation);
         Assert.Equal(AuthorityErrorCodes.ContributorWritesDisabled, (await Assert.ThrowsAsync<AuthorityException>(() => off.PrepareAsync(off.Contributor, operation, candidate, withCurrent: true))).ErrorCode);
@@ -389,7 +389,7 @@ public sealed class ContributorWriteProtocolTests
         var preparedA = await h.PrepareAsync(h.Contributor, opA, candidateA, withCurrent: true);
         var opB = Guid.CreateVersion7();
         var candidateB = h.Stage(Change(h.Rows(), h.Other, r => r.With("string_value", RowValue.Text("owner"))), opB);
-        var preparedB = await h.PrepareAsync(h.Owner, opB, candidateB, withCurrent: false);
+        var preparedB = await h.PrepareAsync(h.Owner, opB, candidateB, withCurrent: true);
 
         await h.CommitAsync(h.Owner, preparedB, candidateB);
         var lost = await Assert.ThrowsAsync<AuthorityException>(() => h.CommitAsync(h.Contributor, preparedA, candidateA));

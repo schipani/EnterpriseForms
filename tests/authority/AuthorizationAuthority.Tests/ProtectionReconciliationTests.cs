@@ -56,10 +56,12 @@ public sealed class ProtectionReconciliationTests
             mac.ProvisionKeyAsync(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", CancellationToken.None).GetAwaiter().GetResult();
             var spice = DispatchProxy.Create<ISpiceDbProjection, SearchCatalogueTests.SpiceDb>();
             Spice = (SearchCatalogueTests.SpiceDb)(object)spice;
-            Content = new ContentService(Store, mac, spice, new NoOpFaultInjector(), TimeProvider.System, new ShareContributorWriteSwitch(false, testingOverrideAllowed: true));
-            Catalogue = new SearchCatalogueService(Store, spice, TimeProvider.System, new CatalogueOptions { MigrationPageSize = 1000 });
+            Spice.Markers = org => TestProjection.MarkerFor(Store.Organizations.Single(o => o.OrganizationId == org));
+            var verifier = TestProjection.Verifier(Store, spice);
+            Content = new ContentService(Store, mac, verifier, new NoOpFaultInjector(), TimeProvider.System, new ShareContributorWriteSwitch(false, testingOverrideAllowed: true));
+            Catalogue = new SearchCatalogueService(Store, verifier, TimeProvider.System, new CatalogueOptions { MigrationPageSize = 1000 });
             Reconciliation = new ProtectionReconciliationService(Store, Content, TimeProvider.System);
-            Store.Organizations.Add(new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous });
+            Store.Organizations.Add(new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous }.WithJournalDigest());
             Store.Bindings.Add(new IdentityBinding { IdentityBindingId = Guid.CreateVersion7(), OrganizationId = Org, AuthorityUserId = Owner, IdentityIssuerUri = Issuer, IdentitySubjectIdentifier = Owner.ToString("D"), IdentityBindingEnabled = true });
             Store.Keys.Add(new IntegrityKeyRegistration { IntegrityKeyRegistrationId = Guid.CreateVersion7(), OrganizationId = Org, ProviderName = "LocalDevelopment", ProviderKeyName = "org-key", CurrentSigningKeyVersion = 1, MinimumVerificationKeyVersion = 1 });
             foreach (var form in new[] { FormA, FormB })

@@ -24,8 +24,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "d41e73764c5cc75f1b67877d8df4d6998bc24ee100ab0581781a126c77a87a29",
-      "bytes": 5896
+      "sha256": "faa9e1b8e8b87980a9c27bb3f67a1d0983d8dc9ce70079f944bac03e72b7a91c",
+      "bytes": 6186
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "03014a47b2355f94a80725bf344bb74bfefdc3c675cb341d56b2320d74e124a3",
-      "bytes": 93056
+      "sha256": "03b570ad178fd3081f6cb3b4a5d44d0a2b4f758ff6948a1ae76028e9a5339821",
+      "bytes": 124102
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -143,6 +143,136 @@
       "bytes": 18890
     },
     {
+      "path": "docs/architecture/INDEXED_SEARCH_C149_EVIDENCE.md",
+      "sha256": "9f1b31dc6d71ba300bf463788c2e8ee4a97077e984d2818dd2c92d957b205b0c",
+      "bytes": 34654
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_C150_EVIDENCE.md",
+      "sha256": "53a180debe9e243850c1bd78abd1b6c1f14fbc520ed835138add72fa63f5cc1b",
+      "bytes": 30098
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md",
+      "sha256": "c9f5074447f3d057654982eb4ba04b64f3f8a37b8a6c935871f9239b7d830679",
+      "bytes": 24672
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_INTEGRITY_COST_REASSESSMENT.md",
+      "sha256": "991508c70757bcede954c32ec5ee5cd5176df8fe07f0f33dd1906eded38fa29b",
+      "bytes": 17755
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX1_EVIDENCE.md",
+      "sha256": "05a5faeb7c20d3914e59f8ed66172097f1cd8a52fd2ea37e2179dfd4c4eff041",
+      "bytes": 51973
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX2_EVIDENCE.md",
+      "sha256": "58d317924fb45db0967b6e9dd6a65d1abf85ec2d3dac695a2c8860d736039768",
+      "bytes": 30371
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX3_EVIDENCE.md",
+      "sha256": "e7b2dde7133303e51547145400172ba3f447878b04651b3aa262b2e4fa112d43",
+      "bytes": 25420
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX4_EVIDENCE.md",
+      "sha256": "587907872b69abc663f228ecbd98cba8ff44af8abb1aa2f40ba59af4de2be9f7",
+      "bytes": 82198
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX5A_EVIDENCE.md",
+      "sha256": "5b911cff5841e21257f0aec0ba365b82c9afe49a5f1f4f43f39305800fd012e9",
+      "bytes": 16654
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX5B_EVIDENCE.md",
+      "sha256": "ee214237d22bb1b40cb1ec44d96f3c51975c6676dea2ce6dd4adafce9bf24965",
+      "bytes": 18293
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX5_DESIGN_ACCEPTANCE_RECORD.md",
+      "sha256": "43bedd6ea8055e79b1a0420a12af3a8957d14492b6b0e96be5e6a2edb78513d6",
+      "bytes": 7500
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX5_EVIDENCE_PLANS.md",
+      "sha256": "a5c21281d799d305b53f394c5e6044c8402001a5a5dc1c275c3fd7138cb8d918",
+      "bytes": 11726
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX5_IX7_COMPLETION_EVIDENCE.md",
+      "sha256": "ba91607d63c0c6d8c7f53101a96d6547cca3887fb201b8cf88d8fa9e539cfdfe",
+      "bytes": 25231
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md",
+      "sha256": "dbf95b574bd1d561391c3f54c13980c338d0aa36331b49d5cc857508c058db7e",
+      "bytes": 16016
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
+      "sha256": "8ee4bc38fd81b2f642f403071e353a9433d9f31098e1c2c63c0ee71c82ee1f0d",
+      "bytes": 193115
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",
+      "sha256": "393ec381a2553071de2ff60cb26049408b62d5a1ed0a28ee51df0092195a8a72",
+      "bytes": 60436
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER1_OWNER_REVIEW_EVIDENCE.md",
+      "sha256": "db3998121aae499f21fcf3f90f6bf0c0a895451d2d958ebedb68d9ebf0d443e4",
+      "bytes": 27749
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER1_READINESS_ASSESSMENT.md",
+      "sha256": "52b6323aae70ca30cc55f3587b01237824bf0e5aa13f240d9b942253a1637bcb",
+      "bytes": 10266
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_BENCHMARK_DATA_DESIGN.md",
+      "sha256": "270311d7334ef981a131a3b469e1948357b608b9a06346221b038465aad1a10c",
+      "bytes": 12374
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_FULL_SWEEP_ASSESSMENT.md",
+      "sha256": "7176099cc43c941f53494f5434e9c6e0d439e52e65a380676cd6736f672482b6",
+      "bytes": 9166
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_INDEX_ARCHITECTURE_ASSESSMENT.md",
+      "sha256": "d0f42ef826802cdab34e85f0980d69d957c2ffcb757ba5c3618575c502a3b72d",
+      "bytes": 58552
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_LOOKUPSUBJECTS_ASSESSMENT.md",
+      "sha256": "680dd9c20516fbeec08fc1d907e726ff5251d153543932d78791ea083247bcd8",
+      "bytes": 14553
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_ONLINE_SAMPLING_PLAN.md",
+      "sha256": "acd76084d84b6fff457832e23e52f9e7d75b7ea3cbd901a2d442ba866825f959",
+      "bytes": 11034
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_REVIEWER_COVER_NOTE.md",
+      "sha256": "d152f00aca0acf288b7835c940a723c5fcc85d8a25aab034ac9f037a49c612bd",
+      "bytes": 4537
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md",
+      "sha256": "b0546a989f32c98fec771e164f5dc7799178db6114ee5aab4bfaa55d2d29ca65",
+      "bytes": 71404
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md",
+      "sha256": "314e86a7a1dd15c1e684f4efb41795efde7eeda0bd4fa1917299e73ce8561a2b",
+      "bytes": 45305
+    },
+    {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
       "sha256": "ba289a52bf305eff68b87a74e690fce323053bfc9a789dd1e935601ba2b25aa7",
       "bytes": 7852
@@ -179,8 +309,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md",
-      "sha256": "f85125e002633753713ce8e0e49ec1730d5dccc607edb0d17704c85d090cf7e1",
-      "bytes": 44465
+      "sha256": "9e0b578beb5833c840cdc6652b0bf71b11f5e2fd3934f1047316739e4647e9dc",
+      "bytes": 44662
     },
     {
       "path": "docs/architecture/PHASE_C8_M1_01_DURABLE_COMMAND_RECONCILIATION.md",
@@ -203,6 +333,31 @@
       "bytes": 92014
     },
     {
+      "path": "docs/architecture/PHASE_C8_M4_1_DESIGNS_M1_S1.md",
+      "sha256": "96c2be241f941108706ffe3dff368c1348cad196e619a7f245dd73f8f834488e",
+      "bytes": 58228
+    },
+    {
+      "path": "docs/architecture/PHASE_C8_M4_1_P_S1_1_SEARCH_OPTIMIZATION_PROPOSAL.md",
+      "sha256": "b4433b4e0022add724e291c25435decaa41894b7b72f552c6b789a76408b74b2",
+      "bytes": 13295
+    },
+    {
+      "path": "docs/architecture/PHASE_C8_M4_1_REVIEW_AND_REMEDIATION.md",
+      "sha256": "f2199fac3d2b565c8c6fe3f95b3e376368be178b2ef1dd1b18fcc730e697dd4f",
+      "bytes": 27753
+    },
+    {
+      "path": "docs/architecture/PHASE_C8_M4_1_S1_M1_INDEPENDENT_REVIEW_PACKAGE.md",
+      "sha256": "07172edd38c29a3c4a087619eaa00a81dbda477d63589976c9455c8ad2c96e8a",
+      "bytes": 39413
+    },
+    {
+      "path": "docs/architecture/PHASE_C8_M4_AC8_SECURITY_CONTRACT.md",
+      "sha256": "2aa581ef8e5aa363fe925b6328ebc3679a1095cb3e212579c5a4f588e6a1c576",
+      "bytes": 52433
+    },
+    {
       "path": "docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md",
       "sha256": "931df23b4e3f71f69223c6524c26fe5328b1bbf7b1d00ceeaa29a10781c6e550",
       "bytes": 106322
@@ -213,6 +368,11 @@
       "bytes": 10406
     },
     {
+      "path": "docs/architecture/RECORD_REGISTRATION_THROUGHPUT_R37_RECOMMENDATION.md",
+      "sha256": "1e6a957d0c58413a3fa56b46022088607548c4d8c6bc00f4fa2f3f7a1b976ad7",
+      "bytes": 12521
+    },
+    {
       "path": "docs/data-lifecycle/PB13_IMPORT_EXPORT_OFFBOARDING_STANDARD.md",
       "sha256": "601d3bd714ada33016c5ad2a39b8d2b2711e112813340a247d45aca2b19790c2",
       "bytes": 6295
@@ -221,6 +381,11 @@
       "path": "docs/decisions/ADR-AMENDMENT-PB-004-A1-ENCRYPTED-TO-PLAINTEXT-MIGRATION.md",
       "sha256": "d10ff4a49cfd3c0703de8dc5e02e42616b0bf0201457f960c7e2d777a1f01dbf",
       "bytes": 15129
+    },
+    {
+      "path": "docs/decisions/ADR-AMENDMENT-PB-004-A2-AUTHORITY-SEARCH-INDEX.md",
+      "sha256": "8467e4ca58535cda1a0777baaee7580b1d35b555aad2f7f1a8f97d19f09c7373",
+      "bytes": 15667
     },
     {
       "path": "docs/decisions/ADR-PB-001-CANONICAL-REPOSITORY.md",
@@ -299,8 +464,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "78d55489dbcec9a9332e59d48ca82281afc12d699905eb6d55b6627d008ed8ff",
-      "bytes": 167216
+      "sha256": "88c37276d837645ce68463fa3e3611224255c3e734e2724b00d8cf4039376907",
+      "bytes": 277912
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -348,6 +513,16 @@
       "bytes": 14113
     },
     {
+      "path": "docs/dynamic-forms/search-entry-seal-format.md",
+      "sha256": "8d275a86db8c5fe2e2f592ab72cfdbdb858de20508cd6c54cd6be9d9e02daa0e",
+      "bytes": 5012
+    },
+    {
+      "path": "docs/governance/AMENDMENT_GA-IX5-1_OWNER_LED_SECURITY_REVIEW.md",
+      "sha256": "56cd0a0205f9d0d754532c5ce28a6df159cc70993f232647970b72c2b55bfe77",
+      "bytes": 4619
+    },
+    {
       "path": "docs/governance/PB12_RELEASE_EVIDENCE_SCHEMA.json",
       "sha256": "a13142a0ffec26598d642a8da4c4f1c01349ea4ed7c47e2c7f77aa059bca5700",
       "bytes": 4650
@@ -356,6 +531,11 @@
       "path": "docs/governance/PB12_SECURITY_EVIDENCE_RELEASE_STANDARD.md",
       "sha256": "9658a213d742defc1d777d4b197f58347f31900674c95c6db1d83da65f905f8d",
       "bytes": 6300
+    },
+    {
+      "path": "docs/governance/REVIEW_AND_AUTHORIZATION_WORKFLOW.md",
+      "sha256": "bbd3f7c7e22dd1b244d13d7a67b416b65937a4b621b8f4ff7af0274510e73cb1",
+      "bytes": 3944
     },
     {
       "path": "docs/identity/PB08_IDENTITY_ASSURANCE_STANDARD.md",
@@ -371,6 +551,11 @@
       "path": "docs/infrastructure/PB05_DEPLOYMENT_BLUEPRINT.md",
       "sha256": "49ce553042002c1b2d46cbc58dbff27b17ea9e0cd290064e6d71e5868a51f017",
       "bytes": 4242
+    },
+    {
+      "path": "docs/infrastructure/STAGING_PREPARATION_INDEXED_SEARCH.md",
+      "sha256": "52827fcf1724f085158d83777eb1756fe36e05c67e8ed70d58e59bdd9b5e801b",
+      "bytes": 25195
     },
     {
       "path": "docs/performance/PB09_BENCHMARK_ACCEPTANCE_MATRIX.csv",
@@ -389,8 +574,13 @@
     },
     {
       "path": "docs/privacy/PB10_DATA_FLOW_RESIDENCY_REGISTER.csv",
-      "sha256": "b9af1a78b380185468d858794369dd024f8aa4d22776a21a4d24e76566fffe88",
-      "bytes": 3348
+      "sha256": "b1f3d154ea127b8a48d2b6c03bc8ac13fd05d9da30b4b10d3870c9f05b073cbb",
+      "bytes": 3646
+    },
+    {
+      "path": "docs/security/AUTHORITY_PRIVILEGE_REMEDIATION_PROPOSAL.md",
+      "sha256": "3a9ef3b6b7838ee3dcd3859bd9e411a9f973670239082fb79528dd27a148d3a8",
+      "bytes": 12003
     },
     {
       "path": "docs/security/C7_M4_DEVELOPMENT_INCIDENT_2026-10-29.md",
@@ -428,9 +618,19 @@
       "bytes": 18024
     },
     {
+      "path": "docs/security/OBS-IX-1_AUTHORITY_APPEND_ONLY_UPDATE_PRIVILEGE.md",
+      "sha256": "dc06c9bc54e1c7f51a04feaf0f6e91582374c97c546980f350d764aca2f20256",
+      "bytes": 16095
+    },
+    {
+      "path": "docs/security/PROJECTION_INTEGRITY_S1_OPERATIONS.md",
+      "sha256": "decb2e5bd92f02b7f288fee729d16f18ada54ac037225d5829f043fcd63cb003",
+      "bytes": 10580
+    },
+    {
       "path": "docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md",
-      "sha256": "dc096d0018cd4a745b1e9c12f16870a2dc04aff7387dd91d60bbefdbf7122bcf",
-      "bytes": 21554
+      "sha256": "888feee620960f2165344ba8a7e6f4b54aa290680443a2279c32c0375c98fadb",
+      "bytes": 25148
     },
     {
       "path": "docs/security/stage-a-vault-transit-vectors.json",
@@ -439,8 +639,8 @@
     },
     {
       "path": "docs/testing/FAST_FEEDBACK_TESTING.md",
-      "sha256": "1bd0f10eaa0dcf47df4467e9a39d6925d81973b04e16c11c9b6385f06ab4c8db",
-      "bytes": 10124
+      "sha256": "fac8ffc14ecf0971f62f1f8d3a21e51df987b4ef33b204c630114349fffab521",
+      "bytes": 12370
     },
     {
       "path": "docs/testing/PB07_REQUEST_UPLOAD_ACCEPTANCE_TESTS.md",
@@ -476,6 +676,11 @@
       "path": "docs/testing/PHASE_C8_M1_MANUAL_ACCESSIBILITY_CHECKLIST.md",
       "sha256": "530d093715f15fac6343623ab8b010fce091ca3b22cb1031937c0f71b5dee2af",
       "bytes": 4006
+    },
+    {
+      "path": "docs/testing/STAGE_B_RELEASE_ONLY_POLICY.md",
+      "sha256": "98777826b8f6369ada765a58bd40001f5598eb3085779d07dfdd7be91fbc296a",
+      "bytes": 9290
     },
     {
       "path": "docs/ui/C1_DESIGNER_UX_IMPLEMENTATION_BRIEF.md",
@@ -604,8 +809,8 @@
     },
     {
       "path": "scripts/ci/stage_b_groups.py",
-      "sha256": "9d50ec3a7dddab064ff2ed325a08326a3a84c92f45c6aba737c67cc6834ac81e",
-      "bytes": 11632
+      "sha256": "0cbdbd17d0916492f6a7017e29c8fdd4589314e749a68c9c2985d726d389fd86",
+      "bytes": 12859
     },
     {
       "path": "scripts/ci/summarize_trx.py",
@@ -614,8 +819,8 @@
     },
     {
       "path": "scripts/ci/test_stage_b_groups.py",
-      "sha256": "ac479aed153becd4a54c8859bcf4c535a8818a462fe0dc083b0351e38dce98e2",
-      "bytes": 9167
+      "sha256": "e911c24adbc3941b2d5b452bbd497ee705bf8c2b8d459fec8da7ea124bb479fb",
+      "bytes": 10056
     },
     {
       "path": "scripts/ci/test_test_results.py",
@@ -624,13 +829,13 @@
     },
     {
       "path": "scripts/dev/stage-b.ps1",
-      "sha256": "7615baf4588defc7d64c87dbc55e4dd5b35595f305b42493ed20884a3ebe2c54",
-      "bytes": 4306
+      "sha256": "b163d1146b5036dd4193a1d37316fe372f3af312f307037490bd1df96c6c4960",
+      "bytes": 7305
     },
     {
       "path": "scripts/dev/test.ps1",
-      "sha256": "613efc76874c97b592042fbd593bc09f7a1ee9a26933c309d6b2a045ad16cdd5",
-      "bytes": 7849
+      "sha256": "1f1d7e6dd1494f35bdafb3ae56aae1e51296f8c74e24964f93f9c20c8e0b69f4",
+      "bytes": 10060
     },
     {
       "path": "scripts/devstack/devstack.py",
@@ -681,6 +886,46 @@
       "path": "scripts/integrity/verify_vectors.py",
       "sha256": "c7cdab8cbea6b13aad73debc0a92d3b85028737913f6596288a8a5035388c989",
       "bytes": 9193
+    },
+    {
+      "path": "scripts/measurement/ix1/sealbench/Program.cs",
+      "sha256": "cd17e522d34554442df636a1b19febdca77ee8580db07a03e82634b959d9c15e",
+      "bytes": 2887
+    },
+    {
+      "path": "scripts/measurement/ix1/sealbench/sealbench.csproj",
+      "sha256": "13dcf9ab550529e5986b0bcde15bf4a31e1c475a6951dd9fd178471e2a334800",
+      "bytes": 567
+    },
+    {
+      "path": "scripts/measurement/ix1/vault_sign_bench.py",
+      "sha256": "32d3dfc5226a5505cb8ce92469d8ba7a8b40642ff9f81a433522a21ff34ff7eb",
+      "bytes": 1775
+    },
+    {
+      "path": "scripts/measurement/ix5/authority_db_wait_sampler.sh",
+      "sha256": "4530443371e8eb2a7591c8c715a32b50618669376814e3b3a48ee331b9e2b1ff",
+      "bytes": 1512
+    },
+    {
+      "path": "scripts/measurement/ix5/p5_paired_pooled.py",
+      "sha256": "dd1d3304162a397e61d96084110da83347df3c8b66123c26fb5314c3b666dcbc",
+      "bytes": 4835
+    },
+    {
+      "path": "scripts/measurement/ix5/p5_reconstruct_partial.py",
+      "sha256": "1c84c862292b08ff68dfb4f407be41ebf2d17ee927d9c64f3b1c401d609f58c2",
+      "bytes": 2621
+    },
+    {
+      "path": "scripts/measurement/ix5/run_stageb_method.ps1",
+      "sha256": "64b8033e02aa4392c7128a70cac2f358cddb095ac991cdbbf2a02e29ad7e8633",
+      "bytes": 2790
+    },
+    {
+      "path": "scripts/measurement/ix5/summarize_wait_samples.py",
+      "sha256": "25df2745b9636372cb82e40ea3a78db1a15465524ac8cfaf8c023fb4fb657baf",
+      "bytes": 1776
     },
     {
       "path": "scripts/validate-specifications.py",
@@ -749,8 +994,8 @@
     },
     {
       "path": "trust_authority/COORDINATED_DISASTER_RECOVERY.md",
-      "sha256": "e87ee5ef768b9623e466a687048e9baaa2f0aa8717d3a99a42dc1ecbea4da776",
-      "bytes": 29979
+      "sha256": "76d4171483645e7ff67589a243155693594bc9487f273743a6582cad6c104b8e",
+      "bytes": 30773
     },
     {
       "path": "trust_authority/CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md",
@@ -866,6 +1111,11 @@
       "path": "trust_authority/row-integrity-v1.test-vectors.json",
       "sha256": "7a42ce583f61e7efc7ddf07231074b4baaa3e8acd1481b643df3f8bd98a14899",
       "bytes": 18057
+    },
+    {
+      "path": "trust_authority/search-entry-seal-v1.test-vectors.json",
+      "sha256": "1728c3fc3448591bf68d45790e74939bcac111021fe2f55ca8b271d729ce90d4",
+      "bytes": 47605
     },
     {
       "path": "trust_authority/spicedb.schema.zed",

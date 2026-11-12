@@ -25,7 +25,7 @@ public sealed record OrganizationOverviewResponse(bool CanManageConfiguration, b
 /// in (no name is known yet). <c>SignInStatus</c>: <c>SignedIn</c> (a sign-in was recorded), <c>NotRecorded</c> (seen in the
 /// business directory before sign-ins were recorded), <c>NeverSignedIn</c> (bound by the Authority, never seen).
 /// <c>AvailableActions</c> are hints for the caller (the Authority decides every command): <c>AppointSecurityAdministrator</c>,
-/// <c>RemoveSecurityAdministrator</c>.
+/// <c>RemoveSecurityAdministrator</c>, <c>AppointSecurityAuditor</c>, <c>RemoveSecurityAuditor</c> (C8 M4; never on the caller's own row).
 /// </summary>
 public sealed record OrganizationMemberResponse(Guid UserId, string DisplayName, string IdentityIssuer, string IdentitySubject, DateTimeOffset? FirstSeenOn, IReadOnlyList<string> AuthorityRoles, IReadOnlyList<DirectoryTeamResponse> Teams, bool IsCurrentUser,
     DateTimeOffset? LastSignedInOn = null, string SignInStatus = "NotRecorded", IReadOnlyList<string>? AvailableActions = null, string MembershipState = "Enabled", DateTimeOffset? DisabledOn = null,
@@ -131,3 +131,19 @@ public sealed record OwnerRecoveryObjectionRequest(string Reason, bool UseDevelo
 
 /// <summary>Returned only after the Authority has recorded the objection; the case is then ended and cannot be executed.</summary>
 public sealed record OwnerRecoveryObjectionResponse(Guid CaseId, string State, DateTimeOffset ObjectedOn);
+
+/// <summary>
+/// C8 M4 (AC-8.1, C-110): appoint a Security Auditor. <c>ReasonCode</c> is one of the appointment codes from
+/// <c>GET /api/v1/organization/security-auditors/reason-codes</c>; the Authority validates it exactly. <c>ReasonNote</c> is optional
+/// (at most 500 characters): it is encrypted by the business API before it is sent (C8 M4 M1), stored by the Authority as
+/// ciphertext only and never readable in the application.
+/// </summary>
+public sealed record AppointSecurityAuditorRequest(Guid UserId, string? ReasonCode, string? ReasonNote = null, bool UseDevelopmentStepUp = false);
+
+/// <summary>C8 M4 (AC-8.1): remove a Security Auditor with a removal reason code and an optional encrypted note, as for appointment.</summary>
+public sealed record RemoveSecurityAuditorRequest(string? ReasonCode, string? ReasonNote = null, bool UseDevelopmentStepUp = false);
+
+/// <summary>One owner-approved reason (C-110): the exact wire value and its display label.</summary>
+public sealed record SecurityAuditorReasonCodeResponse(string ReasonCode, string ReasonLabel);
+
+public sealed record SecurityAuditorReasonCodesResponse(IReadOnlyList<SecurityAuditorReasonCodeResponse> Appointment, IReadOnlyList<SecurityAuditorReasonCodeResponse> Removal);

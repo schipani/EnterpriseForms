@@ -1,0 +1,34 @@
+# S1 probe, mode "bench" (open-loop; each request = baseline then protocol), authzed/spicedb:v1.56.2, security-test stack,
+# probe run 2026-11-04 in mcr.microsoft.com/dotnet/aspnet:10.0 on enterpriseforms-sectest_authority-net. Verbatim output.
+BENCH rps=50 seconds=30 items=1 issued=1501 achieved_rps=50.0
+baseline (today)       n=  1501 p50=   1.55 p95=   2.56 p99=   3.54 ms
+protocol (S1 total)    n=  1501 p50=   7.15 p95=  12.36 p99=  15.84 ms
+  M1 pin read          n=  1501 p50=   2.12 p95=   3.68 p99=   4.96 ms
+  D exact check        n=  1501 p50=   2.23 p95=   3.94 p99=   5.19 ms
+  M2 verify read       n=  1501 p50=   2.81 p95=   4.96 p99=   6.28 ms
+  added (M1+M2)        n=  1501 p50=   4.92 p95=   8.39 p99=  10.86 ms
+BENCH errors: none
+BENCH rps=50 seconds=60 items=1
+baseline (today)       n=  3001 p50=   1.51 p95=   2.20 p99=   3.08 ms
+protocol (S1 total)    n=  3001 p50=   7.08 p95=  10.96 p99=  14.19 ms
+  M1 pin read          n=  3001 p50=   2.08 p95=   3.25 p99=   4.47 ms
+  D exact check        n=  3001 p50=   2.19 p95=   3.48 p99=   4.44 ms
+  M2 verify read       n=  3001 p50=   2.76 p95=   4.29 p99=   5.49 ms
+  added (M1+M2)        n=  3001 p50=   4.87 p95=   7.60 p99=   9.73 ms
+BENCH errors: none
+BENCH rps=150 seconds=60 items=1 issued=9001 achieved_rps=150.0
+baseline (today)       n=  9001 p50=   1.47 p95=   2.35 p99=   4.29 ms
+protocol (S1 total)    n=  9001 p50=   7.36 p95=  11.92 p99=  18.70 ms
+  M1 pin read          n=  9001 p50=   2.13 p95=   3.43 p99=   5.59 ms
+  D exact check        n=  9001 p50=   2.29 p95=   3.75 p99=   5.64 ms
+  M2 verify read       n=  9001 p50=   2.91 p95=   4.74 p99=   7.61 ms
+  added (M1+M2)        n=  9001 p50=   5.06 p95=   8.17 p99=  13.20 ms
+BENCH errors: none
+BENCH rps=50 seconds=60 items=25 issued=3001 achieved_rps=50.0
+baseline (today)       n=  3001 p50=   2.43 p95=   3.62 p99=   5.36 ms
+protocol (S1 total)    n=  3001 p50=   7.91 p95=  12.95 p99=  17.49 ms
+  M1 pin read          n=  3001 p50=   2.08 p95=   3.47 p99=   4.73 ms
+  D exact check        n=  3001 p50=   3.00 p95=   4.94 p99=   6.90 ms
+  M2 verify read       n=  3001 p50=   2.83 p95=   4.72 p99=   7.01 ms
+  added (M1+M2)        n=  3001 p50=   4.93 p95=   8.03 p99=  11.18 ms
+BENCH errors: none

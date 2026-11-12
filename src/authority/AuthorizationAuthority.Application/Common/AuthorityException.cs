@@ -11,6 +11,12 @@ public static class AuthorityErrorCodes
     public const string AuthorityNotReady = "AUTHORITY_NOT_READY";
     public const string StaleAuthorizationRevision = "STALE_AUTHORIZATION_REVISION";
     public const string ContentRevisionConflict = "CONTENT_REVISION_CONFLICT";
+
+    /// <summary>R-53: a retained item id changed its identity anchor (field, group occurrence, group definition or form).</summary>
+    public const string ItemIdentityChanged = "ITEM_IDENTITY_CHANGED";
+
+    /// <summary>R-53: a new item names an id that is already bound or was accepted before (reintroduction or reuse).</summary>
+    public const string ItemIdentityReused = "ITEM_IDENTITY_REUSED";
     public const string IntegrityQuarantine = "INTEGRITY_QUARANTINE";
     public const string IntegrityVerificationFailed = "INTEGRITY_VERIFICATION_FAILED";
     public const string IdempotencyConflict = "IDEMPOTENCY_CONFLICT";
@@ -70,6 +76,9 @@ public static class AuthorityErrorCodes
 
     // C8 M2 (AC-7) membership and organization-role administration.
     public const string SelfChangeForbidden = "SELF_CHANGE_FORBIDDEN";
+
+    /// <summary>C8 M4 (D8-72, C-113): Security Auditor reason notes are not accepted until the approved note encryption (R1) exists.</summary>
+    public const string ReasonNoteNotAccepted = "REASON_NOTE_NOT_ACCEPTED";
     public const string OwnerApprovalRequired = "OWNER_APPROVAL_REQUIRED";
     public const string ProposalNotPending = "PROPOSAL_NOT_PENDING";
     public const string ProposalExpired = "PROPOSAL_EXPIRED";
@@ -142,6 +151,18 @@ public static class AuthorityErrorCodes
     /// <summary>C-107: the organization already has (or would exceed) the maximum number of active owners.</summary>
     public const string OrganizationOwnerLimit = "ORGANIZATION_OWNER_LIMIT";
     public const string CursorInvalid = "CURSOR_INVALID";
+
+    /// <summary>IX-1: the search index could not be derived for a content commit; the commit is refused (IX-D7, fail closed).</summary>
+    public const string SearchIndexDerivationFailed = "SEARCH_INDEX_DERIVATION_FAILED";
+
+    /// <summary>IX-1: the search entry seal could not be produced with the pinned key; the commit is refused (fail closed).</summary>
+    public const string SearchSealUnavailable = "SEARCH_SEAL_UNAVAILABLE";
+
+    /// <summary>IX-2: the organization has no search index, or this deployment does not maintain one (Disabled mode).</summary>
+    public const string SearchIndexNotPresent = "SEARCH_INDEX_NOT_PRESENT";
+
+    /// <summary>IX-2: the search index is quarantined; only a SearchProjectionRebuild clears it (IX-D7). Never an organization quarantine.</summary>
+    public const string SearchIndexQuarantined = "SEARCH_INDEX_QUARANTINED";
 }
 
 /// <summary>Thrown by application services; mapped to an ErrorResponse by the host. Never carries secrets or protected values.</summary>

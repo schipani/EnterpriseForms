@@ -49,6 +49,14 @@ def passing(cls: str, n: int) -> list[tuple[str, str]]:
 
 
 class CoverageTests(unittest.TestCase):
+    def test_group_selection_for_release_runs(self) -> None:
+        # C-131: a release run may select one, several or all groups; unknown names are refused, nothing is silently dropped.
+        self.assertEqual([g["name"] for g in sbg.select_groups(MANIFEST, "all")[0]], ["alpha", "beta"])
+        self.assertEqual([g["name"] for g in sbg.select_groups(MANIFEST, None)[0]], ["alpha", "beta"])
+        self.assertEqual([g["name"] for g in sbg.select_groups(MANIFEST, " beta ")[0]], ["beta"])
+        self.assertEqual([g["name"] for g in sbg.select_groups(MANIFEST, "beta,alpha")[0]], ["alpha", "beta"])
+        self.assertEqual(sbg.select_groups(MANIFEST, "alpha,gamma")[1], ["gamma"])
+
     def test_complete_assignment_passes(self) -> None:
         self.assertEqual(sbg.check_coverage(MANIFEST, DISCOVERED), [])
 
@@ -172,7 +180,9 @@ class RealManifestTests(unittest.TestCase):
         assigned = Counter(c for g in manifest["groups"] for c in g["classes"])
         self.assertEqual([c for c, n in assigned.items() if n > 1], [])
         tests = sbg.DEFAULT_MANIFEST.parent / "Tests"
-        in_source = {p.stem for p in tests.glob("*.cs")}
+        # A partial class may span files named <Class>.<Part>.cs (for example SearchIndexFoundationTests.Paired.cs): the class is the
+        # part of the file name before the first dot.
+        in_source = {p.name.split(".")[0] for p in tests.glob("*.cs")}
         self.assertEqual(sorted(in_source - set(assigned)), [], "test class files that belong to no group")
         self.assertEqual(sorted(set(assigned) - in_source), [], "manifest classes with no source file")
 

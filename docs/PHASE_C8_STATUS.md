@@ -615,3 +615,405 @@ Changes after the owner's review of M3 (no Authority, permission or migration ch
 - **Search Approvals navigation (owner correction):** Search Approvals is no longer in the primary navigation; it is reached under Organization, Security & Governance, in the Organization sidebar, and the page uses the shared Organization layout. The URL `/app/organization/search-approvals`, the `security.administer` requirement (checked again by the Authority on every request) and the page content are unchanged; an owner without that capability gets the layout and a refusal and the page requests nothing. The Organization sidebar column is 18rem wide (was 16rem).
 
 - **Active indicator, User area and pinned header (owner request):** the active primary item had a 4px underline, but TanStack merges the base and active class names, so `text-muted` won over `text-body` and the underline took the muted slate colour at the very edge of the 44px link. Both navigation levels now draw a 3-4px solid underline under the label in the primary token (black by default) from the router's `aria-current="page"`, with a background and semibold text; focus keeps its own outline. A shared `SideNavLayout` (support feature) renders the Organization and the new User sidebars identically (18rem, 18px group and 16px item Lucide icons, 44px items). The User area is `/app/user` (My Profile) and `/app/user/regional`, `/language`, `/text-size` (Experience & Preferences); the five earlier addresses redirect with the router's `redirect` (query and hash kept), and the account menu goes to My Profile and Preferences there. The header stays in the page flow at the top; after about 72px of scrolling (back near 40px) a fixed 3.5rem compact bar takes over with the small logo, the primary links on one row from 1280px (a Menu button below that, which also holds My Profile and Preferences on a phone), the account menu and a visible Sign out (the one session logout). One passive, frame-throttled scroll listener; state changes only at the thresholds; no layout shift; reduced motion respected; `scroll-padding-top: 4.5rem` keeps focused content clear; the sidebars stick below it. Backend, routes of other areas, authorization and the Platform Console are unchanged.
+
+## 32. M4 — Governance audit and security home: architecture and AC-8 security review (2026-11-04, C-108) — proposal, stopped at the AC-8 approval checkpoint
+
+- **Baseline verified:** PR #50 merged (2026-11-04 09:50 UTC); `main` = `c245200`. Branch `phase-c8/m4-governance-audit` was created from that commit.
+- **Delivered:** `docs/architecture/PHASE_C8_M4_AC8_SECURITY_CONTRACT.md`, which contains:
+  * verified facts F-1…F-14;
+  * risks R-1…R-16;
+  * the permission matrix;
+  * AC-8.1 (`security_auditor` / `view_audit` through `GrantSystemRole`, rules A1–A9);
+  * AC-8.2 (sanitized security-command timeline);
+  * AC-8.3 (Authority check-and-record evidence of audit access, fail closed);
+  * AC-8.4 (security overview, authorized from desired state with an Effective-edge rule so it works while the gate is closed);
+  * AC-8.5 (DR-C7-5 coverage as designed);
+  * business contracts, redaction catalog, migrations (indexes only) and tests (AC8-T01…T17, `AuditExplorerTests`, `SecurityHomeTests` in existing shards);
+  * milestones M4-0…M4-5;
+  * owner decisions D8-62…D8-70 and reviewer questions Q-1…Q-5.
+- **Finding recorded (pre-existing, not new to M4):** the business database has no PostgreSQL row-level security (F-10; G08 open). The audit explorer relies on a single tenant-bound query adapter plus negative tests, and claims no RLS.
+- **Not done:** nothing implemented. No Authority, business, schema or UI change. D8-6/D8-7 (C-78) preserved unchanged. All findings in the contract §12 stay open. This is not an independent review.
+
+## 33. M4 — owner decisions and corrected AC-8 contract (2026-11-04, C-109) — awaiting final owner acceptance; M4-1 not authorized
+
+- **Owner decisions recorded:** D8-62…D8-70, D8-62a (Security Administrator self-removal refused — intentional C-70 change), D8-67a (directory display names shown; field keys, labels, option text, design-diff labels, free-text reasons and matched counts withheld), and Q-1…Q-5. These are owner decisions, not independent approval.
+- **Contract revision 2:** `docs/architecture/PHASE_C8_M4_AC8_SECURITY_CONTRACT.md`.
+  * **Corrections:** E-1 (self-removal is allowed and tested today, F-15); E-2 (no check-and-record atomicity across SpiceDB and AuthorityDb, F-17).
+  * **AC-8.1:** reason codes for auditor commands.
+  * **AC-8.2:** restricted ownership and share envelopes.
+  * **AC-8.3 protocol:** check → `FOR UPDATE NOWAIT` with a bounded transaction → revision compare → `AuditAccessAuthorized` with `delivery: not_attested` → commit, or 503. Bounded retries, rate limits, telemetry.
+  * **AC-8.4/8.5:** Effective-edge rule in one read-only snapshot.
+  * **Redaction table:** D8-67/D8-67a.
+  * **Risk register:** RR-1…RR-10, including RR-3 (auditor tenure).
+  * **Tests and criteria:** tests T01…T23 and acceptance criteria AC-M4-1.1…AC-M4-5.1.
+- **C-70 specification:** `SECURITY_ADMINISTRATOR_MANAGEMENT.md` rule 7 carries an "approved change, not implemented" note. Code and tests are unchanged until M4-1.
+- **Proposed M4-1 boundary:** C-109. Claude's technical choices to confirm: TC-1…TC-5 (contract §10.2).
+- **Not done:** nothing implemented; nothing pushed; no PR. Independent review is still required for closure and merge; Azure staging evidence is still required before production claims.
+
+## 34. M4-1 — AC-8.1 Security Auditor role implemented (2026-11-04, C-110 authorization, C-111) — Development/Testing, not pushed, not merged, not independently reviewed
+
+**Scope (C-109 boundary, nothing beyond it):**
+- **Authority:**
+  * `organization#security_auditor` / `view_audit` and `RequestedAction.ViewAudit`;
+  * `GrantSystemRole` / `RevokeSystemRole` for `security_auditor` with the C-110 reason codes;
+  * D8-62a self-change refusal for both roles;
+  * sanitized rejection evidence (`SecurityAuditorCommandRejected`, sanitized rejected rows);
+  * the roster lists the role.
+- **Business:**
+  * `/api/v1/organization/security-auditors` (reason codes, appoint, remove);
+  * `SECURITY_AUDITOR_APPOINTED` / `_REMOVED` with the reason code only;
+  * People-page role, filter and own-row-free hints;
+  * the Security Administrators card no longer offers self-removal.
+- **UI:** People-page dialog with a required reason-code select and an optional bounded note. It was drafted by a Sonnet subagent and reviewed before commit.
+- **Not built:** AC-8.2–AC-8.5, any audit read endpoint or page, the `audit.view` capability, business migrations.
+
+**Commits (signed, local only):**
+- `b54821f`: Authority.
+- `667643e`: business API and UI.
+- `7c9acf4`: Stage B tests, browser spec and C-70 specification.
+- The commit carrying this section: contract-test update and documentation.
+
+**Verification (local, real stack; each Stage B shard on its own freshly recreated security-test stack, `down -v` plus rebuild, at `7c9acf4`):**
+
+| Run | Result |
+|---|---|
+| Stage B `authorization-security-onboarding` (incl. new `SecurityAuditorTests` ×7, rewritten `SecurityAdministratorTests`) | **69/69 passed**, 0 skipped, 525 s |
+| Stage B `administration-membership` (incl. updated `PeopleDirectoryTests`) | **55/55 passed**, 0 skipped, 687 s |
+| `run_dotnet_tests.py EnterpriseForms.All.slnx` (Authority 322, contract 500, architecture 75, integrity 34, console 23) | **954/954 passed** |
+| Vitest (whole frontend) / ESLint / typecheck | **450/450**, clean, exit 0 |
+| Playwright `security-administrators.spec.ts` + `organization-administration.spec.ts` (isolated stack, guard verified) | **8/8 passed** |
+| OpenAPI and TypeScript client regeneration | Regenerated and committed. The Authority OpenAPI gains only `ViewAudit`. |
+
+An earlier run of the first shard had 3 failures in the new test class. Two were `jsonb` text formatting in assertions, and one was a missing projection-gate wait after a direct command, which correctly fails closed. Those test defects were fixed before the final runs. A contract test that pinned the Security Administrator hint list was updated after the shard runs; that change is test-only.
+
+**Hosted verification:** not run (nothing pushed; owner instruction).
+
+**Contract tests executed:** AC8-T01–T05, T07, T13–T15, T17–T19, T02a, plus the §8.2 C-70 test updates.
+
+**Not executed: T16** (recovery replay after revoke). Neither the Stage B nor the security harness can rebuild SpiceDB from the journal. AC-7's T16 is likewise not executed. T16 stays open.
+
+**Findings recorded in this milestone:**
+- **F-M4-1a:** with self-removal refused, `LAST_SECURITY_ADMINISTRATOR` can no longer trigger through the command path, because the actor is always a remaining enabled administrator. It is kept as defence in depth and unit-tested at planner level.
+- **F-M4-1b:** rejected `GrantSystemRole`/`RevokeSystemRole` rows (both roles) now keep only validated identifiers instead of the raw request body. This tightens storage; the wire contract is unchanged.
+- **F-M4-1c:** `reason_note` is plaintext in AuthorityDb (command payload and authorization journal body) and in the archive, like every existing command reason. The Authority has no application-level encryption for journal text. It never reaches BusinessDb, logs, rejection evidence or auditors. Encrypting it would be a new design (owner decision).
+- **F-M4-1d (pre-existing, out of scope):** rejected commands of other kinds (AC-7 and others) still store the raw request payload, step-up evidence included, on the rejected row.
+- **F-M4-1e (tooling):** `scripts/dev/stage-b.ps1` says the dev and security-test stacks pin the same subnets. They do not (172.31.x versus 172.30.x), so both can run at once. Under Windows PowerShell 5.1, redirecting the script's output in-session turns Docker's stderr into a terminating error. Run it as a child process instead.
+
+**Still open:** RR-1…RR-10 (contract §3.1, RR-3 auditor tenure included), T16, and everything in contract §12. Independent security review is the closure and merge gate; Azure staging evidence is required before production claims.
+
+## 35. M4-1 conditional acceptance and open findings (2026-11-04, C-112) — proposals only
+
+- **Owner:** AC-8.1 conditionally accepted as implementation evidence. This is not closure and not independent approval; C-111 stays open.
+- **Open findings:**
+  * **RN-1:** `reason_note` is plaintext in AuthorityDb and the archive, which does not meet C-110. Remediation option R1 is proposed.
+  * **RCF-1:** rejected commands of other kinds keep the raw request, step-up evidence included. Severity: Low now, latent High before PB-08.
+  * **T16:** outstanding, mandatory, not waived; decomposition T16-B, T16-S and T16-A proposed.
+- **Reference:** `docs/architecture/PHASE_C8_M4_1_REVIEW_AND_REMEDIATION.md` holds the designs, tests, the review package addendum and decisions D8-71…D8-75.
+- **Not done:** nothing implemented, pushed or merged. M4-2 is not started.
+
+## 36. C-113 execution: containment, R1 checkpoint, T16-B/T16-S (2026-11-04, C-114) — not pushed, not merged, not independently reviewed
+
+- **D8-72 containment:** implemented. Commit `b662309` (the Authority refuses notes; the business API refuses before sending; the UI field is removed).
+- **R1:** stopped. The existing service does not support the required context binding; design change M1 is requested (D8-76).
+- **T16-B:** **PASS**.
+- **T16-S:** **FAIL, security defect T16S-1.** After an older SpiceDB datastore is restored, revoked auditor and designer authorizations are effective again with the gate `Ready`. It is pre-existing and affects all SpiceDB-resolved permissions. Remediation S1 is requested (D8-77); the test is kept failing (D8-78).
+
+**Evidence at `b662309`:**
+
+| Run | Result |
+|---|---|
+| Stage B `authorization-security-onboarding` (fresh stack) | **71/72**; the sole failure is T16-S (the defect). The new containment test and T16-B pass; the SpiceDB restore caused no collateral failures. 551 s |
+| Stage B `administration-membership` (fresh stack) | **55/55**, 683 s |
+| .NET sweep | **955/955** |
+| Vitest / ESLint / typecheck | 450/450, clean, clean |
+| Playwright (two affected specs, isolated stack) | 8/8 |
+
+**Open:** T16S-1 (RR-11), RN-1 (contained, RR-12), RCF-1 (RR-13), T16-A under G14 (RR-14), and every item listed in §34. C-111 is open; M4-2 is not started.
+
+## 37. Owner decisions D8-76…D8-78; Designs A and B presented (2026-11-04, C-115) — design only, nothing implemented
+
+- **Design document:** `docs/architecture/PHASE_C8_M4_1_DESIGNS_M1_S1.md` (Opus).
+- **Design A (M1):** a seal-only note sealer with its own AAD domain, using the existing primitive and key provider. It defines the exact AAD, envelope schema, validation contract (V1–V11, B1–B8), key-version and recovery behaviour, and tests A-T01…A-T13.
+- **Design B (S1):** pin, decide, verify:
+  * marker pin, then `at_exact_snapshot` decisions with a `checked_at` proof, then a decisive `fully_consistent` marker read, then the AuthorityDb re-read;
+  * lock-confirmed persistent quarantine, an audit event and a Critical alert;
+  * the S2 periodic check;
+  * the regression matrix RB-01…RB-15 and characterisation tests CT-1…CT-6.
+- **New evidence (read-only probes on `authzed/spicedb:v1.56.2`, security-test stack):**
+  * `at_least_as_fresh` ignores a foreign-datastore token and accepts a future token, echoing it;
+  * `checked_at` equals the exact-snapshot token;
+  * zero-match reads stream no token;
+  * the `at_exact_snapshot` error classes are `Unknown` (different datastore), `OutOfRange` (future or expired) and `InvalidArgument` (malformed).
+
+  No SpiceDB data was written.
+- **Unchanged:**
+  * T16-S stays failing (D8-78);
+  * T16S-1 is open (RR-11);
+  * D8-72 containment is active (RR-12);
+  * C-111 is open;
+  * M4-2 is not started;
+  * nothing is pushed.
+- **Decisions requested:** A-Q1…A-Q3 and B-Q1…B-Q4.
+
+## 38. C-116 design review: revision 2 and focused protocol verification (2026-11-04) — documentation and verification only, nothing implemented
+
+- **Approved:** A-Q1, A-Q3, B-Q1, B-Q3, B-Q4. **Conditional:** A-Q2 and B-Q2, answered in `docs/architecture/PHASE_C8_M4_1_DESIGNS_M1_S1.md` revision 2 (§1.9, §4).
+- **Evidence:** `docs/evidence/phase-c8/m4-1-protocol-verification/`, from throwaway probes on the disposable security-test stack.
+
+| Check | Result |
+|---|---|
+| Revoked user during and after a live datastore restore (E1), today's check / S1 protocol | **44,024 stale allows / 0** |
+| The same with SpiceDB stopped and restarted (E3) | **62,034 / 0** |
+| Snapshot pinned before a restore, decision after (E2/E3) | Exact-snapshot check `ALLOW` with `checked_at = S`, so a pin alone is unsafe; the post-decision `fully_consistent` marker read detected it |
+| Datastore replaced (E4); old dump restored into it under a running SpiceDB (E5) | `FailedPrecondition` (no schema); old exact tokens fail "different datastore instance"; the marker reads detect it |
+| Latency added by S1 (50–150 requests/s, batch 1 and 25) | p95 **8.8–9.8 ms**, p99 11.1–14.4 ms (local only, not PB-09 evidence) |
+| M1 known-answer vector | .NET and Python `cryptography` match byte for byte |
+
+- **Revision 2:** history-bound marker; quarantine on every unchanged-state mismatch; permanent-quarantine trigger; single-use verified snapshot; guarantee G-S1 under I1–I6; residuals RE-1…RE-6.
+- **After the probes,** the security-test SpiceDB datastore holds a restored dump. Recreate the stack (`down -v`) before any shard run.
+- **Unchanged:** T16-S failing (D8-78); T16S-1 open; D8-72 containment active; C-111 open; M4-2 not started; nothing pushed.
+- **Decisions requested:** A-Q2, B-Q2, B-Q5…B-Q9.
+
+## 39. C-117 implementation of S1 and M1; C-118 interim acceptance (2026-11-04/05) — Development/Testing, not pushed, not merged, not independently reviewed
+
+- **C-117:** A-Q2, B-Q2 and B-Q5…B-Q9 approved.
+- **C-118:** interim owner acceptance of S1 and M1, and approval of the V3 change.
+- **Still open:** M4-1, pending the final evidence and an independent security review.
+- **Not authorized:** M4-2, push, PR, merge, deploy, G14 and the RCF-1 fix.
+- **Evidence:** `docs/evidence/phase-c8/m4-1-s1-implementation/` (README, per-shard summaries, latency files).
+- **Operations guide:** `docs/security/PROJECTION_INTEGRITY_S1_OPERATIONS.md`.
+
+### 39.1 Commits (signed, local)
+
+| Commit | Content |
+|---|---|
+| `5f5fb07` | **S1 projection integrity** (57 files). Authority: ports and `VerifiedProjectionSnapshot`; `ProjectionMarker` v2; `ProjectionIntegrityVerifier` (pin, decide, verify, lock-confirmed quarantine); `ProjectionIntegrityMonitor` (marker transition and S2 periodic check); projector changes; migration `20261104231152_ProjectionIntegrityS1` (snapshot-token column, legacy-token check constraint, permanence trigger); metrics; readiness gating. Tests: 21 Authority unit tests; architecture tests ARCH-01…03 and U-09; SpiceDB contract probe CT-1…CT-6; Stage B RB-02…RB-15, T16-S tightened as RB-01, and a latency test. Docs: operations guide; DR §10 item 10 |
+| `9b47a8b` | **M1 sealed Security Auditor notes** (24 files): `IAuditorNoteSealer` and `AesGcmAuditorNoteSealer`; normalization and padding; Authority validation V1–V11; handlers, contracts, OpenAPI and the TypeScript client; the People dialog note field; Authority, contract and Stage B tests |
+| `051a65d` | RC24 test: since the trigger refuses ordinary UPDATEs, it now simulates the privileged G14 clearance. No product change |
+| documentation commit (this section) | C-117 and C-118 records; V3 contract amendment with its equivalence test; risk register; evidence; manifest |
+
+### 39.2 Stage B results by shard (each run on a freshly recreated security-test stack)
+
+| Shard | S1 run at `5f5fb07` | Rerun at `051a65d` (S1 + M1 + RC24 fix) | Status |
+|---|---|---|---|
+| authorization-security-onboarding | **93/93**. An earlier run from the uncommitted working tree was 92/93: an RB-10 test setup error, fixed before the commit | **93/93** | Passed in full at both commits |
+| forms-documents | **38/38** | not rerun | Passed in full at `5f5fb07`; not rerun (M1 does not touch it) |
+| records-lifecycle | **62/62** | not rerun | Passed in full at `5f5fb07`; not rerun |
+| administration-membership | **52/55**, three failures (listed below the table) | **55/55** | Passed in full only at `051a65d` |
+| search-catalogue | **16/17**: `BenchmarkTheVerifiedScopeAt50And150And480Records` failed, because the 480-record scope was refused with `SEARCH_VERIFICATION_LIMIT` (time) | shard not rerun; class `SearchCatalogueTests` alone **11/12** (the same benchmark failure) | **Partial.** See 39.4: the 480-record time-limit refusal is **probably contributed to by S1, not proven** (pre-S1 passed alone at 12.5 s p50; S1 was refused in both runs) |
+| search-execution | **14/14** | not rerun | Passed in full at `5f5fb07`; not rerun |
+| protection-reconciliation | **22/22** | not rerun | Passed in full at `5f5fb07`; not rerun |
+
+The three `administration-membership` failures at `5f5fb07`:
+- **RC24 (caused by S1):** the new permanence trigger refused the test's own SQL clearance. The test was fixed in `051a65d`.
+- **RC19 (environment):** NETSDK1004, because the worktree had never been restored with NuGet.
+- **`StaleAndConcurrentChangesLoseCleanlyAndValidationHolds` (timing, intermittent):** the losing request got a retryable 503 `AUTHORITY_NOT_READY` (`AwaitingArchive`) instead of a 409. Nothing was changed.
+
+**Not every shard passed in full at one commit.**
+- Five shards passed in full at `5f5fb07`.
+- `administration-membership` passed in full only on the rerun at `051a65d`.
+- `search-catalogue` never passed in full. At `051a65d` only its main class was rerun, 11/12, with the same benchmark refusal.
+- Four shards were not rerun at `051a65d`: forms-documents, records-lifecycle, search-execution and protection-reconciliation.
+
+### 39.3 Required tests
+
+| Test | Result (fresh stack) |
+|---|---|
+| T16-S = RB-01 (SpiceDB datastore restored from before a revoke) | **Pass** at `5f5fb07` and `051a65d`: 423 `INTEGRITY_QUARANTINE`; gate `Quarantined`; reason `PROJECTION_MARKER_BEHIND`; one `ProjectionIntegrityQuarantined` journal event; the alert is logged. The revoked auditor and the revoked designer are denied |
+| T16-B (hostile BusinessDb restore) | **Pass** at both commits |
+| RB-02…RB-15 | **Pass** at both commits (cases listed below the table) |
+| CT-1…CT-6 (SpiceDB behaviour contract) | **Pass** at both commits |
+| M1 Stage B `ASealedReasonNoteReachesTheAuthorityAsCiphertextOnlyAndThePlaintextIsNeverKept` | **Pass** at `051a65d` (checks listed below the table) |
+| M1 contract tests (business API) | **Pass**: KAT-M1-01; context binding (organization, target, role, direction, note id); tampering; cross-domain; padding and normalization rules; key provider unavailable (503, nothing sent); no decrypt operation exists |
+| M1 Authority tests | **Pass**: plaintext refused permanently; envelope rules V2–V10; omitted and `null` equivalent (C-118) |
+| Non-stack sweep at the documentation commit | **990/990** (Authority 346 including the new V3 equivalence test, contract 507, architecture 80, integrity 34, platform console 23) |
+
+RB-02…RB-15 cover:
+- shares;
+- field items;
+- team membership;
+- discovery and the catalogue;
+- form permissions;
+- cross-organization isolation;
+- a missing marker;
+- the Authority behind SpiceDB;
+- permanence across restarts, commands, projection and a direct UPDATE;
+- legitimate concurrent changes, which never quarantine;
+- a live restore;
+- a replaced datastore;
+- the periodic check;
+- an outage, which fails closed without quarantine.
+
+The M1 Stage B test checks that:
+- the Authority receives only the envelope with its 2,048-byte ciphertext;
+- the plaintext sentinel appears nowhere: not in a `pg_dump` of AuthorityDb or BusinessDb, the rejected rows, the audit stream, or the api, authority and worker logs;
+- the Authority refuses plaintext;
+- a note id cannot be reused;
+- an idempotent replay is one command;
+- an invalid note sends nothing.
+
+### 39.4 Performance
+
+**Authorization checks** (`AuthorizationLatencyTests`: open loop, host to Authority; fresh stack per run; two runs each; p95 in ms):
+
+| Load | Pre-S1 | S1 | Added (mean) |
+|---|---|---|---|
+| single @ 50 rps | 14.80, 15.59 | 21.86, 21.40 | +6.4 |
+| single @ 150 rps | 20.62, 16.65 | 27.86, 38.63 | +14.6 (+7.2 and +22.0) |
+| batch of 25 @ 50 rps | 16.80, 14.55 | 22.70, 25.62 | +8.5 |
+
+- **B-Q9 target (added p95 ≤ 15 ms):** met at 50 rps. At 150 rps it is **not reliably met** on this laptop: the mean is 14.6 ms, but one run added 22 ms.
+- **Measurement limits:**
+  * one developer laptop, with the owner's dev stack running at the same time;
+  * no TLS, zones or staging data volume;
+  * two runs per configuration.
+- **The staging performance gate decides:** Azure staging PERF-01 under PB-09 conditions is required before production readiness.
+- **Optimizations O-B2 and O-B1:** not implemented; they need separate approval.
+
+**Verified search scope** (`SearchCatalogueTests` benchmark, server ms):
+
+| Run (fresh stack each) | 50 records p50 / p95 | 150 records p50 / p95 | 480 records p50 / p95 |
+|---|---|---|---|
+| Pre-S1 `70894d2`, class alone | 1,990 / 2,132 | 5,738 / 6,197 | **12,481 / 12,952 (passed)** |
+| S1 `5f5fb07`, in the shard | 1,327 / 1,498 | 4,276 / 4,824 | **refused** (`SEARCH_VERIFICATION_LIMIT`, time, 15 s) |
+| S1 + M1 `051a65d`, class alone | 1,561 / 1,697 | 4,451 / 4,717 | **refused** (same) |
+
+- **Verdict: S1 probably contributes, but this is not proven.**
+- **Evidence for an S1 contribution:** like-for-like (class alone, fresh stack), pre-S1 completed 480 records, and S1 was refused in both of its runs.
+- **Evidence against a simple slowdown:**
+  * At 50 and 150 records S1 was *faster* than the pre-S1 run, so run-to-run variance on this laptop (about ±30%) dominates.
+  * Pre-S1 already used 83% of the 15 s budget at 480 records.
+  * Pre-S1 has exceeded the budget on this laptop before (`PHASE_C7_STATUS.md` §15.5).
+  * The comparison is three runs, not a statistical sample.
+- **What S1 adds on this path:**
+  * for each verification batch, one pin (marker read) and one verify (marker read plus AuthorityDb re-read): about 20 extra round trips over the 10 batches of a 480-record scope;
+  * the per-record checks at an exact snapshot instead of `at_least_as_fresh`.
+  * This is enough to push a scope at the edge of the budget over it. It has not been isolated.
+- **Behaviour is safe:**
+  * the refusal is the typed, non-partial fail-closed answer (PB-04);
+  * no result was partial;
+  * no test other than the benchmark failed.
+- **Effect:** on this laptop, verified search near the 500-record ceiling is refused more often. Hosted runners were about 2× faster in C7 (480 records at 6.1 s). Whether S1 changes this on staging is unmeasured.
+- **Possible remedy (not implemented, needs approval):** verify each batch with one bulk check instead of one check per record. This uses the same snapshot and the same S1 protocol. A staging measurement of the search path should be added to PERF-01.
+
+### 39.5 Invariants (as implemented and tested)
+
+- **Every protected SpiceDB decision is pinned and verified:**
+  * permission checks, bulk checks and lookups run at the pinned exact snapshot, and `checked_at`/`looked_up_at` must equal it;
+  * a `fully_consistent` marker read and an AuthorityDb re-read follow every decision;
+  * the single-use `VerifiedProjectionSnapshot` is the only route to the SpiceDB ports (ARCH-01…03).
+- **A confirmed mismatch quarantines the organization:**
+  * only when the Authority state is unchanged;
+  * the quarantine is lock-confirmed and persisted together with an audit-stream event, and a Critical alert follows;
+  * if the Authority state changed in the meantime, the decision is retried; it never results in an allow.
+- **A quarantine is permanent under normal operation:**
+  * no code path clears it;
+  * the trigger refuses, for every role, UPDATEs that clear it or change its reason;
+  * the projector does not write for a quarantined organization;
+  * only a privileged G14 recovery could lift it, and that recovery is not implemented.
+- **A pre-S1 Authority cannot run silently against an S1 database:** the legacy token column is constrained `NULL`. The minimum safe version and the pipeline rule are documented, but the PB-11 pipeline that would enforce it does not exist yet.
+- **Single SpiceDB backend (I3, B-Q8):** a deployment rule that the code cannot enforce. RE-1 is the accepted residual risk.
+- **M1:**
+  * no plaintext note is persisted anywhere;
+  * there is no decrypt operation;
+  * notes are refused when no key provider is configured;
+  * an omitted envelope and a `null` envelope are equivalent.
+
+### 39.6 Remaining defects, risks and deviations
+
+- **Defects:** no known open security defect in S1 or M1 on the tested paths. There has been no independent security review.
+- **Open performance finding P-S1-1:** a 480-record verified search scope is refused at the 15 s budget with S1 on this laptop; S1 probably contributes (§39.4). This is fail-closed, not a security defect. It needs either the bulk-check remedy (approval required) or staging evidence.
+- **Risks:**
+  * RE-1, accepted under I3;
+  * RE-2…RE-6, see `PROJECTION_INTEGRITY_S1_OPERATIONS.md`;
+  * a false quarantine lasts until G14 exists, an availability risk;
+  * RR-13 (RCF-1) and RR-14 (T16-A, needs G14) remain open;
+  * RR-6 and RR-7: archive immutability and AuthorityDb administration in production;
+  * M1 has no production key providers or key rotation yet;
+  * the trigger stops UPDATEs, not DDL by the table owner, who is inside the Authority trust boundary.
+- **Deviations:**
+  * V3, approved in C-118;
+  * B-Q9 not reliably met at 150 rps locally;
+  * the `search-catalogue` shard was not rerun in full at the final commit, and four other shards were not rerun at it.
+- **Observed test flakiness:** the membership race test once got a retryable 503 (`AwaitingArchive`). The test still expects only 409s, and is unchanged here.
+
+## 40. C-119: final Stage B reruns, P-S1-1 investigation and the independent review package (2026-11-05/06). Development/Testing, not pushed, not independently reviewed
+
+Owner decision C-119: S1 and M1 accepted **as implemented, for the purpose of independent review**. This does not close M4-1 and is not independent approval.
+
+- M4-2 is unauthorized.
+- No push, PR, merge or deploy.
+- No G14 or RCF-1 work.
+
+Code baseline: `f117995`, with no product or test change since. This section and its evidence are documentation only.
+
+### 40.1 Final Stage B matrix at `f117995` (fresh stack per run; a failed shard rerun once, except the known benchmark)
+
+| Shard | Final pass | Single rerun | Full pass at `f117995`? |
+|---|---|---|---|
+| forms-documents | 38/38 | not needed | yes |
+| authorization-security-onboarding | 92/93: `SecurityAdministratorTests.BrowserSessionsNeedCsrfAndKeepNoPrivilegeAfterRemovalOrSignOut`, 423 | 92/93, the same | **no** |
+| records-lifecycle | 62/62 | not needed | yes |
+| administration-membership | 55/55 | not needed | yes |
+| search-catalogue | 16/17: the 480-record benchmark refused (`time`, P-S1-1) | not rerun (known finding) | **no** |
+| search-execution | 14/14 | not needed | yes |
+| protection-reconciliation | incomplete: 1 failure, then the host slept during the next test | 22/22 | yes (rerun) |
+
+**Five of seven shards pass in full at `f117995`. The Stage B suite is not green.**
+
+**Failures:**
+- **Authorization failure, reproducible, a test-isolation defect:**
+  * RB-13 swaps in an empty SpiceDB datastore, and S1 then quarantines every organization on the stack (`PROJECTION_SCHEMA_MISSING`; 18 organizations in one burst in the rerun);
+  * those include the seeded development organization (`01a1aee5-0415…`, the earliest on the stack, created by dev-seed), which the browser-session tests share;
+  * a later seeded-organization test therefore gets 423;
+  * S1 behaved as designed;
+  * it passed at `5f5fb07` and `051a65d`, so test order evidently varies between runs;
+  * the fix, not implemented, is a test change for owner decision: isolate the tests that destroy the whole datastore.
+- **Protection-reconciliation final-pass failure:** `TheCatalogueCeilingEndsIncompleteAndExpiredSnapshotsAreRenewedSafely` expected round 1 and saw round 2 of a correctly blocked reconciliation. It did not recur in the rerun. Recorded as intermittent timing; the cause has not been investigated.
+
+**Evidence:** `docs/evidence/phase-c8/m4-1-s1-implementation/shards-final-f117995-*.txt`, `shards-final-rerun-f117995-*.txt`, `shards-final-rerun-f117995-quarantine-alerts.txt`.
+
+### 40.2 P-S1-1 investigation (Opus)
+
+**Method:** a throwaway timing probe on `f117995`, never committed, with its diff kept as evidence. One run of the benchmark class on a fresh stack. Per 50-record Authority batch (median):
+
+| Component | Time | Share of the batch |
+|---|---|---|
+| S1 pin | 2.8 ms | 0.7%, together with the verify |
+| S1 verify | 4.6 ms | |
+| 50 single-record SpiceDB checks | 182 ms | 19% |
+| 400 per-leaf MAC verifications | 556 ms | 54% |
+| Other AuthorityDb reads and processing | 272 ms | 27% |
+
+**Business side:** sequential BusinessDb content reads took about a third of the search.
+
+**480-record scope:** refused again. In the 8 of 10 batches that finished, S1's pin and verify took 68 ms in total.
+
+**Conclusion, for the independent reviewer to confirm:** the refusal is a capacity limit that predates S1, not an S1 regression. The pre-S1 480-record figure (12.5 s) is below a linear extrapolation of its own 150-record figure, and this is unexplained.
+
+**Proposal** (`docs/architecture/PHASE_C8_M4_1_P_S1_1_SEARCH_OPTIMIZATION_PROPOSAL.md`; nothing implemented):
+- O-1: batch-level bulk SpiceDB checks, with result mapping by echoed request and fail-the-call on per-item errors; about −1.4 s at 480 records;
+- O-2: batched BusinessDb content reads, no authorization change; about −4 to −5 s;
+- O-3 and O-4: concurrent MAC verification and batched AuthorityDb reads, deferred to PERF-01;
+- rejected options listed in the proposal.
+
+**New PERF-01 observation:** 3,840 HMAC verifications per 480-record search against Managed HSM in production.
+
+### 40.3 Independent review package
+
+`docs/architecture/PHASE_C8_M4_1_S1_M1_INDEPENDENT_REVIEW_PACKAGE.md`:
+- the eight owner questions, with the source, test and evidence paths for each;
+- how to reproduce;
+- limitations;
+- the final matrix;
+- the P-S1-1 summary;
+- the findings and attestation templates.
+
+**It has not been submitted:** no independent reviewer is available inside this session, and an AI agent acting for the owner or Claude is excluded by the package's own independence rule. The owner sends it to a reviewer.
+
+### 40.4 Open items
+
+- the Stage B suite is not green: the RB-13 test-isolation defect, and P-S1-1;
+- independent security review not started;
+- PERF-01 and the Azure staging recovery evidence remain mandatory;
+- §39.6 risks unchanged.

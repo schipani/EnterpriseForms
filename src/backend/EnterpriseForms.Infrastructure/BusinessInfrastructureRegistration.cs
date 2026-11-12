@@ -52,17 +52,23 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<IAuthorizationAuthorityClient>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IBrowserSessionStateAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IFieldSearchPolicyAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
+        services.AddSingleton<ISearchIndexAdministrationAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>()); // IX-2 rebuild
+        services.AddSingleton<IIndexedSearchAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>()); // IX-3 indexed query (Shadow)
+        services.AddSingleton<IIndexedRecordListAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>()); // IX-6 indexed My Records
         services.AddSingleton<ISecurityAdministratorAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IOrganizationRosterAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IOwnerRecoveryNoticeAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<ITestStackIdentityAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.Ports.IRecordDisplayDirectory, EnterpriseForms.Application.Features.FormRecords.Ports.RecordDisplayDirectory>();
         services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearchPolicy.FieldSearchPolicyHandlers>();
+        services.AddSingleton<EnterpriseForms.Application.Features.Search.IndexBuilder.SearchIndexAdministrationHandler>();
 
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AuthorityCommandAwaiter>();
         // Every host gets the no-op fault seam; only the Testing API host replaces it (TestingWriteFaults, F-C7-01).
         services.TryAddSingleton<EnterpriseForms.Application.Common.IWriteFaultInjector>(EnterpriseForms.Application.Common.NoWriteFaults.Instance);
+        // C-137 (R-37): every host gets the no-op timing sink; only a Development/Testing API host replaces it (TestingOperationTiming).
+        services.TryAddSingleton<EnterpriseForms.Application.Common.IOperationTimingSink>(EnterpriseForms.Application.Common.NoOperationTiming.Instance);
         services.AddSingleton<RecordCandidateStager>();
         services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.Ports.IAcceptedRecordItemsReader, EnterpriseForms.Application.Features.FormRecords.Ports.AcceptedRecordItemsReader>();
         services.AddSingleton<VerifiedRecordReader>();
@@ -73,6 +79,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<FormAccessHandlers>();
         services.AddSingleton<SecurityPolicyHandlers>();
         services.AddSingleton<SecurityAdministratorsHandlers>();
+        services.AddSingleton<SecurityAuditorsHandlers>();
         services.AddSingleton<OwnerRecoveryNoticeHandlers>();
         services.AddSingleton<EnterpriseForms.Application.Features.Identity.MemberAdministration.MemberAdministrationHandlers>();
         services.AddSingleton<CreateFormRecordHandler>();
@@ -147,5 +154,7 @@ public static class BusinessInfrastructureRegistration
 
         services.AddSingleton<IFileEncryptionService, AesGcmFileEncryptionService>();
         services.AddSingleton<IFieldEncryptionService, AesGcmFieldEncryptionService>();
+        // C8 M4 M1: seal-only Security Auditor reason notes (same primitive and key provider, its own AAD context; no decrypt anywhere).
+        services.AddSingleton<EnterpriseForms.Application.Features.Organizations.ReasonNotes.IAuditorNoteSealer, EnterpriseForms.Infrastructure.Features.Organizations.AesGcmAuditorNoteSealer>();
     }
 }

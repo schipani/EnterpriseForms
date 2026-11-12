@@ -1,3 +1,4 @@
+using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.Catalogue;
@@ -14,14 +15,21 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace AuthorizationAuthority.Infrastructure.Persistence;
 
-/// <summary>EF Core implementation of the authority store port. One DbContext + one transaction per scope.</summary>
-public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> contextFactory) : IAuthorityStore
+/// <summary>
+/// EF Core implementation of the authority store port. One DbContext + one transaction per scope.
+/// C-150 R56-B: a scope that appended to the authorization stream notifies <see cref="AuthorityWorkOptions.NotificationChannel"/> inside its
+/// transaction (PostgreSQL delivers it to every listening Authority instance only if the transaction commits) and signals this instance's
+/// work loop after the commit returned. Neither is a statement that work exists or completed; the loop reads durable state.
+/// </summary>
+public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> contextFactory, AuthorityWorkSignal? workSignal = null, AuthorityWorkOptions? workOptions = null) : IAuthorityStore
 {
+    private readonly AuthorityWorkSignal? wakeup = workOptions?.CommitWakeupEnabled == true ? workSignal : null;
+
     public async Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken)
     {
         var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken).ConfigureAwait(false);
-        return new AuthorityScope(context, transaction);
+        return new AuthorityScope(context, transaction, wakeup);
     }
 
     public async Task<IAuthorityScope> BeginReadOnlySnapshotScopeAsync(CancellationToken cancellationToken)
@@ -29,7 +37,7 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, cancellationToken).ConfigureAwait(false);
         await context.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", cancellationToken).ConfigureAwait(false);
-        return new AuthorityScope(context, transaction);
+        return new AuthorityScope(context, transaction, null);
     }
 
     public async Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken cancellationToken)
@@ -40,9 +48,32 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         return await projection.Union(archive).Distinct().ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction) : IAuthorityScope
+    public async Task<IReadOnlyList<Guid>> GetAllOrganizationIdsAsync(CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        return await context.OrganizationStates.AsNoTracking().OrderBy(o => o.OrganizationId).Select(o => o.OrganizationId).ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<OrganizationChangeMarker>> GetOrganizationChangeMarkersAsync(CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        return await context.OrganizationStates.AsNoTracking().OrderBy(o => o.OrganizationId)
+            .Select(o => new OrganizationChangeMarker(o.OrganizationId, o.AuthorizationRevision, o.ContentIntegrityRevision, o.AuditJournalRevision))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction, AuthorityWorkSignal? wakeup) : IAuthorityScope
     {
         private bool committed;
+        private bool authorizationWorkAppended;
+        private SearchIndexStore? searchIndex;
+
+        /// <summary>IX-1: the search index on this scope's context and transaction.</summary>
+        public ISearchIndexStore SearchIndex => searchIndex ??= new SearchIndexStore(context);
+
+        private SearchAccessStore? searchAccess;
+
+        public ISearchAccessStore SearchAccess => searchAccess ??= new SearchAccessStore(context);
 
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>
             context.OrganizationStates.FromSqlInterpolated($"SELECT * FROM authority.organization_authorization_states WHERE organization_id = {organizationId} FOR UPDATE")
@@ -120,6 +151,11 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken) =>
             context.SecurityCommands.FirstOrDefaultAsync(c => c.OrganizationId == organizationId && c.CommandIdempotencyKey == idempotencyKey, cancellationToken);
 
+        public Task<List<string>> GetCommandPayloadsAsync(Guid organizationId, IReadOnlyCollection<string> commandKinds, CancellationToken cancellationToken) =>
+            context.SecurityCommands.AsNoTracking()
+                .Where(c => c.OrganizationId == organizationId && commandKinds.Contains(c.CommandKindName) && c.CommandStateName != SecurityCommandStates.Rejected)
+                .Select(c => c.CommandPayloadJson).ToListAsync(cancellationToken);
+
         public Task<SecurityCommand?> FindCommandAsync(Guid securityCommandId, CancellationToken cancellationToken) =>
             context.SecurityCommands.FirstOrDefaultAsync(c => c.SecurityCommandId == securityCommandId, cancellationToken);
 
@@ -130,7 +166,12 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public Task<ProjectionOutboxEvent?> FindOutboxEventAsync(Guid organizationId, long targetAuthorizationRevision, CancellationToken cancellationToken) =>
             context.ProjectionOutbox.FirstOrDefaultAsync(e => e.OrganizationId == organizationId && e.TargetAuthorizationRevision == targetAuthorizationRevision, cancellationToken);
 
-        public void AddJournalEntry(SecurityJournalEntry entry) => context.JournalEntries.Add(entry);
+        public void AddJournalEntry(SecurityJournalEntry entry)
+        {
+            context.JournalEntries.Add(entry);
+            // C-150 R56-B: an authorization-stream entry is projection and archive work that keeps the organization gate closed until done.
+            authorizationWorkAppended |= string.Equals(entry.JournalStreamName, JournalStreamNames.Authorization, StringComparison.Ordinal);
+        }
 
         public Task<SecurityJournalEntry?> FindJournalEntryAsync(Guid organizationId, string streamName, long streamRevision, CancellationToken cancellationToken) =>
             context.JournalEntries.FirstOrDefaultAsync(j => j.OrganizationId == organizationId && j.JournalStreamName == streamName && j.JournalStreamRevision == streamRevision, cancellationToken);
@@ -171,6 +212,20 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public void AddManifestCommit(RecordManifestCommit commit) => context.ManifestCommits.Add(commit);
 
         public void AddManifestLeaves(IEnumerable<RecordManifestLeaf> leaves) => context.ManifestLeaves.AddRange(leaves);
+
+        public Task<List<ContentItemIdentity>> FindItemIdentitiesAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken)
+        {
+            var ids = manifestItemIds.Distinct().ToList();
+            return context.ContentItemIdentities.AsNoTracking().Where(i => ids.Contains(i.ManifestItemId)).ToListAsync(cancellationToken);
+        }
+
+        public void AddItemIdentities(IEnumerable<ContentItemIdentity> identities) => context.ContentItemIdentities.AddRange(identities);
+
+        public Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken)
+        {
+            var ids = manifestItemIds.Distinct().ToList();
+            return context.ManifestLeaves.AsNoTracking().Where(l => ids.Contains(l.ManifestItemId)).Select(l => l.ManifestItemId).Distinct().ToListAsync(cancellationToken);
+        }
 
         public Task<List<RecordManifestLeaf>> GetManifestLeavesAsync(Guid recordManifestCommitId, CancellationToken cancellationToken) =>
             context.ManifestLeaves.AsNoTracking().Where(l => l.RecordManifestCommitId == recordManifestCommitId).OrderBy(l => l.ManifestLeafPosition).ToListAsync(cancellationToken);
@@ -575,8 +630,19 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public async Task CommitAsync(CancellationToken cancellationToken)
         {
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            var notify = wakeup is not null && authorizationWorkAppended;
+            if (notify)
+            {
+                // Transactional: queued now, delivered by PostgreSQL to every listener only when this transaction commits (never on rollback).
+                await context.Database.ExecuteSqlRawAsync("SELECT pg_notify('" + AuthorityWorkOptions.NotificationChannel + "', '')", cancellationToken).ConfigureAwait(false);
+            }
+
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             committed = true;
+            if (notify)
+            {
+                wakeup!.Signal(AuthorityWorkSignalSource.Commit); // after the commit returned: this instance looks at once
+            }
         }
 
         public async ValueTask DisposeAsync()

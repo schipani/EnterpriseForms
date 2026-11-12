@@ -27,8 +27,7 @@
           { "context": "Specifications, manifest and integrity vectors" },
           { "context": ".NET build, architecture tests, contract tests" },
           { "context": "Frontend lint, typecheck, tests, build, generated client drift" },
-          { "context": "Docker Compose profiles validate" },
-          { "context": "Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e" }
+          { "context": "Docker Compose profiles validate" }
         ]
       }
     }

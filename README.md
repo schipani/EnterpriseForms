@@ -35,6 +35,10 @@ The current documentation references three **future generated or finalized artif
 
 ## Stage B local run (Accused vertical slice)
 
+> **Stage B testing is release-only** (owner policy C-131, `docs/testing/STAGE_B_RELEASE_ONLY_POLICY.md`): the Stage B
+> integration groups and the full browser suite run only for owner-authorized release testing. The commands below start the
+> application stack; they do not run Stage B.
+
 Stage A's security gate remains **BLOCKED** (independent cryptographic review not performed); Stage B is a feature
 milestone on top of it, not a production or Level 2 claim. Status, test evidence and open defects:
 `docs/STAGE_B_STATUS.md`.

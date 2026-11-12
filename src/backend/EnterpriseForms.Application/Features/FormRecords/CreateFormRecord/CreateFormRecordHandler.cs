@@ -27,7 +27,7 @@ namespace EnterpriseForms.Application.Features.FormRecords.CreateFormRecord;
 /// is deleted or repaired from business-database data, and only one content revision can be accepted for the creation.
 /// </para>
 /// </summary>
-public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, RecordCandidateStager stager, TimeProvider clock, Encryption.IFieldEncryptionService encryption, Projection.VerifiedRecordReader reader, IWriteFaultInjector faults)
+public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, RecordCandidateStager stager, TimeProvider clock, Encryption.IFieldEncryptionService encryption, Projection.VerifiedRecordReader reader, IWriteFaultInjector faults, IOperationTimingSink timing)
 {
     public Task<FormRecordResponse> HandleAsync(RequestContext context, Guid formDefinitionId, CreateFormRecordRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
@@ -80,6 +80,42 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(values);
 
+        // C-137 (R-37): phase durations for the optional diagnostics sink (the no-op sink measures nothing).
+        var timer = new OperationPhaseTimer(timing);
+        var outcome = "Created";
+        try
+        {
+            return await CreateCoreAsync(context, formDefinitionId, values, groupValues, ownerTeamId, child, idempotencyKey, timer, cancellationToken).ConfigureAwait(false);
+        }
+        catch (BusinessException ex)
+        {
+            outcome = ex.ErrorCode;
+            throw;
+        }
+        catch (AuthorityClientException ex)
+        {
+            outcome = ex.ErrorCode;
+            throw;
+        }
+        catch (PendingCommandException)
+        {
+            outcome = "COMMAND_PENDING";
+            throw;
+        }
+        catch (Exception ex)
+        {
+            outcome = ex.GetType().Name;
+            throw;
+        }
+        finally
+        {
+            timer.Complete(child is null ? "CreateRecord" : "CreateChildRecord", context.OrganizationId, outcome);
+        }
+    }
+
+    private async Task<FormRecordResponse> CreateCoreAsync(RequestContext context, Guid formDefinitionId, IReadOnlyDictionary<string, string> values, IReadOnlyList<RecordGroupValuesRequest>? groupValues, Guid? ownerTeamId, (Guid ParentId, FormRelationshipDefinition Relationship, int SortOrder)? child, string idempotencyKey, OperationPhaseTimer timer, CancellationToken cancellationToken)
+    {
+
         Domain.Features.FormDefinitions.FormDefinition definition;
         Domain.Features.FormDefinitions.FormVersion version;
         List<Domain.Features.FormDefinitions.FieldDefinition> fields;
@@ -101,6 +137,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             groups = await scope.GetGroupDefinitionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false);
         }
 
+        timer.Mark("load_form");
         var layout = FormLayoutCodec.Parse(version.LayoutJson);
         var now = clock.GetUtcNow();
         var formRecordId = CreateFormDefinitionHandler.DeterministicId(idempotencyKey, "record");
@@ -109,6 +146,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             groups: new CandidateBuilder.GroupInput(groups, [], RecordGroupWrites.From(groupValues)));
         var candidateValues = applied.Rows;
         CandidateBuilder.EnsureWithinCeiling(candidateValues.Count + applied.Occurrences.Count + 1);
+        timer.Mark("validate");
 
         if (child is null)
         {
@@ -119,10 +157,13 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             }
         }
 
+        timer.Mark("permission_create");
         var canonicalRequest = CreationRequestFingerprint.Canonicalize(new CreationRequestFingerprint.Request(context.IssuerUri, context.SubjectIdentifier, formDefinitionId, ownerTeamId, child?.ParentId, child?.Relationship.FormRelationshipDefinitionId, values, groupValues));
         await RequireSameRequestAsync(context, formRecordId, canonicalRequest, now, cancellationToken).ConfigureAwait(false);
+        timer.Mark("request_fingerprint");
 
         var revisionDecision = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.ManageOrganization), cancellationToken).ConfigureAwait(false);
+        timer.Mark("permission_revision");
         var payload = JsonSerializer.SerializeToElement(new
         {
             form_record_id = formRecordId,
@@ -131,9 +172,13 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             parent_form_record_id = child?.ParentId,
             form_relationship_definition_id = child?.Relationship.FormRelationshipDefinitionId,
         });
-        var command = await awaiter.SubmitAndAwaitAsync(context.ToDelegatedUser(), new SecurityCommandRequest(
+        // Equivalent to AuthorityCommandAwaiter.SubmitAndAwaitAsync, split so the submit and the Effective wait are timed apart.
+        var submitted = await awaiter.Authority.SubmitSecurityCommandAsync(context.ToDelegatedUser(), new SecurityCommandRequest(
             context.OrganizationId, SecurityCommandKind.RegisterRecord, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), revisionDecision.AuthorizationRevision, payload, child is null ? "create record" : "create child record"),
             "record:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
+        timer.Mark("command_submit");
+        var command = await awaiter.AwaitAsync(context.ToDelegatedUser(), submitted, cancellationToken, onPoll: timer.Poll).ConfigureAwait(false);
+        timer.Mark("command_effective_wait");
         if (command.CommandStatus != SecurityCommandStatus.Effective)
         {
             throw new PendingCommandException(new CommandOutcome(command.CommandId, command.CommandStatus.ToString(), command.AuthorizationRevision, false));
@@ -186,8 +231,10 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             }
         }
 
+        timer.Mark("business_row");
         faults.Checkpoint(WriteFaultCheckpoints.RecordProjected);
         var head = await authority.GetCommittedContentRevisionAsync(context.ToDelegatedUser(), context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
+        timer.Mark("content_head");
         if (head.CommittedContentRevision > 1)
         {
             // A retry of a creation that was accepted and edited since: the current verified record, never a new version.
@@ -228,12 +275,15 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             faults.Checkpoint(WriteFaultCheckpoints.ContentCommitted);
         }
 
+        timer.Mark("content_commit");
         if (accepted.CommittedOperationId is { } acceptedOperation)
         {
             await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
             await scope.ProjectAcceptedHeadAsync(context.OrganizationId, formRecordId, accepted.CommittedContentRevision, acceptedOperation, cancellationToken).ConfigureAwait(false);
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
+
+        timer.Mark("head_projection");
 
         var fieldsById = fields.ToDictionary(f => f.FieldDefinitionId);
         var optionsById = options.ToDictionary(o => o.FieldOptionId);

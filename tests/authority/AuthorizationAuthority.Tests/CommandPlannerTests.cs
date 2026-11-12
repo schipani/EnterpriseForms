@@ -365,6 +365,10 @@ public sealed class CommandPlannerTests
     /// <summary>In-memory scope: only the lookups the planner needs. Cross-organization lookups return nothing (tenant binding).</summary>
     private sealed class FakeScope(Guid organizationId) : IAuthorityScope
     {
+        public ISearchIndexStore SearchIndex => throw new NotSupportedException();
+
+        public ISearchAccessStore SearchAccess => throw new NotSupportedException();
+
         public List<AuthorityResource> Resources { get; } = [];
 
         public List<IdentityBinding> Bindings { get; } = [];
@@ -442,6 +446,8 @@ public sealed class CommandPlannerTests
 
         public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid org, string key, CancellationToken ct) => throw new NotSupportedException();
 
+        public Task<List<string>> GetCommandPayloadsAsync(Guid organizationId, IReadOnlyCollection<string> commandKinds, CancellationToken cancellationToken) => Task.FromResult(new List<string>());
+
         public void AddCommand(SecurityCommand command) => throw new NotSupportedException();
 
         public void AddOutboxEvent(ProjectionOutboxEvent outboxEvent) => throw new NotSupportedException();
@@ -473,6 +479,12 @@ public sealed class CommandPlannerTests
         public void AddManifestCommit(RecordManifestCommit commit) => throw new NotSupportedException();
 
         public void AddManifestLeaves(IEnumerable<RecordManifestLeaf> leaves) => throw new NotSupportedException();
+
+        public Task<List<ContentItemIdentity>> FindItemIdentitiesAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddItemIdentities(IEnumerable<ContentItemIdentity> identities) => throw new NotSupportedException();
+
+        public Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public void AddContentCheckpoint(ContentIntegrityCheckpoint checkpoint) => throw new NotSupportedException();
 

@@ -1,0 +1,9 @@
+RACE baseline:ALLOW count=62034 first_at=14.9s
+RACE baseline:DENY count=4792 first_at=0.5s
+RACE baseline:RPC_Unavailable:Error connecting to subchannel. count=82180 first_at=10.1s
+RACE baseline:RPC_Unavailable:Error starting gRPC call. HttpRequestException count=3 first_at=10.1s
+RACE protocol:DENY count=4788 first_at=0.5s
+RACE protocol:M1_MISMATCH count=62037 first_at=14.9s
+RACE protocol:RPC_Unavailable:Error connecting to subchannel. count=82180 first_at=10.1s
+RACE protocol:RPC_Unavailable:Error starting gRPC call. HttpRequestException count=4 first_at=10.1s
+RACE protocol:ALLOW for revoked user = 0 (must be 0)

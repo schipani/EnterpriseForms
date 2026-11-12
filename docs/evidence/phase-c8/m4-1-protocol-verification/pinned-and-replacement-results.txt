@@ -1,0 +1,13 @@
+# S1 probe, modes "pin"/"afterpin"/"once", verbatim output, 2026-11-04 (u1 = the revoked user, u2 = kept user).
+--- E2: pin before restore (marker 2 = after revoke), restore dump taken at marker 1 into the live datastore, then decide (no SpiceDB restart)
+PIN markers=[2] expected=2 S=GiQKGENMRWJJTEFiS0xEb3NLWE5rNzd5R0E9PRIIZGM5YzFhMGE=
+AFTERPIN revoked-user check at pinned S = ALLOW checked_at=S; marker at S = [1]; M2 fully_consistent markers = [1] expected=2 => protocol DENIES (M2 mismatch)
+ONCE user=u1(revoked) baseline_at_least_as_fresh=ALLOW exact_at_authority_token=ALLOW protocol=M1_MISMATCH:1 head_markers=[1]
+--- E3: as E2 but SpiceDB stopped during the restore and restarted
+PIN markers=[2] expected=2 S=GiQKGENQb2JJUGtiS05DdHFKV2NsTDd5R0E9PRIIZGM5YzFhMGE=
+AFTERPIN revoked-user check at pinned S = ALLOW checked_at=S; marker at S = [1]; M2 fully_consistent markers = [1] expected=2 => protocol DENIES (M2 mismatch)
+--- E4: datastore replaced by a fresh migrated empty one (SpiceDB restarted; schema not rewritten because the Authority was not restarted)
+marker read => Grpc.Core.RpcException: Status(StatusCode="FailedPrecondition", Detail="object definition `organization` not found")
+--- E5: the E3 dump restored into the replacement datastore while SpiceDB keeps running
+ONCE user=u1(revoked) baseline_at_least_as_fresh=ALLOW exact_at_authority_token=RPC_Unknown:ZedToken specified references a different datastore instance but at-exact-snapshot was requested protocol=M1_MISMATCH:1 head_markers=[1]
+AFTERPIN revoked-user check at pinned S = RPC_Unknown:ZedToken specified references a different datastore instance but at-exact-snapshot was requested; marker at S = [RPC_Unknown:ZedToken specified references a different datastore instance but at-exact-snapshot was requested]; M2 fully_consistent markers = [1] expected=2 => protocol DENIES (M2 mismatch)

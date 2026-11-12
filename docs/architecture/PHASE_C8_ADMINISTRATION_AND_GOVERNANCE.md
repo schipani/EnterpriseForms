@@ -260,6 +260,8 @@ Manual NVDA/VoiceOver review remains outstanding, as for every earlier page.
 
 ### M4 — AC-8: governance audit and security home (Authority change; needs D8-6/D8-7)
 
+> **C-108 (2026-11-04):** superseded in detail by `PHASE_C8_M4_AC8_SECURITY_CONTRACT.md` (proposal, stopped at the AC-8 approval checkpoint; decisions D8-62…D8-70). D8-6 and D8-7 are unchanged.
+
 - **Functional:**
   * Audit explorer (PG-054): chronological business `audit_events` for the organization, with filters (date, actor, action, outcome, entity, correlation), keyset pagination ordered by `(event_occurred_on, audit_sequence)` and labelled as event-time order, not commit order;
   * Event detail (PG-055), with redaction as stored;

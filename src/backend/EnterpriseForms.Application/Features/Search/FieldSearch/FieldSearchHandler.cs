@@ -28,8 +28,11 @@ namespace EnterpriseForms.Application.Features.Search.FieldSearch;
 /// </para>
 /// </summary>
 public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPolicyAuthority policy, TrustedScopeVerifier verifier, FieldSearchAdmission admission,
-    IAuthorizationAuthorityClient authority, IOpaqueCursorProtector cursors, IRecordDisplayDirectory directory, TimeProvider clock)
+    IAuthorizationAuthorityClient authority, IOpaqueCursorProtector cursors, IRecordDisplayDirectory directory, TimeProvider clock, FieldSearchShadowComparer? shadow = null,
+    FieldSearchIndexedEngine? indexedEngine = null, IFieldSearchEngineObserver? engineObserver = null, FieldSearchRetryPolicy? retryPolicy = null)
 {
+    private readonly FieldSearchRetryPolicy retry = retryPolicy ?? new FieldSearchRetryPolicy(limits, clock, engineObserver);
+
     public const string ConditionJoinAnd = "And";
 
     public const string CompletenessComplete = "Complete";
@@ -70,10 +73,53 @@ public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPol
     /// <summary>Authorizes every condition against the Authority's capabilities, then (gate on) runs the verified search.</summary>
     public async Task<FieldSearchResponse> SearchAsync(RequestContext context, FieldSearchRequest? request, CancellationToken cancellationToken)
     {
+        var (response, failure, _) = await ExecuteAsync(context, request, forceShadow: false, cancellationToken).ConfigureAwait(false);
+        if (failure is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
+        }
+
+        return response!;
+    }
+
+    /// <summary>
+    /// IX-3: the V1 search exactly as before; with <c>FieldSearch:Engine=Shadow</c> the indexed engine is then compared (R1 §G.3).
+    /// V1's answer or failure is returned unchanged; the comparison never alters it. Validation and predicate-authorization
+    /// refusals are thrown directly (nothing executed, nothing to compare).
+    /// <para>
+    /// IX-4: with <c>FieldSearch:Engine=Indexed</c> and a browser session, the Authority's indexed engine answers
+    /// (<see cref="FieldSearchIndexedEngine"/>). When the index cannot answer (IX-D8), the complete, unmodified V1 path runs instead,
+    /// only within V1's limits (a V1 limit refusal returns the index's reason) and the response says so (<c>ResultBasis</c>
+    /// <c>VerifiedScan</c>); one search never combines engines. Without a browser session (bearer API callers) the result snapshot
+    /// cannot be bound to a session (§18.4), so V1 answers (D-IX4-2). <paramref name="forceShadow"/> (Testing endpoint) always runs
+    /// V1 with the shadow comparison, under either engine.
+    /// </para>
+    /// </summary>
+    public async Task<(FieldSearchResponse? Response, SearchException? Failure, FieldSearchShadowComparison? Shadow)> ExecuteAsync(RequestContext context, FieldSearchRequest? request, bool forceShadow, CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(context);
         FieldSearchRequestValidator.Validate(request, limits);
         var conditions = request!.Conditions ?? [];
-        var capabilities = await policy.GetFieldSearchCapabilitiesAsync(context.ToDelegatedUser(), new FieldSearchCapabilitiesQuery(context.OrganizationId, request.FormDefinitionId), cancellationToken).ConfigureAwait(false);
+        // C-150 R56-A: one retry budget for the whole request (capability check and search attempts together).
+        var retries = retry.Begin();
+        AuthorityFieldSearchCapabilities capabilities;
+        while (true)
+        {
+            try
+            {
+                capabilities = await policy.GetFieldSearchCapabilitiesAsync(context.ToDelegatedUser(), new FieldSearchCapabilitiesQuery(context.OrganizationId, request.FormDefinitionId), cancellationToken).ConfigureAwait(false);
+                break;
+            }
+            catch (AuthorityClientException ex) when (FieldSearchRetryPolicy.IsRetryable(ex))
+            {
+                // A closed organization gate refuses the capability check too (503 AUTHORITY_NOT_READY): the same bounded backoff, a fresh call.
+                if (!await retry.WaitBeforeRetryAsync(retries, "capabilities", ex.ErrorCode, context.CorrelationId, null, cancellationToken).ConfigureAwait(false))
+                {
+                    throw;
+                }
+            }
+        }
+
         var allowed = capabilities.PlaintextSearchPermitted ? capabilities.Fields.ToDictionary(f => f.FieldDefinitionId) : [];
         for (var index = 0; index < conditions.Count; index++)
         {
@@ -100,11 +146,82 @@ public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPol
             throw SearchException.TrustedSearchNotEnabled();
         }
 
+        if (!forceShadow && indexedEngine is { Enabled: true } && context.SessionDigestBase64 is not null)
+        {
+            var (indexedResponse, indexedFailure) = await ExecuteIndexedAsync(context, request!, conditions, retries, cancellationToken).ConfigureAwait(false);
+            return (indexedResponse, indexedFailure, null);
+        }
+
+        FieldSearchResponse? response = null;
+        SearchException? failure = null;
+        List<Guid>? orderedIds = null;
+        try
+        {
+            (response, orderedIds) = await ExecuteVerifiedAsync(context, request!, conditions, null, retries, cancellationToken).ConfigureAwait(false);
+        }
+        catch (SearchException ex)
+        {
+            failure = ex;
+        }
+
+        FieldSearchShadowComparison? comparison = null;
+        if (shadow is not null && shadow.CanCompare(forceShadow))
+        {
+            comparison = await shadow.CompareAsync(context, request!, failure is null ? FieldSearchV1Outcome.Success(orderedIds!) : FieldSearchV1Outcome.Failure(failure), forceShadow, cancellationToken).ConfigureAwait(false);
+        }
+
+        return (response, failure, comparison);
+    }
+
+    /// <summary>
+    /// IX-4: the indexed engine, then — only when the index cannot answer — the complete V1 path within V1's limits (IX-D8, §17.2 Q2).
+    /// The indexed admission lease is released before V1 takes its own. S1, record quarantine, limits and authorization refusals of the
+    /// indexed engine are final: they never fall back.
+    /// </summary>
+    private async Task<(FieldSearchResponse? Response, SearchException? Failure)> ExecuteIndexedAsync(RequestContext context, FieldSearchRequest request, IReadOnlyList<FieldSearchCondition> conditions, FieldSearchRetryPolicy.Budget retries, CancellationToken cancellationToken)
+    {
+        IndexedSearchUnavailableException unavailable;
+        try
+        {
+            return (await indexedEngine!.SearchAsync(context, request, retries, cancellationToken).ConfigureAwait(false), null);
+        }
+        catch (SearchException ex)
+        {
+            return (null, ex);
+        }
+        catch (IndexedSearchUnavailableException ex)
+        {
+            unavailable = ex;
+        }
+
+        try
+        {
+            var (response, _) = await ExecuteVerifiedAsync(context, request, conditions,
+                " The search index could not answer this search, so every record in scope was verified instead.", retries, cancellationToken).ConfigureAwait(false);
+            engineObserver?.FallbackToVerifiedScan(unavailable.IndexReason, "COMPLETED");
+            return (response, null);
+        }
+        catch (SearchException ex) when (ex.ErrorCode == SearchErrorCodes.VerificationLimit)
+        {
+            // Outside V1's limits the fallback does not apply: the index's own reason is returned (R1 §G.2).
+            engineObserver?.FallbackToVerifiedScan(unavailable.IndexReason, "V1_LIMIT");
+            return (null, SearchException.VerificationUnavailable(unavailable.IndexReason, unavailable.Retryable));
+        }
+        catch (SearchException ex)
+        {
+            engineObserver?.FallbackToVerifiedScan(unavailable.IndexReason, ex.ErrorCode);
+            return (null, ex);
+        }
+    }
+
+    /// <summary>The V1 verified scan (Phase C7 M3), unchanged; the admission slot is released before any shadow comparison.</summary>
+    private async Task<(FieldSearchResponse Response, List<Guid> OrderedIds)> ExecuteVerifiedAsync(RequestContext context, FieldSearchRequest request, IReadOnlyList<FieldSearchCondition> conditions, string? statementNote, FieldSearchRetryPolicy.Budget retries, CancellationToken cancellationToken)
+    {
         var prepared = FieldSearchEvaluator.Prepare(conditions, limits);
         using var lease = await admission.AdmitAsync(context.LocalUserId, cancellationToken).ConfigureAwait(false);
         var started = clock.GetTimestamp();
         var budget = TimeSpan.FromSeconds(limits.MaximumExecutionSeconds);
-        var scope = await VerifyWithOneRetryAsync(context, request.FormDefinitionId, conditions, started, budget, cancellationToken).ConfigureAwait(false);
+        var scope = await VerifyWithRetriesAsync(context, request.FormDefinitionId, conditions, started, budget, retries, cancellationToken).ConfigureAwait(false);
 
         var evaluated = 0;
         var matches = new List<FieldSearchMatch>();
@@ -142,10 +259,11 @@ public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPol
         await RecordAsync(context, scope.SearchCatalogueSnapshotId, conditions, "COMPLETED", evaluated, ordered.Count, started, cancellationToken).ConfigureAwait(false);
         var statement = $"Complete: all {scope.Records.Count} records of this form that you can find were verified at one Authority snapshot"
                         + (scope.RecordsWithoutContent > 0 ? $"; {scope.RecordsWithoutContent} pending creation(s) without accepted content cannot match" : string.Empty)
-                        + ". Conditions are evaluated only on values you can read; repeating sections, related records, documents and encrypted fields are not searched.";
+                        + ". Conditions are evaluated only on values you can read; repeating sections, related records, documents and encrypted fields are not searched."
+                        + statementNote;
         var cursor = new FieldSearchCursor(context.OrganizationId, context.LocalUserId, request.FormDefinitionId, scope.SearchCatalogueSnapshotId, scope.AuthorizationRevision, Digest(request), request.PageSize,
             scope.SnapshotExpiresOn, statement, ordered);
-        return await PageResponseAsync(context, cursor, 0, cancellationToken).ConfigureAwait(false);
+        return (await PageResponseAsync(context, cursor, 0, cancellationToken).ConfigureAwait(false), ordered.Select(m => m.FormRecordId).ToList());
     }
 
     /// <summary>
@@ -159,6 +277,13 @@ public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPol
         if (!limits.ExecutionEnabled)
         {
             throw SearchException.TrustedSearchNotEnabled();
+        }
+
+        if (IndexedFieldSearchCursor.IsIndexedToken(request!.Cursor))
+        {
+            // IX-4: a page of an indexed result is served by the Authority, which re-authorizes it (§17.3); never by V1 (no silent
+            // downgrade of an indexed paging request). With the engine switched off, an indexed cursor is refused (§12.3 rollback).
+            return indexedEngine is not { Enabled: true } ? throw SearchException.SnapshotChanged() : await indexedEngine.PageAsync(context, request.Cursor, cancellationToken).ConfigureAwait(false);
         }
 
         var (cursor, offset) = FieldSearchCursor.Decode(cursors, request!.Cursor, context, clock.GetUtcNow());
@@ -180,9 +305,14 @@ public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPol
         return await PageResponseAsync(context, cursor, offset, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<VerifiedScope> VerifyWithOneRetryAsync(RequestContext context, Guid formDefinitionId, IReadOnlyList<FieldSearchCondition> conditions, long started, TimeSpan budget, CancellationToken cancellationToken)
+    /// <summary>
+    /// The V1 verification with C-150 R56-A bounded backoff: only a changed snapshot (which includes a closed organization gate) is
+    /// retried, only with half the execution budget left and a free slot, and only within the request's retry budget. Each attempt
+    /// asks the Authority for a new catalogue snapshot; evidence of each failed attempt is recorded as before.
+    /// </summary>
+    private async Task<VerifiedScope> VerifyWithRetriesAsync(RequestContext context, Guid formDefinitionId, IReadOnlyList<FieldSearchCondition> conditions, long started, TimeSpan budget, FieldSearchRetryPolicy.Budget retries, CancellationToken cancellationToken)
     {
-        for (var attempt = 1; ; attempt++)
+        while (true)
         {
             Guid? issued = null;
             try
@@ -196,8 +326,9 @@ public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPol
                     await RecordAsync(context, snapshot, conditions, ex.ErrorCode, null, null, started, cancellationToken).ConfigureAwait(false);
                 }
 
-                // At most one automatic retry, only for a changed snapshot, only with half the budget left and a free slot.
-                if (attempt > 1 || ex.ErrorCode != SearchErrorCodes.SnapshotChanged || clock.GetElapsedTime(started) > budget / 2 || !admission.HasFreeSlot)
+                var elapsed = clock.GetElapsedTime(started);
+                if (ex.ErrorCode != SearchErrorCodes.SnapshotChanged || elapsed > budget / 2 || !admission.HasFreeSlot
+                    || !await retry.WaitBeforeRetryAsync(retries, "verified-scan", ex.ErrorCode, context.CorrelationId, (budget / 2) - elapsed, cancellationToken).ConfigureAwait(false))
                 {
                     throw;
                 }
@@ -272,7 +403,7 @@ public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPol
         var next = offset + page.Count < cursor.Matches.Count ? cursor.Encode(cursors, offset + page.Count, now) : null;
         var previous = offset > 0 ? cursor.Encode(cursors, Math.Max(0, offset - cursor.PageSize), now) : null;
         return new FieldSearchResponse(items, cursor.Matches.Count, cursor.Matches.Count == 0 ? 0 : offset + 1, cursor.PageSize, cursor.SearchCatalogueSnapshotId.ToString("D"), cursor.AuthorizationRevision,
-            CompletenessComplete, cursor.ScopeStatement, next, previous);
+            CompletenessComplete, cursor.ScopeStatement, next, previous, FieldSearchResultBases.VerifiedScan);
     }
 
     /// <summary>Digest of everything that shaped the result (kept inside the protected cursor; never logged).</summary>
