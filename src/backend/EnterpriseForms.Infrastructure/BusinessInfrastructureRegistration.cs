@@ -149,6 +149,14 @@ public static class BusinessInfrastructureRegistration
         {
             services.AddSingleton<IEncryptionKeyProvider, LocalDevelopmentKeyProvider>();
         }
+        else if (keyProvider == EncryptionOptions.VaultTransitProviderName)
+        {
+            // E-2: exactly one provider is registered; the local keyring is never registered alongside it (no fallback). Redirects are
+            // not followed, so the Vault token is never sent to another address.
+            services.AddHttpClient(VaultTransitKeyProvider.HttpClientName)
+                .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler { AllowAutoRedirect = false });
+            services.AddSingleton<IEncryptionKeyProvider, VaultTransitKeyProvider>();
+        }
         else
         {
             services.AddSingleton<IEncryptionKeyProvider>(new UnavailableKeyProvider("no permitted encryption key provider is configured (Encryption:KeyProvider); Azure Key Vault/Managed HSM providers are not implemented in Stage B"));

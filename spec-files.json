@@ -603,6 +603,11 @@
       "bytes": 7567
     },
     {
+      "path": "docs/security/E2_VAULT_TRANSIT_PROVIDER.md",
+      "sha256": "eca35d2c58371eae610cb2833ee5bec243405b44366fe97c49b968433ae9d3f1",
+      "bytes": 14093
+    },
+    {
       "path": "docs/security/FIELD_PROTECTION_RECONCILIATION.md",
       "sha256": "f1249e4c9c0c43056345a250188bea7d18be0547978afe47187ee59ee15c67e7",
       "bytes": 29934
@@ -836,6 +841,11 @@
       "path": "scripts/ci/test_test_results.py",
       "sha256": "c63cede5ac611a8899f3936452d556db07533dfc537e3bf39dfaee650a2aaa48",
       "bytes": 4364
+    },
+    {
+      "path": "scripts/dev/e2-vault-integration.ps1",
+      "sha256": "e623ae8622009d45eab9e845fca95b23cf1f0ff6d0c0aa4ebc18f47cb9749863",
+      "bytes": 4148
     },
     {
       "path": "scripts/dev/stage-b.ps1",

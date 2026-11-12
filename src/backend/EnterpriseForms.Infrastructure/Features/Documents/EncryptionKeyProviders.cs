@@ -13,8 +13,14 @@ public sealed class EncryptionOptions
     /// <summary>The configuration value that selects <see cref="LocalDevelopmentKeyProvider"/> (Development/Testing only, E0-1).</summary>
     public const string LocalDevelopmentProviderName = "LocalDevelopment";
 
-    /// <summary>"LocalDevelopment" (local keyring, Development/Testing only) or "Unconfigured" (fail closed). Azure Key Vault/Managed HSM providers are not implemented.</summary>
+    /// <summary>The configuration value that selects <see cref="VaultTransitKeyProvider"/> (Development/Testing only, E-2).</summary>
+    public const string VaultTransitProviderName = VaultTransitKeyProvider.ProviderNameValue;
+
+    /// <summary>"LocalDevelopment" (local keyring), "VaultTransit" (local Docker Vault Transit) — both Development/Testing only — or "Unconfigured" (fail closed). Azure Key Vault/Managed HSM providers are not implemented.</summary>
     public string KeyProvider { get; set; } = "Unconfigured";
+
+    /// <summary>E-2: settings of the Vault Transit provider (used only when <see cref="KeyProvider"/> is "VaultTransit").</summary>
+    public VaultTransitEncryptionOptions VaultTransit { get; set; } = new();
 
     /// <summary>
     /// The legacy development KEK (32 bytes, base64). It opens data wrapped before E-1 under <see cref="LocalDevelopmentKeyReference"/>
@@ -44,7 +50,8 @@ public sealed class LocalDevelopmentKeyringOptions
     public Dictionary<string, Dictionary<string, LocalKeyVersionOptions>> Organizations { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
-public sealed class LocalKeyVersionOptions
+/// <summary>One scope's key-version table (current, retained and disabled versions), shared by every key provider (E-1, E-2).</summary>
+public class KeyVersionOptions
 {
     /// <summary>The version new data is wrapped under.</summary>
     public int CurrentVersion { get; set; } = 1;
@@ -55,6 +62,9 @@ public sealed class LocalKeyVersionOptions
     /// <summary>Versions that must not be used at all (unwrapping them fails closed).</summary>
     public List<int> DisabledVersions { get; set; } = [];
 }
+
+/// <summary>The local keyring's version table (E1-6); the same shape as <see cref="KeyVersionOptions"/>.</summary>
+public sealed class LocalKeyVersionOptions : KeyVersionOptions;
 
 /// <summary>
 /// E-1 Development/Testing key provider (refused outside Development/Testing at startup, E0-1). Two kinds of reference:
@@ -85,8 +95,7 @@ public sealed class LocalDevelopmentKeyProvider : IEncryptionKeyProvider
     private readonly string legacyReference;
     private readonly bool legacyDecryptionEnabled;
     private readonly byte[]? rootPrk;
-    private readonly Dictionary<EncryptionKeyPurpose, VersionTable> purposeTables = [];
-    private readonly Dictionary<(Guid Organization, EncryptionKeyPurpose Purpose), VersionTable> organizationTables = [];
+    private readonly KeyVersionTables tables = new();
     private readonly string? configurationError;
 
     public LocalDevelopmentKeyProvider(IOptions<EncryptionOptions> options)
@@ -102,31 +111,16 @@ public sealed class LocalDevelopmentKeyProvider : IEncryptionKeyProvider
             rootPrk = root is null ? null : HKDF.Extract(HashAlgorithmName.SHA256, root, RootSalt);
             if (legacyReference.Length == 0 || legacyReference.StartsWith(ScopedReferencePrefix + ":", StringComparison.Ordinal))
             {
-                throw new KeyringConfigurationException("the legacy key reference must be set and must not use the scoped reference form");
+                throw new KeyConfigurationException("the legacy key reference must be set and must not use the scoped reference form");
             }
 
             var keyring = value.LocalDevelopmentKeyring ?? new LocalDevelopmentKeyringOptions();
-            foreach (var purpose in EncryptionKeyPurpose.All)
-            {
-                purposeTables[purpose] = VersionTable.From(keyring.Purposes.GetValueOrDefault(purpose.Name), purpose.Name);
-            }
-
-            RejectUnknownPurposes(keyring.Purposes.Keys);
-            foreach (var (organizationText, tables) in keyring.Organizations)
-            {
-                if (!Guid.TryParse(organizationText, out var organization) || organization == Guid.Empty)
-                {
-                    throw new KeyringConfigurationException("an organization key table is not keyed by an organization id");
-                }
-
-                RejectUnknownPurposes(tables.Keys);
-                foreach (var (purposeName, table) in tables)
-                {
-                    organizationTables[(organization, EncryptionKeyPurpose.All.Single(p => p.Name == purposeName))] = VersionTable.From(table, purposeName);
-                }
-            }
+            tables.Load(
+                keyring.Purposes.ToDictionary(p => p.Key, KeyVersionOptions (p) => p.Value, StringComparer.Ordinal),
+                keyring.Organizations.ToDictionary(o => o.Key, o => o.Value.ToDictionary(p => p.Key, KeyVersionOptions (p) => p.Value, StringComparer.Ordinal), StringComparer.OrdinalIgnoreCase),
+                "keyring");
         }
-        catch (KeyringConfigurationException ex)
+        catch (KeyConfigurationException ex)
         {
             configurationError = ex.Message;
             rootPrk = null;
@@ -226,9 +220,9 @@ public sealed class LocalDevelopmentKeyProvider : IEncryptionKeyProvider
         RequireConfigured();
         switch (TableOf(scope).Resolve(version))
         {
-            case VersionState.Disabled:
+            case KeyVersionState.Disabled:
                 throw new EncryptionUnavailableException("the key version is disabled");
-            case VersionState.Unknown:
+            case KeyVersionState.Unknown:
                 throw new EncryptionUnavailableException("the key version is not retained");
         }
 
@@ -264,23 +258,7 @@ public sealed class LocalDevelopmentKeyProvider : IEncryptionKeyProvider
         return true;
     }
 
-    internal static byte[] ScopedWrapAad(DataKeyScope scope, int version) => ScopeBytes(WrapDomain, scope, version);
-
-    private static byte[] ScopeBytes(byte[] domain, DataKeyScope scope, int version)
-    {
-        var token = Encoding.ASCII.GetBytes(scope.Purpose.Token);
-        var bytes = new byte[domain.Length + 16 + 4 + token.Length + 4];
-        domain.CopyTo(bytes, 0);
-        var offset = domain.Length;
-        scope.OrganizationId.TryWriteBytes(bytes.AsSpan(offset, 16), bigEndian: true, out _);
-        offset += 16;
-        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(offset, 4), token.Length);
-        offset += 4;
-        token.CopyTo(bytes, offset);
-        offset += token.Length;
-        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(offset, 4), version);
-        return bytes;
-    }
+    internal static byte[] ScopedWrapAad(DataKeyScope scope, int version) => KeyScopeEncoding.Context(WrapDomain, scope, version);
 
     private static byte[] Open(byte[] kek, ReadOnlySpan<byte> wrapped, byte[] aad)
     {
@@ -300,26 +278,17 @@ public sealed class LocalDevelopmentKeyProvider : IEncryptionKeyProvider
         try
         {
             var bytes = Convert.FromBase64String(base64);
-            return bytes.Length == KeySize ? bytes : throw new KeyringConfigurationException(what + " is not 32 bytes");
+            return bytes.Length == KeySize ? bytes : throw new KeyConfigurationException(what + " is not 32 bytes");
         }
         catch (FormatException)
         {
-            throw new KeyringConfigurationException(what + " is not valid base64");
+            throw new KeyConfigurationException(what + " is not valid base64");
         }
     }
 
-    private static void RejectUnknownPurposes(IEnumerable<string> names)
-    {
-        if (names.FirstOrDefault(n => EncryptionKeyPurpose.All.All(p => p.Name != n)) is { } unknown)
-        {
-            throw new KeyringConfigurationException("unknown key purpose '" + unknown + "' in the keyring configuration");
-        }
-    }
+    private byte[] DeriveKek(DataKeyScope scope, int version) => HKDF.Expand(HashAlgorithmName.SHA256, rootPrk!, KeySize, KeyScopeEncoding.Context(DerivationDomain, scope, version));
 
-    private byte[] DeriveKek(DataKeyScope scope, int version) => HKDF.Expand(HashAlgorithmName.SHA256, rootPrk!, KeySize, ScopeBytes(DerivationDomain, scope, version));
-
-    private VersionTable TableOf(DataKeyScope scope) =>
-        organizationTables.TryGetValue((scope.OrganizationId, scope.Purpose), out var table) ? table : purposeTables[scope.Purpose];
+    private KeyVersionTable TableOf(DataKeyScope scope) => tables.For(scope);
 
     private void RequireConfigured()
     {
@@ -333,40 +302,6 @@ public sealed class LocalDevelopmentKeyProvider : IEncryptionKeyProvider
             throw new EncryptionUnavailableException("local development key material is not configured");
         }
     }
-
-    private enum VersionState
-    {
-        Usable,
-        Disabled,
-        Unknown,
-    }
-
-    private sealed record VersionTable(int Current, IReadOnlySet<int> Retained, IReadOnlySet<int> Disabled)
-    {
-        public static VersionTable From(LocalKeyVersionOptions? options, string purposeName)
-        {
-            var current = options?.CurrentVersion ?? 1;
-            var retained = (options?.RetainedVersions ?? []).ToHashSet();
-            var disabled = (options?.DisabledVersions ?? []).ToHashSet();
-            if (current < 1 || retained.Any(v => v < 1) || disabled.Any(v => v < 1))
-            {
-                throw new KeyringConfigurationException("key versions of " + purposeName + " must be positive");
-            }
-
-            if (disabled.Contains(current) || retained.Overlaps(disabled))
-            {
-                throw new KeyringConfigurationException("a key version of " + purposeName + " is both usable and disabled");
-            }
-
-            retained.Remove(current);
-            return new VersionTable(current, retained, disabled);
-        }
-
-        public VersionState Resolve(int version) =>
-            version == Current || Retained.Contains(version) ? VersionState.Usable : Disabled.Contains(version) ? VersionState.Disabled : VersionState.Unknown;
-    }
-
-    private sealed class KeyringConfigurationException(string message) : Exception(message);
 }
 
 /// <summary>Registered when no permitted key provider is configured: wrapping and unwrapping fail closed.</summary>
@@ -380,3 +315,125 @@ public sealed class UnavailableKeyProvider(string reason) : IEncryptionKeyProvid
 
     public Task<byte[]> UnwrapDataKeyAsync(DataKeyScope scope, string keyReference, ReadOnlyMemory<byte> wrappedDataKey, CancellationToken cancellationToken) => Task.FromException<byte[]>(new EncryptionUnavailableException(reason));
 }
+
+/// <summary>The scope context both key providers authenticate: domain ‖ organization (16 bytes, big-endian UUID) ‖ Int32BE(token length) ‖ purpose token ‖ Int32BE(version).</summary>
+internal static class KeyScopeEncoding
+{
+    public static byte[] Context(byte[] domain, DataKeyScope scope, int version)
+    {
+        var token = Encoding.ASCII.GetBytes(scope.Purpose.Token);
+        var bytes = new byte[domain.Length + 16 + 4 + token.Length + 4];
+        domain.CopyTo(bytes, 0);
+        var offset = domain.Length;
+        scope.OrganizationId.TryWriteBytes(bytes.AsSpan(offset, 16), bigEndian: true, out _);
+        offset += 16;
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(offset, 4), token.Length);
+        offset += 4;
+        token.CopyTo(bytes, offset);
+        offset += token.Length;
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(offset, 4), version);
+        return bytes;
+    }
+
+    /// <summary>Parses the canonical reference <c>{prefix}:{organization}:{purpose token}:{version}</c>; any other spelling (case, padding, leading zeros) is not a reference.</summary>
+    public static bool TryParseReference(string? reference, string prefix, out Guid organizationId, out EncryptionKeyPurpose purpose, out int version)
+    {
+        organizationId = Guid.Empty;
+        purpose = null!;
+        version = 0;
+        var parts = (reference ?? string.Empty).Split(':');
+        if (parts.Length != 4 || parts[0] != prefix
+            || !Guid.TryParseExact(parts[1], "D", out organizationId) || organizationId == Guid.Empty || parts[1] != organizationId.ToString("D")
+            || EncryptionKeyPurpose.All.FirstOrDefault(p => p.Token == parts[2]) is not { } parsed
+            || !int.TryParse(parts[3], NumberStyles.None, CultureInfo.InvariantCulture, out version) || version < 1 || parts[3] != version.ToString(CultureInfo.InvariantCulture))
+        {
+            organizationId = Guid.Empty;
+            version = 0;
+            return false;
+        }
+
+        purpose = parsed;
+        return true;
+    }
+
+    public static string Reference(string prefix, DataKeyScope scope, int version) =>
+        string.Join(':', prefix, scope.OrganizationId.ToString("D"), scope.Purpose.Token, version.ToString(CultureInfo.InvariantCulture));
+}
+
+internal enum KeyVersionState
+{
+    Usable,
+    Disabled,
+    Unknown,
+}
+
+/// <summary>One scope's validated version table.</summary>
+internal sealed record KeyVersionTable(int Current, IReadOnlySet<int> Retained, IReadOnlySet<int> Disabled)
+{
+    public static KeyVersionTable From(KeyVersionOptions? options, string purposeName)
+    {
+        var current = options?.CurrentVersion ?? 1;
+        var retained = (options?.RetainedVersions ?? []).ToHashSet();
+        var disabled = (options?.DisabledVersions ?? []).ToHashSet();
+        if (current < 1 || retained.Any(v => v < 1) || disabled.Any(v => v < 1))
+        {
+            throw new KeyConfigurationException("key versions of " + purposeName + " must be positive");
+        }
+
+        if (disabled.Contains(current) || retained.Overlaps(disabled))
+        {
+            throw new KeyConfigurationException("a key version of " + purposeName + " is both usable and disabled");
+        }
+
+        retained.Remove(current);
+        return new KeyVersionTable(current, retained, disabled);
+    }
+
+    public KeyVersionState Resolve(int version) =>
+        version == Current || Retained.Contains(version) ? KeyVersionState.Usable : Disabled.Contains(version) ? KeyVersionState.Disabled : KeyVersionState.Unknown;
+}
+
+/// <summary>The version tables of every scope: one per purpose (default current version 1), optionally replaced per organization.</summary>
+internal sealed class KeyVersionTables
+{
+    private readonly Dictionary<EncryptionKeyPurpose, KeyVersionTable> purposeTables = [];
+    private readonly Dictionary<(Guid Organization, EncryptionKeyPurpose Purpose), KeyVersionTable> organizationTables = [];
+
+    /// <summary>Validates and loads the tables; throws <see cref="KeyConfigurationException"/> (never with key material) when they are invalid.</summary>
+    public void Load(IReadOnlyDictionary<string, KeyVersionOptions> purposes, IReadOnlyDictionary<string, Dictionary<string, KeyVersionOptions>> organizations, string label)
+    {
+        RejectUnknownPurposes(purposes.Keys, label);
+        foreach (var purpose in EncryptionKeyPurpose.All)
+        {
+            purposeTables[purpose] = KeyVersionTable.From(purposes.GetValueOrDefault(purpose.Name), purpose.Name);
+        }
+
+        foreach (var (organizationText, tables) in organizations)
+        {
+            if (!Guid.TryParse(organizationText, out var organization) || organization == Guid.Empty)
+            {
+                throw new KeyConfigurationException("an organization key table is not keyed by an organization id");
+            }
+
+            RejectUnknownPurposes(tables.Keys, label);
+            foreach (var (purposeName, table) in tables)
+            {
+                organizationTables[(organization, EncryptionKeyPurpose.All.Single(p => p.Name == purposeName))] = KeyVersionTable.From(table, purposeName);
+            }
+        }
+    }
+
+    public KeyVersionTable For(DataKeyScope scope) =>
+        organizationTables.TryGetValue((scope.OrganizationId, scope.Purpose), out var table) ? table : purposeTables[scope.Purpose];
+
+    private static void RejectUnknownPurposes(IEnumerable<string> names, string label)
+    {
+        if (names.FirstOrDefault(n => EncryptionKeyPurpose.All.All(p => p.Name != n)) is { } unknown)
+        {
+            throw new KeyConfigurationException("unknown key purpose '" + unknown + "' in the " + label + " configuration");
+        }
+    }
+}
+
+/// <summary>An invalid key-provider configuration (message never contains key material or credentials).</summary>
+internal sealed class KeyConfigurationException(string message) : Exception(message);
