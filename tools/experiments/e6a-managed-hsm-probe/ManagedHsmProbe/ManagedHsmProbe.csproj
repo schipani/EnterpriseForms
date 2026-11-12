@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    E-6a STANDALONE EXPERIMENT (Development/Testing only). Not part of EnterpriseForms.All.slnx, not referenced by and not
+    referencing any EnterpriseForms production project. It answers one question for a later, separately authorized run
+    against a throwaway non-production Azure Managed HSM: does HS256 over the raw canonical bytes reproduce the existing
+    LocalHmacProvider / VaultTransitHmacProvider HMAC-SHA-256 MAC? Default mode is local-only and makes no network call.
+    Package versions are pinned here (central package management is off for this isolated experiment, as in
+    scripts/measurement/ix1/sealbench), so the repository's Directory.Packages.props is untouched.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <RootNamespace>EnterpriseForms.Experiments.ManagedHsmProbe</RootNamespace>
+    <AssemblyName>ManagedHsmProbe</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Azure.Security.KeyVault.Keys 4.10.2 (2026-10-02): SignatureAlgorithm.HS256 exists since 4.8.0. Azure.Identity 1.21.0 (2026-04-11). -->
+    <PackageReference Include="Azure.Security.KeyVault.Keys" Version="4.10.2" />
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Committed reference vectors (regenerate with `generate-vectors`). Conditional only so the very first generation can build. -->
+    <EmbeddedResource Include="../vectors/e6a-reference-vectors.json" LogicalName="e6a-reference-vectors.json" Condition="Exists('../vectors/e6a-reference-vectors.json')" />
+    <None Include="../probe.settings.template.json" Link="probe.settings.template.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('../probe.settings.template.json')" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="ManagedHsmProbe.Tests" />
+  </ItemGroup>
+</Project>
