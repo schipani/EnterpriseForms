@@ -1,6 +1,7 @@
 # IX-5 security design acceptance record (owner-led)
 
 - **Status:** **Approved by the owner in C-147 (2026-11-10), for Development/Testing only.** An owner-led security approval under GA-IX5-1, **not** an independent security assessment; no independent review has occurred. Approved design baseline: `7ec5a79`. IX-5a only is authorized; IX-5b and IX-5c need separate owner approval.
+- **C-151 (2026-11-11):** the M1 fence and M2 verification are implemented and the sampling evidence is instrumented (TQ 1, 3–5); the M2 split and the 14-day criterion stay open until real sampling evidence exists; TQ-23 is still to be re-decided before serving. See `INDEXED_SEARCH_IX5_IX7_COMPLETION_EVIDENCE.md` §2.
 - **Design baseline:** signed commit `f5b1ca6`: [INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md](INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md) with annexes A to E and the UF-25 document. It also covers the C-146 evidence in [INDEXED_SEARCH_IX5_EVIDENCE_PLANS.md](INDEXED_SEARCH_IX5_EVIDENCE_PLANS.md) §R.
 - **Prepared by:** Claude (design author), for the owner. Positions in the tables below are **proposed**; they bind only once the owner signs them.
 

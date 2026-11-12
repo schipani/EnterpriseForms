@@ -169,8 +169,8 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX2_EVIDENCE.md",
-      "sha256": "7f69f38bf3ff07ba482c436f4b4d6d0208e40486a30e9506854f48e5c90cec5b",
-      "bytes": 29946
+      "sha256": "58d317924fb45db0967b6e9dd6a65d1abf85ec2d3dac695a2c8860d736039768",
+      "bytes": 30371
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX3_EVIDENCE.md",
@@ -179,8 +179,8 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX4_EVIDENCE.md",
-      "sha256": "d45a1be19115bd330831666d3ba2233d264ae346d9d6cb24cd3209113d3fb504",
-      "bytes": 82066
+      "sha256": "587907872b69abc663f228ecbd98cba8ff44af8abb1aa2f40ba59af4de2be9f7",
+      "bytes": 82198
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5A_EVIDENCE.md",
@@ -194,13 +194,18 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_DESIGN_ACCEPTANCE_RECORD.md",
-      "sha256": "f2a0c38882014f05cab0b276f6cf035e428f48a19bb472f63a97c63d1deff59a",
-      "bytes": 7178
+      "sha256": "43bedd6ea8055e79b1a0420a12af3a8957d14492b6b0e96be5e6a2edb78513d6",
+      "bytes": 7500
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_EVIDENCE_PLANS.md",
       "sha256": "a5c21281d799d305b53f394c5e6044c8402001a5a5dc1c275c3fd7138cb8d918",
       "bytes": 11726
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX5_IX7_COMPLETION_EVIDENCE.md",
+      "sha256": "d33a1f478517e2714066cbf35f8d90e00119fcea1bad28bc80e83b84c1deccf7",
+      "bytes": 25184
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md",
@@ -209,8 +214,8 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
-      "sha256": "3f105f5916f126a75545ae8b9b1ac66a0c77172884fa0120622160be7eeca98b",
-      "bytes": 192521
+      "sha256": "8ee4bc38fd81b2f642f403071e353a9433d9f31098e1c2c63c0ee71c82ee1f0d",
+      "bytes": 193115
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",
@@ -459,8 +464,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "7aaee8540a1a637a3042fdbeac86b37a75dbeac50c2c4076310ba68539571033",
-      "bytes": 274697
+      "sha256": "33c4b8a9deab476331e59a5990bb342cd98e2b7b27c6da695199ce65826c7b9f",
+      "bytes": 276412
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
