@@ -83,7 +83,9 @@ public static class RestorePlanner
             catch (Exception ex) when (ex is Documents.Ports.EncryptionUnavailableException or CryptographicException)
             {
                 // The rows verified; an envelope that cannot be opened means its key is unavailable (no historic KEK retention yet, R-08).
-                throw new BusinessException(fromSource ? "HISTORIC_KEY_UNAVAILABLE" : "ENCRYPTION_UNAVAILABLE", 503, "a key needed to read this version is not available; nothing was restored");
+                var refused = new BusinessException(fromSource ? "HISTORIC_KEY_UNAVAILABLE" : "ENCRYPTION_UNAVAILABLE", 503, "a key needed to read this version is not available; nothing was restored");
+                Encryption.DecryptionFailure.CarryOver(ex, refused); // E0-4: the API boundary records the decryption failure once
+                throw refused;
             }
         }
 

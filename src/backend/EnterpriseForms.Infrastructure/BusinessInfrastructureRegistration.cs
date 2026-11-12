@@ -106,6 +106,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<TeamDirectoryHandlers>();
         services.AddSingleton<DashboardHandler>();
         services.AddSingleton<ISecurityIncidentRecorder, SecurityIncidentRecorder>();
+        services.AddSingleton<IDecryptionFailureRecorder, EnterpriseForms.Infrastructure.Features.Audit.DecryptionFailureRecorder>(); // E0-4
         services.AddSingleton<UploadSessionHandlers>();
         services.AddSingleton<DocumentHandlers>();
         services.AddSingleton<DocumentProcessingService>();
@@ -142,8 +143,9 @@ public static class BusinessInfrastructureRegistration
             services.AddSingleton<IFileMalwareScanner>(new UnavailableMalwareScanner("malware scanner is not configured (MalwareScanner:Provider); documents stay ScanPending"));
         }
 
-        var keyProvider = configuration[$"{EncryptionOptions.SectionName}:KeyProvider"] ?? "Unconfigured";
-        if (keyProvider == "LocalDevelopment")
+        // E0-1: EncryptionProviderEnvironmentPolicy (applied at startup by the API and the Worker) refuses this provider outside Development/Testing.
+        var keyProvider = EncryptionProviderEnvironmentPolicy.ConfiguredKeyProvider(configuration);
+        if (keyProvider == EncryptionOptions.LocalDevelopmentProviderName)
         {
             services.AddSingleton<IEncryptionKeyProvider, LocalDevelopmentKeyProvider>();
         }

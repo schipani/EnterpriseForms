@@ -1,0 +1,66 @@
+# E0-6: independent reproduction of the AES-256-GCM v1 known-answer vectors with Python 'cryptography' AESGCM.
+# Written from the documented layouts (AesGcmFieldEncryptionService / AesGcmFileEncryptionService summaries), not from the C# code.
+# Run (scratchpad venv): python e0-kat-crosscheck.py
+import hashlib, struct, uuid
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+seq = lambda s, n: bytes((s + i) % 256 for i in range(n))
+u = lambda x: uuid.UUID(x).bytes  # RFC 4122 (big-endian) byte order
+KEK = seq(0x00, 32)
+KEY_REFERENCE = "local-dev-kek-v1"
+SEGMENT = 1024 * 1024
+
+def wrap(dek, wrap_nonce):
+    # LocalDevelopmentKeyProvider: nonce(12) || AES-GCM(KEK, AAD = "DynamicForms/DekWrap/v1:" + reference) ciphertext || tag(16)
+    return wrap_nonce + AESGCM(KEK).encrypt(wrap_nonce, dek, ("DynamicForms/DekWrap/v1:" + KEY_REFERENCE).encode("ascii"))
+
+# ---- Field value envelope v1 ----
+F_TENANT, F_RECORD, F_FIELD, F_ITEM = (u(x) for x in ("019a5b2c-e001-7000-8000-000000000001", "019a5b2c-e002-7000-8000-000000000002", "019a5b2c-e003-7000-8000-000000000003", "019a5b2c-e004-7000-8000-000000000004"))
+
+def field_aad(logical_type):
+    t = logical_type.encode("utf-8")
+    return b"DynamicForms/FieldValue/v1" + struct.pack(">i", 1) + F_TENANT + F_RECORD + F_FIELD + F_ITEM + struct.pack(">i", len(t)) + t
+
+def field_vector(name, logical_type, plaintext, dek, nonce, wrap_nonce):
+    aad = field_aad(logical_type)
+    out = AESGCM(dek).encrypt(nonce, plaintext.encode("utf-8"), aad)
+    print(f"{name}.aad_hex={aad.hex()}")
+    print(f"{name}.ciphertext_hex={out[:-16].hex()}")
+    print(f"{name}.tag_hex={out[-16:].hex()}")
+    print(f"{name}.wrapped_data_key_hex={wrap(dek, wrap_nonce).hex()}")
+
+field_vector("F1", "String", "Avery Synthetic \u2014 L\u00e9a 42", seq(0x20, 32), seq(0x50, 12), seq(0x40, 12))
+field_vector("F2", "Date", "1990-02-28", seq(0x80, 32), seq(0xA0, 12), seq(0xB0, 12))
+
+# ---- Document envelope v1 (segmented) ----
+D_TENANT, D_RECORD, D_ATTACHMENT = (u(x) for x in ("019a5b2c-d001-7000-8000-000000000001", "019a5b2c-d002-7000-8000-000000000002", "019a5b2c-d003-7000-8000-000000000003"))
+D_VERSION = 3
+D_DEK, D_PREFIX, D_WRAP_NONCE = seq(0xC0, 32), seq(0xE0, 8), seq(0xF0, 12)
+
+def doc_aad(segment, final):
+    return struct.pack(">i", 1) + D_TENANT + D_RECORD + D_ATTACHMENT + struct.pack(">i", D_VERSION) + struct.pack(">I", segment) + (b"\x01" if final else b"\x00")
+
+def doc_plaintext(n):
+    return bytes((i * 7 + 3) % 256 for i in range(n))
+
+def doc_encrypt(p):
+    segments = [p[i:i + SEGMENT] for i in range(0, len(p), SEGMENT)] or [b""]
+    out, tags = b"", []
+    for index, chunk in enumerate(segments):
+        final = index == len(segments) - 1
+        sealed = AESGCM(D_DEK).encrypt(D_PREFIX + struct.pack(">I", index), chunk, doc_aad(index, final))
+        out += struct.pack(">I", len(chunk)) + sealed
+        tags.append(sealed[-16:].hex())
+    return out, tags
+
+print(f"D.aad_segment0_final_hex={doc_aad(0, True).hex()}")
+print(f"D.aad_segment1_nonfinal_hex={doc_aad(1, False).hex()}")
+print(f"D.wrapped_data_key_hex={wrap(D_DEK, D_WRAP_NONCE).hex()}")
+for name, n in (("D0", 0), ("D1", 37), ("D2", SEGMENT), ("D3", SEGMENT + 5), ("D4", 2 * SEGMENT)):
+    p = doc_plaintext(n)
+    c, tags = doc_encrypt(p)
+    print(f"{name}.plaintext_length={n} plaintext_sha256={hashlib.sha256(p).hexdigest()}")
+    print(f"{name}.ciphertext_length={len(c)} ciphertext_sha256={hashlib.sha256(c).hexdigest()}")
+    print(f"{name}.segment_tags={','.join(tags)}")
+    if n < 64:
+        print(f"{name}.ciphertext_hex={c.hex()}")
