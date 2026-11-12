@@ -814,8 +814,8 @@
     },
     {
       "path": "scripts/ci/test_stage_b_groups.py",
-      "sha256": "2e04f4bf2d23c70e79f3c7fa774bc72ef4b81877db6b47e1ccc45eae46bfb2df",
-      "bytes": 9854
+      "sha256": "e911c24adbc3941b2d5b452bbd497ee705bf8c2b8d459fec8da7ea124bb479fb",
+      "bytes": 10056
     },
     {
       "path": "scripts/ci/test_test_results.py",
