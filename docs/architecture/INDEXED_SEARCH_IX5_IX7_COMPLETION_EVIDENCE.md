@@ -43,7 +43,7 @@ Committed as `5e0a0f0`. The detail of the M1 fence, the M2 sweep, the IX-39 coup
 | IX-39 schema-coupling guard (SHA-256 of the zed schema; startup disables Tier 2 on a different schema; rows of another digest rebuilt) | Implemented, tested |
 | IX-40 property-based differential against an independent zed-semantics oracle | Implemented (5 seeds), tested |
 | Shadow sampling evidence (§6 of the plans): digests, restart events, canary flag, retention purge | Implemented, tested |
-| **14-day sampling criterion** | **Not met: no 14-day period has been run.** The report computes it; nothing asserts it |
+| **14-day sampling criterion** | **Not met: no 14-day period has been run.** The report computes it; nothing asserts it. **C-152: deferred by the owner (not waived)** |
 | M2 split decision (acceptance record TQ 3–5) | Instrumented; the decision stays with the owner on real sampling evidence |
 
 ### 2.2 R-02: statement preparation (measured; R-02 stays FAIL)

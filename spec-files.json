@@ -204,8 +204,8 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_IX7_COMPLETION_EVIDENCE.md",
-      "sha256": "d33a1f478517e2714066cbf35f8d90e00119fcea1bad28bc80e83b84c1deccf7",
-      "bytes": 25184
+      "sha256": "ba91607d63c0c6d8c7f53101a96d6547cca3887fb201b8cf88d8fa9e539cfdfe",
+      "bytes": 25231
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md",
@@ -464,8 +464,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "33c4b8a9deab476331e59a5990bb342cd98e2b7b27c6da695199ce65826c7b9f",
-      "bytes": 276412
+      "sha256": "88c37276d837645ce68463fa3e3611224255c3e734e2724b00d8cf4039376907",
+      "bytes": 277912
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -551,6 +551,11 @@
       "path": "docs/infrastructure/PB05_DEPLOYMENT_BLUEPRINT.md",
       "sha256": "49ce553042002c1b2d46cbc58dbff27b17ea9e0cd290064e6d71e5868a51f017",
       "bytes": 4242
+    },
+    {
+      "path": "docs/infrastructure/STAGING_PREPARATION_INDEXED_SEARCH.md",
+      "sha256": "52827fcf1724f085158d83777eb1756fe36e05c67e8ed70d58e59bdd9b5e801b",
+      "bytes": 25195
     },
     {
       "path": "docs/performance/PB09_BENCHMARK_ACCEPTANCE_MATRIX.csv",
