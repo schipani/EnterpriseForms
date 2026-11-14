@@ -608,6 +608,11 @@
       "bytes": 14290
     },
     {
+      "path": "docs/security/E3_ENVELOPE_V2_KEY_HIERARCHY_DESIGN.md",
+      "sha256": "d2c175130e088c575efc4077006d6f4d213008f2b5417d530bb2d04bda09d32d",
+      "bytes": 101026
+    },
+    {
       "path": "docs/security/E4_CONTROLLED_KEY_ACTIVATION.md",
       "sha256": "6ca9e57084fb7c8dadd03b88e90032a94c1c4ebe7921ba1c579710d1c0595fc6",
       "bytes": 12677

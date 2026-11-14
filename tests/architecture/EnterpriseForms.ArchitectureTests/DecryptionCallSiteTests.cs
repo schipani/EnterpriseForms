@@ -27,6 +27,8 @@ public sealed partial class DecryptionCallSiteTests
     private const string DecryptionStep = "EnterpriseForms.Application.Features.FormRecords.Values.DecryptedFieldValues";
     private const string LocalKeys = "EnterpriseForms.Infrastructure.Features.Documents.LocalDevelopmentKeyProvider";
     private const string UnavailableKeys = "EnterpriseForms.Infrastructure.Features.Documents.UnavailableKeyProvider";
+    private const string FieldOpenerV2 = "EnterpriseForms.Infrastructure.Features.Documents.EnvelopeV2.FieldEnvelopeV2Opener";
+    private const string DocumentCipherV2 = "EnterpriseForms.Infrastructure.Features.Documents.EnvelopeV2.DocumentEnvelopeV2Cipher";
 
     /// <summary>The reviewed call sites ("caller -> operation") and why each is permitted.</summary>
     private static readonly Dictionary<string, string> Allowed = new(StringComparer.Ordinal)
@@ -72,6 +74,17 @@ public sealed partial class DecryptionCallSiteTests
             "Document encryption implementation: authenticated segment decryption with the v1 segment AAD.",
         ["EnterpriseForms.Infrastructure.Features.Documents.LocalDevelopmentKeyProvider.Open -> AesGcm.Decrypt"] =
             "Development/Testing keyring: AES-GCM key unwrap of a scoped or legacy wrapped DEK (refused outside Development/Testing at startup, E0-1).",
+
+        // ---- E3-M1 Envelope v2 core: internal, NOT reachable from any product path (EnvelopeV2IsolationTests). Its two entry points
+        // are themselves decrypting operations below, so the first product caller fails this test until E3-M2 is authorized and reviewed. ----
+        ["EnterpriseForms.Infrastructure.Features.Documents.EnvelopeV2.FieldEnvelopeV2Opener.OpenAsync -> IEncryptionKeyProvider.UnwrapDataKeyAsync"] =
+            "E3-M1 v2 field opener: unwraps one seal-batch seed per data-key group, only after every request's organization, purpose and expected item identity and the group's consistency were checked; zeroed after use. Unwired.",
+        ["EnterpriseForms.Infrastructure.Features.Documents.EnvelopeV2.FieldEnvelopeV2Opener.Decrypt -> AesGcm.Decrypt"] =
+            "E3-M1 v2 field opener: AES-256-GCM with the HKDF-derived single-use item key and AAD = H ‖ C_field, after the key commitment matched. Unwired.",
+        ["EnterpriseForms.Infrastructure.Features.Documents.EnvelopeV2.DocumentEnvelopeV2Cipher.DecryptAsync -> IEncryptionKeyProvider.UnwrapDataKeyAsync"] =
+            "E3-M1 v2 document cipher: unwraps the version's seed after the organization and document identity were checked; zeroed after the document key is derived. Unwired.",
+        ["EnterpriseForms.Infrastructure.Features.Documents.EnvelopeV2.DocumentEnvelopeV2Cipher.DecryptAsync -> AesGcm.Decrypt"] =
+            "E3-M1 v2 document cipher: segment AES-256-GCM with AAD = H ‖ C_doc ‖ segment ‖ final, after the key commitment matched. Unwired.",
     };
 
     [GeneratedRegex(@"^<+([^<>]+)>")]
@@ -87,6 +100,7 @@ public sealed partial class DecryptionCallSiteTests
             (Codec, "FormatAsync") => "FieldValueCodec.FormatAsync",
             (DecryptionStep, "DecryptAsync") => "DecryptedFieldValues.DecryptAsync",
             (KeyPort or LocalKeys or UnavailableKeys, "UnwrapDataKeyAsync") => Short(type) + ".UnwrapDataKeyAsync",
+            (FieldOpenerV2, "OpenAsync") or (DocumentCipherV2, "DecryptAsync") => Short(type) + "." + name,
             _ when type.StartsWith("System.Security.Cryptography.", StringComparison.Ordinal) && (name.StartsWith("Decrypt", StringComparison.Ordinal) || name == "CreateDecryptor") => Short(type) + "." + name,
             _ => null,
         };
