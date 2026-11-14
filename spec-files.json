@@ -464,8 +464,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "88c37276d837645ce68463fa3e3611224255c3e734e2724b00d8cf4039376907",
-      "bytes": 277912
+      "sha256": "f29c321d007494e1f9a34d3d52038c3d81c27fd4a39d8706ed6dc6ec5383efda",
+      "bytes": 280665
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -721,6 +721,11 @@
       "path": "docs/ui/C1_DESIGNER_UX_VISUAL_REFERENCE.png",
       "sha256": "cec0999216be7fc615843894cb873b98a3e33d6f0e051eb802c5fe899be78943",
       "bytes": 1824577
+    },
+    {
+      "path": "docs/ui/FD01_LAYOUT_FIDELITY.md",
+      "sha256": "3f1a3c0983db0c24a3ed7e7085ed8627c6d09e8e933f00f9e1388949492f105f",
+      "bytes": 15431
     },
     {
       "path": "docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md",

@@ -1,5 +1,5 @@
 import type { FieldDefinitionResponse, GroupDefinitionResponse, RelationshipDefinitionResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
-import { applyEditValues, elementKey, findElement, moveElementTo, placedIds, sameScope, setSectionRepeat, toEditValues, updateElementByKey, updateSection, validateEditValues, type DesignerSelection, type FieldEditValues } from "@enterpriseforms/form-designer";
+import { applyEditValues, elementKey, fieldCells, findElement, isEmptyRow, maxSpanAt, maxSpanFor, moveToNewRow, neighbourKey, placeAtCell, placedIds, refusalMessage, sameScope, sectionGrid, setSectionRepeat, setSpan, setStartOnNewRow, swapElements, toEditValues, updateElementByKey, updateSection, validateEditValues, type DesignerSelection, type FieldEditValues, type GridEditResult, type GridOperation } from "@enterpriseforms/form-designer";
 import { CONTROLS_BY_TYPE, REPEAT_CEILING, type DocumentElement, type FieldDataType, type FieldElement, type FormLayout, type LayoutElement, type LayoutRepeat, type RelatedElement } from "@enterpriseforms/form-renderer";
 import { ActionIcons, Badge, Button, Checkbox, errorTextClass, IconButton, Select, StatusMessage, Tabs, TextArea, TextInput } from "@enterpriseforms/ui";
 import { useState, type ReactNode } from "react";
@@ -9,12 +9,13 @@ import { DependentChoices, RulesTab } from "./RulesTab";
 import { FieldSearchSection } from "../../search";
 import { ErrorPanel } from "../../support";
 
+/** An exact desktop cell of a section (FD-01): a new or existing field placed here keeps this row and column. */
 export interface PlacementTarget {
   sectionKey: string;
-  insertIndex: number;
-  /** The specific empty cell this is, when it is one of several at the same `insertIndex` (e.g. a "+ Add Row" column); used to consume exactly that slot and to carry its `startOnNewRow` into the placed field. */
+  row: number;
+  column: number;
+  /** The empty cell this is (`cell-<row>-<column>`). */
   slotId?: string | undefined;
-  startOnNewRow?: boolean | undefined;
 }
 
 export interface DesignerInspectorProps {
@@ -35,8 +36,8 @@ export interface DesignerInspectorProps {
   onOpenFieldEditor: (fieldDefinitionId: string) => void;
   /** Starts creating a new field/document collection that is placed at `target` once the server confirms it. */
   onCreateAt: (kind: "field" | "documents", target: PlacementTarget) => void;
-  /** An empty cell was filled; lets the page retire an extra "+ Add Column" cell. */
-  onPlacedAt?: ((target: PlacementTarget) => void) | undefined;
+  /** Clear/Delete row or column for the selected cell (FD-01 row management); the page confirms before removing fields. */
+  onRequestGridOperation?: ((operation: GridOperation) => void) | undefined;
   onOpenRelatedForms: () => void;
   onStrengthen: (fieldDefinitionId: string, request: StrengthenFieldProtectionRequest) => void;
   strengthenPending: boolean;
@@ -93,9 +94,10 @@ export function DesignerInspector(props: DesignerInspectorProps) {
     const sectionIndex = layout.sections.findIndex((section) => section.sectionKey === selection.sectionKey);
     if (sectionIndex >= 0) {
       title = "Add Field";
-      body = <SlotOptions key={`${selection.sectionKey}:${selection.slotId}`} {...props} sectionIndex={sectionIndex} target={{ sectionKey: selection.sectionKey, insertIndex: selection.insertIndex, slotId: selection.slotId, startOnNewRow: selection.startOnNewRow }} />;
+      body = <SlotOptions key={`${selection.sectionKey}:${selection.slotId}`} {...props} sectionIndex={sectionIndex} target={{ sectionKey: selection.sectionKey, row: selection.row, column: selection.column, slotId: selection.slotId }} />;
     }
   }
+  const gridActions = <RowColumnActions {...props} />;
   return (
     <aside aria-labelledby="designer-inspector-heading" className="flex min-w-0 flex-col rounded-panel border border-line bg-surface">
       <div className="flex min-h-12 items-center gap-2 border-b border-line px-4 py-2">
@@ -110,8 +112,73 @@ export function DesignerInspector(props: DesignerInspectorProps) {
           </IconButton>
         ) : null}
       </div>
-      <div className="flex min-w-0 flex-col gap-3 p-4">{body}</div>
+      <div className="flex min-w-0 flex-col gap-3 p-4">
+        {body}
+        {gridActions}
+      </div>
     </aside>
+  );
+}
+
+/**
+ * FD-01 row management: the row and column of the selected field or empty cell, with Clear row / Delete row / Clear
+ * column / Delete column. Clearing keeps the empty cells; deleting removes the row or the column position (later fields
+ * move up or left). Every action that would remove a field asks for confirmation first, and all of them are undoable.
+ */
+function RowColumnActions({ layout, selection, canDesign, onRequestGridOperation }: DesignerInspectorProps) {
+  if (!canDesign || !onRequestGridOperation || (selection?.kind !== "element" && selection?.kind !== "slot")) {
+    return null;
+  }
+  let sectionKey: string;
+  let row: number;
+  let column: number;
+  let span = 1;
+  if (selection.kind === "element") {
+    const position = findElement(layout, selection.key);
+    const section = position ? layout.sections[position.sectionIndex] : undefined;
+    const cell = section ? sectionGrid(section).find((candidate) => candidate.key === selection.key) : undefined;
+    if (!section || !cell) {
+      return null;
+    }
+    sectionKey = section.sectionKey;
+    ({ row, column, span } = cell);
+  } else {
+    const section = layout.sections.find((candidate) => candidate.sectionKey === selection.sectionKey);
+    if (!section || !sectionGrid(section).some((cell) => cell.row === selection.row)) {
+      return null;
+    }
+    sectionKey = section.sectionKey;
+    ({ row, column } = selection);
+  }
+  const section = layout.sections.find((candidate) => candidate.sectionKey === sectionKey)!;
+  const cells = sectionGrid(section);
+  const rowHasFields = fieldCells(cells).some((cell) => cell.row === row);
+  const occupied = selection.kind === "element";
+  const columns = span > 1 ? `columns ${column}–${column + span - 1}` : `column ${column}`;
+  const request = (kind: GridOperation["kind"]) => onRequestGridOperation({ kind, sectionKey, row, column });
+  return (
+    <section aria-labelledby="designer-row-column-heading" className="flex flex-col gap-2 border-t border-line pt-3" data-testid="row-column-actions">
+      <h3 id="designer-row-column-heading" className="text-sm font-semibold">
+        Row {row} · {span > 1 ? `Columns ${column}–${column + span - 1}` : `Column ${column}`}
+      </h3>
+      <p className="text-xs text-muted">Clearing removes fields and keeps the empty cells. Deleting also removes the row (rows below move up) or the column position (fields to its right move left). You are asked before any field is removed, and Undo restores it.</p>
+      <div role="group" aria-label={`Row ${row} actions`} className="flex flex-wrap gap-2">
+        <Button size="sm" variant="secondary" icon={ActionIcons.clear} disabled={!rowHasFields} onClick={() => request("clearRow")} aria-label={`Clear row ${row}`}>
+          Clear row
+        </Button>
+        <Button size="sm" variant="danger" icon={ActionIcons.delete} disabled={!rowHasFields && cells.every((cell) => cell.row === row)} onClick={() => request("deleteRow")} aria-label={`Delete row ${row}`}>
+          Delete row
+        </Button>
+      </div>
+      <div role="group" aria-label={`Column ${column} actions`} className="flex flex-wrap gap-2">
+        <Button size="sm" variant="secondary" icon={ActionIcons.clear} disabled={!occupied} onClick={() => request("clearColumn")} aria-label={`Clear column ${column} of row ${row}${span > 1 ? ` (the field spans ${columns})` : ""}`}>
+          Clear column
+        </Button>
+        <Button size="sm" variant="danger" icon={ActionIcons.delete} disabled={isEmptyRow(cells, row)} onClick={() => request("deleteColumn")} aria-label={`Delete column ${column} of row ${row}`}>
+          Delete column
+        </Button>
+      </div>
+    </section>
   );
 }
 
@@ -133,17 +200,23 @@ function NothingSelected({ layout, fields, relationships }: DesignerInspectorPro
  * section, move earlier/later. `FieldConfigModal` reuses this unchanged with a local draft layout/setter so the
  * Advanced tab's Placement section behaves identically while deferring the actual commit to Apply Changes.
  */
-export function placementControls({ layout, onChange, onSelect, announce, canDesign }: DesignerInspectorProps, element: LayoutElement, sectionIndex: number, index: number) {
+export function placementControls({ layout, onChange, onSelect, announce, canDesign }: DesignerInspectorProps, element: LayoutElement, sectionIndex: number) {
   const key = elementKey(element);
   const section = layout.sections[sectionIndex]!;
-  const moveTo = (targetSectionIndex: number, insertIndex: number, message: string) => {
-    const next = moveElementTo(layout, key, targetSectionIndex, insertIndex);
-    if (next !== layout) {
-      onChange(next);
-      onSelect({ kind: "element", key });
-      announce(message);
+  // FD-01: placement edits go through the grid edits; a refused edit changes nothing and is announced.
+  const apply = (result: GridEditResult, message: string) => {
+    if (!result.ok) {
+      announce(refusalMessage(result.reason));
+      return;
     }
+    onChange(result.layout);
+    onSelect({ kind: "element", key });
+    announce(message);
   };
+  const cell = sectionGrid(section).find((candidate) => candidate.key === key);
+  const widest = maxSpanFor(layout, key);
+  const previous = neighbourKey(layout, key, -1);
+  const following = neighbourKey(layout, key, 1);
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -151,10 +224,19 @@ export function placementControls({ layout, onChange, onSelect, announce, canDes
           label="Field width"
           value={String(element.layout.columnSpan)}
           disabled={!canDesign}
-          options={WIDTH_OPTIONS}
-          onValueChange={(value) => onChange(updateElementByKey(layout, key, (current) => ({ ...current, layout: { ...current.layout, columnSpan: Number(value) as 1 | 2 | 3 | 4 } })))}
+          options={WIDTH_OPTIONS.map((option) => (Number(option.value) > widest ? { ...option, label: `${option.label} (no room in this row)`, disabled: true } : option))}
+          helpText={cell ? `Row ${cell.row}, column ${cell.column} on desktop.` : undefined}
+          onValueChange={(value) => apply(setSpan(layout, key, Number(value) as 1 | 2 | 3 | 4), `Width ${value} of 4 columns`)}
         />
-        <Checkbox label="Start on a new row" checked={element.layout.startOnNewRow} disabled={!canDesign} onCheckedChange={(checked) => onChange(updateElementByKey(layout, key, (current) => ({ ...current, layout: { ...current.layout, startOnNewRow: checked } })))} />
+        <Checkbox
+          label="Start on a new row"
+          checked={element.layout.startOnNewRow}
+          disabled={!canDesign}
+          onCheckedChange={(checked) => {
+            onChange(setStartOnNewRow(layout, key, checked));
+            announce(checked ? "Starts a new row" : "Joins the previous row where there is room");
+          }}
+        />
       </div>
       <Select
         label="Section"
@@ -165,15 +247,15 @@ export function placementControls({ layout, onChange, onSelect, announce, canDes
         onValueChange={(sectionKey) => {
           const target = layout.sections.findIndex((candidate) => candidate.sectionKey === sectionKey);
           if (target >= 0 && target !== sectionIndex) {
-            moveTo(target, layout.sections[target]!.elements.length, `Moved to ${layout.sections[target]!.title ?? sectionKey}`);
+            apply(moveToNewRow(layout, key, target), `Moved to ${layout.sections[target]!.title ?? sectionKey}`);
           }
         }}
       />
       <div className="flex flex-wrap gap-2" role="group" aria-label="Position in section">
-        <Button size="sm" variant="secondary" disabled={!canDesign || index === 0} onClick={() => moveTo(sectionIndex, index - 1, "Moved earlier")}>
+        <Button size="sm" variant="secondary" disabled={!canDesign || previous === null} onClick={() => previous && apply(swapElements(layout, key, previous), "Moved earlier")}>
           Move earlier
         </Button>
-        <Button size="sm" variant="secondary" disabled={!canDesign || index === section.elements.length - 1} onClick={() => moveTo(sectionIndex, index + 2, "Moved later")}>
+        <Button size="sm" variant="secondary" disabled={!canDesign || following === null} onClick={() => following && apply(swapElements(layout, key, following), "Moved later")}>
           Move later
         </Button>
       </div>
@@ -377,7 +459,7 @@ export function FieldProperties(props: DesignerInspectorProps & { element: Field
     {
       value: "placement",
       label: "Placement & Alignment",
-      content: <div className="flex flex-col gap-4">{placementControls(props, element, props.sectionIndex, props.index)}</div>,
+      content: <div className="flex flex-col gap-4">{placementControls(props, element, props.sectionIndex)}</div>,
     },
     {
       value: "security",
@@ -437,7 +519,7 @@ export function RelatedListProperties(props: DesignerInspectorProps & { element:
     {
       value: "placement",
       label: "Placement & Alignment",
-      content: <div className="flex flex-col gap-4">{placementControls(props, element, props.sectionIndex, props.index)}</div>,
+      content: <div className="flex flex-col gap-4">{placementControls(props, element, props.sectionIndex)}</div>,
     },
     { value: "security", label: "Security & Encryption", content: <p className="text-sm text-muted">Each child is an independent record. The Authorization Authority decides access per child record; a share of the parent never covers its children, and each child field keeps its own encryption policy.</p> },
     {
@@ -592,6 +674,9 @@ function SlotOptions(props: DesignerInspectorProps & { sectionIndex: number; tar
   ];
   const [choice, setChoice] = useState<string | undefined>(undefined);
   const [width, setWidth] = useState("1");
+  const [problem, setProblem] = useState<string | null>(null);
+  // FD-01: widths that do not fit the free cells from this column are offered but disabled (a new row fits any width).
+  const roomHere = maxSpanAt(sectionGrid(section), target.row, target.column);
   if (!canDesign) {
     return <p className="text-sm text-muted">You can view this form's design but not change it.</p>;
   }
@@ -601,32 +686,44 @@ function SlotOptions(props: DesignerInspectorProps & { sectionIndex: number; tar
     }
     const [kind, id] = choice.split(":", 2) as [string, string];
     const columnSpan = Number(width) as 1 | 2 | 3 | 4;
-    const startOnNewRow = target.startOnNewRow === true;
     let element: LayoutElement;
     if (kind === "relationship") {
       const relationship = relationships.find((candidate) => candidate.formRelationshipDefinitionId === id)!;
-      element = { kind: "relatedFormList", formRelationshipDefinitionId: id, label: relationship.relationshipDisplayName, layout: { columnSpan, startOnNewRow }, summaryFieldKeys: [] };
+      element = { kind: "relatedFormList", formRelationshipDefinitionId: id, label: relationship.relationshipDisplayName, layout: { columnSpan, startOnNewRow: false }, summaryFieldKeys: [] };
     } else {
       const field = fields.find((candidate) => candidate.fieldDefinitionId === id)!;
-      element = { ...newElementFor(field, columnSpan), layout: { columnSpan, startOnNewRow } };
+      element = newElementFor(field, columnSpan);
     }
-    const sectionNow = layout.sections[sectionIndex]!;
-    const elements = [...sectionNow.elements];
-    elements.splice(Math.min(target.insertIndex, elements.length), 0, element);
-    const sections = [...layout.sections];
-    sections[sectionIndex] = { ...sectionNow, elements };
-    onChange({ ...layout, sections });
-    props.onPlacedAt?.(target);
+    const placed = placeAtCell(layout, sectionIndex, element, target.row, target.column);
+    if (!placed.ok) {
+      setProblem(refusalMessage(placed.reason));
+      props.announce(refusalMessage(placed.reason));
+      return;
+    }
+    onChange(placed.layout);
     props.onSelect({ kind: "element", key: elementKey(element) });
     props.announce(`${element.label} placed in ${section.title ?? section.sectionKey}`);
   };
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-muted">
-        Position {target.insertIndex + 1} in <span className="font-medium text-body">{section.title ?? section.sectionKey}</span>.
+        Row {target.row}, column {target.column} in <span className="font-medium text-body">{section.title ?? section.sectionKey}</span>.
       </p>
       <Select label="Place an existing field" value={choice} onValueChange={setChoice} options={options} placeholder={options.length === 0 ? "Every field is already placed" : "Choose a field…"} disabled={options.length === 0} />
-      <Select label="Width" value={width} onValueChange={setWidth} options={WIDTH_OPTIONS} />
+      <Select
+        label="Width"
+        value={width}
+        onValueChange={(value) => {
+          setWidth(value);
+          setProblem(null);
+        }}
+        options={WIDTH_OPTIONS.map((option) => (Number(option.value) > roomHere ? { ...option, label: `${option.label} (no room here)`, disabled: true } : option))}
+      />
+      {problem ? (
+        <p role="alert" className={errorTextClass}>
+          {problem}
+        </p>
+      ) : null}
       <div>
         <Button disabled={!choice} onClick={place}>
           Place field here

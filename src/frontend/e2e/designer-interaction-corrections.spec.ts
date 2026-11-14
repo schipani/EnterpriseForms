@@ -53,48 +53,53 @@ test.describe.serial("Phase C3 designer interaction and usability corrections", 
     await expect(canvas(page).getByRole("heading", { level: 2 })).toHaveCount(2); // the form's default section + Alpha
     await expect(section(page, "Alpha").locator("[data-repeat-badge]")).toHaveCount(0);
 
+    // An empty section starts with one row of four empty columns (FD-01: there is no separate single "new row" cell).
+    const allCells = section(page, "Alpha").getByRole("button", { name: /^Add Field to Alpha/ });
+    await expect(allCells).toHaveCount(4);
+
     // 1. Select the section (its header) and click Add Row.
     await canvas(page).getByRole("button", { name: "Alpha", exact: true }).click();
     await expect(page.getByRole("button", { name: "Add Row" })).toBeEnabled();
     await page.getByRole("button", { name: "Add Row" }).click();
 
-    // 2. The new row has exactly four independent columns, each width 1 (one grid unit) — not one wide cell. A
-    // fifth "+ Add Field" cell is the section's own always-present trailing cell (same as "+ Add Column" leaves one
-    // on an empty section); it coexists with — but sorts after, and wraps below — the four just added.
-    const allCells = section(page, "Alpha").getByRole("button", { name: /^Add Field to Alpha/ });
-    await expect(allCells).toHaveCount(5);
-    const cells = allCells; // the first four (indexes 0-3, see below) are this row's columns; index 4 is the trailing cell
-    const widths = await allCells.evaluateAll((nodes) => nodes.slice(0, 4).map((n) => n.getBoundingClientRect().width));
+    // 2. Add Row adds exactly one row of four independent columns, each width 1 (one grid unit) — not one wide cell,
+    // and no extra trailing cell: 4 + 4 cells, the new four on a row of their own below the first row.
+    await expect(allCells).toHaveCount(8);
+    const cells = section(page, "Alpha").getByRole("button", { name: /^Add Field to Alpha, row 2, column [1-4]$/ });
+    await expect(cells).toHaveCount(4);
+    await expect(cells.first()).toHaveAttribute("aria-pressed", "true"); // the new row's first column is selected
+    const widths = await cells.evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().width));
     const total = widths.reduce((a, b) => a + b, 0);
     for (const width of widths) {
       expect(width).toBeLessThan(total / 3); // each is roughly a quarter, not a single full-width cell
     }
-    const rowTops = await allCells.evaluateAll((nodes) => nodes.slice(0, 4).map((n) => Math.round(n.getBoundingClientRect().top)));
+    const rowTops = await cells.evaluateAll((nodes) => nodes.map((n) => Math.round(n.getBoundingClientRect().top)));
     expect(new Set(rowTops).size).toBe(1); // all four sit in the same row
-    const baselineTop = await allCells.evaluateAll((nodes) => Math.round(nodes[4]!.getBoundingClientRect().top));
-    expect(baselineTop).toBeGreaterThan(rowTops[0]!); // the trailing cell wraps below the new row, not inside it
+    const firstRowTop = await allCells.first().evaluate((node) => Math.round(node.getBoundingClientRect().top));
+    expect(rowTops[0]!).toBeGreaterThan(firstRowTop); // below the section's first row
     await expect(canvas(page).getByRole("heading", { level: 2 })).toHaveCount(2); // still only two sections, not five
 
-    // 3. Click columns 1-4 individually; confirm each one, and only that one, becomes selected (the trailing cell is unaffected).
+    // 3. Click columns 1-4 individually; confirm each one, and only that one, becomes selected.
     for (let i = 0; i < 4; i++) {
       await cells.nth(i).click();
-      for (let j = 0; j < 5; j++) {
-        await expect(cells.nth(j)).toHaveAttribute("aria-pressed", String(j === i));
+      for (let j = 0; j < 8; j++) {
+        await expect(allCells.nth(j)).toHaveAttribute("aria-pressed", String(j === i + 4));
       }
     }
 
-    // 4. Place fields in all four columns, filling them in order (not the trailing cell, which sorts and renders last).
+    // 4. Place fields in all four columns of the new row, filling them in order.
     for (let i = 1; i <= 4; i++) {
       await addField(page, `Row field ${i}`, "String");
       await page.getByRole("tab", { name: "Design" }).click();
-      await cells.first().click();
+      await section(page, "Alpha").getByRole("button", { name: `Add Field to Alpha, row 2, column ${i}`, exact: true }).click();
       const inspector = page.getByRole("complementary", { name: "Add Field" });
       await inspector.getByLabel("Place an existing field").click();
       await page.getByRole("option", { name: new RegExp(`^Row field ${i} \\(`) }).click();
       await inspector.getByRole("button", { name: "Place field here" }).click();
     }
     await expect(section(page, "Alpha").getByRole("button", { name: /^Row field [1-4]$/ })).toHaveCount(4);
-    await expect(cells).toHaveCount(1); // all four columns were filled; only the section's own trailing cell remains
+    await expect(cells).toHaveCount(0); // all four columns of the new row were filled, and no further row was created
+    await expect(allCells).toHaveCount(4); // only the (still empty) first row's cells remain
     const fieldTops = await section(page, "Alpha")
       .getByRole("button", { name: /^Row field [1-4]$/ })
       .evaluateAll((nodes) => nodes.map((n) => Math.round(n.getBoundingClientRect().top)));
@@ -121,6 +126,7 @@ test.describe.serial("Phase C3 designer interaction and usability corrections", 
     await page.reload();
     await expect(page.getByRole("heading", { level: 1, name: formName })).toBeVisible();
     await expect(section(page, "Alpha").getByRole("button", { name: /^Row field [1-4]$/ })).toHaveCount(4);
+    await expect(allCells).toHaveCount(0); // empty rows are designer-only: after reload the full row is the section's only row
     const reloadedTops = await section(page, "Alpha")
       .getByRole("button", { name: /^Row field [1-4]$/ })
       .evaluateAll((nodes) => nodes.map((n) => Math.round(n.getBoundingClientRect().top)));

@@ -6,7 +6,15 @@ import { ruleConditionSchema, ruleShapeProblem } from "./rules";
  * The server remains authoritative: this schema exists so the designer and renderer can parse/produce the same
  * document and give early feedback. Unknown properties are rejected so nothing executable can ride along.
  */
-const placement = z.object({ columnSpan: z.number().int().min(1).max(4), startOnNewRow: z.boolean() }).strict();
+/**
+ * Placement on the four-column desktop grid. `columnStart` (FD-01, optional, additive to schema v2) pins the element to an
+ * explicit desktop column so empty cells before it are preserved; an element without it flows from the current position
+ * exactly as layouts always have. The server enforces the same bounds (`FormLayoutCodec.ParsePlacement`).
+ */
+const placement = z
+  .object({ columnSpan: z.number().int().min(1).max(4), startOnNewRow: z.boolean(), columnStart: z.number().int().min(1).max(4).optional() })
+  .strict()
+  .refine((value) => value.columnStart === undefined || value.columnStart + value.columnSpan - 1 <= 4, "The field extends beyond the four-column grid");
 const validation = z
   .object({
     minLength: z.number().int().min(0).optional(),

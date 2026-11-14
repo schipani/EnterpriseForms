@@ -108,7 +108,8 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
     /// remaining element: a rule names fields (and comparison values) the viewer may not be allowed to see, and a partial
     /// projection never evaluates rules, so shipping them would only disclose layout structure. Dropdown dependencies are
     /// removed for the same reason (they name the parent field), and repeating sections are dropped entirely: their entries
-    /// are not part of any share (C-17).
+    /// are not part of any share (C-17). FD-01: explicit column positions are removed as well, so the remaining elements
+    /// reflow in source order and no empty cell can mark where an unauthorized field would have been.
     /// </summary>
     public static FormLayout AuthorizedLayout(FormLayout layout, IReadOnlySet<Guid> authorizedFieldIds, IReadOnlySet<Guid> authorizedDocumentFieldIds)
     {
@@ -121,7 +122,7 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
                     LayoutElementKinds.Field => e.FieldDefinitionId is { } id && authorizedFieldIds.Contains(id),
                     LayoutElementKinds.DocumentCollection => e.FieldDefinitionId is { } id && authorizedDocumentFieldIds.Contains(id),
                     _ => false,
-                }).Select(e => e with { VisibleWhen = null, RequiredWhen = null, ClearWhenHidden = false, OptionFilter = null }).ToList(),
+                }).Select(e => e with { VisibleWhen = null, RequiredWhen = null, ClearWhenHidden = false, OptionFilter = null, Layout = e.Layout with { ColumnStart = null } }).ToList(),
             })
             .Where(section => section.Elements.Count > 0)
             .ToList();

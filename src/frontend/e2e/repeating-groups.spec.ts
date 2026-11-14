@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { formIdFromUrl, openFieldConfig, placeFromPicker, saveAndPublish, signIn, signOut } from "./support";
+import { formIdFromUrl, openFieldConfig, placeFromPicker, saveAndPublish, selectNewRowCell, signIn, signOut } from "./support";
 
 /**
  * Phase C3, through the real application and API (no mocks):
@@ -39,8 +39,7 @@ async function addDropdown(page: Page, name: string, options: string[]) {
 
 /** Creates a field for each entry from the repeating section's own "+ Add Field" cell. */
 async function addEntryField(page: Page, sectionName: string, name: string, dropdownOptions?: string[]) {
-  await page.getByRole("tab", { name: "Design" }).click();
-  await section(page, sectionName).getByRole("button", { name: /^Add Field to / }).last().click();
+  await selectNewRowCell(page, sectionName);
   await page.getByRole("complementary", { name: "Add Field" }).getByRole("button", { name: "New field for each entry…" }).click();
   const dialog = page.getByRole("dialog", { name: "Add field" });
   await expect(dialog.getByText(/allows multiple entries: it has one value per entry/)).toBeVisible();

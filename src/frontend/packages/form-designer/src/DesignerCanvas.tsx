@@ -1,7 +1,9 @@
 import { packElements, visibleColumns, type Breakpoint, type FormLayout, type LayoutElement, type LayoutSection, type RendererField } from "@enterpriseforms/form-renderer";
 import { IconButton as SharedIconButton, OverflowMenu } from "@enterpriseforms/ui";
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
-import { duplicateSection, elementKey, findElement, moveElementTo, moveSection, newSectionKey, removeElement, sameScope, updateElement, updateSection } from "./layoutEdits";
+import { appendRow, emptyCells, fieldCells, isEmptyRow, maxSpanFor, moveByColumn, moveToCell, moveToNewRow, neighbourKey, placementProblem, refusalMessage, removeFromGrid, sectionGrid, setSpan, swapElements, type GridEditResult } from "./gridEdits";
+import { duplicateSection, elementKey, findElement, moveSection, newSectionKey, sameScope, updateElement, updateSection } from "./layoutEdits";
+import type { GridOperation } from "./rowColumnEdits";
 
 export interface DesignerRelationship {
   formRelationshipDefinitionId: string;
@@ -10,13 +12,12 @@ export interface DesignerRelationship {
 }
 
 /**
- * What the inspector shows: a placed element, a section, or an empty "+ Add Field" cell (exact insertion position).
- * A slot's `slotId` disambiguates several empty cells that share the same `insertIndex` — the four independent
- * columns "+ Add Row" creates all insert at the same position until one of them is filled, so `insertIndex` alone
- * cannot tell them apart (Phase C3 usability corrections: this was the root cause of all four columns highlighting
- * together, and of clicks on one column sometimes acting on another).
+ * What the inspector shows: a placed element, a section, or an empty "+ Add Field" cell. FD-01: a cell is an exact desktop
+ * grid position (`row`, `column`) of its section — an empty cell of a row with fields, or a cell of an empty row ("+ Add
+ * Row", "Clear row") — and `slotId` identifies it uniquely (so several empty cells of one row are independently
+ * selectable, Phase C3 usability corrections).
  */
-export type DesignerSelection = { kind: "element"; key: string } | { kind: "section"; sectionKey: string } | { kind: "slot"; sectionKey: string; insertIndex: number; slotId: string; startOnNewRow?: boolean | undefined } | null;
+export type DesignerSelection = { kind: "element"; key: string } | { kind: "section"; sectionKey: string } | { kind: "slot"; sectionKey: string; slotId: string; row: number; column: number } | null;
 
 export interface DesignerCanvasProps {
   layout: FormLayout;
@@ -26,16 +27,10 @@ export interface DesignerCanvasProps {
   readOnly?: boolean | undefined;
   selection: DesignerSelection;
   onSelect: (selection: DesignerSelection) => void;
-  /**
-   * Additional empty placement cells per section, designer-only and never persisted, each with a stable `id` so it
-   * can be independently selected, highlighted and later consumed by filling it with a field. "+ Add Column" adds
-   * one 1-column cell at the target position. "+ Add Row" adds four independent 1-column cells at the end of the
-   * target section — the same single-column building block "+ Add Column" uses, reusing the existing grid/packing
-   * semantics rather than a separate structure — with only the first one marked `startOnNewRow: true` so the row
-   * always starts fresh (the packer, `packElements`, then lays the other three immediately after it; together they
-   * fill exactly one row of four).
-   */
-  extraSlots?: Readonly<Record<string, readonly { id: string; index: number; startOnNewRow?: boolean }[]>> | undefined;
+  /** A placement edit was refused (occupied cell, not enough room); the page shows the message. */
+  onRefused?: ((message: string) => void) | undefined;
+  /** Clear/Delete row or column (FD-01 row management); the page confirms before any field is removed. */
+  onRequestGridOperation?: ((operation: GridOperation) => void) | undefined;
   collapsed: ReadonlySet<string>;
   onToggleCollapse: (sectionKey: string) => void;
   /** Section whose title is being renamed inline (set right after "+ Add Section"). */
@@ -64,62 +59,98 @@ export function DesignerCanvas(props: DesignerCanvasProps) {
   const dragKey = useRef<string | null>(null);
   // A tile moved with the keyboard into another section remounts; this tells the new instance to take focus back.
   const focusKey = useRef<string | null>(null);
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const fieldById = new Map(props.fields.map((field) => [field.fieldDefinitionId, field]));
   const relationshipById = new Map(props.relationships.map((relationship) => [relationship.formRelationshipDefinitionId, relationship]));
 
-  const drag = {
+  // Applies a grid edit; a refusal changes nothing and is reported (never a silent overwrite or displacement).
+  const apply: Apply = (result, key, message) => {
+    if (!result.ok) {
+      const text = refusalMessage(result.reason);
+      props.onRefused?.(text);
+      props.announce?.(text);
+      return;
+    }
+    if (result.layout !== layout) {
+      props.onChange(result.layout);
+      props.onSelect({ kind: "element", key });
+      props.announce?.(message);
+    }
+  };
+  const draggedElement = () => (dragKey.current ? findElement(layout, dragKey.current) : null);
+
+  const drag: Drag = {
     start: (key: string) => (event: DragEvent) => {
       dragKey.current = key;
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", key);
     },
-    over: (target: string) => (event: DragEvent) => {
-      if (dragKey.current) {
-        event.preventDefault();
-        event.stopPropagation();
-        event.dataTransfer.dropEffect = "move";
-        setDropTarget(target);
+    // Only valid targets accept the drop (preventDefault); an invalid one shows a "no drop" cursor and a distinct outline.
+    over: (target, valid) => (event: DragEvent) => {
+      const dragged = draggedElement();
+      if (!dragged || !dragKey.current) {
+        return;
       }
+      event.stopPropagation();
+      const ok = valid({ key: dragKey.current, sectionIndex: dragged.sectionIndex, span: dragged.element.layout.columnSpan });
+      if (ok) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      } else {
+        event.dataTransfer.dropEffect = "none";
+      }
+      setDropTarget((current) => (current?.id === target && current.valid === ok ? current : { id: target, valid: ok }));
     },
-    drop: (sectionIndex: number, insertIndex: number) => (event: DragEvent) => {
+    drop: (run) => (event: DragEvent) => {
       event.preventDefault();
       event.stopPropagation();
       const key = dragKey.current;
       dragKey.current = null;
       setDropTarget(null);
-      if (!key) {
-        return;
-      }
-      const next = moveElementTo(layout, key, sectionIndex, insertIndex);
-      if (next !== layout) {
-        props.onChange(next);
-        props.onSelect({ kind: "element", key });
-        props.announce?.(`Moved to ${sectionTitle(layout.sections[sectionIndex]!)}`);
+      if (key) {
+        run(key);
       }
     },
     end: () => {
       dragKey.current = null;
       setDropTarget(null);
     },
+    toCell: (sectionIndex, row, column) => (key) => apply(moveToCell(layout, key, sectionIndex, row, column), key, `Moved to ${sectionTitle(layout.sections[sectionIndex]!)}, row ${row}, column ${column}`),
+    toSection: (sectionIndex) => (key) => apply(moveToNewRow(layout, key, sectionIndex), key, `Moved to a new row in ${sectionTitle(layout.sections[sectionIndex]!)}`),
+    onto: (targetKey) => (key) => (key === targetKey ? undefined : apply(swapElements(layout, key, targetKey), key, "Fields swapped")),
   };
 
   return (
     <div className="flex min-w-0 flex-col gap-4" onDragEnd={drag.end}>
       {layout.sections.map((section, sectionIndex) => (
-        <SectionCard key={section.sectionKey} section={section} sectionIndex={sectionIndex} props={props} focusKey={focusKey} fieldById={fieldById} relationshipById={relationshipById} readOnly={readOnly} drag={drag} dropTarget={dropTarget} />
+        <SectionCard key={section.sectionKey} section={section} sectionIndex={sectionIndex} props={props} focusKey={focusKey} fieldById={fieldById} relationshipById={relationshipById} readOnly={readOnly} drag={drag} dropTarget={dropTarget} apply={apply} />
       ))}
     </div>
   );
 }
 
+type DraggedInfo = { key: string; sectionIndex: number; span: number };
+type DropTarget = { id: string; valid: boolean };
+type Apply = (result: GridEditResult, key: string, message: string) => void;
 type Drag = {
   start: (key: string) => (event: DragEvent) => void;
-  over: (target: string) => (event: DragEvent) => void;
-  drop: (sectionIndex: number, insertIndex: number) => (event: DragEvent) => void;
+  over: (target: string, valid: (dragged: DraggedInfo) => boolean) => (event: DragEvent) => void;
+  drop: (run: (key: string) => void) => (event: DragEvent) => void;
+  end: () => void;
+  toCell: (sectionIndex: number, row: number, column: number) => (key: string) => void;
+  toSection: (sectionIndex: number) => (key: string) => void;
+  onto: (targetKey: string) => (key: string) => void;
 };
 
-type Item = { type: "element"; element: LayoutElement; index: number; layout: LayoutElement["layout"] } | { type: "slot"; insertIndex: number; slotId: string; startOnNewRow?: boolean; layout: LayoutElement["layout"] };
+/** A drawn grid item: a placed element, or an empty cell at an exact desktop (row, column) of the section. */
+type Item = { type: "element"; element: LayoutElement; index: number; row: number; column: number; span: number } | { type: "slot"; slotId: string; row: number; column: number };
+
+function dropOutline(target: DropTarget | null, id: string): string {
+  if (target?.id !== id) {
+    return "";
+  }
+  return target.valid ? "outline-2 outline-dashed outline-focus" : "outline-2 outline-dashed outline-danger";
+}
 
 /**
  * The canvas shows the authored four-column desktop arrangement whenever a section is wide enough to draw four usable
@@ -148,7 +179,7 @@ function sectionTitle(section: LayoutSection): string {
   return section.title?.trim() || section.sectionKey;
 }
 
-function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relationshipById, readOnly, drag, dropTarget }: { section: LayoutSection; sectionIndex: number; props: DesignerCanvasProps; focusKey: React.RefObject<string | null>; fieldById: Map<string, RendererField>; relationshipById: Map<string, DesignerRelationship>; readOnly: boolean; drag: Drag; dropTarget: string | null }) {
+function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relationshipById, readOnly, drag, dropTarget, apply }: { section: LayoutSection; sectionIndex: number; props: DesignerCanvasProps; focusKey: React.RefObject<string | null>; fieldById: Map<string, RendererField>; relationshipById: Map<string, DesignerRelationship>; readOnly: boolean; drag: Drag; dropTarget: DropTarget | null; apply: Apply }) {
   const { layout, selection } = props;
   const [gridRef, breakpoint] = useCanvasBreakpoint();
   const title = sectionTitle(section);
@@ -162,23 +193,24 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
   const headingId = `designer-section-${section.sectionKey}`;
   const bodyId = `${headingId}-body`;
 
-  // Placement cells: the trailing "+ Add Field" cell (always 1 column, stable id "baseline") plus any extra cells
-  // added with "+ Add Column" (one 1-column cell) or "+ Add Row" (four independent 1-column cells), in element order.
-  const slots = readOnly
-    ? []
-    : [...(props.extraSlots?.[section.sectionKey] ?? []).map((slot) => ({ id: slot.id, index: Math.min(slot.index, section.elements.length), startOnNewRow: slot.startOnNewRow === true })), { id: "baseline", index: section.elements.length, startOnNewRow: false }].sort((a, b) => a.index - b.index);
-  const items: Item[] = [];
-  const pushSlots = (index: number) => {
-    for (const slot of slots.filter((candidate) => candidate.index === index)) {
-      items.push({ type: "slot", insertIndex: slot.index, slotId: slot.id, startOnNewRow: slot.startOnNewRow, layout: { columnSpan: 1, startOnNewRow: slot.startOnNewRow } });
-    }
-  };
-  section.elements.forEach((element, index) => {
-    pushSlots(index);
-    items.push({ type: "element", element, index, layout: element.layout });
-  });
-  pushSlots(section.elements.length);
-  const packed = packElements(items, breakpoint);
+  // FD-01: the canvas draws the section's canonical desktop grid (the same packer Preview and the published renderer use)
+  // with every element at its exact (row, column). Empty "+ Add Field" cells are the empty cells of each row, including all
+  // four cells of a designer-only empty row ("+ Add Row", "Clear row"); there is no separate trailing cell — "+ Add Row"
+  // adds exactly one row, and filling a cell of an empty row turns it into a row of the section.
+  const cells = sectionGrid(section);
+  const desktop = breakpoint === "desktop";
+  const elementItems: Item[] = fieldCells(cells).map((cell) => ({ type: "element", element: cell.element, index: cell.index, row: cell.row, column: cell.column, span: cell.span }));
+  const slots: Item[] = readOnly ? [] : emptyCells(cells).filter(({ row }) => desktop || isEmptyRow(cells, row)).map(({ row, column }): Item => ({ type: "slot", slotId: `cell-${row}-${column}`, row, column }));
+  // Reading/tab order is the visual order: row by row, column by column.
+  const ordered = [...elementItems, ...slots].sort((a, b) => a.row - b.row || a.column - b.column);
+  // Narrower canvases (tablet, phone, zoom) draw the renderer's reflow of the same elements (no empty desktop cells of rows
+  // with fields), keeping the cells of empty rows in place; their placement targets are still exact desktop cells.
+  const packed = desktop
+    ? ordered.map((item) => ({ element: item, row: item.row, column: item.column, span: item.type === "element" ? item.span : 1 }))
+    : packElements(
+        ordered.map((item) => ({ item, layout: item.type === "element" ? item.element.layout : { columnSpan: 1, startOnNewRow: item.column === 1 } })),
+        breakpoint,
+      ).map((cell) => ({ element: cell.element.item, row: cell.row, column: cell.column, span: cell.span }));
   const columns = visibleColumns(breakpoint);
 
   const sectionMenu = readOnly
@@ -202,9 +234,9 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
   return (
     <section
       aria-labelledby={headingId}
-      className={`min-w-0 rounded-panel border bg-surface ${selected ? "border-focus ring-2 ring-focus" : containsSelection ? "border-focus" : "border-line"} ${dropTarget === `section:${section.sectionKey}` ? "outline-2 outline-dashed outline-focus" : ""}`}
-      onDragOver={readOnly ? undefined : drag.over(`section:${section.sectionKey}`)}
-      onDrop={readOnly ? undefined : drag.drop(sectionIndex, section.elements.length)}
+      className={`min-w-0 rounded-panel border bg-surface ${selected ? "border-focus ring-2 ring-focus" : containsSelection ? "border-focus" : "border-line"} ${dropOutline(dropTarget, `section:${section.sectionKey}`)}`}
+      onDragOver={readOnly ? undefined : drag.over(`section:${section.sectionKey}`, (dragged) => sameScope(layout.sections[dragged.sectionIndex]!, section))}
+      onDrop={readOnly ? undefined : drag.drop(drag.toSection(sectionIndex))}
     >
       <div className="flex min-h-12 items-center gap-1 border-b border-line px-2 py-1">
         <SharedIconButton
@@ -277,19 +309,21 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
               const slot = cell.element;
               const isSelected = selection?.kind === "slot" && selection.sectionKey === section.sectionKey && selection.slotId === slot.slotId;
               const target = `slot:${section.sectionKey}:${slot.slotId}`;
+              const fits = (dragged: DraggedInfo) => sameScope(layout.sections[dragged.sectionIndex]!, section) && placementProblem(cells, slot.row, slot.column, dragged.span, dragged.key) === null;
+              const dropState = dropTarget?.id === target ? (dropTarget.valid ? "valid" : "invalid") : null;
               return (
-                <li key={slot.slotId} style={style} className="min-w-0" onDragOver={drag.over(target)} onDrop={drag.drop(sectionIndex, slot.insertIndex)}>
+                <li key={slot.slotId} style={style} className="min-w-0" data-grid-row={slot.row} data-grid-column={slot.column} data-empty-row={isEmptyRow(cells, slot.row) ? "true" : undefined} onDragOver={drag.over(target, fits)} onDrop={drag.drop(drag.toCell(sectionIndex, slot.row, slot.column))}>
                   <button
                     type="button"
                     aria-pressed={isSelected}
-                    aria-label={`Add Field to ${title}, position ${slot.insertIndex + 1}`}
+                    aria-label={`Add Field to ${title}, row ${slot.row}, column ${slot.column}`}
                     onClick={(event) => {
                       // A parent section/row selection must never intercept a column's own click (Phase C3 usability
                       // corrections): stop here even though the section-body handler already skips buttons.
                       event.stopPropagation();
-                      props.onSelect({ kind: "slot", sectionKey: section.sectionKey, insertIndex: slot.insertIndex, slotId: slot.slotId, startOnNewRow: slot.startOnNewRow });
+                      props.onSelect({ kind: "slot", sectionKey: section.sectionKey, slotId: slot.slotId, row: slot.row, column: slot.column });
                     }}
-                    className={`flex h-full min-h-20 w-full flex-col items-center justify-center gap-1 rounded-control border-2 border-dashed text-sm font-medium text-body hover:bg-page ${isSelected || dropTarget === target ? "border-focus bg-page" : "border-input"}`}
+                    className={`flex h-full min-h-20 w-full flex-col items-center justify-center gap-1 rounded-control border-2 border-dashed text-sm font-medium text-body hover:bg-page ${isSelected || dropState === "valid" ? "border-focus bg-page" : dropState === "invalid" ? "border-danger" : "border-input"}`}
                   >
                     <span aria-hidden="true" className="text-xl leading-none">
                       +
@@ -307,16 +341,18 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
                 style={style}
                 element={element}
                 index={index}
+                position={{ row: cell.element.row, column: cell.element.column }}
                 section={section}
                 sectionIndex={sectionIndex}
                 field={element.kind === "relatedFormList" ? undefined : fieldById.get(element.fieldDefinitionId)}
                 relationship={element.kind === "relatedFormList" ? relationshipById.get(element.formRelationshipDefinitionId) : undefined}
                 selected={selection?.kind === "element" && selection.key === key}
-                dropActive={dropTarget === `element:${key}`}
+                dropOutline={dropOutline(dropTarget, `element:${key}`)}
                 props={props}
                 focusKey={focusKey}
                 readOnly={readOnly}
                 drag={drag}
+                apply={apply}
               />
             );
           })}
@@ -326,7 +362,7 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
   );
 }
 
-function FieldTile({ style, element, index, section, sectionIndex, field, relationship, selected, dropActive, props, focusKey, readOnly, drag }: { style: React.CSSProperties; element: LayoutElement; index: number; section: LayoutSection; sectionIndex: number; field: RendererField | undefined; relationship: DesignerRelationship | undefined; selected: boolean; dropActive: boolean; props: DesignerCanvasProps; focusKey: React.RefObject<string | null>; readOnly: boolean; drag: Drag }) {
+function FieldTile({ style, element, index, position, section, sectionIndex, field, relationship, selected, dropOutline: dropClass, props, focusKey, readOnly, drag, apply }: { style: React.CSSProperties; element: LayoutElement; index: number; position: { row: number; column: number }; section: LayoutSection; sectionIndex: number; field: RendererField | undefined; relationship: DesignerRelationship | undefined; selected: boolean; dropOutline: string; props: DesignerCanvasProps; focusKey: React.RefObject<string | null>; readOnly: boolean; drag: Drag; apply: Apply }) {
   const { layout } = props;
   const key = elementKey(element);
   const [renaming, setRenaming] = useState(false);
@@ -337,38 +373,61 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
     event?.stopPropagation(); // a field's own click must never also select its containing section (Phase C3 usability corrections)
     props.onSelect({ kind: "element", key });
   };
-  const move = (targetSectionIndex: number, insertIndex: number, message: string) => {
-    const next = moveElementTo(layout, key, targetSectionIndex, insertIndex);
-    if (next !== layout) {
-      props.onChange(next);
-      props.onSelect({ kind: "element", key });
-      props.announce?.(message);
+  // FD-01 grid moves. Earlier/later exchange places with the neighbouring field in reading order (crossing into the
+  // previous/next section of the same scope at the ends); left/right move one column within the row. A move that would
+  // overlap or leave the grid is refused and announced — nothing else moves.
+  const previous = neighbourKey(layout, key, -1);
+  const following = neighbourKey(layout, key, 1);
+  const adjacentSection = (delta: -1 | 1) => {
+    for (let candidate = sectionIndex + delta; candidate >= 0 && candidate < layout.sections.length; candidate += delta) {
+      if (sameScope(layout.sections[candidate]!, section)) {
+        return candidate;
+      }
+    }
+    return null;
+  };
+  const moveEarlier = () => {
+    if (previous) {
+      apply(swapElements(layout, key, previous), key, `${label} moved earlier`);
+      return;
+    }
+    const target = adjacentSection(-1);
+    if (target !== null) {
+      apply(moveToNewRow(layout, key, target), key, `${label} moved to ${sectionTitle(layout.sections[target]!)}`);
     }
   };
-  const setSpan = (value: number) => {
+  const moveLater = () => {
+    if (following) {
+      apply(swapElements(layout, key, following), key, `${label} moved later`);
+      return;
+    }
+    const target = adjacentSection(1);
+    if (target !== null) {
+      apply(moveToNewRow(layout, key, target, true), key, `${label} moved to ${sectionTitle(layout.sections[target]!)}`);
+    }
+  };
+  const moveColumn = (delta: -1 | 1) => apply(moveByColumn(layout, key, delta), key, `${label} moved to column ${position.column + delta}`);
+  const setWidth = (value: number) => {
     const columnSpan = Math.min(4, Math.max(1, value)) as 1 | 2 | 3 | 4;
-    props.onChange(updateElement(layout, sectionIndex, index, (current) => ({ ...current, layout: { ...current.layout, columnSpan } })));
-    props.announce?.(`${label} width ${columnSpan} of 4 columns`);
+    apply(setSpan(layout, key, columnSpan), key, `${label} width ${columnSpan} of 4 columns`);
   };
   const onKeyDown = (event: KeyboardEvent) => {
     if (readOnly || !event.altKey) {
       return;
     }
     focusKey.current = key;
-    if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+    if (event.key === "ArrowUp") {
       event.preventDefault();
-      if (index > 0) {
-        move(sectionIndex, index - 1, `${label} moved earlier`);
-      } else if (sectionIndex > 0) {
-        move(sectionIndex - 1, layout.sections[sectionIndex - 1]!.elements.length, `${label} moved to ${sectionTitle(layout.sections[sectionIndex - 1]!)}`);
-      }
-    } else if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+      moveEarlier();
+    } else if (event.key === "ArrowDown") {
       event.preventDefault();
-      if (index < section.elements.length - 1) {
-        move(sectionIndex, index + 2, `${label} moved later`);
-      } else if (sectionIndex < layout.sections.length - 1) {
-        move(sectionIndex + 1, 0, `${label} moved to ${sectionTitle(layout.sections[sectionIndex + 1]!)}`);
-      }
+      moveLater();
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      moveColumn(-1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      moveColumn(1);
     }
   };
   // Keep focus on a tile moved with Alt+Arrow so repeated presses keep working, even across sections.
@@ -385,19 +444,31 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
   const menu = readOnly
     ? []
     : [
-        { key: "earlier", label: "Move earlier", disabled: index === 0, run: () => move(sectionIndex, index - 1, `${label} moved earlier`) },
-        { key: "later", label: "Move later", disabled: index === section.elements.length - 1, run: () => move(sectionIndex, index + 2, `${label} moved later`) },
+        { key: "earlier", label: "Move earlier", disabled: previous === null, run: moveEarlier },
+        { key: "later", label: "Move later", disabled: following === null, run: moveLater },
+        { key: "left", label: "Move one column left", disabled: position.column <= 1, run: () => moveColumn(-1) },
+        { key: "right", label: "Move one column right", disabled: position.column + span > 4, run: () => moveColumn(1) },
         ...layout.sections
           .map((candidate, candidateIndex) => ({ candidate, candidateIndex }))
           .filter(({ candidate, candidateIndex }) => candidateIndex !== sectionIndex && sameScope(candidate, section))
-          .map(({ candidate, candidateIndex }) => ({ key: `to-${candidate.sectionKey}`, label: `Move to ${sectionTitle(candidate)}`, run: () => move(candidateIndex, candidate.elements.length, `${label} moved to ${sectionTitle(candidate)}`) })),
-        { key: "narrower", label: "Narrower", disabled: span <= 1, run: () => setSpan(span - 1) },
-        { key: "wider", label: "Wider", disabled: span >= 4, run: () => setSpan(span + 1) },
+          .map(({ candidate, candidateIndex }) => ({ key: `to-${candidate.sectionKey}`, label: `Move to ${sectionTitle(candidate)}`, run: () => apply(moveToNewRow(layout, key, candidateIndex), key, `${label} moved to ${sectionTitle(candidate)}`) })),
+        { key: "narrower", label: "Narrower", disabled: span <= 1, run: () => setWidth(span - 1) },
+        { key: "wider", label: "Wider", disabled: span >= 4 || maxSpanFor(layout, key) <= span, run: () => setWidth(span + 1) },
         { key: "rename", label: "Rename label", run: () => setRenaming(true) },
         { key: "remove", label: "Remove from layout", run: () => removeFromLayout() },
+        ...(props.onRequestGridOperation
+          ? (
+              [
+                ["clearColumn", span > 1 ? `Clear columns ${position.column}–${position.column + span - 1}…` : `Clear column ${position.column}…`],
+                ["deleteColumn", `Delete column ${position.column}…`],
+                ["clearRow", `Clear row ${position.row}…`],
+                ["deleteRow", `Delete row ${position.row}…`],
+              ] as const
+            ).map(([kind, text]) => ({ key: kind, label: text, run: () => props.onRequestGridOperation!({ kind, sectionKey: section.sectionKey, row: position.row, column: position.column }) }))
+          : []),
       ];
   function removeFromLayout() {
-    props.onChange(removeElement(layout, sectionIndex, index));
+    props.onChange(removeFromGrid(layout, key));
     props.onSelect(null);
     props.announce?.(`${label} removed from the layout. The field and its stored values are kept.`);
   }
@@ -407,12 +478,15 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
       style={style}
       className="min-w-0"
       draggable={!readOnly && !renaming}
+      data-grid-row={position.row}
+      data-grid-column={position.column}
+      data-grid-span={span}
       onDragStart={readOnly ? undefined : drag.start(key)}
-      onDragOver={readOnly ? undefined : drag.over(`element:${key}`)}
-      onDrop={readOnly ? undefined : drag.drop(sectionIndex, index)}
+      onDragOver={readOnly ? undefined : drag.over(`element:${key}`, (dragged) => dragged.key !== key && sameScope(layout.sections[dragged.sectionIndex]!, section))}
+      onDrop={readOnly ? undefined : drag.drop(drag.onto(key))}
     >
       <div
-        className={`relative flex h-full min-h-20 flex-col gap-2 rounded-control border bg-surface p-3 ${selected ? "border-focus ring-2 ring-focus" : "border-line hover:border-input"} ${dropActive ? "outline-2 outline-dashed outline-focus" : ""} ${readOnly ? "" : "cursor-grab"}`}
+        className={`relative flex h-full min-h-20 flex-col gap-2 rounded-control border bg-surface p-3 ${selected ? "border-focus ring-2 ring-focus" : "border-line hover:border-input"} ${dropClass} ${readOnly ? "" : "cursor-grab"}`}
         onClick={(event) => {
           if (!(event.target as HTMLElement).closest("button,input,[role=menu]")) {
             select();
@@ -441,12 +515,12 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
               type="button"
               aria-pressed={selected}
               aria-describedby={`${key}-desc`}
-              aria-keyshortcuts={readOnly ? undefined : "Alt+ArrowUp Alt+ArrowDown"}
+              aria-keyshortcuts={readOnly ? undefined : "Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight"}
               className="min-w-0 flex-1 truncate rounded-control text-left text-sm font-semibold text-body"
               onClick={select}
               onDoubleClick={() => !readOnly && setRenaming(true)}
               onKeyDown={onKeyDown}
-              title={readOnly ? undefined : "Click to select; double-click to rename; drag or Alt+Arrow keys to move"}
+              title={readOnly ? undefined : "Click to select; double-click to rename; drag to an empty cell (or onto a field to swap), or Alt+Arrow keys to move"}
             >
               {label}
               {element.kind !== "relatedFormList" && element.required ? (
@@ -472,7 +546,7 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
           ) : null}
         </div>
         <span id={`${key}-desc`} className="sr-only">
-          {kind}, {span} of 4 columns{element.kind !== "relatedFormList" && element.required ? ", required" : ""}
+          {kind}, {span} of 4 columns, row {position.row}, column {position.column}{element.kind !== "relatedFormList" && element.required ? ", required" : ""}
           {behaviorFlags(element, field).map((flag) => `, ${flag.description}`).join("")}, in {sectionTitle(section)}
         </span>
         {/* The preview resembles the actual record form (control first); badges are designer-only metadata, shown
@@ -729,19 +803,35 @@ function UploadIcon() {
   );
 }
 
-/** Pure helper for the toolbar: where a new "+ Add Column" cell goes for the current selection. */
-export function columnSlotFor(layout: FormLayout, selection: DesignerSelection): { sectionKey: string; insertIndex: number } | null {
+/**
+ * Pure helper for the toolbar ("New field…"): the exact desktop cell a new field goes to for the current selection — the
+ * first empty cell to the right of a selected field in its row, the selected empty cell itself, or otherwise the first
+ * trailing empty row (or a new row) at the end of the selected (or last) section.
+ */
+export function columnSlotFor(layout: FormLayout, selection: DesignerSelection): { sectionKey: string; slotId: string; row: number; column: number } | null {
+  // The first of the section's trailing empty rows (consumed when the field is placed), otherwise a new row at the end.
+  const trailing = (section: LayoutSection) => {
+    const row = appendRow(sectionGrid(section));
+    return { sectionKey: section.sectionKey, slotId: `cell-${row}-1`, row, column: 1 };
+  };
   if (selection?.kind === "element") {
     const position = findElement(layout, selection.key);
-    return position ? { sectionKey: layout.sections[position.sectionIndex]!.sectionKey, insertIndex: position.index + 1 } : null;
+    if (!position) {
+      return null;
+    }
+    const section = layout.sections[position.sectionIndex]!;
+    const cells = sectionGrid(section);
+    const cell = cells.find((candidate) => candidate.key === selection.key)!;
+    const gap = emptyCells(cells).find((candidate) => candidate.row === cell.row && candidate.column > cell.column);
+    return gap ? { sectionKey: section.sectionKey, slotId: `cell-${gap.row}-${gap.column}`, row: gap.row, column: gap.column } : trailing(section);
   }
   if (selection?.kind === "slot") {
-    return { sectionKey: selection.sectionKey, insertIndex: selection.insertIndex };
+    return { sectionKey: selection.sectionKey, slotId: selection.slotId, row: selection.row, column: selection.column };
   }
   if (selection?.kind === "section") {
     const section = layout.sections.find((candidate) => candidate.sectionKey === selection.sectionKey);
-    return section ? { sectionKey: section.sectionKey, insertIndex: section.elements.length } : null;
+    return section ? trailing(section) : null;
   }
   const last = layout.sections.at(-1);
-  return last ? { sectionKey: last.sectionKey, insertIndex: last.elements.length } : null;
+  return last ? trailing(last) : null;
 }
