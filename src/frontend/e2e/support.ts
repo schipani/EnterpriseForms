@@ -49,16 +49,33 @@ export async function addDocumentCollection(page: Page, name: string) {
 }
 
 /**
+ * Selects the first cell of a new row at the end of a section (default: the last section): the section's last empty row
+ * when it has one (an empty section always shows one), otherwise a row added with "+ Add Row" (FD-01: there is no
+ * separate trailing "new row" cell). Each item placed this way starts its own row in column 1.
+ */
+export async function selectNewRowCell(page: Page, sectionName?: string) {
+  await page.getByRole("tab", { name: "Design" }).click();
+  const canvas = page.getByRole("region", { name: "Form canvas" });
+  const scope = sectionName ? canvas.getByRole("region", { name: sectionName, exact: true }) : canvas.locator("section[aria-labelledby]").last();
+  const emptyRowCell = scope.locator('li[data-empty-row="true"][data-grid-column="1"]').last();
+  if ((await emptyRowCell.count()) === 0) {
+    // Select the section from its title with the keyboard: on a tall section the title can sit under the pinned designer
+    // header, which would intercept a pointer click.
+    await scope.getByRole("heading", { level: 2 }).getByRole("button").first().focus();
+    await page.keyboard.press("Enter");
+    await page.getByRole("button", { name: "Add Row", exact: true }).click();
+  }
+  await emptyRowCell.getByRole("button", { name: /^Add Field to / }).click();
+}
+
+/**
  * Places an existing (unplaced) field, document collection or related list on the Design canvas through the C1
- * designer's real UI: click the last "+ Add Field" cell of a section (default: the last section), choose the item in
+ * designer's real UI: select the first cell of a new row of a section (default: the last section), choose the item in
  * the inspector's "Place an existing field" picker, and place it. Related lists and document collections default to a
  * full row, fields to the width given (default 1 column). `pickerLabel` is kept for call-site readability only.
  */
 export async function placeFromPicker(page: Page, pickerLabel: string, optionText: RegExp, options: { section?: string; width?: string } = {}) {
-  await page.getByRole("tab", { name: "Design" }).click();
-  const canvas = page.getByRole("region", { name: "Form canvas" });
-  const scope = options.section ? canvas.getByRole("region", { name: options.section, exact: true }) : canvas;
-  await scope.getByRole("button", { name: /^Add Field to / }).last().click();
+  await selectNewRowCell(page, options.section);
   const inspector = page.getByRole("complementary", { name: "Add Field" });
   await inspector.getByLabel("Place an existing field").click();
   await page.getByRole("option", { name: optionText }).click();

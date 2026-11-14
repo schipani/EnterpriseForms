@@ -21,7 +21,7 @@ export {
   type LayoutValidation,
   type RelatedElement,
 } from "./layout";
-export { breakpointForWidth, effectiveSpan, packElements, visibleColumns, type Breakpoint, type PackedCell } from "./packer";
+export { breakpointForWidth, effectiveSpan, explicitColumn, packElements, packVisibleElements, visibleColumns, type Breakpoint, type PackablePlacement, type PackedCell } from "./packer";
 export { ruleFieldsOf, ruleStatesFor, validateElement, validateValues, valuesById, type ErrorMap, type RendererField, type RuleContext, type ValueMap } from "./validation";
 export { allowedByParent, cascadeDependentClears, choicesFor, defaultSelection, dependentChoicesFor, dependentViolation, describeSelection, initialValues, type ChoiceOption } from "./options";
 export {

@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { changeInOccurrence, changeTopLevel, groupKeyFor, initialGroups, moveOccurrence, newOccurrence, occurrenceErrorKey, occurrenceRuleStates, occurrenceScopeValues, type GroupInfo, type GroupValueMap, type RepeatingSection } from "./groups";
 import type { DocumentElement, FieldElement, FormLayout, LayoutElement, LayoutSection, RelatedElement } from "./layout";
 import { dependentChoicesFor, describeSelection } from "./options";
-import { breakpointForWidth, packElements, visibleColumns, type Breakpoint } from "./packer";
+import { breakpointForWidth, packVisibleElements, visibleColumns, type Breakpoint } from "./packer";
 import type { FieldRuleState } from "./rules";
 import { splitSelection } from "./rules";
 import { ruleStatesFor, type ErrorMap, type RendererField, type ValueMap } from "./validation";
@@ -130,18 +130,19 @@ export function FormRenderer({ layout, fields, values, errors = {}, onChange, re
             />
           );
         }
-        // Omitted from the grid (so nothing reflows around an empty slot): unauthorized/unknown fields, fields a rule hides,
-        // and — in the data-entry form only — fields the designer chose not to show. "Show in form" is presentation, never security.
+        // Not drawn: unauthorized/unknown fields, fields a rule hides, and — in the data-entry form only — fields the
+        // designer chose not to show. "Show in form" is presentation, never security. FD-01: on desktop a hidden field with an
+        // explicit column keeps its (empty) cell so nothing around it moves; unknown fields never reserve a cell.
         const visible = visibleElements(section, byId, states, readOnly);
         if (visible.length === 0 && section.elements.length > 0) {
           return null;
         }
-        const cells = packElements(visible, active);
+        const cells = sectionCells(section, byId, states, readOnly, active);
         return (
           <fieldset key={section.sectionKey} className="min-w-0 rounded-panel border border-line bg-surface p-5">
             <legend className="px-1 text-lg font-semibold">{section.title ?? section.sectionKey}</legend>
             {section.description ? <p className="mb-3 text-sm text-muted">{section.description}</p> : null}
-            <div className={`grid ${gapClass[section.layout?.columnGap ?? "medium"]}`} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+            <div className={`grid ${gapClass[section.layout?.columnGap ?? "medium"]}`} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }} data-breakpoint={active}>
               {cells.map((cell) => (
                 <div key={elementKey(cell.element)} className="min-w-0" style={{ gridColumn: `${cell.column} / span ${cell.span}`, gridRow: cell.row }} data-field-key={fieldKeyOfCell(cell.element, byId)}>
                   {renderElement(cell.element, byId, values, values, (key) => errors[key], changeTop, readOnly, states, renderRelatedList, renderDocumentCollection)}
@@ -156,15 +157,27 @@ export function FormRenderer({ layout, fields, values, errors = {}, onChange, re
 }
 
 function visibleElements(section: LayoutSection, byId: Map<string, RendererField>, states: ReadonlyMap<string, FieldRuleState>, readOnly: boolean): LayoutElement[] {
-  return section.elements.filter((element) => {
-    if (element.kind !== "field") {
-      return true;
-    }
-    if (!byId.has(element.fieldDefinitionId) || states.get(element.fieldDefinitionId)?.visible === false) {
-      return false;
-    }
-    return readOnly || element.showInForm !== false;
-  });
+  return section.elements.filter((element) => isKnown(element, byId) && isShown(element, states, readOnly));
+}
+
+/** A field element the viewer has no definition for (unauthorized or unknown) is never drawn and never reserves a cell. */
+function isKnown(element: LayoutElement, byId: Map<string, RendererField>): boolean {
+  return element.kind !== "field" || byId.has(element.fieldDefinitionId);
+}
+
+function isShown(element: LayoutElement, states: ReadonlyMap<string, FieldRuleState>, readOnly: boolean): boolean {
+  if (element.kind !== "field") {
+    return true;
+  }
+  if (states.get(element.fieldDefinitionId)?.visible === false) {
+    return false;
+  }
+  return readOnly || element.showInForm !== false;
+}
+
+/** The section's drawn cells through the one canonical packer (shared with the designer canvas and Preview). */
+function sectionCells(section: LayoutSection, byId: Map<string, RendererField>, states: ReadonlyMap<string, FieldRuleState>, readOnly: boolean, breakpoint: Breakpoint) {
+  return packVisibleElements(section.elements.filter((element) => isKnown(element, byId)), breakpoint, (element) => isShown(element, states, readOnly));
 }
 
 /**
@@ -241,7 +254,7 @@ function RepeatingSectionView({
         {entries.map((entry, index) => {
           const scopeValues = occurrenceScopeValues(values, entry);
           const states = occurrenceRuleStates(layout, section, fields, values, entry, applyRules);
-          const cells = packElements(visibleElements(section, byId, states, readOnly), active);
+          const cells = sectionCells(section, byId, states, readOnly, active);
           const position = `entry ${index + 1} of ${entries.length}`;
           return (
             <li key={entry.clientKey}>
@@ -282,7 +295,7 @@ function RepeatingSectionView({
                     </div>
                   ) : null}
                 </div>
-                <div className={`grid ${gapClass[section.layout?.columnGap ?? "medium"]}`} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+                <div className={`grid ${gapClass[section.layout?.columnGap ?? "medium"]}`} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }} data-breakpoint={active}>
                   {cells.map((cell) => (
                     <div key={elementKey(cell.element)} className="min-w-0" style={{ gridColumn: `${cell.column} / span ${cell.span}`, gridRow: cell.row }} data-field-key={entryFieldKeyOfCell(cell.element, byId, groupKey, index)}>
                       {renderElement(cell.element, byId, scopeValues, entry.values, (key) => errors[occurrenceErrorKey(groupKey, index, key)], (key, value) => onFieldChange(index, key, value), readOnly, states, renderRelatedList, renderDocumentCollection)}

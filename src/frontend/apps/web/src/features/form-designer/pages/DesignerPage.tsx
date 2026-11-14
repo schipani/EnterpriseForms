@@ -1,6 +1,6 @@
 import type { FieldDefinitionResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
 import { useApi } from "@enterpriseforms/app-runtime";
-import { DesignerCanvas, columnSlotFor, duplicateSection, elementKey, findElement, findOptionFilterCycle, findRuleCycle, insertElement, insertSection, locateField, moveSection, newSectionKey, placedIds, removeElement, setSectionRepeat, updateElement, type DesignerSelection } from "@enterpriseforms/form-designer";
+import { DesignerCanvas, GRID_OPERATION_LABEL, addEmptyRow, appendRow, carryEmptyRows, columnSlotFor, droppedPositions, duplicateSection, elementKey, emptyCells, emptyRowsSignature, findElement, findOptionFilterCycle, findRuleCycle, insertSection, locateField, moveSection, newSectionKey, nextEmptyCell, placeAtCell, placedIds, planGridOperation, refusalMessage, removeFromGrid, sectionGrid, selectionAfter, setSectionRepeat, updateElement, type DesignerSelection, type GridOperation, type GridOperationPlan } from "@enterpriseforms/form-designer";
 import { FormRenderer, describeCondition, emptyLayout, initialValues, serializeLayout, tryParseLayout, type Breakpoint, type FieldElement, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
 import { ActionIcons, Badge, Button, Card, DataTable, Dialog, FieldLayoutProvider, LoadingBlock, menuContentClass, menuItemClass, RowActions, Select, SideNavTabs, StatusMessage, TextInput, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -14,6 +14,7 @@ import { EditFieldDialog, type FieldEditSubmission } from "../components/EditFie
 import { FieldConfigModal } from "../components/FieldConfigModal";
 import { OptionListsDialog } from "../components/OptionListsDialog";
 import { FormAccessPanel } from "../components/FormAccessPanel";
+import { GridOperationDialog } from "../components/GridOperationDialog";
 import { RemoveSectionDialog } from "../components/RemoveSectionDialog";
 import { RenameFormDialog, type RenameFormTarget } from "../components/RenameFormDialog";
 
@@ -42,14 +43,19 @@ export function DesignerPage() {
   const [baseJson, setBaseJson] = useState<string>("");
   const [parseError, setParseError] = useState<string | null>(null);
   // Undo/redo over the draft layout: `setLayoutTracked` is the single mutation path for the canvas and inspector, so
-  // every layout change — sections, placements, moves, spans, labels and validation — is undoable.
+  // every layout change — sections, placements, moves, spans, labels and validation — is undoable. FD-01: the identity of a
+  // designer state includes its designer-only empty rows ("+ Add Row", "Clear row"), which are kept on the layout objects
+  // themselves (never serialized), so snapshots restore them exactly and adding an empty row is undoable too.
   const undoStack = useRef<FormLayout[]>([]);
   const redoStack = useRef<FormLayout[]>([]);
   const [, setHistoryTick] = useState(0);
   const setLayoutTracked = useCallback((next: FormLayout | ((current: FormLayout | null) => FormLayout | null)) => {
     setLayout((current) => {
       const resolved = typeof next === "function" ? (next as (c: FormLayout | null) => FormLayout | null)(current) : next;
-      if (current && resolved && serializeLayout(resolved) !== serializeLayout(current)) {
+      // The `undoStack.current.at(-1) !== current` guard keeps one entry per change when React invokes this updater twice
+      // (StrictMode in development): the second invocation would otherwise push the same snapshot again, so one Undo
+      // click appeared to do nothing.
+      if (current && resolved && undoStack.current.at(-1) !== current && (serializeLayout(resolved) !== serializeLayout(current) || emptyRowsSignature(resolved) !== emptyRowsSignature(current))) {
         undoStack.current = [...undoStack.current, current].slice(-100);
         redoStack.current = [];
         setHistoryTick((tick) => tick + 1);
@@ -82,12 +88,8 @@ export function DesignerPage() {
 
   const [view, setView] = useState<View>("design");
   const [selection, setSelection] = useState<DesignerSelection>(null);
-  const [extraSlots, setExtraSlots] = useState<Record<string, Array<{ id: string; index: number; startOnNewRow?: boolean }>>>({});
-  // Stable per-slot ids (Phase C3 usability corrections): several empty cells at the same insertIndex — most notably
-  // the four independent columns "+ Add Row" creates — are otherwise indistinguishable, which was the root cause of
-  // clicking one column selecting/highlighting all of them.
-  const nextSlotIdRef = useRef(0);
-  const nextSlotId = () => `slot-${nextSlotIdRef.current++}`;
+  // FD-01 row management: Clear/Delete row or column awaiting confirmation (only when it would remove fields).
+  const [gridOperation, setGridOperation] = useState<Extract<GridOperationPlan, { ok: true }> | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => readCollapsed(formDefinitionId));
   const [renamingSectionKey, setRenamingSectionKey] = useState<string | null>(null);
   const [pane, setPane] = useState<"canvas" | "properties">("canvas");
@@ -106,6 +108,8 @@ export function DesignerPage() {
   const [maxChildren, setMaxChildren] = useState("50");
   const [announcement, setAnnouncement] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  // FD-01: set when a save did not keep explicit column positions (cleared by the next complete save).
+  const [positionsWarning, setPositionsWarning] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<RenameFormTarget | null>(null);
   const [renamedNotice, setRenamedNotice] = useState<string | null>(null);
   const announce = useCallback((message: string) => setAnnouncement((current) => (current === message ? `${message} ` : message)), []);
@@ -146,19 +150,6 @@ export function DesignerPage() {
   }, [collapsed, formDefinitionId]);
 
   const invalidate = () => Promise.all([queryClient.invalidateQueries({ queryKey: ["forms", formDefinitionId] }), queryClient.invalidateQueries({ queryKey: ["forms"] })]);
-  const consumeSlot = (target: PlacementTarget) =>
-    setExtraSlots((current) => {
-      const slots = current[target.sectionKey];
-      if (!slots) {
-        return current;
-      }
-      // Remove exactly the slot that was filled (by its stable id, when the placement came from one — e.g. a
-      // specific column of a "+ Add Row" row); fall back to the first slot at that position otherwise. Every other
-      // pending slot at or after this position shifts by one, since the array of elements just grew.
-      const at = target.slotId && target.slotId !== "baseline" ? slots.findIndex((slot) => slot.id === target.slotId) : slots.findIndex((slot) => slot.index === target.insertIndex);
-      const remaining = (at >= 0 ? slots.filter((_, index) => index !== at) : slots).map((slot) => (slot.index >= target.insertIndex ? { ...slot, index: slot.index + 1 } : slot));
-      return { ...current, [target.sectionKey]: remaining };
-    });
   const addFieldMutation = useMutation({
     mutationFn: (request: Parameters<typeof api.forms.addField>[1]) => api.forms.addField(formDefinitionId, request).then((r) => r.result),
     onSuccess: async (field) => {
@@ -166,14 +157,23 @@ export function DesignerPage() {
       setCreateAt(null);
       if (target) {
         const element = newElementFor(field, 1);
+        // FD-01: the new field goes to the exact cell it was created from. If that cell was taken meanwhile, it is placed
+        // on a new row at the end of the section instead and the designer is told — never on top of another field.
         setLayoutTracked((current) => {
           if (!current) {
             return current;
           }
           const sectionIndex = current.sections.findIndex((section) => section.sectionKey === target.sectionKey);
-          return sectionIndex >= 0 ? insertElement(current, sectionIndex, target.insertIndex, element) : current;
+          if (sectionIndex < 0) {
+            return current;
+          }
+          const placed = placeAtCell(current, sectionIndex, element, target.row, target.column);
+          if (placed.ok) {
+            return placed.layout;
+          }
+          setNotice(`${refusalMessage(placed.reason)} The new field was placed on a new row at the end of the section.`);
+          return placeAtCell(current, sectionIndex, element, appendRow(sectionGrid(current.sections[sectionIndex]!)), 1).layout;
         });
-        consumeSlot(target);
         setSelection({ kind: "element", key: elementKey(element) });
         setView("design");
         announce(`${field.fieldDisplayName} created and placed`);
@@ -203,6 +203,31 @@ export function DesignerPage() {
       await invalidate();
     },
   });
+  /**
+   * Adopts the layout the server stored after a draft save. FD-01 rollback/compatibility safeguard: when the server did not
+   * keep explicit column positions it was sent (a server version that predates FD-01 accepts and silently drops them),
+   * the designer keeps its own arrangement on screen, leaves it marked unsaved, and reports the save as incomplete instead
+   * of presenting the stripped layout as saved. Returns whether the save was adopted as complete.
+   */
+  const adoptSavedDraft = (sent: FormLayout, savedJson: string): boolean => {
+    const parsed = tryParseLayout(savedJson);
+    if (!parsed.ok) {
+      return false;
+    }
+    const dropped = droppedPositions(sent, parsed.layout);
+    if (dropped.length > 0) {
+      setLayout(sent);
+      setBaseJson(serializeLayout(parsed.layout));
+      setPositionsWarning(`The server did not keep the column positions of ${dropped.length === 1 ? "1 field" : `${dropped.length} fields`}. This server version does not support explicit column placement, so the saved draft would not match the design. Do not publish; your arrangement is still shown here and marked unsaved.`);
+      announce("Draft saved without column positions; the layout is not saved as designed");
+      return false;
+    }
+    setPositionsWarning(null);
+    // Designer-only empty rows are not saved; they stay usable after the save while the arrangement is unchanged.
+    setLayout(carryEmptyRows(sent, parsed.layout));
+    setBaseJson(serializeLayout(parsed.layout));
+    return true;
+  };
   const editField = useMutation({
     mutationFn: async ({ fieldId, submission }: { fieldId: string; submission: FieldEditSubmission }) => {
       const field = detail.data!.fields.find((candidate) => candidate.fieldDefinitionId === fieldId)!;
@@ -213,18 +238,14 @@ export function DesignerPage() {
       if (layout && location && submission.element) {
         const next = updateElement(layout, location.sectionIndex, location.index, () => submission.element!);
         if (serializeLayout(next) !== serializeLayout(layout)) {
-          return api.forms.saveDraft(formDefinitionId, { expectedDraftRevision: Number(detail.data?.draft?.draftRevision ?? 0), layoutJson: serializeLayout(next) }).then((r) => r.result);
+          return api.forms.saveDraft(formDefinitionId, { expectedDraftRevision: Number(detail.data?.draft?.draftRevision ?? 0), layoutJson: serializeLayout(next) }).then((r) => ({ draft: r.result, sent: next }));
         }
       }
       return null;
     },
-    onSuccess: async (draft) => {
-      if (draft) {
-        const parsed = tryParseLayout(draft.layoutJson);
-        if (parsed.ok) {
-          setLayout(parsed.layout);
-          setBaseJson(serializeLayout(parsed.layout));
-        }
+    onSuccess: async (saved) => {
+      if (saved) {
+        adoptSavedDraft(saved.sent, saved.draft.layoutJson);
       }
       setEditFieldId(null);
       await invalidate();
@@ -239,13 +260,10 @@ export function DesignerPage() {
   });
   const saveDraft = useMutation({
     mutationFn: (current: FormLayout) => api.forms.saveDraft(formDefinitionId, { expectedDraftRevision: Number(detail.data?.draft?.draftRevision ?? 0), layoutJson: serializeLayout(current) }).then((r) => r.result),
-    onSuccess: async (draft) => {
-      const parsed = tryParseLayout(draft.layoutJson);
-      if (parsed.ok) {
-        setLayout(parsed.layout);
-        setBaseJson(serializeLayout(parsed.layout));
+    onSuccess: async (draft, sent) => {
+      if (adoptSavedDraft(sent, draft.layoutJson)) {
+        announce(`Draft saved (revision ${draft.draftRevision})`);
       }
-      announce(`Draft saved (revision ${draft.draftRevision})`);
       await invalidate();
     },
   });
@@ -389,11 +407,8 @@ export function DesignerPage() {
     setNotice(null);
     announce("New section added. Type its title and press Enter.");
   };
-  // Add Row adds a new row containing four independent 1-column cells at the end of the currently selected section
-  // (disabled with no section target) — the same single-column building block "+ Add Column" uses, not a separate
-  // structure. Only the first of the four is marked startOnNewRow, so the row reliably starts fresh even when the
-  // current row has room left; the packer then lays the other three immediately after it, filling exactly one row.
-  // Each column gets its own stable id so it can be independently selected and placed into.
+  // Add Row adds exactly one empty row of four independent cells at the end of the selected section (disabled with no
+  // section target). Each cell is an exact desktop position; a field placed or dragged into it fills that row (FD-01).
   const addRow = () => {
     if (!layout) {
       return;
@@ -403,14 +418,53 @@ export function DesignerPage() {
       return;
     }
     const section = layout.sections[sectionIndex]!;
-    const insertIndex = section.elements.length;
-    const columns = [{ id: nextSlotId(), index: insertIndex, startOnNewRow: true }, { id: nextSlotId(), index: insertIndex, startOnNewRow: false }, { id: nextSlotId(), index: insertIndex, startOnNewRow: false }, { id: nextSlotId(), index: insertIndex, startOnNewRow: false }];
+    const added = addEmptyRow(layout, sectionIndex);
     setView("design");
-    setExtraSlots((current) => ({ ...current, [section.sectionKey]: [...(current[section.sectionKey] ?? []), ...columns] }));
-    setSelection({ kind: "slot", sectionKey: section.sectionKey, insertIndex, slotId: columns[0]!.id, startOnNewRow: true });
+    setLayoutTracked(added.layout);
+    setSelection({ kind: "slot", sectionKey: section.sectionKey, slotId: `cell-${added.row}-1`, row: added.row, column: 1 });
     setNotice(null);
-    announce(`New row of 4 empty columns added in ${section.title ?? section.sectionKey}`);
+    announce(`Row ${added.row} of 4 empty columns added in ${section.title ?? section.sectionKey}`);
   };
+  // FD-01 row management: Clear/Delete row or column. An operation that removes fields is confirmed first (and blocked
+  // while other fields' rules depend on them); one that removes nothing is applied at once. Both are undoable.
+  const requestGridOperation = (operation: GridOperation) => {
+    if (!layout) {
+      return;
+    }
+    const plan = planGridOperation(layout, operation);
+    if (!plan.ok) {
+      setNotice(plan.message);
+      announce(plan.message);
+      return;
+    }
+    if (plan.removed.length > 0 || plan.dependencies.length > 0) {
+      setGridOperation(plan);
+      return;
+    }
+    applyGridOperation(operation);
+  };
+  const applyGridOperation = (operation: GridOperation) => {
+    if (!layout) {
+      return;
+    }
+    // Re-planned against the current layout, so a confirmation never applies a stale result.
+    const plan = planGridOperation(layout, operation);
+    setGridOperation(null);
+    if (!plan.ok || plan.dependencies.length > 0) {
+      const message = plan.ok ? "Other fields still depend on these fields; nothing was changed." : plan.message;
+      setNotice(message);
+      announce(message);
+      return;
+    }
+    setView("design");
+    setLayoutTracked(plan.layout);
+    setSelection(selectionAfter(plan.layout, operation));
+    setNotice(null);
+    const removed = plan.removed.length === 0 ? "" : ` ${plan.removed.length === 1 ? "1 field was" : `${plan.removed.length} fields were`} removed from the layout.`;
+    announce(`${GRID_OPERATION_LABEL[operation.kind]}: ${plan.affected}.${removed} Undo is available.`);
+  };
+  // Add Column selects the next empty cell after the selection in reading order (the grid always has four columns, so
+  // empty cells already exist wherever a row is not full); when every row is full it adds an empty row.
   const addColumn = () => {
     if (!layout) {
       return;
@@ -420,18 +474,25 @@ export function DesignerPage() {
       return;
     }
     const section = layout.sections.find((candidate) => candidate.sectionKey === target.sectionKey)!;
-    const existing = extraSlots[target.sectionKey] ?? [];
+    const cells = sectionGrid(section);
+    const from = selection?.kind === "element" ? cells.find((cell) => cell.key === selection.key) : null;
+    const afterRow = from ? from.row : selection?.kind === "slot" ? selection.row : 0;
+    const afterColumn = from ? from.column + from.span - 1 : selection?.kind === "slot" ? selection.column : 0;
+    const next = nextEmptyCell(cells, afterRow, afterColumn);
     setView("design");
-    if (existing.length >= 3) {
-      setNotice(`“${section.title ?? section.sectionKey}” already shows four empty cells. Sections use the standard four-column grid; place a field in an empty cell first.`);
+    if (next) {
+      setSelection({ kind: "slot", sectionKey: section.sectionKey, slotId: `cell-${next.row}-${next.column}`, row: next.row, column: next.column });
+      setNotice(`Empty cell selected in “${section.title ?? section.sectionKey}”: row ${next.row}, column ${next.column}.`);
+      announce(`Empty cell, row ${next.row}, column ${next.column}`);
       return;
     }
-    const id = nextSlotId();
-    setExtraSlots((current) => ({ ...current, [target.sectionKey]: [...(current[target.sectionKey] ?? []), { id, index: target.insertIndex }] }));
-    setSelection({ kind: "slot", sectionKey: target.sectionKey, insertIndex: target.insertIndex, slotId: id });
-    setNotice(`Empty cell added in “${section.title ?? section.sectionKey}”. Sections keep the four-column grid; a full row continues on the next row.`);
+    const added = addEmptyRow(layout, layout.sections.indexOf(section));
+    setLayoutTracked(added.layout);
+    setSelection({ kind: "slot", sectionKey: section.sectionKey, slotId: `cell-${added.row}-1`, row: added.row, column: 1 });
+    setNotice(`Every row of “${section.title ?? section.sectionKey}” is full; an empty row was added. Sections keep the four-column grid.`);
     announce("Empty cell added");
   };
+  // Place an existing field: selects the first empty cell of the section (adding one empty row when every row is full).
   const placeExisting = () => {
     if (!layout) {
       return;
@@ -439,7 +500,14 @@ export function DesignerPage() {
     const sectionIndex = sectionOfSelection() ?? layout.sections.length - 1;
     const section = layout.sections[sectionIndex]!;
     setView("design");
-    setSelection({ kind: "slot", sectionKey: section.sectionKey, insertIndex: section.elements.length, slotId: "baseline" });
+    const free = emptyCells(sectionGrid(section))[0];
+    if (free) {
+      setSelection({ kind: "slot", sectionKey: section.sectionKey, slotId: `cell-${free.row}-${free.column}`, row: free.row, column: free.column });
+    } else {
+      const added = addEmptyRow(layout, sectionIndex);
+      setLayoutTracked(added.layout);
+      setSelection({ kind: "slot", sectionKey: section.sectionKey, slotId: `cell-${added.row}-1`, row: added.row, column: 1 });
+    }
     setPane("properties");
   };
   const toggleCollapse = (sectionKey: string) =>
@@ -488,7 +556,7 @@ export function DesignerPage() {
           setEditFieldId(fieldId);
         },
         onCreateAt: (kind, target) => setCreateAt({ kind, target }),
-        onPlacedAt: consumeSlot,
+        onRequestGridOperation: requestGridOperation,
         onOpenRelatedForms: () => setView("relationships"),
         onStrengthen: (fieldId, request) => strengthen.mutate({ fieldId, request }),
         strengthenPending: strengthen.isPending,
@@ -595,7 +663,8 @@ export function DesignerPage() {
               setSelection(next);
               setNotice(null);
             }}
-            extraSlots={extraSlots}
+            onRefused={setNotice}
+            onRequestGridOperation={canDesign ? requestGridOperation : undefined}
             collapsed={collapsed}
             onToggleCollapse={toggleCollapse}
             renamingSectionKey={renamingSectionKey}
@@ -691,7 +760,8 @@ export function DesignerPage() {
         run: () => {
           const found = findElement(layout, key);
           if (found) {
-            setLayoutTracked(removeElement(layout, found.sectionIndex, found.index));
+            // FD-01: every other field keeps its position (the section is pinned first).
+            setLayoutTracked(removeFromGrid(layout, key));
             announce(`${row.fieldDisplayName} removed from the layout; the field and its values are kept`);
           }
         },
@@ -911,6 +981,11 @@ export function DesignerPage() {
                   {notice}
                 </StatusMessage>
               ) : null}
+              {positionsWarning ? (
+                <StatusMessage tone="warning" title="Column positions were not saved">
+                  {positionsWarning}
+                </StatusMessage>
+              ) : null}
               {saveDraft.isError ? <ErrorPanel error={saveDraft.error} /> : null}
               {restore.isError ? <ErrorPanel error={restore.error} /> : null}
               {item.content}
@@ -932,6 +1007,15 @@ export function DesignerPage() {
             setSelection(null);
             announce(message);
           }}
+        />
+      ) : null}
+      {gridOperation && layout ? (
+        <GridOperationDialog
+          plan={gridOperation}
+          sectionTitle={layout.sections.find((candidate) => candidate.sectionKey === gridOperation.operation.sectionKey)?.title?.trim() || gridOperation.operation.sectionKey}
+          fieldName={(fieldDefinitionId) => form.fields.find((candidate) => candidate.fieldDefinitionId === fieldDefinitionId)?.fieldDisplayName ?? "Unknown field"}
+          onConfirm={() => applyGridOperation(gridOperation.operation)}
+          onClose={() => setGridOperation(null)}
         />
       ) : null}
       {editFieldId !== null && form.fields.some((candidate) => candidate.fieldDefinitionId === editFieldId) ? (
