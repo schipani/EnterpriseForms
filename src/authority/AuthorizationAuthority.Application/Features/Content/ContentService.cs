@@ -140,6 +140,11 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         // R-53 (C-148): the complete current snapshot is proven equal to the accepted head on every write path, and the
         // candidate's item identities are checked against it and against the permanent bindings (ContentItemIdentityRules).
         var current = await BindAcceptedSnapshotAsync(scope, state, request, currentLeaves, head, key, bound, correlationId, cancellationToken).ConfigureAwait(false);
+
+        // E3-M2a remediation: no data-key or nonce reuse against the verified current revision, on every write path (owner,
+        // share editor, protection migration; creation has an empty current revision). Commit binds the same head by its
+        // revision compare-and-set, so a candidate checked against an older head can never be accepted on a newer one.
+        EnvelopeRules.EnforceAgainstCurrent(parsed.Select(p => (p.ItemId, p.Document)), current.Select(c => (c.ItemId, c.Document)));
         await ContentItemIdentityRules.EnforceAtPrepareAsync(scope, state.OrganizationId, request.FormRecordId,
             current.Select(i => (i.Kind, i.ItemId, i.Document)).ToList(), parsed.Select(p => (p.Kind, p.ItemId, p.Document)).ToList(), cancellationToken).ConfigureAwait(false);
         Dictionary<string, string> mutations;
@@ -368,6 +373,21 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         // R-53 (C-148): every committed item matches its permanent identity binding; new items are bound in this transaction.
         var stagedDocuments = request.StagedItems.Select(i => (i.ItemKind, i.ItemId, RowCanonicalDecoder.Decode(Convert.FromBase64String(i.CanonicalBytesBase64)))).ToList();
+
+        // E3-M2a: the envelope rules again on the verified staged bytes, so an operation prepared before the rules existed (an
+        // older Authority build) cannot commit an envelope they refuse. A refusal aborts the operation, nothing is accepted.
+        try
+        {
+            EnvelopeRules.Enforce(stagedDocuments.Select(d => d.Item3));
+        }
+        catch (AuthorityException)
+        {
+            operation.OperationStateName = ContentOperationStates.Aborted;
+            operation.OperationQuarantineReasonCode = "ENVELOPE_INVALID_AT_COMMIT";
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+
         var newIdentities = await ContentItemIdentityRules.BindAtCommitAsync(scope, state.OrganizationId, request.FormRecordId, operationId, stagedDocuments, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false);
 
         if (shareEditorOperation)
@@ -730,16 +750,13 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     /// <summary>Not a registered record of the scoped form (or its registration was revoked).</summary>
     public const string NotInScope = "NOT_IN_SCOPE";
 
-    /// <summary>The only AEAD envelope the business encrypts with (B-28); anything else in a target-form row is an envelope issue.</summary>
-    private const string ApprovedEncryptionAlgorithm = "AES-256-GCM";
-
     /// <summary>
     /// Phase C7 M4 (G19, verifier workload only — no user, no SpiceDB): verifies one record of the scoped form exactly as
     /// <see cref="VerifyRecordCoreAsync"/> does — registry, quarantine, archive receipt, verification key, complete leaf set,
     /// every HMAC, root — against the head the verifier expects, then counts the rows of <paramref name="fieldDefinitionId"/>
     /// in the verified canonical bytes: all occurrences (top level and repeating sections), those still in the form the
-    /// decision removes, and target-form encrypted rows whose envelope is not the approved shape or reuses a nonce under the
-    /// same wrapped key. Integrity failures quarantine the head and journal a minimal incident naming the workload, exactly
+    /// decision removes, and target-form encrypted rows whose envelope is not the approved shape or reuses another row's wrapped
+    /// data key (E3-M2a: with the same or a different nonce). Integrity failures quarantine the head and journal a minimal incident naming the workload, exactly
     /// like a user verification; nothing is repaired or re-signed. Provider outages throw (the caller's whole call fails).
     /// The caller holds the organization lock and commits the scope when <c>Quarantined</c> is true.
     /// IX-2: the verification itself is <see cref="VerifyWorkloadObservedContentAsync"/>, shared with the search-index builder.
@@ -892,25 +909,12 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     }
 
     /// <summary>
-    /// Shape of a target-form AEAD envelope as far as the Authority can judge without keys: the approved algorithm, a 96-bit
-    /// nonce, a 128-bit tag, non-empty ciphertext, wrapped data key and key reference, and no (wrapped key, nonce) pair seen
-    /// before in this revision. The tag itself can only be checked by the key holder (the worker's decrypt check).
+    /// Shape of a target-form AEAD envelope as far as the Authority can judge without keys: the v1 rules every write enforces
+    /// (<see cref="EnvelopeRules"/>, E3-M2a), and no wrapped data key seen before in this revision. Rows accepted before
+    /// E3-M2a may still fail them, which is what the census reports. The tag itself can only be checked by the key holder.
     /// </summary>
-    private static bool EnvelopeLooksApproved(RowCanonicalDocument document, HashSet<string> nonces)
-    {
-        var algorithm = document.Column("encryption_algorithm_name")?.AsText();
-        var nonce = document.Column("encryption_nonce_bytes")?.AsBytes();
-        var tag = document.Column("encryption_auth_tag_bytes")?.AsBytes();
-        var ciphertext = document.Column("encrypted_value_bytes")?.AsBytes();
-        var wrapped = document.Column("wrapped_data_key_bytes")?.AsBytes();
-        var keyReference = document.Column("encryption_key_reference")?.AsText();
-        if (algorithm != ApprovedEncryptionAlgorithm || nonce is not { Length: 12 } || tag is not { Length: 16 } || ciphertext is not { Length: > 0 } || wrapped is not { Length: > 0 } || string.IsNullOrEmpty(keyReference))
-        {
-            return false;
-        }
-
-        return nonces.Add(Convert.ToHexStringLower(wrapped.Value.Span) + ":" + Convert.ToHexStringLower(nonce.Value.Span));
-    }
+    private static bool EnvelopeLooksApproved(RowCanonicalDocument document, HashSet<string> nonces) =>
+        EnvelopeRules.Validate(document) is null && nonces.Add(EnvelopeRules.WrappedKeyOf(document)); // E3-M2a: the same rules as every write (one value per v1 data key)
 
     /// <summary>
     /// One record's verification (shared by the single and the batch operation). Throws the single operation's typed
@@ -1226,6 +1230,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             throw AuthorityException.Invalid("exactly one record header item is required");
         }
 
+        // E3-M2a: every encrypted row of every write path (owner, share editor, protection migration; new and carried rows)
+        // must be a well-formed v1 envelope, before anything is classified or signed.
+        EnvelopeRules.Enforce(parsed.Select(p => p.Document));
         return parsed;
     }
 

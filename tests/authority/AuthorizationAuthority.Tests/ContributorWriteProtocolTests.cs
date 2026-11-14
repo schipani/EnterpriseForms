@@ -49,12 +49,19 @@ public sealed partial class ContributorWriteProtocolTests
         /// <summary>The accepted rows of the head with their signatures (what the business store would hold).</summary>
         public List<(Staged Row, byte[] Signature)> Accepted { get; private set; } = [];
 
+        /// <summary>The organization's in-process HMAC provider (E3-M2a: lets a test reproduce what an older Authority build signed).</summary>
+        public LocalHmacProvider Mac { get; }
+
+        /// <summary>The provider the content service signs through (E3-M2a: counts signatures, so a refusal can be shown to precede signing).</summary>
+        public CountingMacProvider Signer { get; }
+
         public Harness(bool contributorWritesEnabled = true)
         {
-            var mac = new LocalHmacProvider();
+            var mac = Mac = new LocalHmacProvider();
             mac.ProvisionKeyAsync(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", CancellationToken.None).GetAwaiter().GetResult();
             Switch = new ShareContributorWriteSwitch(contributorWritesEnabled, testingOverrideAllowed: true);
-            Service = new ContentService(Store, mac, TestProjection.Verifier(Store, ThrowingProxy.Create<ISpiceDbProjection>()), new NoOpFaultInjector(), TimeProvider.System, Switch);
+            Signer = new CountingMacProvider(mac);
+            Service = new ContentService(Store, Signer, TestProjection.Verifier(Store, ThrowingProxy.Create<ISpiceDbProjection>()), new NoOpFaultInjector(), TimeProvider.System, Switch);
             State = new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous };
             Store.Organizations.Add(State);
             foreach (var user in new[] { Owner, Contributor })

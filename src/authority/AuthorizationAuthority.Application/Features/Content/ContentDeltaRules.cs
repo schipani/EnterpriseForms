@@ -60,10 +60,11 @@ public static class ContentDeltaRules
     public const string AlgorithmColumn = "encryption_algorithm_name";
     public const string EnvelopeVersionColumn = "encryption_envelope_version";
 
-    /// <summary>Envelope algorithms a share-editor update may introduce (business AesGcmFieldEncryptionService).</summary>
-    public static readonly IReadOnlySet<string> AllowedEnvelopeAlgorithms = new HashSet<string>(StringComparer.Ordinal) { "AES-256-GCM" };
+    /// <summary>Envelope algorithms a share-editor update may introduce: the central list (<see cref="EnvelopeRules"/>, E3-M2a), which every write path now enforces.</summary>
+    public static readonly IReadOnlySet<string> AllowedEnvelopeAlgorithms = EnvelopeRules.AllowedAlgorithms;
 
-    public static readonly IReadOnlySet<int> AllowedEnvelopeVersions = new HashSet<int> { 1 };
+    /// <summary>Envelope versions a share-editor update may introduce: the central list (<see cref="EnvelopeRules"/>, E3-M2a).</summary>
+    public static readonly IReadOnlySet<int> AllowedEnvelopeVersions = EnvelopeRules.AllowedEnvelopeVersions;
 
     private static readonly string[] PlaintextValueKinds =
     [

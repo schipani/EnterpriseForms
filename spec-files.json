@@ -613,6 +613,11 @@
       "bytes": 101026
     },
     {
+      "path": "docs/security/E3_M2_AUTHORITY_DATABASE_CONTRACT.md",
+      "sha256": "dc029d23ac153b59be08e74d3ae685fc7d313dc30522c59dfb14f3f004a3fcbf",
+      "bytes": 85922
+    },
+    {
       "path": "docs/security/E4_CONTROLLED_KEY_ACTIVATION.md",
       "sha256": "6ca9e57084fb7c8dadd03b88e90032a94c1c4ebe7921ba1c579710d1c0595fc6",
       "bytes": 12677
