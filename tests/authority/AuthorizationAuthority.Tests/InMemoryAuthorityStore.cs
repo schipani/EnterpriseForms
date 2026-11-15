@@ -77,6 +77,15 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     /// <summary>C-149: number of read-write scopes opened.</summary>
     public int ScopeCount { get; private set; }
 
+    /// <summary>
+    /// RB-CARV-1: when set, every <see cref="IAuthorityScope.RequireContentAcceptanceFloorAsync"/> refuses as a Release B instance
+    /// whose floor is not enforced (the real verification is PostgreSQL-only and is covered by harness R). Null = Release A.
+    /// </summary>
+    public string? ContentAcceptanceFenceRefusal { get; set; }
+
+    /// <summary>RB-CARV-1: number of content write fence checks requested by the services under test.</summary>
+    public int ContentAcceptanceFenceChecks { get; private set; }
+
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken)
     {
         ScopeCount++;
@@ -111,6 +120,12 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public ISearchAccessStore SearchAccess => s.SearchAccess;
 
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(s.Organizations.FirstOrDefault(o => o.OrganizationId == organizationId));
+
+        public Task RequireContentAcceptanceFloorAsync(CancellationToken cancellationToken)
+        {
+            s.ContentAcceptanceFenceChecks++;
+            return s.ContentAcceptanceFenceRefusal is null ? Task.CompletedTask : throw AuthorizationAuthority.Application.Features.Content.ContentAcceptanceFloorFailures.Refusal();
+        }
 
         public Task<OrganizationAuthorizationState?> ReadOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(s.Organizations.FirstOrDefault(o => o.OrganizationId == organizationId));
 

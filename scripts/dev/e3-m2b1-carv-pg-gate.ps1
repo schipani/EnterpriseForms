@@ -13,6 +13,9 @@
                with the legacy build driven through the legacy agent child process. No emulation trigger.
     Harness F  E3-M2b-1F: the REAL floor migration, applied only by this tree's explicit --apply-content-acceptance-floor
                command (never by --migrate), with the real CARV build and the legacy agent (including a lagging clock).
+    Harness R  RB-CARV-1: the Release B content write fence of this tree (policy, store fence, readiness) with the real floor
+               command and the legacy agent: scenarios A..H (removal, weakening, restore, metadata loss, configuration,
+               concurrent removal). Its container runs with track_commit_timestamp=on (scenario H orders commits).
 
   Legacy builds come from -LegacyBinariesRoot\<first 7 characters of the commit>\ when present (for example the frozen
   design-gate builds whose hashes are in docs/evidence/e3-m2b1-carv), otherwise from `git archive` of the commit, built in the
@@ -102,6 +105,7 @@ foreach ($commit in $LegacyCommits) {
 # 3. Harness builds (copies outside the repository).
 $harnessB = Build-Copy (Join-Path $gate 'HarnessB') (Join-Path $WorkDir 'harnessB') $new
 $harnessF = Build-Copy (Join-Path $gate 'HarnessF') (Join-Path $WorkDir 'harnessF') $new
+$harnessR = Build-Copy (Join-Path $gate 'HarnessR') (Join-Path $WorkDir 'harnessR') $new
 $harnessA = @{}; $agents = @{}
 foreach ($short in $legacy.Keys) {
     $harnessA[$short] = Build-Copy (Join-Path $gate 'HarnessA') (Join-Path $WorkDir "harnessA-$short") $legacy[$short]
@@ -117,7 +121,9 @@ function Invoke-GateRun([string]$kind, [string]$short) {
     $runtimePassword = 'carv-runtime-' + [guid]::NewGuid().ToString('N')
     $code = 99
     try {
-        docker run -d --rm --name $name -e "POSTGRES_PASSWORD=$adminPassword" -e POSTGRES_DB=carv -p "127.0.0.1:${Port}:5432" --tmpfs /var/lib/postgresql:rw postgres:18.0 | Out-Null
+        # Harness R alone needs commit timestamps (RB-CARV-1 scenario H); A, B and F keep the unchanged server defaults.
+        $serverArguments = if ($kind -eq 'R') { @('-c', 'track_commit_timestamp=on') } else { @() }
+        docker run -d --rm --name $name -e "POSTGRES_PASSWORD=$adminPassword" -e POSTGRES_DB=carv -p "127.0.0.1:${Port}:5432" --tmpfs /var/lib/postgresql:rw postgres:18.0 @serverArguments | Out-Null
         for ($i = 0; $i -lt 60; $i++) {
             docker exec $name pg_isready -U postgres -d carv 2>$null | Out-Null
             if ($LASTEXITCODE -eq 0) { break }
@@ -141,7 +147,7 @@ function Invoke-GateRun([string]$kind, [string]$short) {
         else {
             $env:CARV_AGENT = Join-Path $agents[$short] 'LegacyAgent.exe'
             $env:CARV_LEGACY = "legacy Authority Release build $short (legacy-$short-sha256.txt), driven by the legacy agent"
-            $exe = if ($kind -eq 'F') { Join-Path $harnessF 'CarvHarnessF.exe' } else { Join-Path $harnessB 'CarvHarnessB.exe' }
+            $exe = switch ($kind) { 'F' { Join-Path $harnessF 'CarvHarnessF.exe' } 'R' { Join-Path $harnessR 'CarvHarnessR.exe' } default { Join-Path $harnessB 'CarvHarnessB.exe' } }
             & $exe *> (Join-Path $runEvidence 'console.txt')
         }
 
@@ -161,7 +167,7 @@ function Invoke-GateRun([string]$kind, [string]$short) {
     }
 }
 
-$results = foreach ($short in $legacy.Keys | Sort-Object) { Invoke-GateRun 'A' $short; Invoke-GateRun 'B' $short; Invoke-GateRun 'F' $short }
+$results = foreach ($short in $legacy.Keys | Sort-Object) { Invoke-GateRun 'A' $short; Invoke-GateRun 'B' $short; Invoke-GateRun 'F' $short; Invoke-GateRun 'R' $short }
 $results | Format-Table -AutoSize | Out-String | Write-Output
 $results | ConvertTo-Json | Set-Content -Encoding ascii (Join-Path $Evidence 'summary.json')
 if ($results | Where-Object { $_.ExitCode -ne 0 -or $_.Failed -ne 0 -or -not $_.ContainerRemoved }) {

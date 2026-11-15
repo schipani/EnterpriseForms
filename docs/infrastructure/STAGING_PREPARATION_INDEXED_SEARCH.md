@@ -99,6 +99,15 @@ Values are environment configuration held in Key Vault (Canada) or the deploymen
 | `Database__RuntimeRoleName` | The runtime role name (grants target) |
 | `ConnectionStrings__AuthoritySearchReader` | The `authority_search_reader` login: SELECT on the search schemas only, **distinct** from the runtime connection (enforced at startup). Needed only if the query path is enabled under SB-6 |
 
+### 4.1a Content acceptance phase (RB-CARV-1; contract §22, operations runbook §2b)
+
+| Setting | Staging value |
+|---|---|
+| `ContentAcceptance__EnforcementPhase` | **Mandatory, no default** (the image's `appsettings.json` value `Unconfigured` refuses the start). `ReleaseA` until the CARV floor is activated and verified; then `ReleaseB` |
+| `ContentAcceptance__RequiredFloor` | Absent in Release A; exactly `1` in Release B |
+
+Both values must come from the separately permissioned Authority release pipeline (PB-11), unchangeable by business deployers and the Authority runtime, with audited changes; that protection is not implemented in the repository (R-CARV-22). Verify on the staging PostgreSQL version that the Release B write fence's expected definitions match (R-CARV-23) before switching to `ReleaseB`.
+
 ### 4.2 BusinessDb
 
 | Setting | Staging value |

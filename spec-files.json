@@ -554,8 +554,8 @@
     },
     {
       "path": "docs/infrastructure/STAGING_PREPARATION_INDEXED_SEARCH.md",
-      "sha256": "52827fcf1724f085158d83777eb1756fe36e05c67e8ed70d58e59bdd9b5e801b",
-      "bytes": 25195
+      "sha256": "5af226049739dbc7c29304d79e5b2a2829e760372c9870469562661a1a50cf1e",
+      "bytes": 26013
     },
     {
       "path": "docs/performance/PB09_BENCHMARK_ACCEPTANCE_MATRIX.csv",
@@ -614,13 +614,13 @@
     },
     {
       "path": "docs/security/E3_M2B1_CARV_OPERATIONS.md",
-      "sha256": "b57647af50bc29bfa590bfa4fef41e59128aa2246c86c0d82b9eaa29a999f542",
-      "bytes": 14308
+      "sha256": "8422f5139bc734ff60760e6c1c26e6e6e4ee6eed1aad57cb5282c40344b6a3ff",
+      "bytes": 21586
     },
     {
       "path": "docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md",
-      "sha256": "d8197e1ff2a1154bcc6dc5b2624241f5b96e69d3a528bdb22e698712434e5b75",
-      "bytes": 139810
+      "sha256": "261eb78798785896fe35f10586ef05ee6d8e34e8fb0f0d0a40ad634b708cce1e",
+      "bytes": 168778
     },
     {
       "path": "docs/security/E3_M2_AUTHORITY_DATABASE_CONTRACT.md",
@@ -889,8 +889,8 @@
     },
     {
       "path": "scripts/dev/e3-m2b1-carv-pg-gate.ps1",
-      "sha256": "3a0de6b92a0d23d866d9ec951e194bfb88ee0e63370560be04ff006161b9478d",
-      "bytes": 11584
+      "sha256": "64b1836c2d0be1ade5961b69a91555351ef0b25b5785c7abcbfe1deb4209d899",
+      "bytes": 12353
     },
     {
       "path": "scripts/dev/e5-vault-hmac-integration.ps1",
@@ -1079,8 +1079,8 @@
     },
     {
       "path": "trust_authority/DISASTER_RECOVERY_OPERATOR_RUNBOOK.md",
-      "sha256": "cdd7b7825b06046a908aea569cd8b0adef59f10bf04d11265d96d6741918d383",
-      "bytes": 6793
+      "sha256": "339210a4ea726d711cc80b41a66bca1fdde7974d6aa13702e9a3d67fdffa4989",
+      "bytes": 7368
     },
     {
       "path": "trust_authority/DISASTER_RECOVERY_TEST_PLAN.md",

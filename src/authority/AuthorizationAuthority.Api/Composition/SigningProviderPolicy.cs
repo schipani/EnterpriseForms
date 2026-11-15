@@ -80,8 +80,9 @@ public static class SigningProviderRegistration
         services.AddSingleton<SigningProviderPolicy>();
         services.AddHostedService<SigningProviderStartupGuard>();
         services.AddSingleton<AuthorityReadiness>();
-        // E3-M2b-1F: the deployment's required floor (section ContentAcceptance); an invalid value fails at startup.
-        services.AddSingleton(ContentAcceptanceRuleOptions.Validate(configuration.GetSection(ContentAcceptanceRuleOptions.SectionName).Get<ContentAcceptanceRuleOptions>()));
+        // RB-CARV-1 (contract §22): the content acceptance phase and required floor (section ContentAcceptance), from deployment
+        // configuration only; no default; an invalid policy refuses the start and every content write.
+        services.AddContentAcceptancePolicy();
         services.AddSingleton<ContentAcceptanceRuleGuard>(); // E3-M2b-1: CARV startup/readiness guard
         services.AddHostedService<ContentAcceptanceRuleMonitor>();
 

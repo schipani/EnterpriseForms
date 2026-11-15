@@ -34,6 +34,13 @@ public static class AuthorityErrorCodes
     /// never be accepted; the caller starts a fresh operation (new idempotency key). Never retried with the same operation.
     /// </summary>
     public const string OperationRulesOutdated = "OPERATION_RULES_OUTDATED";
+
+    /// <summary>
+    /// RB-CARV-1 (contract §22): 503, not retryable. A Release B instance refused a content write because the required CARV floor
+    /// is not verified in the write transaction (missing, lowered, weakened, unverifiable) or the policy is invalid. Never a content
+    /// conflict: retrying cannot help until an operator restores the floor or the configuration.
+    /// </summary>
+    public const string ContentAcceptanceFloorNotEnforced = "CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED";
     public const string KeyUnavailable = "KEY_UNAVAILABLE";
     public const string CandidateMismatch = "CANDIDATE_MISMATCH";
     public const string LimitExceeded = "LIMIT_EXCEEDED";

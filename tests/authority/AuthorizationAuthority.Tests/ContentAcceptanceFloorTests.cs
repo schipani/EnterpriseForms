@@ -111,24 +111,15 @@ public sealed class ContentAcceptanceFloorTests
     {
         var restored = Fence; // a restore to before the floor: neither constraint nor history row
         var without = new ContentAcceptanceRuleGuard(new FixedReader(restored), TimeProvider.System, NullLogger<ContentAcceptanceRuleGuard>.Instance);
-        var with = new ContentAcceptanceRuleGuard(new FixedReader(restored), TimeProvider.System, NullLogger<ContentAcceptanceRuleGuard>.Instance, new ContentAcceptanceRuleOptions { RequiredFloor = 1 });
+        // RB-CARV-1: the required floor now comes from the Release B policy (the E3-M2b-1F option class was replaced, contract §22).
+        var with = new ContentAcceptanceRuleGuard(new FixedReader(restored), TimeProvider.System, NullLogger<ContentAcceptanceRuleGuard>.Instance, ContentAcceptancePolicy.Resolve("ReleaseB", "1"));
 
         Assert.True((await without.RefreshAsync(CancellationToken.None)).Ready); // undetectable from the database alone: configure the floor
         Assert.Equal((false, "ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1)"), await with.RefreshAsync(CancellationToken.None));
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    public void AnInvalidRequiredFloorFailsAtStartup(int value) =>
-        Assert.Throws<InvalidOperationException>(() => ContentAcceptanceRuleOptions.Validate(new ContentAcceptanceRuleOptions { RequiredFloor = value }));
-
-    [Fact]
-    public void AnAbsentOrValidRequiredFloorIsAccepted()
-    {
-        Assert.Null(ContentAcceptanceRuleOptions.Validate(null).RequiredFloor);
-        Assert.Equal(1, ContentAcceptanceRuleOptions.Validate(new ContentAcceptanceRuleOptions { RequiredFloor = 1 }).RequiredFloor);
-    }
+    // The E3-M2b-1F RequiredFloor validation tests moved to ContentAcceptancePolicyTests (RB-CARV-1): a floor below 1 is still
+    // refused, and a RequiredFloor without a Release B phase is now refused too.
 
     // ---- the operator command ----------------------------------------------------------------------------------------------
 

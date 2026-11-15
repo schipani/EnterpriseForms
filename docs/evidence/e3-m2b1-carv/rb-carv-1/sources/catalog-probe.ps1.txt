@@ -1,0 +1,27 @@
+﻿param([string]$Api, [int]$Port = 55460)
+$ErrorActionPreference = 'Stop'
+$name = 'carv-rb1-probe-' + [guid]::NewGuid().ToString('N').Substring(0, 6)
+$pw = 'probe-' + [guid]::NewGuid().ToString('N')
+try {
+    docker run -d --rm --name $name -e "POSTGRES_PASSWORD=$pw" -e POSTGRES_DB=carv -p "127.0.0.1:${Port}:5432" --tmpfs /var/lib/postgresql:rw postgres:18.0 | Out-Null
+    for ($i = 0; $i -lt 60; $i++) { docker exec $name pg_isready -U postgres -d carv 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { break }; Start-Sleep -Milliseconds 500 }
+    Start-Sleep -Seconds 2
+    docker exec $name psql -U postgres -d carv -qAt -c "CREATE ROLE authority_runtime LOGIN PASSWORD 'x' NOSUPERUSER" | Out-Null
+    $env:ConnectionStrings__AuthorityDbMigration = "Host=127.0.0.1;Port=$Port;Database=carv;Username=postgres;Password=$pw;Pooling=false"
+    & dotnet $Api --migrate | Select-Object -Last 1 | Out-Host
+    & dotnet $Api --apply-content-acceptance-floor 1 | Out-Host
+    Remove-Item Env:ConnectionStrings__AuthorityDbMigration
+    $q = @"
+SELECT 'CON|' || conname || '|' || contype::text || '|' || convalidated || '|' || pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'authority.content_change_operations'::regclass ORDER BY conname;
+SELECT 'TRG|' || tgname || '|' || tgisinternal || '|' || tgenabled::text || '|' || pg_get_triggerdef(oid) FROM pg_trigger WHERE tgrelid = 'authority.content_change_operations'::regclass ORDER BY tgname;
+SELECT 'RUL|' || rulename FROM pg_rewrite WHERE ev_class = 'authority.content_change_operations'::regclass;
+SELECT 'FN|' || p.proname || '|' || l.lanname || '|' || p.prosecdef || '|' || coalesce(array_to_string(p.proconfig, ','), '') || '|' || md5(p.prosrc) FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang WHERE p.proname = 'content_operation_rule_state_guard';
+SELECT 'SRC|' || replace(prosrc, E'\n', '\\n') FROM pg_proc WHERE proname = 'content_operation_rule_state_guard';
+SELECT 'INH|' || count(*) FROM pg_inherits WHERE inhparent = 'authority.content_change_operations'::regclass;
+SELECT 'KIND|' || relkind::text FROM pg_class WHERE oid = 'authority.content_change_operations'::regclass;
+SELECT 'VER|' || version();
+"@
+    $q | docker exec -i $name psql -U postgres -d carv -qAt
+}
+finally { docker rm -f $name 2>$null | Out-Null }
+

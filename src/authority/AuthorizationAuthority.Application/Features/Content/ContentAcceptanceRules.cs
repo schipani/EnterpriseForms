@@ -51,7 +51,40 @@ public static class ContentAcceptanceRules
     /// What the readiness guard reads from the database (one query; see the Infrastructure reader). E3-M2b-1F adds
     /// <paramref name="FloorRecorded"/>: the migration history records that a floor migration was applied.
     /// </summary>
-    public sealed record SchemaFacts(bool MigrationApplied, bool ColumnsPresent, bool CommitCheckPresent, bool StateGuardEnabled, int? InstalledFloor, bool FloorRecorded = false);
+    public sealed record SchemaFacts(bool MigrationApplied, bool ColumnsPresent, bool CommitCheckPresent, bool StateGuardEnabled, int? InstalledFloor, bool FloorRecorded = false, string? WriteFenceFailure = null);
+
+    /// <summary>
+    /// RB-CARV-1 (contract §22): the readiness decision for this instance's policy. Release A (or no policy, as in the E3-M2b-1
+    /// tests) is exactly <see cref="Evaluate"/> without a required floor, so every E3-M2b-1/1F decision and detail string is
+    /// unchanged. An invalid policy is not ready. Release B adds the required floor and the write fence verdict
+    /// (<see cref="SchemaFacts.WriteFenceFailure"/>, the same check every Release B content write performs in its transaction).
+    /// Readiness remains a signal: the write path enforces independently.
+    /// </summary>
+    public static (bool Ready, string Detail) EvaluateForPolicy(SchemaFacts? facts, ContentAcceptancePolicy? policy, int compiledVersion = CurrentVersion)
+    {
+        if (policy is null || (policy.IsValid && policy.Phase == ContentAcceptancePhase.ReleaseA))
+        {
+            return Evaluate(facts, compiledVersion);
+        }
+
+        if (!policy.IsValid)
+        {
+            return (false, $"ContentAcceptancePolicyInvalid({policy.ConfigurationFailure})");
+        }
+
+        var (ready, detail) = Evaluate(facts, compiledVersion, policy.RequiredFloor);
+        if (!ready)
+        {
+            return (false, detail);
+        }
+
+        if (facts!.WriteFenceFailure is { } failure)
+        {
+            return (false, $"ContentAcceptanceFloorNotEnforced(reason={failure}, category={ContentAcceptanceFloorFailures.CategoryOf(failure)})");
+        }
+
+        return (true, $"{detail}; {policy.Describe()}");
+    }
 
     /// <summary>
     /// The startup and readiness decision (§19.8): ready only if the CARV migration, both columns, the commit CHECK and an

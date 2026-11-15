@@ -210,6 +210,9 @@ services:
       ASPNETCORE_URLS: http://0.0.0.0:8080
       # Phase C5 (D10): field-scoped contributor writes stay OFF unless explicitly set to exactly "true" (CI browser job only).
       Content__ShareContributorWritesEnabled: ${AUTHORITY_SHARE_CONTRIBUTOR_WRITES_ENABLED:-false}
+      # RB-CARV-1 (contract §22): the content acceptance phase is mandatory deployment configuration (no default). The local
+      # stacks run Release A; the CARV floor is never activated in them.
+      ContentAcceptance__EnforcementPhase: ReleaseA
       Signing__Provider: VaultTransit
       Signing__VaultAddress: http://vault:8200
       Signing__VaultTransit__Token: ${VAULT_DEV_ROOT_TOKEN}

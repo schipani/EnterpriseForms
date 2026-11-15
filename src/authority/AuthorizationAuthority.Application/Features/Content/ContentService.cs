@@ -76,6 +76,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
         timer.Locked();
+        // RB-CARV-1 (contract §22): Release B verifies the floor in this transaction before anything else, replays included.
+        await scope.RequireContentAcceptanceFloorAsync(cancellationToken).ConfigureAwait(false);
         var (bound, reprotection) = await ResolveActorAsync(scope, state, actor, request.ReprotectionCommandId, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
@@ -282,6 +284,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
         timer.Locked();
+        // RB-CARV-1 (contract §22): Release B verifies the floor in this transaction before anything else, replays included.
+        await scope.RequireContentAcceptanceFloorAsync(cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
         var operation = await scope.FindOperationAsync(operationId, cancellationToken).ConfigureAwait(false);

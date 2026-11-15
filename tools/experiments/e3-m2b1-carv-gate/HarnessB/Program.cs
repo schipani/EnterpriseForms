@@ -367,7 +367,7 @@ internal sealed class Lab(string newBinary, string agent, string legacy, string 
     {
         // The real build's versioned application name (AddAuthorityInfrastructure applies the same helper in the host).
         var cs = ContentAcceptanceRuleConnection.WithVersionedApplicationName(new NpgsqlConnectionStringBuilder(connectionString) { ApplicationName = "carv-runtime-" + name }.ConnectionString)!;
-        var store = new AuthorityStore(Factory.For(cs), null, null, alerts);
+        var store = new AuthorityStore(Factory.For(cs), ContentAcceptancePolicy.Resolve(ContentAcceptancePolicy.ReleaseAName, null), null, null, alerts); // RB-CARV-1: this harness runs Release A instances (unchanged behaviour)
         var clock = new OffsetClock(clockOffset ?? TimeSpan.Zero);
         var faults = new GatedFaults();
         var verifier = new ProjectionIntegrityVerifier(store, ThrowingProxy.Create<ISpiceDbProjection>(), new ProjectionMarkerTransitionState(), new NoAlerts(), new ProjectionIntegrityMetrics(), clock);

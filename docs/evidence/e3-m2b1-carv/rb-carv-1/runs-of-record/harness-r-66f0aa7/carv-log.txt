@@ -1,0 +1,85 @@
+08:48:32.129 LB prepare: OK
+08:48:34.911 LB commit: OK
+08:48:37.347 LB prepare: OK
+08:48:40.039 LB commit: OK
+08:48:42.564 LB prepare: OK
+08:48:45.490 LB commit: OK
+08:48:48.314 LB prepare: OK
+08:48:51.717 LB commit: OK
+08:48:55.354 LB prepare: OK
+08:48:58.431 LB commit: OK
+08:49:00.967 LB prepare: OK
+08:49:03.628 LB commit: OK
+08:49:06.298 LB prepare: OK
+08:49:08.973 LB commit: OK
+08:49:11.517 LB prepare: OK
+08:49:14.241 LB commit: OK
+08:49:16.997 LB prepare: OK
+08:49:21.079 LB commit: OK
+08:49:24.423 LB prepare: OK
+08:49:27.387 LB commit: OK
+08:49:30.789 real --migrate (carv-migration) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+08:49:30.823 PASS RX-00: OK; floor=none
+08:49:30.847 PASS RX-00a: on
+08:49:34.713 LB prepare: OK
+08:49:37.286 LB commit: OK
+08:49:37.343 PASS RX-A1: 1/1 Committed; legacy=NULL/NULL Committed
+08:49:37.416 PASS RX-A2: True content acceptance rules v1 (floor none) | False ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1)
+08:49:37.546 PASS RX-A3: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 12->12; state unchanged; alert [content write refused: reason=FloorNotInstalled category=MissingFloor recovery=RecoveryRequired:ApplyFloor phase=ReleaseB requiredFloor=1 build=1]
+08:49:40.125 LB prepare: OK
+08:49:40.248 database snapshot carv_prefloor: terminate OK; create OK
+08:49:40.274 PASS RX-A4: NULL/NULL Prepared; snapshot OK
+08:49:41.418 floor command (carv-floor-command) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+08:49:41.464 PASS RX-B1: exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; verdict=none
+08:49:41.714 PASS RX-B2: 1/1 Committed | True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1
+08:49:44.465 LB prepare: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1
+08:49:44.532 PASS RX-B3: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1; 503 {"errorCode":"AUTHORITY_NOT_READY"; ops 14->14
+08:49:47.618 LB commit: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1
+08:49:47.669 PASS RX-B4: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1; unchanged (head=1:4eb2c745cb1392f7f8e4ee944f1353b2d7d4bba4876498e31590435c600d2f7d; commits=11; leaves=33; identities=24; checkpoints=11; journal=11; committedOps=11); NULL/NULL Prepared
+08:49:47.829 PASS RX-B5: 1/1 Committed
+08:49:48.015 PASS RX-G1: cached True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1 / True; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 16->16; state unchanged; alert [content write refused: reason=FloorRecordedButMissing category=MissingFloor recovery=RecoveryRequired:ReinstateRecordedFloor phase=ReleaseB requiredFloor=1 build=1]
+08:49:48.126 PASS RX-C1: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False | AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False | AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged (head=1:30a3cb3bd993716d03b9facafe4f8e7a9f433cb52290d039acfb6a05d452637f; commits=12; leaves=36; identities=24; checkpoints=12; journal=12; committedOps=12); 1/NULL Prepared
+08:49:48.133 PASS RX-C2: False ContentAcceptanceRuleFloorMissing(recorded in the migration history, constraint absent)
+08:49:51.414 LB prepare: OK
+08:49:52.735 floor command (carv-floor-command) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: 1 unexpired operation(s) prepared by a pre-CARV build are in flight; let them expire or abort them first
+08:49:52.761 PASS RX-C3: legacy NULL/NULL Prepared | exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: 1 unexpired operation(s) prepared by a pre-CARV build are in flight; let them expire or abort them first
+08:49:53.924 floor command (carv-floor-command) exit 4: content acceptance rule floor 1 is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with --reinstate-recorded-floor
+08:49:55.234 floor command (carv-floor-command) exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+08:49:55.294 PASS RX-C4: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False | exit 4: content acceptance rule floor 1 is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with --reinstate-recorded-floor | exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; verdict=none
+08:49:55.363 PASS RX-C5: OK; 1/1 Committed
+08:49:56.707 floor command (carv-floor-command) exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+08:49:56.806 PASS RX-C6: weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 17->17; state unchanged; alert [content write refused: reason=FloorDefinitionMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FloorDefinitionMismatch; restored OK; resumed OK
+08:49:58.080 floor command (carv-floor-command) exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+08:49:58.175 PASS RX-C7: weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 18->18; state unchanged; alert [content write refused: reason=FloorDefinitionMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FloorDefinitionMismatch; restored OK; resumed OK
+08:49:58.399 PASS RX-C8: weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 19->19; state unchanged; alert [content write refused: reason=FenceStateGuardMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FenceStateGuardMismatch; restored OK; resumed OK
+08:49:58.614 PASS RX-C9: weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 20->20; state unchanged; alert [content write refused: reason=FenceStateGuardMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FenceStateGuardMismatch; restored OK; resumed OK
+08:49:58.848 PASS RX-C10: weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 21->21; state unchanged; alert [content write refused: reason=FenceCommitCheckMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FenceCommitCheckMismatch; restored OK; resumed OK
+08:49:59.070 PASS RX-C11: weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 22->22; state unchanged; alert [content write refused: reason=FenceUnexpectedTableObject category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FenceUnexpectedTableObject; restored OK; resumed OK
+08:49:59.286 PASS RX-C12: weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 23->23; state unchanged; alert [content write refused: reason=FenceUnexpectedTableObject category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FenceUnexpectedTableObject; restored OK; resumed OK
+08:50:02.124 LB prepare: OK
+08:50:02.346 PASS RX-C13: legacy 1/NULL Prepared | AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 25->25; state unchanged; alert [content write refused: reason=FenceStampDefaultPresent category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1] | OK
+08:50:02.554 PASS RX-F1: weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 26->26; state unchanged; alert [content write refused: reason=FloorUnverifiable category=UnverifiableFloor recovery=CheckAuthorityDbReachabilityAndPrivileges phase=ReleaseB requiredFloor=1 build=1]; live verdict none; restored OK; resumed OK
+08:50:02.789 PASS RX-F2: weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 27->27; state unchanged; alert [content write refused: reason=FloorUnverifiable category=UnverifiableFloor recovery=CheckAuthorityDbReachabilityAndPrivileges phase=ReleaseB requiredFloor=1 build=1]; live verdict none; restored OK; resumed OK
+08:50:03.025 PASS RX-F3: weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 28->28; state unchanged; alert [content write refused: reason=FloorNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FloorNotRecorded; restored OK; resumed OK
+08:50:03.244 PASS RX-F4: weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 29->29; state unchanged; alert [content write refused: reason=FenceMigrationNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FenceMigrationNotRecorded; restored OK; resumed OK
+08:50:03.515 PASS RX-F5: killed 1; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged (head=15:07f8adad2cb81898597010ab4ddd0906d8dbac19ee9619d1b5c6e120d0f50216; commits=25; leaves=75; identities=24; checkpoints=25; journal=25; committedOps=25); next OK
+08:50:04.203 PASS RX-E1: <absent>/<absent> -> EnforcementPhaseUnconfigured refused; Unconfigured/<absent> -> EnforcementPhaseUnconfigured refused; ReleaseB/<absent> -> RequiredFloorMissing refused; ReleaseB/0 -> RequiredFloorBelowMinimum refused; ReleaseB/2 -> RequiredFloorUnsupported refused; releaseb/1 -> EnforcementPhaseUnsupported refused; ReleaseA/1 -> RequiredFloorNotPermittedInReleaseA refused
+08:50:04.304 PASS RX-S1: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; heads=0
+08:50:04.357 PASS RX-S2: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; revision 1->1
+08:50:04.400 PASS RX-S3: OK; 1/NULL Aborted
+08:50:05.711 floor command (carv-floor-command) exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+08:50:05.738 PASS RX-S4: exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1
+08:50:07.803 PASS RX-H1: held RowExclusiveLock; drop 55P03 : canceling statement due to lock timeout; floor=1
+08:50:08.654 floor dropped by xid 1319, committed 2026-11-15 08:50:08.652989+00
+08:50:08.838 PASS RX-H2: drop committed 2026-11-15 08:50:08.652989+00; late/accepted 0/13; refused=25, conflict=2, OK=13
+08:50:10.141 floor command (carv-floor-command) exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+08:50:10.258 PASS RX-H3: exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; OK
+08:50:10.346 database restored from carv_prefloor: drop OK; create OK
+08:50:10.540 PASS RX-D1: OK; floor=none; history=0; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 13->13; state unchanged; alert [content write refused: reason=FloorNotInstalled category=MissingFloor recovery=RecoveryRequired:ApplyFloor phase=ReleaseB requiredFloor=1 build=1] | False ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1)
+08:50:13.563 LB prepare: OK
+08:50:16.643 LB commit: OK
+08:50:16.657 PASS RX-D2: OK | legacy accepted NULL/NULL Committed
+08:50:17.852 floor command (carv-floor-command) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+08:50:20.516 LB prepare: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1
+08:50:20.577 PASS RX-D3: exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; verdict=none; OK; legacy DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1
+08:50:20.594 PASS FINAL: Committed=15, Prepared=1; legacy agent calls=30; alerts=53

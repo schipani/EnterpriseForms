@@ -9,6 +9,7 @@
 | E3-M2a | Accepted for Development/Testing; local signed commit `66f0aa7b257d984555533ceb10dfccfa921aa273` (branch `e3/m1-envelope-v2-core`, clean tree at the start of this task) |
 | E3-M2b-1 (CARV) | **Implemented and owner-accepted for Development/Testing (2026-11-14, §20.9), signed local commit `c44be41`: §20** |
 | E3-M2b-1F (floor) | **Implemented and owner-accepted for Development/Testing (2026-11-15), signed local commit; Release B not activated; mandatory gate RB-CARV-1 open: §21** |
+| RB-CARV-1 (Release B write fence) | **Implemented and conditionally owner-accepted for Development/Testing (2026-11-15), signed local commit; not production-closed: deployment protection, Azure compatibility, privileged schema mutation and performance remain open release gates: §22** |
 | E3-M2b-2 and later | **Not authorized** |
 | Independent cryptographic review (V2-IND-01) | Required before production; not started |
 | Production use of Envelope v2 | Not approved |
@@ -1398,6 +1399,205 @@ Each removal was applied alone, built and tested, then reverted; every file's SH
 | Azure staging evidence | **None** |
 
 Satisfying item 2 therefore needs either a separately authorized production change that makes Authority writes refuse on the guard's not-ready decision (the recommended, stronger option), or proven deployment wiring that withdraws a not-ready instance from all write traffic, including internal callers and background work. No production code was changed for this record.
+
+**Update (2026-11-15, §22):** the owner authorized the RB-CARV-1 hardening for Development/Testing. Items 1–3 are now implemented at the application and database level (a mandatory Release A / Release B policy and a transactional write fence that does not depend on readiness; §22). The deployment protection of the configuration (item 1, PB-11) and the Azure evidence (item 4) remain open, so RB-CARV-1 is **not closed for production**. The table above is kept as the record of the state at the E3-M2b-1F commit.
+
+## 22. RB-CARV-1 Release B write fence — implementation record (2026-11-15)
+
+**Status.** Implemented for **Development/Testing only** on `e3/m1-envelope-v2-core` on top of the signed E3-M2b-1F commit `8c6367b25b74cef248481c41dac8ef0f189f7e6d`; **conditionally owner-accepted for Development/Testing (2026-11-15, §22.13)** and committed as one signed local commit (not pushed). Not production-closed. Owner-led work; not an independent review, not a certification. The floor was activated, removed, weakened and restored **only in disposable PostgreSQL containers**. No persistent database, Azure service or deployment was touched; Stage B did not run. Envelope v2, signed schema 2, encryption and key providers are unchanged; E3-M2b-2 was not started.
+
+**Objective.** Close the gap left by E3-M2b-1F (§21.10): readiness detected a missing floor but no write path enforced it, and an omitted `ContentAcceptance:RequiredFloor` silently meant Release A. Invariant: once Release B is required, no Authority content operation may prepare, commit, replay or otherwise advance authoritative content state unless the required floor is verified and enforced, in the same transaction, whatever readiness says.
+
+### 22.1 What was implemented
+
+| Area | Change |
+|---|---|
+| Policy (`ContentAcceptancePolicy`, Application) | The deployment phase `ContentAcceptance:EnforcementPhase` (`ReleaseA` or `ReleaseB`, exact ordinal match) and `ContentAcceptance:RequiredFloor` (Release B: exactly `1`; Release A: must be absent). No default: absent, blank, `Unconfigured`, unknown, malformed, below 1 (a downgrade), above this build's floor, or a floor in Release A are each an invalid policy. `Resolve` never throws and never falls back. Replaces the E3-M2b-1F `ContentAcceptanceRuleOptions` (§22.12) |
+| Composition (Api) | `AddContentAcceptancePolicy` resolves the policy once from the host's final configuration (a singleton; nothing re-reads it, so a configuration reload cannot change a running instance). `ContentAcceptancePolicyStartupGuard` refuses the host start on an invalid policy (not during build-time OpenAPI generation) and logs the resolved phase (event 9213; 9214 when invalid) |
+| Settings | `appsettings.json`: `ContentAcceptance:EnforcementPhase = Unconfigured` (the explicit fail value, like `Signing:Provider`); `appsettings.Development.json`: `ReleaseA`; the local Docker stacks set `ContentAcceptance__EnforcementPhase: ReleaseA` in `infrastructure/docker/compose.yaml` (the security-test stack runs `Testing`, which has no settings file). Staging and Production supply it from deployment configuration |
+| Write fence (`ContentAcceptanceWriteFence`, Infrastructure) | `LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE`, then one catalog query in the same transaction, evaluated against the exact PostgreSQL 18 definitions of the floor and the E3-M2b-1 fence (§22.5). Pure evaluator with fixed reason order |
+| Store (`AuthorityStore`) | Takes the policy as a **required** constructor argument (no construction can silently be Release A). New port method `IAuthorityScope.RequireContentAcceptanceFloorAsync`: Release A no-op; Release B (or an invalid policy) runs the fence once per transaction inside a savepoint (so a refused caller can still record its refusal) and keeps the lock to commit. **Catch-all:** before any `SaveChanges` that would write content-acceptance state, the store runs the same fence itself (§22.3) |
+| Entry calls | `ContentService.PrepareAsync` and `CommitAsync` call the fence right after the organization lock, before every replay branch; `SecurityCommandService.SubmitAsync` calls it before staging a plan that registers a record (its empty accepted head) |
+| Readiness | `ContentAcceptanceRules.EvaluateForPolicy`: Release A and the E3-M2b-1 tests are exactly the previous decision; Release B adds the required floor and the write fence verdict (the reader runs the same fence query, contained so Release A readiness can never depend on it). The Release B ready detail names the phase: `content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1` |
+| Error | `CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED`, 503, not retryable, generic message (no database internals). Never `OPERATION_RULES_OUTDATED` or another content conflict. The business has no mapping for it, so it surfaces as an ordinary non-retryable Authority failure |
+| Unchanged | The E3-M2b-1 and E3-M2b-1F migrations and SQL, the Prepare/Commit rules (P = V, C = P), the state guard, the store's refusal mapping and alert, the floor command and its preconditions, the business mappings, Envelope v2, signed schema 2 |
+| Gate | Harness R (`tools/experiments/e3-m2b1-carv-gate/HarnessR`, scenarios A–H) added to `scripts/dev/e3-m2b1-carv-pg-gate.ps1`; its container alone runs with `track_commit_timestamp=on`. Harnesses B and F construct the store with a Release A policy (their behaviour is unchanged); F's FX-24 expects the new Release B ready detail (§22.12) |
+
+### 22.2 Release A / Release B configuration model
+
+| Phase | Configuration | Behaviour |
+|---|---|---|
+| Release A | `EnforcementPhase = ReleaseA`, no `RequiredFloor` | CARV builds as committed in E3-M2b-1; no write fence; the floor may or may not be installed (activation happens while instances are still Release A). Readiness and its detail strings are exactly as before |
+| Release B | `EnforcementPhase = ReleaseB`, `RequiredFloor = 1` | Every content write transaction verifies floor 1 and the E3-M2b-1 fence first, in the transaction, or refuses. Readiness additionally requires the floor and the write fence verdict |
+| Invalid | anything else, including a missing value | The host refuses to start; if a store is constructed anyway (tests, tools), every content write is refused (`ConfigurationPolicyInvalid`). Never Release A |
+
+- **Source of Release B intent:** deployment configuration only (environment or deployment-supplied settings), never the database, an organization setting or an API. A restored AuthorityDb therefore cannot change it (RX-D1).
+- **Downgrade restrictions:** a lower floor, a malformed value or a phase spelled differently is refused at startup; the value is read once, so a configuration reload has no effect; no API reads or writes it. Changing the deployment from Release B back to Release A is a redeployment that the application cannot distinguish from a legitimate Release A deployment: preventing it is the PB-11 deployment control (R-CARV-22).
+- **Observability:** startup log event 9213 (`phase=ReleaseB requiredFloor=1`), the Release B readiness detail, and every refusal alert name the phase; no secret is involved.
+- **What is not guaranteed:** that the setting is tamper-proof. An environment variable or application setting is only as protected as the pipeline and identities that can change it; the repository has no such mechanism for the Authority (no Authority Bicep) and none was invented. **Deployment control still required:** deliver `ContentAcceptance__EnforcementPhase` and `ContentAcceptance__RequiredFloor` from the separately permissioned Authority release pipeline (PB-11), unchangeable by business deployers and the Authority runtime, with audited changes and PB-12 evidence (RB-CARV-1 item 1).
+- **Rollout order:** activate the floor while every instance is Release A, verify it (`floor 1`, verdict `none`), then deploy the Release B configuration. A Release B instance started before activation refuses every content write (fail closed: RX-A3).
+
+### 22.3 Protected content-write boundaries
+
+| Boundary | Mechanism | Evidence |
+|---|---|---|
+| Prepare (new operation) | Entry call after the organization lock, before any reads, signing or writes | unit; RX-A3, RX-G1, RX-D1 |
+| Prepare replay (idempotent retry) | The same entry call precedes the replay branch | unit; RX-C1 |
+| Commit (in-flight operation) | Entry call after the organization lock, before the replay, expiry, CARV and verification branches; the operation stays Prepared (not aborted) | unit; RX-C1, RX-C5 |
+| Commit replay (already committed) | The same entry call precedes the replay | unit; RX-C1 |
+| Commit-time aborts (expired, outdated rules, revoked, envelope, locked) | Reached only after the entry call succeeded; while the floor is missing no Commit proceeds at all | RX-C1 |
+| Record registration (security command creating the empty accepted head) | Entry call before the plan is staged; refusal recorded as an ordinary rejected command, no revision consumed; commands that register no record never ask | unit (3 tests) |
+| Any other path that stages content-acceptance state | Store catch-all before `SaveChanges`: operations (insert, or any change other than a Prepared→Aborted abort), content heads (insert, or any change other than quarantining), manifest commits, manifest leaves, item identities, candidate leaves, content checkpoints | RX-S1, RX-S2 |
+| Protective changes (exempt on purpose) | An abort (state and abort reason only) and a head quarantine (quarantine fields and modification time only) still commit while the floor is missing: they move away from acceptance | RX-S3 |
+| Background work and maintenance | No background job prepares or commits content: the integrity-incident paths (W2/W3/W4) only quarantine heads and journal incidents (exempt), and W4 runs inside Prepare after the entry call; search projections are derived, not authoritative content | code inspection (§22.11) |
+| Writes outside this build | Legacy binaries, a Release A-configured instance, and direct SQL are **not** bound by this build's fence; only the database floor stops them | RX-C3, RX-D2 (R-CARV-21) |
+
+### 22.4 Transactional enforcement and race safety
+
+1. Write transactions run READ COMMITTED (unchanged). The fence takes ROW EXCLUSIVE on `content_change_operations` first and keeps it to commit or rollback.
+2. Every statement that can remove, replace or weaken what the fence checks needs a lock that conflicts with ROW EXCLUSIVE: `ALTER TABLE … DROP/ADD CONSTRAINT`, `ALTER COLUMN … SET DEFAULT`, `DISABLE/ENABLE TRIGGER`, `DROP/CREATE TRIGGER`, `CREATE/DROP RULE`, and the floor migration (ACCESS EXCLUSIVE). None can commit between the verification and this transaction's commit. Deterministic proof RX-H1: with a verified writer open, a privileged `DROP CONSTRAINT` times out (`55P03`) and the floor stays.
+3. The facts are read by a later statement, so its READ COMMITTED snapshot includes every catalog change committed before the lock was granted, which is also the definition PostgreSQL enforces on this transaction's later writes (the relation cache is refreshed when the lock is acquired).
+4. A writer that finished before a removal committed was verified against the floor that existed then; a writer that starts or waits after it sees the removal and refuses. Concurrency proof RX-H2: four Release B instances writing while the floor is dropped — every accepted operation's commit timestamp precedes the drop's commit timestamp, and every later write was refused.
+5. A floor activation or reinstatement (ACCESS EXCLUSIVE, 5 s lock timeout) waits for in-flight writers or times out without applying anything; it never deadlocks with them (the writers' other lock, the organization row, is not taken by the floor transaction).
+6. **Not serialized:** `CREATE OR REPLACE FUNCTION` of the state-guard function takes no table lock (the fence verifies its source at every write, and RX-C9 shows the refusal, but a replacement committed during an open write is not excluded); a superuser editing the catalogs directly (R-CARV-24). The floor CHECK itself cannot be changed without ACCESS EXCLUSIVE.
+
+### 22.5 What the fence verifies (in order; the first failure is the reason)
+
+1. The E3-M2b-1 migration is recorded in `authority.ef_migrations_history` (`FenceMigrationNotRecorded`).
+2. `ck_content_operation_commit_rule_version` and `ck_content_operation_rule_versions_positive` exist, are validated and render exactly as created (`FenceCommitCheckMismatch`, `FencePositiveCheckMismatch`).
+3. `trg_content_operation_rule_state_guard` renders exactly as created (BEFORE INSERT OR UPDATE, FOR EACH ROW, the expected function), is enabled (`O` or `A`), and its function is plpgsql, not SECURITY DEFINER, with exactly the migration's body (line endings normalized) (`FenceStateGuardMismatch`).
+4. Neither stamp column has a default or is generated (`FenceStampDefaultPresent`: RX-C13 shows a default would let a legacy Prepare pass the floor with a stamp it never applied).
+5. No other non-internal trigger, no rewrite rule, no inheritance child, and the table is a plain table (`FenceUnexpectedTableObject`).
+6. No floor above this build (`FloorAboveBuild`).
+7. `ck_content_operation_rule_floor_v1` exists (otherwise `FloorLowered` if only a lower floor exists, `FloorRecordedButMissing` if its history row exists, else `FloorNotInstalled`) and renders exactly as the floor migration creates it, NOT VALID or validated (`FloorDefinitionMismatch`).
+8. The floor migration is recorded (`FloorNotRecorded`).
+9. Any failure to read (permission, connection, timeout) is `FloorUnverifiable`.
+
+The expected texts are PostgreSQL 18.0's `pg_get_constraintdef`/`pg_get_triggerdef`/`prosrc` output, captured from the disposable container and verified live by RX-B1 (`verdict none`). A server that renders them differently refuses Release B writes until the constants are reviewed (R-CARV-23).
+
+### 22.6 Failure behaviour and diagnostics
+
+- The caller receives only `CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED` (503, `retryable: false`). Nothing of the operation is written: the refusal happens before any staged state, and the transaction rolls back (every RX refusal check compares operations, head, manifests, leaves, identities, checkpoints and journal before and after).
+- Each refusal raises the operational alert `CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED` (Critical) with `reason`, `category`, `recovery`, the policy and the build version, and no secrets or content. Categories: `MissingFloor`, `LoweredFloor`, `WeakenedFence`, `InconsistentMigrationHistory`, `UnverifiableFloor`, `ConfigurationPolicyFailure`, `BuildBelowFloor`; recovery actions: `RecoveryRequired:ApplyFloor`, `RecoveryRequired:ReinstateRecordedFloor`, `RecoveryRequired:Incident`, `CheckAuthorityDbReachabilityAndPrivileges`, `CorrectDeploymentConfiguration`, `DeployBuildAtOrAboveFloor`.
+- Release B readiness reports `ContentAcceptanceFloorNotEnforced(reason=…, category=…)` or `ContentAcceptancePolicyInvalid(…)`; the existing E3-M2b-1/1F reasons and alerts are unchanged.
+- **R-CARV-12 is not closed:** the alert is operational, like the E3-M2b-1 refusal alert; whether mandatory audit policy also requires a durable audit-stream event remains the open release-gate question.
+
+### 22.7 Recovery-command isolation
+
+The floor command (`--apply-content-acceptance-floor 1 [--reinstate-recorded-floor]`) runs before the host is composed, with the migration identity and its own floor context; it never constructs a store and never passes through the write fence, so there is no circular dependency (RX-C4, RX-S4, RX-H3, RX-D3 apply or reinstate the floor while the Release B instance is refusing). Inspection uses the readiness detail and the fence query with the runtime role's existing read privileges. No new privilege, endpoint or bypass was added; the runtime role still cannot drop or alter the floor (FX-23).
+
+### 22.8 Real-PostgreSQL results
+
+`scripts/dev/e3-m2b1-carv-pg-gate.ps1 -LegacyBinariesRoot <frozen builds>`: a fresh Release build of the final working tree (`runs-of-record/new-sha256.txt`), the frozen `66f0aa7` and `de1729b` builds (hashes equal to the design-gate evidence; never modified), a fresh `postgres:18.0` container per run. Evidence: `docs/evidence/e3-m2b1-carv/rb-carv-1/`.
+
+| Run | 66f0aa7 | de1729b |
+|---|---|---|
+| Harness A (E3-M2b-1 regression) | 50/50 | 50/50 |
+| Harness B (E3-M2b-1 regression, real CARV build) | 36/36 | 36/36 |
+| Harness F (E3-M2b-1F floor) | 30/30 | 30/30 |
+| **Harness R (RB-CARV-1)** | **42/42** | **42/42** |
+
+| Owner scenario | Harness R checks |
+|---|---|
+| A. Release A, no floor: CARV operations work; legacy compatibility unchanged | RX-A1 (CARV 1/1 Committed; legacy NULL/NULL Committed), RX-A2 (Release A readiness detail unchanged) |
+| B. Release B, floor 1: CARV works; legacy Prepare and Commit fail | RX-B1 (live verdict `none`: the expected definitions match PostgreSQL 18.0), RX-B2, RX-B3, RX-B4 (lagging-clock legacy Commit refused, nothing advances), RX-B5 |
+| C. Floor removed: new writes and in-flight commits refused; reinstated through the approved command; writes resume only after verification | RX-C1 (in-flight Commit, Prepare replay, Commit replay all refused; operation stays Prepared; nothing advances), RX-C2, RX-C3, RX-C4, RX-C5; weakened variants RX-C6..C13 (floor replaced twice, state guard disabled, state guard function replaced, commit CHECK dropped, extra trigger, rewrite rule, stamp default) |
+| D. Restore of the pre-floor database | RX-D1 (the running Release B instance refuses, `FloorNotInstalled`; readiness not ready), RX-D2 (a Release A-configured instance and a legacy build write again: R-CARV-21), RX-D3 (floor re-applied by the command; writes resume; legacy refused again) |
+| E. Missing, malformed, unsupported or downgraded configuration | RX-E1 (7 invalid policies refuse every write while the floor is fully enforced); host start: contract tests `AuthorityContentAcceptancePolicyStartupTests` (14 cases) |
+| F. Metadata unavailable, connection interrupted, inconsistent history | RX-F1 (history SELECT revoked), RX-F2 (`pg_constraint` SELECT revoked), RX-F3/F4 (history rows deleted), RX-F5 (backend terminated while waiting for the fence lock) |
+| G. Long-running instance | RX-G1: the same instance object throughout; the very next write after the removal is refused while its cached readiness still says ready |
+| H. Concurrent floor removal | RX-H1 (a privileged DROP times out while a verified writer is open), RX-H2 (4 instances: 0 of 13 and 0 of 12 accepted operations committed after the drop committed; 25 and 26 refused; no unexpected outcome), RX-H3 |
+| Secondary paths | RX-S1/S2 (direct head insert and head advance through a store scope without an explicit call: refused by the catch-all), RX-S3 (a protective abort still commits), RX-S4 |
+
+**Legacy-binary verification (owner §8):** harnesses A, B and F re-ran unchanged against both frozen builds (the legacy Prepare and Commit refusals after activation, the historical-operation restrictions, P = V / C = P, the cross-version replay refusals and the non-advancement checks all still hold), and harness R repeats the legacy refusals under a Release B instance (RX-B3, RX-B4, RX-D3).
+
+### 22.9 Enforcement-removal checks
+
+Each removal was applied alone, built and tested, then reverted; every file's SHA-256 matched its backup afterwards and the final rebuild succeeded (`mutations/rb-carv-1-removals.json`).
+
+| ID | Removed | Detected by |
+|---|---|---|
+| MU-1 | the Prepare entry call | 3 Authority tests |
+| MU-2 | the Commit entry call | 3 Authority tests |
+| MU-3 | the record-registration entry call (secondary path) | 2 Authority tests |
+| MU-4 | configuration validation: a missing phase falls back to Release A | 4 Authority tests |
+| MU-5 | configuration validation: a lower required floor (downgrade) accepted | 1 Authority test |
+| MU-6 | floor-integrity verification: a replaced floor definition accepted | 2 Authority tests |
+| MU-7 | fence verification: a stamp default accepted | 1 Authority test |
+| MP-1 | the write-path guard (the store fence is a no-op) | harness R: 19 checks, then the harness aborts (RX-A3: a Release B write before activation committed) |
+| MP-2 | secondary-path coverage (the store catch-all never runs) | RX-S1, RX-S2 |
+| MP-3 | transactional protection (no table lock before the verification) | RX-H1 (the privileged DROP succeeded during a verified write), then the harness aborts |
+| MP-4 | floor-integrity verification (real PostgreSQL) | RX-C6, RX-C7 |
+| MP-5 | the Prepare entry call (the catch-all alone remains) | RX-C1 (the Prepare replay returned an operation while the floor was missing) |
+| MP-6 | configuration validation: a missing phase falls back to Release A (real PostgreSQL) | RX-E1 |
+
+**Narrower evidence for MP-1 and MP-3 (owner acceptance, §22.13).** Both removals were detected, but each run ended early: after the first detecting checks the harness aborted because a later step's precondition no longer held (MP-1: a write committed that should have been refused, so the following steps met unexpected state; MP-3: the privileged `DROP` succeeded during the verified write, so the RX-H2 drop hit SQLSTATE 42704). Their later checks therefore did not run against the mutated build. These two results show that the removal is noticed; they are not a complete assertion of the intended invariant under each removal, and are narrower evidence than the removals whose detecting checks ran to completion.
+
+### 22.10 Test results
+
+| Suite | Result |
+|---|---|
+| Authority (full) | 783 total: **779 passed, 0 failed, 4 skipped** (real-Vault classes). Before RB-CARV-1: 724. +59 tests (`ContentAcceptancePolicyTests`, `ContentAcceptanceRegistrationTests`, `ContributorWriteProtocolTests.ContentAcceptanceFloor`) |
+| Contract (full) | 806 total: **797 passed, 0 failed, 9 skipped** (real-Vault classes). +14 (`AuthorityContentAcceptancePolicyStartupTests`) |
+| Architecture | **124/124** |
+| Integrity | **60/60** |
+| Real PostgreSQL | §22.8: A 50/50 ×2, B 36/36 ×2, F 30/30 ×2, R 42/42 ×2 |
+| Specification manifest | regenerated; `validate-specifications.py --strict` passes |
+| Stage B | **Not run** |
+
+### 22.11 Residual risks and RB-CARV-1 status
+
+| ID | Risk | Disposition |
+|---|---|---|
+| R-CARV-17 | Without `RequiredFloor`, a restore to before the floor was undetectable | **Resolved at the application level:** a Release B instance cannot run without it (startup refusal) and refuses writes without the floor (RX-D1). Protection of the setting itself: R-CARV-22 |
+| R-CARV-21 | The write fence binds this build in Release B only. A legacy binary, a Release A-configured instance or direct SQL is stopped only by the database floor; while the floor is missing (restore, privileged drop) they can write again (RX-C3, RX-D2) | Open, operational: deployment inventory, keep organization gates closed, re-apply the floor before reopening writes, never deploy Release A configuration after Release B |
+| R-CARV-22 | The configuration is not protected by anything in the repository; the application reads it once and refuses invalid values but cannot detect a deliberate redeployment from Release B to Release A | **Open, RB-CARV-1 item 1:** PB-11 protected Authority configuration, audited changes, PB-12 evidence |
+| R-CARV-23 | The expected definitions are PostgreSQL 18.0 renderings; another server version or minor release may render them differently | Fail closed (writes refused, availability only); verify on Azure PostgreSQL before Release B |
+| R-CARV-24 | Not serialized by the fence lock: `CREATE OR REPLACE FUNCTION` of the state guard (function owner), direct catalog edits (superuser) | Detected at the next write and by readiness; privileged access is governed by G08 |
+| R-CARV-25 | Cost per Release B content write transaction: one savepoint, one table lock, one catalog query; the ROW EXCLUSIVE lock is held for the whole Prepare/Commit transaction (it was already taken at the first operation write) | Not benchmarked against PB-09; measure in staging |
+| R-CARV-26 | The catch-all (`AuthorityStore` scope, `HasContentAcceptanceWrites`) lists the content-acceptance entities explicitly; a future entity of that kind must be added to it | Review rule (recorded here; RX-S1/S2 exercise the current list) |
+| R-CARV-27 | Monitoring that matches readiness detail strings exactly must accept the Release B ready detail (it now names the phase) | Operational |
+| R-CARV-11, -12, -16, -18, -19, -20 and the rest | As before | Unchanged (R-CARV-11/F-17 and R-CARV-12 open; R-CARV-19 recommendation retained) |
+
+**RB-CARV-1 status.**
+
+| Item (§21.10) | Status |
+|---|---|
+| 1. Protected configuration | Application side implemented (mandatory, strict, read once, observable). **Deployment protection open (PB-11)** |
+| 2. Fail closed | Implemented and tested on real PostgreSQL: absent, lowered, recorded-but-missing, weakened, unverifiable floors and invalid policies refuse every content write of this build in the write transaction |
+| 3. Restore | Implemented and tested: a pre-floor restore leaves the Release B instance refusing until the floor is re-applied (RX-D1..D3). Legacy binaries and Release A-configured instances: R-CARV-21 |
+| 4. Azure staging evidence | **None** |
+
+RB-CARV-1 is resolved at the application and database enforcement level for this build. It is **not closed for production**: items 1 and 4 remain, together with Azure PostgreSQL verification (R-CARV-18, R-CARV-23) and the existing release approvals.
+
+### 22.12 Changes to accepted E3-M2b-1F items (for owner review)
+
+| Item | Change | Why |
+|---|---|---|
+| `ContentAcceptanceRuleOptions` (E3-M2b-1F, decision 3) | Replaced by `ContentAcceptancePolicy`. The readiness detection it fed is unchanged in Release A and stricter in Release B; `RequiredFloor` without a Release B phase is now refused | RB-CARV-1 requires that a missing or partial configuration never means Release A |
+| Release B readiness ready detail | Appends `; phase=ReleaseB requiredFloor=1` | Observability of the phase (owner requirement 4.8) |
+| Harness F FX-24 | Expects the new Release B ready detail; its 30 checks are otherwise unchanged | The detail string changed, not the decision |
+| Harnesses B and F | Construct the store with an explicit Release A policy | The constructor now requires a policy |
+| `compose.yaml`, `appsettings*.json` | Declare the phase (`Unconfigured` default, `ReleaseA` for Development and the local stacks) | The phase is mandatory |
+| `AuthoritySigningPolicyTests` helper | Adds `ContentAcceptance:EnforcementPhase = ReleaseA` | Its Staging/Production hosts must reach the refusal each test checks |
+
+### 22.13 Owner acceptance (2026-11-15)
+
+The owner **conditionally accepted RB-CARV-1 for Development/Testing** and authorized one signed local commit. This is owner-led acceptance, not an independent review; it is **not** Release B deployment approval and **not** production security certification. RB-CARV-1 is **not production-closed**.
+
+| # | Owner decision |
+|---|---|
+| 1 | The mandatory `EnforcementPhase` policy and the removal of the standalone E3-M2b-1F `RequiredFloor` configuration model are accepted |
+| 2 | Release A / Release B selection at startup, with a missing or invalid phase failing closed, is accepted |
+| 3 | The transactional PostgreSQL content-write fence and its restore and concurrency evidence (§22.8) are accepted for Development/Testing |
+| 4 | The §22.12 configuration, readiness-text, harness and test-helper changes are accepted |
+| 5 | R-CARV-21 retained: legacy binaries, Release A instances and direct SQL remain outside the application fence |
+| 6 | R-CARV-22 retained: the deployment configuration must be independently protected and audited through PB-11 |
+| 7 | R-CARV-24 retained: privileged function replacement and catalog changes are not fully serialized by the table lock |
+| 8 | R-CARV-23, R-CARV-25, R-CARV-26 and R-CARV-27 retained as documented release requirements |
+| 9 | Every earlier unresolved risk is preserved, including R-CARV-11, R-CARV-12 and R-CARV-18 |
+
+**Open release gates (unchanged by this acceptance):** protection and audit of the Release B configuration (R-CARV-22, PB-11/PB-12); Azure PostgreSQL compatibility of the fence definitions and the floor (R-CARV-18, R-CARV-23); privileged schema mutation outside the lock (R-CARV-24, G08); performance of the Release B write path (R-CARV-25, PB-09); Azure staging evidence (§22.11 item 4). The MP-1 and MP-3 removal results are recorded as narrower evidence (§22.9).
 
 ---
 

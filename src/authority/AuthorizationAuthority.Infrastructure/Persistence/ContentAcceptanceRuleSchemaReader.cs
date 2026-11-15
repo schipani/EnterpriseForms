@@ -50,14 +50,31 @@ public sealed class ContentAcceptanceRuleSchemaReader(IDbContextFactory<Authorit
             floor.ParameterName = "floor";
             floor.Value = ContentAcceptanceFloorSql.MigrationId; // E3-M2b-1F: detects a recorded floor whose constraint is missing
             command.Parameters.Add(floor);
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            ContentAcceptanceRules.SchemaFacts facts;
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
-                throw new InvalidOperationException("content acceptance rule facts query returned no row");
+                if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    throw new InvalidOperationException("content acceptance rule facts query returned no row");
+                }
+
+                facts = new ContentAcceptanceRules.SchemaFacts(
+                    reader.GetBoolean(0), reader.GetBoolean(1), reader.GetBoolean(2), reader.GetBoolean(3), reader.IsDBNull(4) ? null : reader.GetInt32(4), reader.GetBoolean(5));
             }
 
-            return new ContentAcceptanceRules.SchemaFacts(
-                reader.GetBoolean(0), reader.GetBoolean(1), reader.GetBoolean(2), reader.GetBoolean(3), reader.IsDBNull(4) ? null : reader.GetInt32(4), reader.GetBoolean(5));
+            // RB-CARV-1: the write fence verdict (used by Release B readiness only). Contained, so Release A readiness never depends on it.
+            string writeFenceFailure;
+            try
+            {
+                var fence = await ContentAcceptanceWriteFence.ReadAsync(connection, null, ContentAcceptancePolicy.ReleaseBFloor, cancellationToken).ConfigureAwait(false);
+                writeFenceFailure = ContentAcceptanceWriteFence.Evaluate(fence, ContentAcceptancePolicy.ReleaseBFloor) ?? string.Empty;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                writeFenceFailure = ContentAcceptanceFloorFailures.FloorUnverifiable;
+            }
+
+            return facts with { WriteFenceFailure = writeFenceFailure.Length == 0 ? null : writeFenceFailure };
         }
         finally
         {

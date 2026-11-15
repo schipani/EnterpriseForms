@@ -399,6 +399,8 @@ public sealed class CommandPlannerTests
 
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
 
+        public Task RequireContentAcceptanceFloorAsync(CancellationToken ct) => throw new NotSupportedException();
+
         public Task<OrganizationAuthorizationState?> ReadOrganizationAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
 
         public void AddOrganization(OrganizationAuthorizationState state) => throw new NotSupportedException();

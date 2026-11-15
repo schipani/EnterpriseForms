@@ -99,7 +99,8 @@ internal sealed class Lab(string newBinary, string agent, string legacy, string 
         // block activation, exactly like an idle pre-CARV instance.
         var rawRuntime = new NpgsqlConnectionStringBuilder(runtimeCs) { Pooling = false, ApplicationName = "carv-raw-sql" }.ConnectionString;
         var markedRuntime = ContentAcceptanceRuleConnection.WithVersionedApplicationName(new NpgsqlConnectionStringBuilder(runtimeCs) { ApplicationName = "carv-guard" }.ConnectionString)!;
-        ContentAcceptanceRuleGuard Guard(int? requiredFloor) => new(new ContentAcceptanceRuleSchemaReader(Factory.For(markedRuntime)), TimeProvider.System, NullLogger<ContentAcceptanceRuleGuard>.Instance, new ContentAcceptanceRuleOptions { RequiredFloor = requiredFloor });
+        // RB-CARV-1: the required floor now comes from the Release B policy (the E3-M2b-1F option class was replaced, contract §22).
+        ContentAcceptanceRuleGuard Guard(int? requiredFloor) => new(new ContentAcceptanceRuleSchemaReader(Factory.For(markedRuntime)), TimeProvider.System, NullLogger<ContentAcceptanceRuleGuard>.Instance, requiredFloor is null ? null : ContentAcceptancePolicy.Resolve(ContentAcceptancePolicy.ReleaseBName, requiredFloor.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         foreach (var record in orgA.Records.Concat(orgB.Records))
         {
             await LegacyWriteAsync(record);
@@ -321,8 +322,8 @@ internal sealed class Lab(string newBinary, string agent, string legacy, string 
             Record("FX-23", "the floor migration's Down refuses, the E3-M2b-1 Down refuses while a floor exists, and the runtime role cannot drop the floor", "P0001 never lowered | P0001 floors are never lowered | 42501",
                 $"{down} | {carvDown} | {drop}; floor={await ScalarAsync(adminCs, FloorQuery)}",
                 down.Contains("never lowered", StringComparison.Ordinal) && carvDown.Contains("floors are never lowered", StringComparison.Ordinal) && drop.StartsWith("42501", StringComparison.Ordinal) && await ScalarAsync(adminCs, FloorQuery) == "1");
-            Record("FX-24", "readiness with the floor installed: ready, with or without a required floor 1", "True ...(floor 1) | True ...(floor 1)", $"{await GuardAsync(Guard(null))} | {await GuardAsync(Guard(1))}",
-                await GuardAsync(Guard(null)) == "True content acceptance rules v1 (floor 1)" && await GuardAsync(Guard(1)) == "True content acceptance rules v1 (floor 1)");
+            Record("FX-24", "readiness with the floor installed: ready, with or without a required floor 1", "True ...(floor 1) | True ...(floor 1); phase=ReleaseB requiredFloor=1", $"{await GuardAsync(Guard(null))} | {await GuardAsync(Guard(1))}",
+                await GuardAsync(Guard(null)) == "True content acceptance rules v1 (floor 1)" && await GuardAsync(Guard(1)) == "True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1"); // RB-CARV-1: a Release B ready detail names its phase
         }
 
         // ---------- recovery: a missing floor is detected and can only be re-installed (never lowered)
@@ -440,7 +441,7 @@ internal sealed class Lab(string newBinary, string agent, string legacy, string 
     {
         // The real build's versioned application name (AddAuthorityInfrastructure applies the same helper in the host).
         var cs = ContentAcceptanceRuleConnection.WithVersionedApplicationName(new NpgsqlConnectionStringBuilder(connectionString) { ApplicationName = "carv-runtime-" + name }.ConnectionString)!;
-        var store = new AuthorityStore(Factory.For(cs), null, null, alerts);
+        var store = new AuthorityStore(Factory.For(cs), ContentAcceptancePolicy.Resolve(ContentAcceptancePolicy.ReleaseAName, null), null, null, alerts); // RB-CARV-1: this harness runs Release A instances (unchanged behaviour)
         var clock = new OffsetClock(clockOffset ?? TimeSpan.Zero);
         var faults = new GatedFaults();
         var verifier = new ProjectionIntegrityVerifier(store, ThrowingProxy.Create<ISpiceDbProjection>(), new ProjectionMarkerTransitionState(), new NoAlerts(), new ProjectionIntegrityMetrics(), clock);

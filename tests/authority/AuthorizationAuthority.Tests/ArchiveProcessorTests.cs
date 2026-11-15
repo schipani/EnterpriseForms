@@ -125,6 +125,8 @@ public sealed class ArchiveProcessorTests
 
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid org, CancellationToken ct) => Task.FromResult<OrganizationAuthorizationState?>(org == organizationId ? State : null);
 
+        public Task RequireContentAcceptanceFloorAsync(CancellationToken ct) => throw new NotSupportedException();
+
         public Task<List<SecurityJournalEntry>> GetPendingJournalEntriesAsync(Guid org, int limit, CancellationToken ct) => Task.FromResult(Entries.Where(e => e.OrganizationId == org && e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending).Take(limit).ToList());
 
         public Task<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformJournalHead?> LockPlatformJournalAsync(CancellationToken cancellationToken) => throw new NotSupportedException();

@@ -54,6 +54,17 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>SELECT ... FOR UPDATE on the organization state row: serializes every mutation of that organization (A6).</summary>
     Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// RB-CARV-1 (contract §22): the content write fence of this transaction. Release A: no-op. Release B: takes a ROW EXCLUSIVE
+    /// lock on the content operations table (held to the end of the transaction, so no floor DDL can commit until this transaction
+    /// ends), then verifies in this transaction that the required floor and the E3-M2b-1 fence are installed exactly as defined;
+    /// anything else, including an unreadable catalog or an invalid policy, throws
+    /// <see cref="AuthorityErrorCodes.ContentAcceptanceFloorNotEnforced"/> (503) and raises an operational alert. Called at the
+    /// entry of every content mutation (Prepare, Commit, record registration); the store additionally applies it before writing
+    /// any content-acceptance entity, so a path that forgets the call still cannot write.
+    /// </summary>
+    Task RequireContentAcceptanceFloorAsync(CancellationToken cancellationToken);
+
     Task<OrganizationAuthorizationState?> ReadOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
 
     void AddOrganization(OrganizationAuthorizationState state);

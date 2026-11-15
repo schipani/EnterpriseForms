@@ -1,0 +1,305 @@
+{
+  "harness": "RB-CARV-1 gate, harness R (Release B write fence of the real build \u002B real floor command \u002B legacy agent)",
+  "carvBuild": "E3-M2b-1 Release build of the working tree (newbin-sha256.txt); ContentAcceptanceRules.CurrentVersion = 1",
+  "legacyBuild": "legacy Authority Release build de1729b (legacy-de1729b-sha256.txt), driven by the legacy agent",
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "legacyAgentCalls": 30,
+  "checksTotal": 42,
+  "checksFailed": 0,
+  "checks": [
+    {
+      "Id": "RX-00",
+      "Description": "setup: legacy history, then this build\u0027s ordinary --migrate applies E3-M2b-1 (never the floor)",
+      "Expected": "OK; floor none",
+      "Observed": "OK; floor=none",
+      "Pass": true
+    },
+    {
+      "Id": "RX-00a",
+      "Description": "setup: commit timestamps are tracked (scenario H orders commits against the floor removal)",
+      "Expected": "on",
+      "Observed": "on",
+      "Pass": true
+    },
+    {
+      "Id": "RX-A1",
+      "Description": "Release A, no floor: a CARV write commits; legacy compatibility is unchanged (a legacy Prepare and Commit are still accepted before the floor)",
+      "Expected": "1/1 Committed; legacy NULL/NULL Committed",
+      "Observed": "1/1 Committed; legacy=NULL/NULL Committed",
+      "Pass": true
+    },
+    {
+      "Id": "RX-A2",
+      "Description": "readiness without a floor: Release A ready (E3-M2b-1 detail unchanged); Release B not ready",
+      "Expected": "True ...(floor none) | False FloorBelowRequired",
+      "Observed": "True content acceptance rules v1 (floor none) | False ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1)",
+      "Pass": true
+    },
+    {
+      "Id": "RX-A3",
+      "Description": "a Release B instance before activation refuses content writes; nothing persisted; alert reason FloorNotInstalled (MissingFloor)",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FloorNotInstalled category=MissingFloor",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 12-\u003E12; state unchanged; alert [content write refused: reason=FloorNotInstalled category=MissingFloor recovery=RecoveryRequired:ApplyFloor phase=ReleaseB requiredFloor=1 build=1]",
+      "Pass": true
+    },
+    {
+      "Id": "RX-A4",
+      "Description": "setup: a lagging-clock legacy operation (expired in the database) and a pre-floor database snapshot for scenario D",
+      "Expected": "NULL/NULL Prepared; snapshot OK",
+      "Observed": "NULL/NULL Prepared; snapshot OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-B1",
+      "Description": "the explicit floor command activates floor 1; the live catalog matches the write fence\u0027s expected PostgreSQL 18 definitions exactly",
+      "Expected": "exit 0; floor 1; verdict none",
+      "Observed": "exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; verdict=none",
+      "Pass": true
+    },
+    {
+      "Id": "RX-B2",
+      "Description": "Release B with the floor: a CARV write commits; readiness ready and names the phase",
+      "Expected": "1/1 Committed | True ...(floor 1); phase=ReleaseB requiredFloor=1",
+      "Observed": "1/1 Committed | True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1",
+      "Pass": true
+    },
+    {
+      "Id": "RX-B3",
+      "Description": "Release B: a legacy Prepare is refused by the database floor; nothing persisted; the legacy host reports 503",
+      "Expected": "23514 ck_content_operation_rule_floor_v1; 503; ops unchanged",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1; 503 {\u0022errorCode\u0022:\u0022AUTHORITY_NOT_READY\u0022; ops 14-\u003E14",
+      "Pass": true
+    },
+    {
+      "Id": "RX-B4",
+      "Description": "Release B: a legacy Commit of a pre-floor operation (lagging clock) is refused by the floor; nothing advances",
+      "Expected": "23514 ck_content_operation_rule_floor_v1; snapshot unchanged; NULL/NULL Prepared",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1; unchanged (head=1:10e802a609f78c143df2b4a7d921c195f1c8d994f494c65406f9971ca1111f2e; commits=11; leaves=33; identities=24; checkpoints=11; journal=11; committedOps=11); NULL/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "RX-B5",
+      "Description": "a Release A instance with the floor installed still writes (Release A semantics unchanged)",
+      "Expected": "1/1 Committed",
+      "Observed": "1/1 Committed",
+      "Pass": true
+    },
+    {
+      "Id": "RX-G1",
+      "Description": "long-running Release B instance: the floor removed by a privileged connection; the very next write is refused without a restart or readiness refresh (the cached readiness still says ready); alert FloorRecordedButMissing",
+      "Expected": "cached ready before and after; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FloorRecordedButMissing",
+      "Observed": "cached True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1 / True; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 16-\u003E16; state unchanged; alert [content write refused: reason=FloorRecordedButMissing category=MissingFloor recovery=RecoveryRequired:ReinstateRecordedFloor phase=ReleaseB requiredFloor=1 build=1]",
+      "Pass": true
+    },
+    {
+      "Id": "RX-C1",
+      "Description": "with the floor removed: the in-flight Release B operation cannot commit, its Prepare replay and an accepted operation\u0027s Commit replay are refused; nothing advances; the operation stays Prepared",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x3; unchanged; 1/NULL Prepared",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False | AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False | AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged (head=1:be2e0ab92989bd00a5984481bc98e989ef3ce8391f63b313e61442957a78f689; commits=12; leaves=36; identities=24; checkpoints=12; journal=12; committedOps=12); 1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "RX-C2",
+      "Description": "readiness detects the removal on its next refresh",
+      "Expected": "False ContentAcceptanceRuleFloorMissing",
+      "Observed": "False ContentAcceptanceRuleFloorMissing(recorded in the migration history, constraint absent)",
+      "Pass": true
+    },
+    {
+      "Id": "RX-C3",
+      "Description": "while the floor is missing a legacy Prepare is accepted again (residual R-CARV-21: only the floor stops legacy builds); the reinstatement refuses until it is reconciled",
+      "Expected": "legacy NULL/NULL Prepared | exit 3 in flight",
+      "Observed": "legacy NULL/NULL Prepared | exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: 1 unexpired operation(s) prepared by a pre-CARV build are in flight; let them expire or abort them first",
+      "Pass": true
+    },
+    {
+      "Id": "RX-C4",
+      "Description": "recovery through the approved command only (migration identity): reconciliation by a CARV build; exit 4 without the reinstatement flag; exit 0 with it; floor 1; live verdict none",
+      "Expected": "OPERATION_RULES_OUTDATED | exit 4 | exit 0; floor 1; none",
+      "Observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False | exit 4: content acceptance rule floor 1 is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with --reinstate-recorded-floor | exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; verdict=none",
+      "Pass": true
+    },
+    {
+      "Id": "RX-C5",
+      "Description": "writes resume only after the floor is verified again: the same in-flight operation now commits",
+      "Expected": "OK; 1/1 Committed",
+      "Observed": "OK; 1/1 Committed",
+      "Pass": true
+    },
+    {
+      "Id": "RX-C6",
+      "Description": "the floor replaced by a same-named Prepared-only floor (D-2): the Release B write is refused (reason FloorDefinitionMismatch); after reversal writes resume",
+      "Expected": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FloorDefinitionMismatch; restored OK; resumed OK",
+      "Observed": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 17-\u003E17; state unchanged; alert [content write refused: reason=FloorDefinitionMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FloorDefinitionMismatch; restored OK; resumed OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-C7",
+      "Description": "the floor replaced without its IS NOT NULL term (D-1): the Release B write is refused (reason FloorDefinitionMismatch); after reversal writes resume",
+      "Expected": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FloorDefinitionMismatch; restored OK; resumed OK",
+      "Observed": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 18-\u003E18; state unchanged; alert [content write refused: reason=FloorDefinitionMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FloorDefinitionMismatch; restored OK; resumed OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-C8",
+      "Description": "the state guard trigger disabled: the Release B write is refused (reason FenceStateGuardMismatch); after reversal writes resume",
+      "Expected": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FenceStateGuardMismatch; restored OK; resumed OK",
+      "Observed": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 19-\u003E19; state unchanged; alert [content write refused: reason=FenceStateGuardMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FenceStateGuardMismatch; restored OK; resumed OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-C9",
+      "Description": "the state guard function replaced by a no-op (owner privilege): the Release B write is refused (reason FenceStateGuardMismatch); after reversal writes resume",
+      "Expected": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FenceStateGuardMismatch; restored OK; resumed OK",
+      "Observed": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 20-\u003E20; state unchanged; alert [content write refused: reason=FenceStateGuardMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FenceStateGuardMismatch; restored OK; resumed OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-C10",
+      "Description": "the E3-M2b-1 commit CHECK dropped: the Release B write is refused (reason FenceCommitCheckMismatch); after reversal writes resume",
+      "Expected": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FenceCommitCheckMismatch; restored OK; resumed OK",
+      "Observed": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 21-\u003E21; state unchanged; alert [content write refused: reason=FenceCommitCheckMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FenceCommitCheckMismatch; restored OK; resumed OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-C11",
+      "Description": "an extra BEFORE trigger on the operations table: the Release B write is refused (reason FenceUnexpectedTableObject); after reversal writes resume",
+      "Expected": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FenceUnexpectedTableObject; restored OK; resumed OK",
+      "Observed": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 22-\u003E22; state unchanged; alert [content write refused: reason=FenceUnexpectedTableObject category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FenceUnexpectedTableObject; restored OK; resumed OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-C12",
+      "Description": "a rewrite rule on the operations table: the Release B write is refused (reason FenceUnexpectedTableObject); after reversal writes resume",
+      "Expected": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FenceUnexpectedTableObject; restored OK; resumed OK",
+      "Observed": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 23-\u003E23; state unchanged; alert [content write refused: reason=FenceUnexpectedTableObject category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FenceUnexpectedTableObject; restored OK; resumed OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-C13",
+      "Description": "a DEFAULT on the Prepare stamp lets a legacy Prepare pass the floor stamped 1 (why the fence checks defaults); the Release B write fence refuses (FenceStampDefaultPresent); writes resume once dropped",
+      "Expected": "legacy 1/NULL Prepared | refused FenceStampDefaultPresent | OK",
+      "Observed": "legacy 1/NULL Prepared | AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 25-\u003E25; state unchanged; alert [content write refused: reason=FenceStampDefaultPresent category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1] | OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-F1",
+      "Description": "metadata access denied: SELECT on the migration history revoked from the runtime role: the Release B write is refused (reason FloorUnverifiable); after reversal writes resume",
+      "Expected": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FloorUnverifiable; restored OK; resumed OK",
+      "Observed": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 26-\u003E26; state unchanged; alert [content write refused: reason=FloorUnverifiable category=UnverifiableFloor recovery=CheckAuthorityDbReachabilityAndPrivileges phase=ReleaseB requiredFloor=1 build=1]; live verdict none; restored OK; resumed OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-F2",
+      "Description": "catalog access denied: SELECT on pg_catalog.pg_constraint revoked from PUBLIC: the Release B write is refused (reason FloorUnverifiable); after reversal writes resume",
+      "Expected": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FloorUnverifiable; restored OK; resumed OK",
+      "Observed": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 27-\u003E27; state unchanged; alert [content write refused: reason=FloorUnverifiable category=UnverifiableFloor recovery=CheckAuthorityDbReachabilityAndPrivileges phase=ReleaseB requiredFloor=1 build=1]; live verdict none; restored OK; resumed OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-F3",
+      "Description": "inconsistent history: the floor constraint present but its history row deleted: the Release B write is refused (reason FloorNotRecorded); after reversal writes resume",
+      "Expected": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FloorNotRecorded; restored OK; resumed OK",
+      "Observed": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 28-\u003E28; state unchanged; alert [content write refused: reason=FloorNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FloorNotRecorded; restored OK; resumed OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-F4",
+      "Description": "inconsistent history: the E3-M2b-1 history row deleted: the Release B write is refused (reason FenceMigrationNotRecorded); after reversal writes resume",
+      "Expected": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FenceMigrationNotRecorded; restored OK; resumed OK",
+      "Observed": "weakened OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 29-\u003E29; state unchanged; alert [content write refused: reason=FenceMigrationNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=1]; live verdict FenceMigrationNotRecorded; restored OK; resumed OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-F5",
+      "Description": "a write whose connection is terminated while it waits for the fence lock fails without writing; the next write succeeds",
+      "Expected": "killed 1; not OK; unchanged; next OK",
+      "Observed": "killed 1; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged (head=15:7db4132dffa5acfe932c00652c13a112d4d85e9e39b41c82388b573d95aa9910; commits=25; leaves=75; identities=24; checkpoints=25; journal=25; committedOps=25); next OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-E1",
+      "Description": "missing, malformed, unsupported and downgraded configurations refuse every content write even though the floor is fully enforced; none behaves as Release A",
+      "Expected": "7 refused (ConfigurationPolicyInvalid)",
+      "Observed": "\u003Cabsent\u003E/\u003Cabsent\u003E -\u003E EnforcementPhaseUnconfigured refused; Unconfigured/\u003Cabsent\u003E -\u003E EnforcementPhaseUnconfigured refused; ReleaseB/\u003Cabsent\u003E -\u003E RequiredFloorMissing refused; ReleaseB/0 -\u003E RequiredFloorBelowMinimum refused; ReleaseB/2 -\u003E RequiredFloorUnsupported refused; releaseb/1 -\u003E EnforcementPhaseUnsupported refused; ReleaseA/1 -\u003E RequiredFloorNotPermittedInReleaseA refused",
+      "Pass": true
+    },
+    {
+      "Id": "RX-S1",
+      "Description": "a scope of the Release B store that writes a content head without calling the fence (a forgotten path) is refused by the store before SaveChanges; nothing inserted",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; 0 heads",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; heads=0",
+      "Pass": true
+    },
+    {
+      "Id": "RX-S2",
+      "Description": "a direct head advance without the fence is refused; the head is unchanged",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; revision unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; revision 1-\u003E1",
+      "Pass": true
+    },
+    {
+      "Id": "RX-S3",
+      "Description": "the narrow protective exemption: aborting a Prepared operation still commits while the floor is missing (never an acceptance)",
+      "Expected": "OK; 1/NULL Aborted",
+      "Observed": "OK; 1/NULL Aborted",
+      "Pass": true
+    },
+    {
+      "Id": "RX-S4",
+      "Description": "the floor reinstated by the approved command",
+      "Expected": "exit 0; floor 1",
+      "Observed": "exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1",
+      "Pass": true
+    },
+    {
+      "Id": "RX-H1",
+      "Description": "while a Release B write transaction holds its verified fence (ROW EXCLUSIVE), a privileged DROP of the floor cannot complete (lock timeout); the floor stays",
+      "Expected": "RowExclusiveLock held; 55P03; floor 1",
+      "Observed": "held RowExclusiveLock; drop 55P03 : canceling statement due to lock timeout; floor=1",
+      "Pass": true
+    },
+    {
+      "Id": "RX-H2",
+      "Description": "four Release B instances writing while the floor is dropped: every accepted operation committed before the drop committed (commit timestamps); writes after it are refused; nothing unexpected",
+      "Expected": "late 0/N (N\u003E0); refused\u003E0; no UNEXPECTED",
+      "Observed": "drop committed 2026-11-15 08:56:28.451801\u002B00; late/accepted 0/12; refused=26, OK=12, conflict=2",
+      "Pass": true
+    },
+    {
+      "Id": "RX-H3",
+      "Description": "after the concurrent removal, the approved reinstatement restores the floor and Release B writes resume",
+      "Expected": "exit 0; floor 1; OK",
+      "Observed": "exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; OK",
+      "Pass": true
+    },
+    {
+      "Id": "RX-D1",
+      "Description": "restore of the pre-floor database: the running Release B instance (its intent is configuration, outside the restored database) refuses writes; readiness not ready",
+      "Expected": "restored; floor none; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged; reason=FloorNotInstalled | False FloorBelowRequired",
+      "Observed": "OK; floor=none; history=0; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; ops 13-\u003E13; state unchanged; alert [content write refused: reason=FloorNotInstalled category=MissingFloor recovery=RecoveryRequired:ApplyFloor phase=ReleaseB requiredFloor=1 build=1] | False ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1)",
+      "Pass": true
+    },
+    {
+      "Id": "RX-D2",
+      "Description": "on the restored database a Release A-configured instance writes and a legacy build prepares and commits again: why Release B intent must be held outside the database (deployment control)",
+      "Expected": "OK | legacy accepted",
+      "Observed": "OK | legacy accepted NULL/NULL Committed",
+      "Pass": true
+    },
+    {
+      "Id": "RX-D3",
+      "Description": "the floor re-applied through the authorized command; Release B writes resume only then; the legacy build is refused again",
+      "Expected": "exit 0; floor 1; verdict none; OK; 23514 floor_v1",
+      "Observed": "exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; verdict=none; OK; legacy DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1",
+      "Pass": true
+    },
+    {
+      "Id": "FINAL",
+      "Description": "final operation table summary",
+      "Expected": "informational",
+      "Observed": "Committed=15, Prepared=1; legacy agent calls=30; alerts=54",
+      "Pass": true
+    }
+  ]
+}
