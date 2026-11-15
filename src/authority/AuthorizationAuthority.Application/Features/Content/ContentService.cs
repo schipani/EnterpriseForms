@@ -26,6 +26,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     private readonly AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator revisions = revisionCoordinator ?? AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator.WithoutIndex;
 
     private const int MaxCandidateItems = 500;
+
+    /// <summary>E3-M2b-2: abort reason recorded on an operation whose verified staged bytes fail the registered-schema rule (S-9) at commit.</summary>
+    public const string SignedSchemaInvalidAtCommitReason = "SIGNED_SCHEMA_INVALID_AT_COMMIT";
+
     private static readonly TimeSpan OperationLifetime = TimeSpan.FromMinutes(10);
 
     private static readonly Dictionary<ManifestItemKind, string[]> AllowedEntityKinds = new()
@@ -397,6 +401,39 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         // R-53 (C-148): every committed item matches its permanent identity binding; new items are bound in this transaction.
         var stagedDocuments = request.StagedItems.Select(i => (i.ItemKind, i.ItemId, RowCanonicalDecoder.Decode(Convert.FromBase64String(i.CanonicalBytesBase64)))).ToList();
+
+        // E3-M2b-2 (S-9, owner decision D-2): the registered-schema rule (supported schema, exact columns, pinned types and
+        // nullability) again on the verified staged bytes, so an operation prepared by a build without S-9 cannot commit a row
+        // it refuses. Commit re-derives it from the bytes alone, so the content acceptance rule version is unchanged.
+        try
+        {
+            foreach (var staged in stagedDocuments)
+            {
+                ContentDeltaRules.EnforceRegisteredSchema(staged.Item3);
+            }
+        }
+        catch (AuthorityException)
+        {
+            operation.OperationStateName = ContentOperationStates.Aborted;
+            operation.OperationQuarantineReasonCode = SignedSchemaInvalidAtCommitReason;
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+
+        // E3-M2b-2 R-M2b2-11 (S-4): the schema/envelope tie again on the verified staged bytes, so an operation prepared by a
+        // build without S-4 cannot commit a mismatched row. Re-derived from the bytes alone (the CARV version is unchanged). A
+        // refusal aborts the operation and accepts nothing.
+        try
+        {
+            EnvelopeSchemaTie.Enforce(stagedDocuments.Select(d => d.Item3));
+        }
+        catch (AuthorityException)
+        {
+            operation.OperationStateName = ContentOperationStates.Aborted;
+            operation.OperationQuarantineReasonCode = EnvelopeSchemaTie.MismatchAtCommitReason;
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
 
         // E3-M2a: the envelope rules again on the verified staged bytes, so an operation prepared before the rules existed (an
         // older Authority build) cannot commit an envelope they refuse. A refusal aborts the operation, nothing is accepted.
@@ -939,7 +976,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     /// E3-M2a may still fail them, which is what the census reports. The tag itself can only be checked by the key holder.
     /// </summary>
     private static bool EnvelopeLooksApproved(RowCanonicalDocument document, HashSet<string> nonces) =>
-        EnvelopeRules.Validate(document) is null && nonces.Add(EnvelopeRules.WrappedKeyOf(document)); // E3-M2a: the same rules as every write (one value per v1 data key)
+        EnvelopeSchemaTie.Violation(document) is null // E3-M2b-2 S-4: the schema/envelope tie, as on every write
+        && EnvelopeRules.Validate(document) is null && nonces.Add(EnvelopeRules.WrappedKeyOf(document)); // E3-M2a: the same rules as every write (one value per v1 data key)
 
     /// <summary>
     /// One record's verification (shared by the single and the batch operation). Throws the single operation's typed
@@ -1254,6 +1292,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         {
             throw AuthorityException.Invalid("exactly one record header item is required");
         }
+
+        // E3-M2b-2 R-M2b2-11 (S-4): the signed schema version and the envelope version of every encrypted row are tied
+        // (1/1 or 2/2 only), independently of and before the envelope rules, on every write path.
+        EnvelopeSchemaTie.Enforce(parsed.Select(p => p.Document));
 
         // E3-M2a: every encrypted row of every write path (owner, share editor, protection migration; new and carried rows)
         // must be a well-formed v1 envelope, before anything is classified or signed.

@@ -1,0 +1,50 @@
+11e15ee7d7c3d9e9be0685c2330ec006503bf1ec plus the uncommitted working tree (git status --short below)
+ M .github/workflows/ci.yml
+ M SHA256SUMS.txt
+ M docs/dynamic-forms/row-integrity-format.md
+ M docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md
+ M scripts/integrity/verify-vectors.mjs
+ M scripts/integrity/verify_vectors.py
+ M spec-files.json
+ M src/authority/AuthorizationAuthority.Application/Features/Content/ContentDeltaRules.cs
+ M src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs
+ M src/backend/EnterpriseForms.Api/Features/Platform/PlatformEndpoints.cs
+ M src/backend/EnterpriseForms.Api/Program.cs
+ M src/backend/EnterpriseForms.Application/Features/Documents/Processing/DocumentProcessingService.cs
+ M src/backend/EnterpriseForms.Application/Features/Documents/UploadSessions/UploadSessionHandlers.cs
+ M src/backend/EnterpriseForms.Application/Features/FormRecords/Integrity/BusinessSignedSchemas.cs
+ M src/backend/EnterpriseForms.Application/Features/FormRecords/Staging/CandidateBuilder.cs
+ M src/backend/EnterpriseForms.Domain/Features/Documents/UploadSession.cs
+ M src/backend/EnterpriseForms.Domain/Features/FormRecords/FormRecord.cs
+ M src/backend/EnterpriseForms.Infrastructure/Features/Documents/DocumentEntityConfigurations.cs
+ M src/backend/EnterpriseForms.Infrastructure/Features/FormRecords/FormRecordEntityConfigurations.cs
+ M src/backend/EnterpriseForms.Infrastructure/Persistence/Migrations/BusinessDbContextModelSnapshot.cs
+ M src/backend/EnterpriseForms.Worker/Program.cs
+ M tests/architecture/EnterpriseForms.ArchitectureTests/SignedColumnRegistryTests.cs
+ M tests/authority/AuthorizationAuthority.Tests/ContributorWriteProtocolTests.EnvelopeRules.cs
+ M tests/authority/AuthorizationAuthority.Tests/ProtectionReconciliationTests.cs
+ M tests/features/EnterpriseForms.Api.ContractTests/ReadinessFailsClosedTests.cs
+ M tests/features/EnterpriseForms.Api.ContractTests/StageBUnitTests.cs
+?? docs/evidence/e3-m2b2-business/
+?? scripts/dev/e3-m2b2-business-pg-gate.ps1
+?? scripts/dev/e3-m2b2-s4-pg-gate.ps1
+?? scripts/integrity/generate_envelope_schema2_vectors.py
+?? src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeSchemaTie.cs
+?? src/backend/EnterpriseForms.Api/Composition/BusinessSchemaMonitor.cs
+?? src/backend/EnterpriseForms.Infrastructure/Persistence/BusinessSchemaGuard.cs
+?? src/backend/EnterpriseForms.Infrastructure/Persistence/EnvelopeMetadataConstraints.cs
+?? src/backend/EnterpriseForms.Infrastructure/Persistence/Migrations/20261115125042_EnvelopeV2SignedColumns.Designer.cs
+?? src/backend/EnterpriseForms.Infrastructure/Persistence/Migrations/20261115125042_EnvelopeV2SignedColumns.cs
+?? src/backend/EnterpriseForms.Worker/Composition/BusinessSchemaStartupGuard.cs
+?? tests/architecture/EnterpriseForms.ArchitectureTests/EnvelopeMetadataMigrationTests.cs
+?? tests/architecture/EnterpriseForms.ArchitectureTests/EnvelopeRowFidelityTests.cs
+?? tests/architecture/EnterpriseForms.ArchitectureTests/WorkerBusinessSchemaGuardTests.cs
+?? tests/authority/AuthorizationAuthority.Tests/ContributorWriteProtocolTests.EnvelopeSchema2.cs
+?? tests/authority/AuthorizationAuthority.Tests/ContributorWriteProtocolTests.EnvelopeSchemaTie.cs
+?? tests/authority/AuthorizationAuthority.Tests/EnvelopeSchemaTieTests.cs
+?? tests/features/EnterpriseForms.Api.ContractTests/BusinessSchemaGuardTests.cs
+?? tests/features/EnterpriseForms.Api.ContractTests/EnvelopeSchema2BusinessRegistryTests.cs
+?? tests/integrity/EnterpriseForms.Integrity.Tests/EnvelopeSchema2VectorTests.cs
+?? tools/experiments/e3-m2b2-business-gate/
+?? tools/experiments/e3-m2b2-s4-gate/
+?? trust_authority/row-integrity-v1-envelope-schema2.test-vectors.json

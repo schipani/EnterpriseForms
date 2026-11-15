@@ -1,0 +1,7 @@
+PASS PRE-01 baseline: history at the previous migration, without the E3-M2b-2 migration or its columns
+PASS PRE-02 the business schema guard reports MigrationMissing for an unmigrated database (runtime role, real reader) :: MigrationMissing / BusinessSchemaMigrationMissing
+PASS PRE-03 the real Worker startup guard refuses to start on the unmigrated database and requests a host stop :: Refusing to start: the business database schema is not verified (BusinessSchemaMigrationMissing).
+PASS PRE-04 the real API monitor stops the host on the unmigrated database
+PASS PRE-05 the new EF model cannot read the envelope table of an unmigrated database (42703: fail closed even without the guard) :: 42703
+PASS PRE-06 a pre-existing schema/envelope mismatch makes the migration fail (23514) and apply nothing (no columns, no CHECKs, old CHECK kept, no history row) :: 23514 ck_field_encrypted_values_schema_envelope_tie
+PASS PRE-07 a concurrent open transaction makes the migration fail with lock_timeout (55P03) within the bound and roll back completely :: 55P03 after 5.1 s

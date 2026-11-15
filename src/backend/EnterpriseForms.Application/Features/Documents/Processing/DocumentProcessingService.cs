@@ -315,7 +315,8 @@ public sealed class DocumentProcessingService(IBusinessStore store, IFileStorage
                 RowRevision = 1,
                 RowSignature = [],
                 RowSignatureKeyVersion = 1,
-                RowSignatureSchemaVersion = 1,
+                // E3-M2b-2 (S-1, F-16): the signed schema follows the envelope the encryption service produced, never a constant.
+                RowSignatureSchemaVersion = BusinessSignedSchemas.SchemaForEnvelope(outcome.Envelope.EnvelopeVersion),
                 VersionState = "Processed",
             };
             scope.AddAttachmentVersion(version);

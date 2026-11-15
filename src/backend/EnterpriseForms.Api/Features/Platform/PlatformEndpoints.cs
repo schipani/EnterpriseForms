@@ -21,9 +21,16 @@ public static class PlatformEndpoints
             .WithName("GetLiveness")
             .WithSummary("Process liveness. Never consults external dependencies.");
 
-        group.MapGet("/ready", static async Task<Results<Ok<ProbeResponse>, ProblemHttpResult>> (TrustAuthorityReadinessProbe probe, CancellationToken cancellationToken) =>
+        group.MapGet("/ready", static async Task<Results<Ok<ProbeResponse>, ProblemHttpResult>> (TrustAuthorityReadinessProbe probe, EnterpriseForms.Infrastructure.Persistence.BusinessSchemaGuard schema, CancellationToken cancellationToken) =>
             {
                 var result = await probe.CheckAsync(cancellationToken).ConfigureAwait(false);
+                if (result.Ready)
+                {
+                    // E3-M2b-2 (D-5): an unverified, stale, unreadable or unmigrated business database is never ready for this build.
+                    var (schemaReady, schemaDetail) = schema.Current;
+                    result = schemaReady ? result : new ReadinessResult(false, "BusinessDb", schemaDetail);
+                }
+
                 return result.Ready
                     ? TypedResults.Ok(new ProbeResponse("Ready", "EnterpriseForms.Api"))
                     : TypedResults.Problem(

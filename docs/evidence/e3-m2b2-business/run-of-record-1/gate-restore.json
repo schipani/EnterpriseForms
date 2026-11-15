@@ -1,0 +1,32 @@
+{
+  "gate": "E3-M2b-2 business PostgreSQL gate",
+  "phase": "restore",
+  "checksTotal": 4,
+  "checksFailed": 0,
+  "checks": [
+    {
+      "checkId": "RST-01",
+      "description": "a restore of the migrated database (pg_dump/pg_restore) keeps the history row, the six validated CHECKs and the v1/v2 rows with identical canonical bytes; the guard is ready on it",
+      "passed": true,
+      "detail": "0 mismatched rows of 4"
+    },
+    {
+      "checkId": "RST-02",
+      "description": "CHECK matrix (32 cases, both tables): each v2 column NULL alone, lengths, wrap codes, v1 with metadata, both tie directions, closed versions",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "checkId": "RST-03",
+      "description": "a restore of the pre-migration database is refused by the guard (MigrationMissing) and unreadable by the new EF model (42703)",
+      "passed": true,
+      "detail": "MigrationMissing / 42703"
+    },
+    {
+      "checkId": "RST-04",
+      "description": "re-applying the migration to the restored pre-migration database makes it ready",
+      "passed": true,
+      "detail": null
+    }
+  ]
+}

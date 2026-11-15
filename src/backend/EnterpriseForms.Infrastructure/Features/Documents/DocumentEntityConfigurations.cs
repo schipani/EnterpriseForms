@@ -80,6 +80,10 @@ public sealed class FileAttachmentVersionConfiguration : IEntityTypeConfiguratio
             t.HasCheckConstraint("ck_file_attachment_versions_state", "version_state IN ('Processed','Committed','Superseded','Removed')");
             // The processed (pre-commit) copy has operation 00000000-… and no signature; every operation-bound copy carries 32 bytes (B-05).
             t.HasCheckConstraint("ck_file_attachment_versions_signature_length", "(content_change_operation_id = '00000000-0000-0000-0000-000000000000' AND octet_length(row_signature) = 0) OR octet_length(row_signature) = 32");
+            // E3-M2b-2 (§9.3, D-1): closed envelope versions (there was no check), the schema/envelope tie (S-11) and the v2 metadata rule.
+            t.HasCheckConstraint(EnvelopeMetadataConstraints.AttachmentEnvelopeVersionName, EnvelopeMetadataConstraints.EnvelopeVersionSql);
+            t.HasCheckConstraint(EnvelopeMetadataConstraints.AttachmentSchemaEnvelopeTieName, EnvelopeMetadataConstraints.SchemaEnvelopeTieSql);
+            t.HasCheckConstraint(EnvelopeMetadataConstraints.AttachmentMetadataName, EnvelopeMetadataConstraints.MetadataSql);
         });
     }
 }

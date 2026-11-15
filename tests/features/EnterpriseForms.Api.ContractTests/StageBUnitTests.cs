@@ -220,8 +220,10 @@ public sealed class StageBUnitTests
         await Assert.ThrowsAsync<EncryptionUnavailableException>(() => unavailable.EncryptAsync(context, "x", EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<EncryptionUnavailableException>(() => unavailable.DecryptAsync(sealedRow, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken));
 
-        // The signed schema binds the exact envelope (row-integrity-format §3.7).
+        // The signed schema binds the exact envelope (row-integrity-format §3.7). E3-M2b-2 (S-2): encoding follows the row's
+        // stored schema version with no fallback, so the schema is assigned first, exactly as the stager does (S-1).
         sealedRow.RowRevision = 1;
+        sealedRow.RowSignatureSchemaVersion = BusinessSignedSchemas.CurrentSchemaVersion(sealedRow);
         Assert.Equal("field_encrypted_values", RowCanonicalHeader.Parse(BusinessSignedSchemas.Encode(sealedRow, 1)).EntityKind);
         Assert.Equal(BusinessSignedSchemas.FieldEncryptedValuesV1.SchemaVersion, BusinessSignedSchemas.CurrentSchemaVersion(sealedRow));
         var canonicalBefore = BusinessSignedSchemas.Encode(sealedRow, 1);

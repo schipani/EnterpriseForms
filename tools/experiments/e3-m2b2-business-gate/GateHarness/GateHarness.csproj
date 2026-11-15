@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    E3-M2b-2 business real-PostgreSQL gate (the build under test; GateBinaries = this tree's Business API Release output plus
+    EnterpriseForms.Worker.dll). Development/Testing only; not part of EnterpriseForms.All.slnx and never built in place:
+    scripts/dev/e3-m2b2-business-pg-gate.ps1 copies this folder to a temporary work directory (outside the repository, so no
+    repository build settings apply) and builds it against the binaries passed as GateBinaries. It references no repository
+    project. Warnings are not errors: the code compiles against external binaries.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>BusinessGateHarness</AssemblyName>
+    <!-- Without a deps file the host loads every assembly in the output folder: the byte-identical copies of GateBinaries. -->
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS1591;CA2007;CA1303;CA1031;CA1849;CA2100</NoWarn>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="$(GateBinaries)\*.dll" Private="true" />
+  </ItemGroup>
+  <Target Name="RequireGateBinaries" BeforeTargets="ResolveAssemblyReferences" Condition="'$(GateBinaries)' == '' Or !Exists('$(GateBinaries)\EnterpriseForms.Infrastructure.dll')">
+    <Error Text="Build through scripts/dev/e3-m2b2-business-pg-gate.ps1 (GateBinaries must name a folder of Business Release binaries)." />
+  </Target>
+</Project>

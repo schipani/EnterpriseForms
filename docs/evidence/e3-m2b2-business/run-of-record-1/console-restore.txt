@@ -1,0 +1,4 @@
+PASS RST-01 a restore of the migrated database (pg_dump/pg_restore) keeps the history row, the six validated CHECKs and the v1/v2 rows with identical canonical bytes; the guard is ready on it :: 0 mismatched rows of 4
+PASS RST-02 CHECK matrix (32 cases, both tables): each v2 column NULL alone, lengths, wrap codes, v1 with metadata, both tie directions, closed versions
+PASS RST-03 a restore of the pre-migration database is refused by the guard (MigrationMissing) and unreadable by the new EF model (42703) :: MigrationMissing / 42703
+PASS RST-04 re-applying the migration to the restored pre-migration database makes it ready

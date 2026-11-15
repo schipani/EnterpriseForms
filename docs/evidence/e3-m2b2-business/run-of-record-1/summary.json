@@ -1,0 +1,36 @@
+{
+    "Phases":  [
+                   {
+                       "Phase":  "pre",
+                       "ExitCode":  0,
+                       "Checks":  7,
+                       "Failed":  0
+                   },
+                   {
+                       "Phase":  "up",
+                       "ExitCode":  0,
+                       "Checks":  7,
+                       "Failed":  0
+                   },
+                   {
+                       "Phase":  "legacy",
+                       "ExitCode":  0,
+                       "Checks":  1,
+                       "Failed":  0
+                   },
+                   {
+                       "Phase":  "post",
+                       "ExitCode":  0,
+                       "Checks":  5,
+                       "Failed":  0
+                   },
+                   {
+                       "Phase":  "restore",
+                       "ExitCode":  0,
+                       "Checks":  4,
+                       "Failed":  0
+                   }
+               ],
+    "ContainerRemoved":  true,
+    "LegacyCommit":  "11e15ee7d7c3d9e9be0685c2330ec006503bf1ec"
+}

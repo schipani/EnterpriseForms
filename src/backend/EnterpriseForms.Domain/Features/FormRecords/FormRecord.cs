@@ -310,6 +310,15 @@ public sealed class FieldEncryptedValue : FieldValueRowBase
     /// <summary>The data type the plaintext was serialized as (String, Integer, Date, …); needed to render and validate after decryption.</summary>
     public string EncryptedLogicalType { get; set; } = string.Empty;
 
+    /// <summary>E3-M2b-2: Envelope v2 seal-batch data-key identifier (UUIDv7). NULL for every envelope-1 row; required for envelope 2 (database CHECK, signed schema 2). No product writer sets it before E3-M4.</summary>
+    public Guid? DataKeyIdentifier { get; set; }
+
+    /// <summary>E3-M2b-2: Envelope v2 key commitment (32 bytes). NULL for every envelope-1 row; required for envelope 2.</summary>
+    public byte[]? DataKeyCommitmentBytes { get; set; }
+
+    /// <summary>E3-M2b-2: Envelope v2 wrap-algorithm registry code (1 or 2). NULL for every envelope-1 row; required for envelope 2.</summary>
+    public int? KeyWrapAlgorithmCode { get; set; }
+
     public override string EntityKind => "field_encrypted_values";
 
     public override Guid RowPrimaryKey => FieldEncryptedValueId;

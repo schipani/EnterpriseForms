@@ -55,6 +55,9 @@ public sealed class Program
 
         builder.Services.AddTrustAuthorityReadinessProbe(builder.Configuration);
         builder.Services.AddBusinessInfrastructure(builder.Configuration);
+        // E3-M2b-2 (D-5): business required-migration guard, evaluated at start and every 30 s; /health/ready reports it.
+        EnterpriseForms.Infrastructure.Persistence.BusinessSchemaGuardRegistration.AddBusinessSchemaGuard(builder.Services);
+        builder.Services.AddHostedService<BusinessSchemaMonitor>();
         // Phase C8 (D8-16): the team-membership timing options are validated at startup in the API as in the Worker.
         var membershipReconciliation = builder.Configuration.GetSection(EnterpriseForms.Application.Features.Teams.MembershipReconciliation.TeamMembershipReconciliationOptions.SectionName).Get<EnterpriseForms.Application.Features.Teams.MembershipReconciliation.TeamMembershipReconciliationOptions>() ?? new();
         if (!Composition.HostExecutionMode.IsOpenApiDocumentGeneration)

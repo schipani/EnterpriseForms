@@ -1,0 +1,723 @@
+{
+  "schema": "DynamicForms/RowHmac/test-vectors/envelope-schema2/v1",
+  "status": "E3-M2b-2 conformance vectors (Development/Testing). RowHmac v1 framing unchanged; signed schema 2 of the two envelope tables. Machine-cross-verified in Python, Node and C#; not an independent cryptographic review. Schema 2 is registered but not accepted by the Authority.",
+  "normativeSource": "docs/dynamic-forms/row-integrity-format.md section 7; docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md sections 4 and 23",
+  "testHmacKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "testHmacKeyWarning": "Published TEST key used only to make HMAC outputs reproducible. Production integrity keys exist only inside the independent signing authority and are never exportable.",
+  "schemas": [
+    {
+      "entityKind": "field_encrypted_values",
+      "schemaVersion": 1,
+      "signedColumns": [
+        {
+          "columnName": "content_change_operation_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "encrypted_logical_type",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "encrypted_value_bytes",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_algorithm_name",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_auth_tag_bytes",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_envelope_version",
+          "type": "Int32",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_key_reference",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_nonce_bytes",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "field_definition_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "field_value_item_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "form_record_group_id",
+          "type": "Uuid",
+          "nullable": true
+        },
+        {
+          "columnName": "form_record_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "tenant_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "wrapped_data_key_bytes",
+          "type": "Bytes",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "entityKind": "field_encrypted_values",
+      "schemaVersion": 2,
+      "signedColumns": [
+        {
+          "columnName": "content_change_operation_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "data_key_commitment_bytes",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "data_key_identifier",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "encrypted_logical_type",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "encrypted_value_bytes",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_algorithm_name",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_auth_tag_bytes",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_envelope_version",
+          "type": "Int32",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_key_reference",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_nonce_bytes",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "field_definition_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "field_value_item_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "form_record_group_id",
+          "type": "Uuid",
+          "nullable": true
+        },
+        {
+          "columnName": "form_record_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "key_wrap_algorithm_code",
+          "type": "Int32",
+          "nullable": false
+        },
+        {
+          "columnName": "tenant_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "wrapped_data_key_bytes",
+          "type": "Bytes",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "entityKind": "file_attachment_versions",
+      "schemaVersion": 1,
+      "signedColumns": [
+        {
+          "columnName": "ciphertext_sha256",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "ciphertext_size_bytes",
+          "type": "Int64",
+          "nullable": false
+        },
+        {
+          "columnName": "content_change_operation_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "detected_content_type",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_algorithm_name",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_envelope_version",
+          "type": "Int32",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_key_reference",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_nonce_prefix",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_segment_size_bytes",
+          "type": "Int32",
+          "nullable": false
+        },
+        {
+          "columnName": "field_definition_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "file_attachment_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "form_record_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "original_file_name",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "plaintext_sha256",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "plaintext_size_bytes",
+          "type": "Int64",
+          "nullable": false
+        },
+        {
+          "columnName": "scan_signature_name",
+          "type": "Text",
+          "nullable": true
+        },
+        {
+          "columnName": "scan_verdict",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "scanned_on",
+          "type": "TimestampUtc",
+          "nullable": false
+        },
+        {
+          "columnName": "scanner_name",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "storage_object_key",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "storage_provider_name",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "tenant_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "uploaded_by_user_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "uploaded_on",
+          "type": "TimestampUtc",
+          "nullable": false
+        },
+        {
+          "columnName": "version_number",
+          "type": "Int32",
+          "nullable": false
+        },
+        {
+          "columnName": "wrapped_data_key",
+          "type": "Bytes",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "entityKind": "file_attachment_versions",
+      "schemaVersion": 2,
+      "signedColumns": [
+        {
+          "columnName": "ciphertext_sha256",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "ciphertext_size_bytes",
+          "type": "Int64",
+          "nullable": false
+        },
+        {
+          "columnName": "content_change_operation_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "data_key_commitment_bytes",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "data_key_identifier",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "detected_content_type",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_algorithm_name",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_envelope_version",
+          "type": "Int32",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_key_reference",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_nonce_prefix",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "encryption_segment_size_bytes",
+          "type": "Int32",
+          "nullable": false
+        },
+        {
+          "columnName": "field_definition_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "file_attachment_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "form_record_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "key_wrap_algorithm_code",
+          "type": "Int32",
+          "nullable": false
+        },
+        {
+          "columnName": "original_file_name",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "plaintext_sha256",
+          "type": "Bytes",
+          "nullable": false
+        },
+        {
+          "columnName": "plaintext_size_bytes",
+          "type": "Int64",
+          "nullable": false
+        },
+        {
+          "columnName": "scan_signature_name",
+          "type": "Text",
+          "nullable": true
+        },
+        {
+          "columnName": "scan_verdict",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "scanned_on",
+          "type": "TimestampUtc",
+          "nullable": false
+        },
+        {
+          "columnName": "scanner_name",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "storage_object_key",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "storage_provider_name",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "tenant_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "uploaded_by_user_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "uploaded_on",
+          "type": "TimestampUtc",
+          "nullable": false
+        },
+        {
+          "columnName": "version_number",
+          "type": "Int32",
+          "nullable": false
+        },
+        {
+          "columnName": "wrapped_data_key",
+          "type": "Bytes",
+          "nullable": false
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "ENVS2-FIELD-S1-REFERENCE",
+      "description": "field_encrypted_values schema 1 / envelope 1: the contract section 4.5 fixture (unchanged v1 framing; 14 columns).",
+      "entityKind": "field_encrypted_values",
+      "schemaVersion": 1,
+      "keyVersion": 1,
+      "organizationId": "11111111-1111-4111-8111-111111111111",
+      "primaryKeyId": "0199a2b3-c4d5-7e6f-8123-456789abce05",
+      "rowRevision": 1,
+      "values": {
+        "content_change_operation_id": "0199a2b3-c4d5-7e6f-8123-456789abce06",
+        "encrypted_logical_type": "String",
+        "encrypted_value_bytes": "0001020304",
+        "encryption_algorithm_name": "AES-256-GCM",
+        "encryption_auth_tag_bytes": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "encryption_envelope_version": 1,
+        "encryption_key_reference": "localdev:11111111-1111-4111-8111-111111111111:field-value:1",
+        "encryption_nonce_bytes": "0b0b0b0b0b0b0b0b0b0b0b0b",
+        "field_definition_id": "0199a2b3-c4d5-7e6f-8123-456789abce08",
+        "field_value_item_id": "0199a2b3-c4d5-7e6f-8123-456789abce09",
+        "form_record_group_id": null,
+        "form_record_id": "0199a2b3-c4d5-7e6f-8123-456789abce07",
+        "tenant_id": "11111111-1111-4111-8111-111111111111",
+        "wrapped_data_key_bytes": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "expected": {
+        "canonicalBytesHex": "10001744796e616d6963466f726d732f526f77486d61632f763100010000000100166669656c645f656e637279707465645f76616c756573111111111111411181111111111111110199a2b3c4d57e6f8123456789abce0500000000000000010000000e001b636f6e74656e745f6368616e67655f6f7065726174696f6e5f6964070199a2b3c4d57e6f8123456789abce060016656e637279707465645f6c6f676963616c5f747970650800000006537472696e670015656e637279707465645f76616c75655f6279746573090000000500010203040019656e6372797074696f6e5f616c676f726974686d5f6e616d65080000000b4145532d3235362d47434d0019656e6372797074696f6e5f617574685f7461675f62797465730900000010aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa001b656e6372797074696f6e5f656e76656c6f70655f76657273696f6e02000000010018656e6372797074696f6e5f6b65795f7265666572656e6365080000003b6c6f63616c6465763a31313131313131312d313131312d343131312d383131312d3131313131313131313131313a6669656c642d76616c75653a310016656e6372797074696f6e5f6e6f6e63655f6279746573090000000c0b0b0b0b0b0b0b0b0b0b0b0b00136669656c645f646566696e6974696f6e5f6964070199a2b3c4d57e6f8123456789abce0800136669656c645f76616c75655f6974656d5f6964070199a2b3c4d57e6f8123456789abce090014666f726d5f7265636f72645f67726f75705f696400000e666f726d5f7265636f72645f6964070199a2b3c4d57e6f8123456789abce07000974656e616e745f696407111111111111411181111111111111110016777261707065645f646174615f6b65795f6279746573090000003ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "canonicalByteLength": 719,
+        "canonicalPayloadDigestHex": "a03eaa90d0e5d2755761e3390fb5d79473e9e95d5ff2e305431d62ae60c1dbb9",
+        "rowSignatureHexWithTestKey": "46ae5e55728e492617015fa94b0ff590bbcb48bb036cf4146f06eb641cd671a2"
+      }
+    },
+    {
+      "caseId": "ENVS2-FIELD-S2-LOCAL-WRAP",
+      "description": "field_encrypted_values schema 2 / envelope 2, wrap code 1: the contract section 4.5 fixture (17 columns).",
+      "entityKind": "field_encrypted_values",
+      "schemaVersion": 2,
+      "keyVersion": 1,
+      "organizationId": "11111111-1111-4111-8111-111111111111",
+      "primaryKeyId": "0199a2b3-c4d5-7e6f-8123-456789abce05",
+      "rowRevision": 1,
+      "values": {
+        "content_change_operation_id": "0199a2b3-c4d5-7e6f-8123-456789abce06",
+        "encrypted_logical_type": "String",
+        "encrypted_value_bytes": "0001020304",
+        "encryption_algorithm_name": "AES-256-GCM",
+        "encryption_auth_tag_bytes": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "encryption_envelope_version": 2,
+        "encryption_key_reference": "localdev:11111111-1111-4111-8111-111111111111:field-value:1",
+        "encryption_nonce_bytes": "0b0b0b0b0b0b0b0b0b0b0b0b",
+        "field_definition_id": "0199a2b3-c4d5-7e6f-8123-456789abce08",
+        "field_value_item_id": "0199a2b3-c4d5-7e6f-8123-456789abce09",
+        "form_record_group_id": null,
+        "form_record_id": "0199a2b3-c4d5-7e6f-8123-456789abce07",
+        "tenant_id": "11111111-1111-4111-8111-111111111111",
+        "wrapped_data_key_bytes": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "data_key_commitment_bytes": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "data_key_identifier": "0199a2b3-c4d5-7e6f-8123-456789abce0a",
+        "key_wrap_algorithm_code": 1
+      },
+      "expected": {
+        "canonicalBytesHex": "10001744796e616d6963466f726d732f526f77486d61632f763100020000000100166669656c645f656e637279707465645f76616c756573111111111111411181111111111111110199a2b3c4d57e6f8123456789abce05000000000000000100000011001b636f6e74656e745f6368616e67655f6f7065726174696f6e5f6964070199a2b3c4d57e6f8123456789abce060019646174615f6b65795f636f6d6d69746d656e745f62797465730900000020dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd0013646174615f6b65795f6964656e746966696572070199a2b3c4d57e6f8123456789abce0a0016656e637279707465645f6c6f676963616c5f747970650800000006537472696e670015656e637279707465645f76616c75655f6279746573090000000500010203040019656e6372797074696f6e5f616c676f726974686d5f6e616d65080000000b4145532d3235362d47434d0019656e6372797074696f6e5f617574685f7461675f62797465730900000010aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa001b656e6372797074696f6e5f656e76656c6f70655f76657273696f6e02000000020018656e6372797074696f6e5f6b65795f7265666572656e6365080000003b6c6f63616c6465763a31313131313131312d313131312d343131312d383131312d3131313131313131313131313a6669656c642d76616c75653a310016656e6372797074696f6e5f6e6f6e63655f6279746573090000000c0b0b0b0b0b0b0b0b0b0b0b0b00136669656c645f646566696e6974696f6e5f6964070199a2b3c4d57e6f8123456789abce0800136669656c645f76616c75655f6974656d5f6964070199a2b3c4d57e6f8123456789abce090014666f726d5f7265636f72645f67726f75705f696400000e666f726d5f7265636f72645f6964070199a2b3c4d57e6f8123456789abce0700176b65795f777261705f616c676f726974686d5f636f64650200000001000974656e616e745f696407111111111111411181111111111111110016777261707065645f646174615f6b65795f6279746573090000003ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "canonicalByteLength": 851,
+        "canonicalPayloadDigestHex": "b21eb45e7b049c1ab139fc4ecb2b1707981aa3df300e7779cae0d7e4fe60b418",
+        "rowSignatureHexWithTestKey": "a08b895a2a8e9936f39a5b9cba27550bdb9b19c640a7ff72150621d9f8d1fe51"
+      }
+    },
+    {
+      "caseId": "ENVS2-FIELD-S2-VAULT-WRAP-GROUP",
+      "description": "field_encrypted_values schema 2 / envelope 2, wrap code 2, a repeating-group occurrence, key version 4, row revision 9.",
+      "entityKind": "field_encrypted_values",
+      "schemaVersion": 2,
+      "keyVersion": 4,
+      "organizationId": "11111111-1111-4111-8111-111111111111",
+      "primaryKeyId": "0199a2b3-c4d5-7e6f-8123-456789abce05",
+      "rowRevision": 9,
+      "values": {
+        "content_change_operation_id": "0199a2b3-c4d5-7e6f-8123-456789abce06",
+        "encrypted_logical_type": "String",
+        "encrypted_value_bytes": "0001020304",
+        "encryption_algorithm_name": "AES-256-GCM",
+        "encryption_auth_tag_bytes": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "encryption_envelope_version": 2,
+        "encryption_key_reference": "vault-transit:11111111-1111-4111-8111-111111111111:field-value:1",
+        "encryption_nonce_bytes": "0b0b0b0b0b0b0b0b0b0b0b0b",
+        "field_definition_id": "0199a2b3-c4d5-7e6f-8123-456789abce08",
+        "field_value_item_id": "0199a2b3-c4d5-7e6f-8123-456789abce09",
+        "form_record_group_id": "0199a2b3-c4d5-7e6f-8123-456789abce0b",
+        "form_record_id": "0199a2b3-c4d5-7e6f-8123-456789abce07",
+        "tenant_id": "11111111-1111-4111-8111-111111111111",
+        "wrapped_data_key_bytes": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "data_key_commitment_bytes": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "data_key_identifier": "0199a2b3-c4d5-7e6f-8123-456789abce0a",
+        "key_wrap_algorithm_code": 2
+      },
+      "expected": {
+        "canonicalBytesHex": "10001744796e616d6963466f726d732f526f77486d61632f763100020000000400166669656c645f656e637279707465645f76616c756573111111111111411181111111111111110199a2b3c4d57e6f8123456789abce05000000000000000900000011001b636f6e74656e745f6368616e67655f6f7065726174696f6e5f6964070199a2b3c4d57e6f8123456789abce060019646174615f6b65795f636f6d6d69746d656e745f62797465730900000020dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd0013646174615f6b65795f6964656e746966696572070199a2b3c4d57e6f8123456789abce0a0016656e637279707465645f6c6f676963616c5f747970650800000006537472696e670015656e637279707465645f76616c75655f6279746573090000000500010203040019656e6372797074696f6e5f616c676f726974686d5f6e616d65080000000b4145532d3235362d47434d0019656e6372797074696f6e5f617574685f7461675f62797465730900000010aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa001b656e6372797074696f6e5f656e76656c6f70655f76657273696f6e02000000020018656e6372797074696f6e5f6b65795f7265666572656e636508000000407661756c742d7472616e7369743a31313131313131312d313131312d343131312d383131312d3131313131313131313131313a6669656c642d76616c75653a310016656e6372797074696f6e5f6e6f6e63655f6279746573090000000c0b0b0b0b0b0b0b0b0b0b0b0b00136669656c645f646566696e6974696f6e5f6964070199a2b3c4d57e6f8123456789abce0800136669656c645f76616c75655f6974656d5f6964070199a2b3c4d57e6f8123456789abce090014666f726d5f7265636f72645f67726f75705f6964070199a2b3c4d57e6f8123456789abce0b000e666f726d5f7265636f72645f6964070199a2b3c4d57e6f8123456789abce0700176b65795f777261705f616c676f726974686d5f636f64650200000002000974656e616e745f696407111111111111411181111111111111110016777261707065645f646174615f6b65795f6279746573090000003ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "canonicalByteLength": 872,
+        "canonicalPayloadDigestHex": "b12725b102d39884607a04849ab946f57bc67b9c3e27e795f6d43c0a57c94eff",
+        "rowSignatureHexWithTestKey": "d5f6363f01febf3d36f2dbd596a7719311c55ae914fb4e6794bda859bce095d7"
+      }
+    },
+    {
+      "caseId": "ENVS2-ATTACHMENT-S1",
+      "description": "file_attachment_versions schema 1 / envelope 1 (26 columns; NULL scan signature; non-ASCII file name).",
+      "entityKind": "file_attachment_versions",
+      "schemaVersion": 1,
+      "keyVersion": 1,
+      "organizationId": "11111111-1111-4111-8111-111111111111",
+      "primaryKeyId": "0199a2b3-c4d5-7e6f-8123-456789abce05",
+      "rowRevision": 1,
+      "values": {
+        "ciphertext_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "ciphertext_size_bytes": 1048604,
+        "content_change_operation_id": "0199a2b3-c4d5-7e6f-8123-456789abce06",
+        "detected_content_type": "application/pdf",
+        "encryption_algorithm_name": "AES-256-GCM",
+        "encryption_envelope_version": 1,
+        "encryption_key_reference": "vault-transit:11111111-1111-4111-8111-111111111111:document:3",
+        "encryption_nonce_prefix": "2222222222222222",
+        "encryption_segment_size_bytes": 1048576,
+        "field_definition_id": "0199a2b3-c4d5-7e6f-8123-456789abce08",
+        "file_attachment_id": "0199a2b3-c4d5-7e6f-8123-456789abce0c",
+        "form_record_id": "0199a2b3-c4d5-7e6f-8123-456789abce07",
+        "original_file_name": "Évaluation 2026.pdf",
+        "plaintext_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "plaintext_size_bytes": 1048576,
+        "scan_signature_name": null,
+        "scan_verdict": "Clean",
+        "scanned_on": "2026-11-15T12:00:00.123456+00:00",
+        "scanner_name": "clamd",
+        "storage_object_key": "documents/0199a2b3c4d57e6f8123456789abce0c/1",
+        "storage_provider_name": "AzureBlob",
+        "tenant_id": "11111111-1111-4111-8111-111111111111",
+        "uploaded_by_user_id": "0199a2b3-c4d5-7e6f-8123-456789abce0d",
+        "uploaded_on": "2026-11-15T11:59:58.000001+00:00",
+        "version_number": 1,
+        "wrapped_data_key": "444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "expected": {
+        "canonicalBytesHex": "10001744796e616d6963466f726d732f526f77486d61632f7631000100000001001866696c655f6174746163686d656e745f76657273696f6e73111111111111411181111111111111110199a2b3c4d57e6f8123456789abce0500000000000000010000001a0011636970686572746578745f736861323536090000002011111111111111111111111111111111111111111111111111111111111111110015636970686572746578745f73697a655f627974657303000000000010001c001b636f6e74656e745f6368616e67655f6f7065726174696f6e5f6964070199a2b3c4d57e6f8123456789abce06001564657465637465645f636f6e74656e745f74797065080000000f6170706c69636174696f6e2f7064660019656e6372797074696f6e5f616c676f726974686d5f6e616d65080000000b4145532d3235362d47434d001b656e6372797074696f6e5f656e76656c6f70655f76657273696f6e02000000010018656e6372797074696f6e5f6b65795f7265666572656e6365080000003d7661756c742d7472616e7369743a31313131313131312d313131312d343131312d383131312d3131313131313131313131313a646f63756d656e743a330017656e6372797074696f6e5f6e6f6e63655f70726566697809000000082222222222222222001d656e6372797074696f6e5f7365676d656e745f73697a655f6279746573020010000000136669656c645f646566696e6974696f6e5f6964070199a2b3c4d57e6f8123456789abce08001266696c655f6174746163686d656e745f6964070199a2b3c4d57e6f8123456789abce0c000e666f726d5f7265636f72645f6964070199a2b3c4d57e6f8123456789abce0700126f726967696e616c5f66696c655f6e616d650800000014c38976616c756174696f6e20323032362e7064660010706c61696e746578745f736861323536090000002033333333333333333333333333333333333333333333333333333333333333330014706c61696e746578745f73697a655f627974657303000000000010000000137363616e5f7369676e61747572655f6e616d6500000c7363616e5f766572646963740800000005436c65616e000a7363616e6e65645f6f6e060006604f66971240000c7363616e6e65725f6e616d650800000005636c616d64001273746f726167655f6f626a6563745f6b6579080000002c646f63756d656e74732f30313939613262336334643537653666383132333435363738396162636530632f31001573746f726167655f70726f76696465725f6e616d650800000009417a757265426c6f62000974656e616e745f69640711111111111141118111111111111111001375706c6f616465645f62795f757365725f6964070199a2b3c4d57e6f8123456789abce0d000b75706c6f616465645f6f6e060006604f6676ab81000e76657273696f6e5f6e756d62657202000000010010777261707065645f646174615f6b6579090000003c444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444",
+        "canonicalByteLength": 1150,
+        "canonicalPayloadDigestHex": "d5435b916e216203161c0bbd1284055c8461506a3ecb76db9bc2d611cc9f1e72",
+        "rowSignatureHexWithTestKey": "6c8b51ad68f5331a6905269bb18a9bc294ef95e604cbd2d530b7f29ea6cc7cdc"
+      }
+    },
+    {
+      "caseId": "ENVS2-ATTACHMENT-S2",
+      "description": "file_attachment_versions schema 2 / envelope 2 (29 columns).",
+      "entityKind": "file_attachment_versions",
+      "schemaVersion": 2,
+      "keyVersion": 1,
+      "organizationId": "11111111-1111-4111-8111-111111111111",
+      "primaryKeyId": "0199a2b3-c4d5-7e6f-8123-456789abce05",
+      "rowRevision": 1,
+      "values": {
+        "ciphertext_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "ciphertext_size_bytes": 1048604,
+        "content_change_operation_id": "0199a2b3-c4d5-7e6f-8123-456789abce06",
+        "detected_content_type": "application/pdf",
+        "encryption_algorithm_name": "AES-256-GCM",
+        "encryption_envelope_version": 2,
+        "encryption_key_reference": "vault-transit:11111111-1111-4111-8111-111111111111:document:3",
+        "encryption_nonce_prefix": "2222222222222222",
+        "encryption_segment_size_bytes": 1048576,
+        "field_definition_id": "0199a2b3-c4d5-7e6f-8123-456789abce08",
+        "file_attachment_id": "0199a2b3-c4d5-7e6f-8123-456789abce0c",
+        "form_record_id": "0199a2b3-c4d5-7e6f-8123-456789abce07",
+        "original_file_name": "Évaluation 2026.pdf",
+        "plaintext_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "plaintext_size_bytes": 1048576,
+        "scan_signature_name": null,
+        "scan_verdict": "Clean",
+        "scanned_on": "2026-11-15T12:00:00.123456+00:00",
+        "scanner_name": "clamd",
+        "storage_object_key": "documents/0199a2b3c4d57e6f8123456789abce0c/1",
+        "storage_provider_name": "AzureBlob",
+        "tenant_id": "11111111-1111-4111-8111-111111111111",
+        "uploaded_by_user_id": "0199a2b3-c4d5-7e6f-8123-456789abce0d",
+        "uploaded_on": "2026-11-15T11:59:58.000001+00:00",
+        "version_number": 1,
+        "wrapped_data_key": "444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444",
+        "data_key_commitment_bytes": "5555555555555555555555555555555555555555555555555555555555555555",
+        "data_key_identifier": "0199a2b3-c4d5-7e6f-8123-456789abce0e",
+        "key_wrap_algorithm_code": 2
+      },
+      "expected": {
+        "canonicalBytesHex": "10001744796e616d6963466f726d732f526f77486d61632f7631000200000001001866696c655f6174746163686d656e745f76657273696f6e73111111111111411181111111111111110199a2b3c4d57e6f8123456789abce0500000000000000010000001d0011636970686572746578745f736861323536090000002011111111111111111111111111111111111111111111111111111111111111110015636970686572746578745f73697a655f627974657303000000000010001c001b636f6e74656e745f6368616e67655f6f7065726174696f6e5f6964070199a2b3c4d57e6f8123456789abce060019646174615f6b65795f636f6d6d69746d656e745f6279746573090000002055555555555555555555555555555555555555555555555555555555555555550013646174615f6b65795f6964656e746966696572070199a2b3c4d57e6f8123456789abce0e001564657465637465645f636f6e74656e745f74797065080000000f6170706c69636174696f6e2f7064660019656e6372797074696f6e5f616c676f726974686d5f6e616d65080000000b4145532d3235362d47434d001b656e6372797074696f6e5f656e76656c6f70655f76657273696f6e02000000020018656e6372797074696f6e5f6b65795f7265666572656e6365080000003d7661756c742d7472616e7369743a31313131313131312d313131312d343131312d383131312d3131313131313131313131313a646f63756d656e743a330017656e6372797074696f6e5f6e6f6e63655f70726566697809000000082222222222222222001d656e6372797074696f6e5f7365676d656e745f73697a655f6279746573020010000000136669656c645f646566696e6974696f6e5f6964070199a2b3c4d57e6f8123456789abce08001266696c655f6174746163686d656e745f6964070199a2b3c4d57e6f8123456789abce0c000e666f726d5f7265636f72645f6964070199a2b3c4d57e6f8123456789abce0700176b65795f777261705f616c676f726974686d5f636f6465020000000200126f726967696e616c5f66696c655f6e616d650800000014c38976616c756174696f6e20323032362e7064660010706c61696e746578745f736861323536090000002033333333333333333333333333333333333333333333333333333333333333330014706c61696e746578745f73697a655f627974657303000000000010000000137363616e5f7369676e61747572655f6e616d6500000c7363616e5f766572646963740800000005436c65616e000a7363616e6e65645f6f6e060006604f66971240000c7363616e6e65725f6e616d650800000005636c616d64001273746f726167655f6f626a6563745f6b6579080000002c646f63756d656e74732f30313939613262336334643537653666383132333435363738396162636530632f31001573746f726167655f70726f76696465725f6e616d650800000009417a757265426c6f62000974656e616e745f69640711111111111141118111111111111111001375706c6f616465645f62795f757365725f6964070199a2b3c4d57e6f8123456789abce0d000b75706c6f616465645f6f6e060006604f6676ab81000e76657273696f6e5f6e756d62657202000000010010777261707065645f646174615f6b6579090000003c444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444",
+        "canonicalByteLength": 1282,
+        "canonicalPayloadDigestHex": "b11383d2b10f7d2a69081ab2fc537e523f581a3528b5ba0ec1eebdd550b0f468",
+        "rowSignatureHexWithTestKey": "465488622d296b742584b6831e675cd99336cf1e3b3249dc894272908672a8cf"
+      }
+    }
+  ],
+  "negativeCases": [
+    {
+      "caseId": "ENVS2-NEG-FIELD-NULL-DATA-KEY-IDENTIFIER",
+      "baseCaseId": "ENVS2-FIELD-S2-LOCAL-WRAP",
+      "set": {
+        "data_key_identifier": null
+      },
+      "expectedError": "NullNotPermitted",
+      "description": "Schema 2 refuses a NULL data-key identifier (no v2 row without metadata can be signed)."
+    },
+    {
+      "caseId": "ENVS2-NEG-FIELD-NULL-COMMITMENT",
+      "baseCaseId": "ENVS2-FIELD-S2-LOCAL-WRAP",
+      "set": {
+        "data_key_commitment_bytes": null
+      },
+      "expectedError": "NullNotPermitted",
+      "description": "Schema 2 refuses a NULL key commitment."
+    },
+    {
+      "caseId": "ENVS2-NEG-FIELD-NULL-WRAP-CODE",
+      "baseCaseId": "ENVS2-FIELD-S2-LOCAL-WRAP",
+      "set": {
+        "key_wrap_algorithm_code": null
+      },
+      "expectedError": "NullNotPermitted",
+      "description": "Schema 2 refuses a NULL wrap-algorithm code."
+    },
+    {
+      "caseId": "ENVS2-NEG-FIELD-MISSING-V2-COLUMN",
+      "baseCaseId": "ENVS2-FIELD-S2-LOCAL-WRAP",
+      "remove": [
+        "key_wrap_algorithm_code"
+      ],
+      "expectedError": "MissingColumn",
+      "description": "Schema 2 refuses an omitted v2 column (absent is not NULL)."
+    },
+    {
+      "caseId": "ENVS2-NEG-FIELD-S1-WITH-V2-COLUMN",
+      "baseCaseId": "ENVS2-FIELD-S1-REFERENCE",
+      "set": {
+        "data_key_identifier": "0199a2b3-c4d5-7e6f-8123-456789abce0a"
+      },
+      "expectedError": "UnregisteredColumn",
+      "description": "Schema 1 cannot carry a v2 column (no silent extension of schema 1)."
+    },
+    {
+      "caseId": "ENVS2-NEG-ATTACHMENT-NULL-COMMITMENT",
+      "baseCaseId": "ENVS2-ATTACHMENT-S2",
+      "set": {
+        "data_key_commitment_bytes": null
+      },
+      "expectedError": "NullNotPermitted",
+      "description": "Document schema 2 refuses a NULL key commitment."
+    },
+    {
+      "caseId": "ENVS2-NEG-ATTACHMENT-WRAP-CODE-TYPE",
+      "baseCaseId": "ENVS2-ATTACHMENT-S2",
+      "set": {
+        "key_wrap_algorithm_code": "2"
+      },
+      "expectedError": "TypeMismatch",
+      "description": "The wrap code is an Int32, never text."
+    }
+  ]
+}

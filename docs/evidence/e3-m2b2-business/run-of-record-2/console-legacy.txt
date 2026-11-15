@@ -1,0 +1,1 @@
+legacy writer: 2 v1 rows written and read back

@@ -35,7 +35,8 @@ jobs:
       - name: Regenerated vectors must equal committed vectors
         run: |
           python scripts/integrity/generate_vectors.py
-          git diff --exit-code -- trust_authority/merkle-v1.test-vectors.json trust_authority/row-integrity-v1.test-vectors.json
+          python scripts/integrity/generate_envelope_schema2_vectors.py
+          git diff --exit-code -- trust_authority/merkle-v1.test-vectors.json trust_authority/row-integrity-v1.test-vectors.json trust_authority/row-integrity-v1-envelope-schema2.test-vectors.json
 
   dotnet:
     name: .NET build, architecture tests, contract tests

@@ -10,7 +10,8 @@
 | E3-M2b-1 (CARV) | **Implemented and owner-accepted for Development/Testing (2026-11-14, §20.9), signed local commit `c44be41`: §20** |
 | E3-M2b-1F (floor) | **Implemented and owner-accepted for Development/Testing (2026-11-15), signed local commit; Release B not activated; mandatory gate RB-CARV-1 open: §21** |
 | RB-CARV-1 (Release B write fence) | **Implemented and conditionally owner-accepted for Development/Testing (2026-11-15), signed local commit; not production-closed: deployment protection, Azure compatibility, privileged schema mutation and performance remain open release gates: §22** |
-| E3-M2b-2 and later | **Not authorized** |
+| E3-M2b-2 (signed schema 2 groundwork) | **Implemented for Development/Testing (2026-11-15), uncommitted, owner review pending; Envelope v2 not activated, no AuthorityDb change, CARV unchanged: §23** |
+| E3-M2c and later | **Not authorized** |
 | Independent cryptographic review (V2-IND-01) | Required before production; not started |
 | Production use of Envelope v2 | Not approved |
 | **E3-M2b-1 CARV final design gate** | **§19** (2026-11-14). The owner conditionally approved the CARV direction. The real-PostgreSQL gate ran against two real pre-CARV Authority binaries (47/47 checks each; evidence in `docs/evidence/e3-m2b1-carv/`). It found and corrected design defects D-1 to D-5. **§19 supersedes §3, §9.1, §9.2, §16 and §17.1.** |
@@ -1598,6 +1599,398 @@ The owner **conditionally accepted RB-CARV-1 for Development/Testing** and autho
 | 9 | Every earlier unresolved risk is preserved, including R-CARV-11, R-CARV-12 and R-CARV-18 |
 
 **Open release gates (unchanged by this acceptance):** protection and audit of the Release B configuration (R-CARV-22, PB-11/PB-12); Azure PostgreSQL compatibility of the fence definitions and the floor (R-CARV-18, R-CARV-23); privileged schema mutation outside the lock (R-CARV-24, G08); performance of the Release B write path (R-CARV-25, PB-09); Azure staging evidence (§22.11 item 4). The MP-1 and MP-3 removal results are recorded as narrower evidence (§22.9).
+
+---
+
+## 23. E3-M2b-2 signed schema 2 groundwork — implementation record (2026-11-15)
+
+**Status.** Implemented for **Development/Testing only** on `e3/m1-envelope-v2-core`, on top of the signed RB-CARV-1 commit `11e15ee7d7c3d9e9be0685c2330ec006503bf1ec`. **Uncommitted; owner review pending.** Owner-led work; not an independent review, not a certification. Envelope v2 is **not** activated: no product writer or reader produces or opens Envelope v2, and the Authority still refuses every schema-2 candidate. No AuthorityDb migration, no CARV version bump, no floor change. After the owner's conditional acceptance, R-M2b2-11 was addressed by a narrow Authority S-4 schema/envelope tie (§23.14, owner amendment of D-3). **Accepted by the owner for Development/Testing (§23.15)** after a focused real-PostgreSQL gate; recorded as one signed local commit (not pushed, not merged). The migration ran **only in disposable PostgreSQL containers** and on disposable copies of the local databases; no persistent database, Azure service or deployment was touched; Stage B did not run.
+
+### 23.1 Owner authorization and decisions applied
+
+The owner authorized E3-M2b-2 for Development/Testing implementation and local testing, and approved the readiness report's interpretations of OD-M2-01, OD-M2-02, OD-M2-14, OD-M2-22, OD-M2-25, OD-E3-4, OD-E3-14 and E-3 §13.8 item 3.
+
+| Decision | Recorded as | Applied as |
+|---|---|---|
+| D-1 | Approved | The v2 disjunct of both metadata CHECKs pairs every comparison with an explicit `IS NOT NULL` (corrects §9.3, which accepted a NULL wrap code: the CARV D-1 class). `EnvelopeMetadataConstraints.MetadataSql` (§23.3) |
+| D-2 | Approved | S-9 pins (type, nullability) at Prepare (identity binding) **and** at Commit on the verified staged bytes (`ContentDeltaRules.EnforceRegisteredSchema`; abort `SIGNED_SCHEMA_INVALID_AT_COMMIT`). Re-derived at Commit, so not Prepare-only: `ContentAcceptanceRules.CurrentVersion` stays 1 |
+| D-3 | Approved (S-4 error code deferred to M2d); **amended by the owner for R-M2b2-11** (§23.14): the S-4 tie only is implemented now, other M2d work stays deferred | The E3-M2a `EnvelopeRules` schema/version refusal is unchanged and still refuses schema 2 / envelope 2. Since §23.14 the separate S-4 tie refuses every mismatched pair first (`ENVELOPE_SCHEMA_MISMATCH`) |
+| D-4 | Approved | `SignedColumnRegistryTests` checks by kind and version, with one exception (non-nullable signed / nullable stored, only for the six v2 columns, only when the named CHECK contains `column IS NOT NULL`) |
+| D-5 | Approved | Business required-migration guard in API and Worker, evaluated at start and every 30 s (§23.6) |
+| D-6 | **Deferred** to PB-09 / staging | The migration validates the CHECKs in the migration transaction (`ADD CONSTRAINT`, full scan). Production activation strategy (for example `NOT VALID` + `VALIDATE`) is open |
+| D-7 | Approved | CI regenerates and diffs the new vector file only (`ci.yml`, one step extended) |
+| D-8 | Approved | Pre-check on disposable copies (§23.2) |
+| D-9 | Approved | A schema-2 candidate is now refused with `ENVELOPE_INVALID: ENVELOPE_SCHEMA_UNSUPPORTED` (422) instead of `UNSUPPORTED_SIGNED_SCHEMA` (422) |
+
+OD-M2-22 is applied as "envelope kinds only": every other kind keeps name-only matching. OD-M2-25 is applied as a separate generator script that writes only the new file.
+
+### 23.2 Read-only pre-check (D-8)
+
+Both persisted local business volumes (developer stack and older default project) were copied into scratch volumes (source mounted read-only, never started), queried by a throwaway postgres:18.0 container with no network (aggregates only), and deleted.
+
+| Database copy | Field rows | Document rows (Processed) | Rows violating any new CHECK | v2 columns already present |
+|---|---|---|---|---|
+| Developer stack (latest migration `20261103054837_PhaseC8M3RegionalPreferences`) | 602 | 62 (25) | 0 | no |
+| Older default project (latest `20261020104151_PhaseC3RepeatingGroups`) | 436 | 122 (49) | 0 | no |
+
+Every row is schema 1 / envelope 1. Total 1,038 field and 184 document rows, as in the E3-M2a assessment. No incompatible data: no stop condition.
+
+### 23.3 BusinessDb migration `20261115125042_EnvelopeV2SignedColumns`
+
+One expand-only EF migration, owned by the business Infrastructure (single migration owner):
+
+| Change | Detail |
+|---|---|
+| Columns | `data_key_identifier uuid`, `data_key_commitment_bytes bytea`, `key_wrap_algorithm_code integer` on `field_encrypted_values` and `file_attachment_versions`: nullable, no default, no backfill, no index |
+| Dropped | `ck_field_encrypted_values_envelope_positive` (`>= 1`, open) |
+| Added (both tables) | `ck_*_envelope_version`: `encryption_envelope_version IN (1, 2)`; `ck_*_schema_envelope_tie` (S-11): `row_signature_schema_version = encryption_envelope_version`; `ck_*_envelope_metadata` (D-1, below) |
+| Lock bound | `SET LOCAL lock_timeout = '5s'`: an open transaction on either table fails the whole migration with `55P03` and applies nothing |
+| Down | Guarded: `RAISE EXCEPTION 'E3-M2b-2 Down refused: envelope version 2 rows exist'` while any envelope-2 row exists in either table; otherwise drops the CHECKs and columns and restores `envelope_positive`. Development/Testing only |
+| Grants | Unchanged (both tables stay insert-only for the runtime role) |
+
+The corrected metadata CHECK (both tables; one constant used by the EF model and, verbatim, by the migration):
+
+```sql
+(encryption_envelope_version = 1 AND data_key_identifier IS NULL AND data_key_commitment_bytes IS NULL AND key_wrap_algorithm_code IS NULL)
+OR (encryption_envelope_version = 2 AND data_key_identifier IS NOT NULL
+    AND data_key_commitment_bytes IS NOT NULL AND octet_length(data_key_commitment_bytes) = 32
+    AND key_wrap_algorithm_code IS NOT NULL AND key_wrap_algorithm_code IN (1, 2))
+```
+
+Compatibility: a pre-E3-M2b-2 business build writes envelope-1 rows with NULL metadata (its EF model does not map the columns), which satisfy every new CHECK (§23.8 POST-01). The E3-M2b-2 build refuses an unmigrated database (guard, §23.6) and cannot even read it (its EF model selects the new columns: `42703`).
+
+### 23.4 Signed schema registry and Authority rules
+
+| Rule | Implementation |
+|---|---|
+| Schema 2 definitions | `BusinessSignedSchemas.FieldEncryptedValuesV2` (17 columns) and `FileAttachmentVersionsV2` (29 columns): schema 1 plus the three v2 columns, non-nullable, ordinal order; added to `All`. Schema 1 of both stays registered (S-7) |
+| S-1 | `CurrentSchemaVersion` → `SchemaForEnvelope(EncryptionEnvelopeVersion)` for both kinds (1 → 1, 2 → 2, anything else throws). The stager (both call sites) uses it unchanged; `DocumentProcessingService` uses it instead of the constant 1 |
+| S-2 | `Encode` dispatches on the stored `RowSignatureSchemaVersion` for both kinds; an unknown version throws (no fallback) |
+| S-10 | `Encode` throws when the stored schema and the envelope version disagree, before anything is sent |
+| Schema 1 bytes | Unchanged: a schema-1 row never signs a v2 column (even if one were set by mistake). The §4.5 schema-1 example and every v1 vector reproduce byte for byte |
+| Authority registration | `ContentDeltaRules`: schema-2 rules for both kinds = the schema-1 classes plus the three v2 columns (Content class); same item kind, primary-key class, item-id column and `ShareUpdatable` as schema 1. Business and Authority rule sets remain equal (architecture test) |
+| S-9 | `SignedItemRule.PinnedShapes` (type, nullable) for both envelope kinds in both versions; `RequireRule` refuses a type tag that differs or a NULL in a non-nullable column (`UNSUPPORTED_SIGNED_SCHEMA: column type or nullability differs from the registered assignment`). Applied at Prepare (identity binding, before `EnvelopeRules`) and re-applied at Commit to the verified staged bytes before the commit-time envelope rule. A Commit-time refusal aborts the operation (`SIGNED_SCHEMA_INVALID_AT_COMMIT`), commits the abort and accepts nothing. Pins equal the business registry (architecture test) |
+| Schema-2 refusal | Unchanged E3-M2a rule: `EnvelopeRules` refuses any envelope row whose schema is not 1 (`ENVELOPE_SCHEMA_UNSUPPORTED`), at Prepare (every write path), at Commit and in the census. Verified on creation, owner edit, share-editor edit and protection migration, for envelope 2 and for a mismatched envelope 1. Since §23.14 a mismatched envelope 1 reaches the S-4 tie first and is reported as `ENVELOPE_SCHEMA_MISMATCH`; schema 2 / envelope 2 still ends here |
+| S-4 (§23.14) | `EnvelopeSchemaTie`: only (schema 1, envelope 1) and (schema 2, envelope 2) pass; separate call sites before `EnvelopeRules` at Prepare, at Commit on the verified staged bytes (abort `ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT`) and in the census |
+| CARV | `CurrentVersion = 1`, unchanged. S-9 is re-derived at Commit, so a mixed fleet cannot bypass it: legacy Prepare (no S-9) + new Commit is refused by Commit; new Prepare + legacy Commit already passed S-9 |
+
+S-9 closes a real gap (F-13): before this increment the Authority accepted a document row whose `scanned_on`, `ciphertext_size_bytes` or `scanner_name` had a wrong type or a NULL, because no rule read those columns. Business encoding always matched the registry, so no legitimate row is refused (all existing suites pass unchanged).
+
+### 23.5 Clone fidelity and document processing
+
+- `UploadSessionHandlers.CloneValue` and `CandidateBuilder.CloneAttachment` copy the envelope version, the signed schema version and the three v2 columns (S-3). They are the only copy paths for envelope rows; the per-operation binding (storage key, operation, revisions, signature, key version and, for documents, the version state) is re-assigned by the stager as before.
+- `DocumentProcessingService` takes the processed copy's schema from the envelope its encryption service produced (S-1, F-16). No product encryption service produces envelope 2, so the product behaviour is unchanged (schema 1).
+- Architecture tests (`EnvelopeRowFidelityTests`): (1) the construction sites of both row types are an exact reviewed list of five (field seal, the creation-idempotency sealed-key decrypt input (F-03, never staged), the two clone helpers, the processed document copy); (2) each clone helper copies every EF-mapped property except the enumerated per-operation binding; (3) no product code assigns a constant signed-schema version to an envelope row (or any value row).
+
+### 23.6 Business required-migration guard (D-5)
+
+| Element | Behaviour |
+|---|---|
+| Requirement | `BusinessSchemaRequirements.RequiredMigrationIds = [20261115125042_EnvelopeV2SignedColumns]`, read from `public."__EFMigrationsHistory"` with the runtime role (it already has `SELECT`; it cannot insert, update or delete there) |
+| Decision | Ready only if every required id is recorded and the decision is younger than 90 s (3 × 30 s). Never evaluated, stale, unreadable (database unreachable, table missing) or missing ⇒ not ready |
+| API | `BusinessSchemaMonitor` evaluates at host start (without blocking it) and every 30 s; `/health/ready` returns 503 `BusinessDb: <detail>` unless the guard is ready (after the existing Authority check). A definitive missing migration stops the host; an unreadable history only keeps it not ready |
+| Worker | It has no readiness endpoint, so `BusinessSchemaStartupGuard` runs the first read before any processing service starts and refuses the start unless the schema is verified; the monitor then re-reads every 30 s and stops the host on a missing migration |
+| Not a write fence | Readiness and host stop are operational hygiene. A write racing a restore is stopped by the database itself (the new EF model cannot touch an unmigrated envelope table: `42703`) and by the Authority, not by the guard. A restore below the migration under a running instance is noticed within one interval (30 s); during it, envelope-table statements fail |
+| Limits | An honest, current build only: a pre-E3-M2b-2 business build has no guard (none is needed: it writes only v1 rows, which satisfy the CHECKs). The guard does not protect the configuration or the deployment (PB-11) |
+
+### 23.7 Integrity vectors (OD-M2-14, OD-M2-25, D-7)
+
+- New file `trust_authority/row-integrity-v1-envelope-schema2.test-vectors.json`, written only by the new `scripts/integrity/generate_envelope_schema2_vectors.py`. `generate_vectors.py` is unchanged and still writes only the two v1 files.
+- Content: the four envelope schemas; five positive cases (field schema 1 and schema 2 with wrap code 1 = the §4.5 fixture; field schema 2 with wrap code 2, a group occurrence, key version 4 and row revision 9; document schema 1 and schema 2); seven negative cases (each v2 column NULL, an omitted v2 column, a v2 column on schema 1, a document wrap code as text).
+- The two §4.5 cases reproduce the contract's worked example exactly: 719 bytes, SHA-256 `a03eaa90…dbb9`, HMAC `46ae5e55…71a2`; 851 bytes, SHA-256 `b21eb45e…b418`, HMAC `a08b895a…fe51`.
+- Verified by the Python reference (`verify_vectors.py`), the independent Node implementation (`verify-vectors.mjs`) and C# twice: the shared canonicalizer (`EnvelopeSchema2VectorTests`, Integrity suite) and the business encoder from domain rows plus equality of `BusinessSignedSchemas` with the file's schemas (`EnvelopeSchema2BusinessRegistryTests`, Contract suite).
+- `trust_authority/merkle-v1.test-vectors.json` and `row-integrity-v1.test-vectors.json` are byte-identical to `11e15ee` (sha256 checked before and after; `generate_vectors.py` regenerates them unchanged). RowHmac v1 and Merkle v1 framing are unchanged.
+- CI: the existing "regenerated vectors must equal committed vectors" step also runs the new generator and diffs the new file; the two verifier steps now cover it. No other CI change.
+
+### 23.8 Real-PostgreSQL gate (M2-FEN, M2-CMP; D-8)
+
+Re-runnable gate `scripts/dev/e3-m2b2-business-pg-gate.ps1` with sources in `tools/experiments/e3-m2b2-business-gate/` (not in the solution; built as copies in a temporary work directory, as for the CARV gate). One fresh disposable `postgres:18.0` container (tmpfs, loopback port, removed afterwards). The harness is compiled against **this tree's Release binaries** (the real migration via EF `IMigrator`, the real EF model, registry, clone helpers, business guard, the real Worker `BusinessSchemaStartupGuard` and the real API `BusinessSchemaMonitor`); the legacy writer is compiled against a `git archive` Release build of `11e15ee` (pre-E3-M2b-2). Fixture rows are written with foreign keys disabled (`session_replication_role = replica`, superuser); every CHECK still applies. Evidence: `docs/evidence/e3-m2b2-business/`.
+
+| Phase | Check | Result |
+|---|---|---|
+| pre | PRE-01 baseline at the previous migration (no history row, no columns, `envelope_positive` present) | pass |
+| | PRE-02 guard (real reader, runtime role) = `MigrationMissing` on the unmigrated database | pass |
+| | PRE-03 the real Worker startup guard refuses to start and requests a host stop | pass |
+| | PRE-04 the real API monitor stops the host | pass |
+| | PRE-05 the new EF model cannot read the unmigrated envelope table (`42703`) | pass |
+| | PRE-06 atomicity: a pre-existing schema 2 / envelope 1 row fails the migration (`23514`, tie CHECK); nothing applied (no columns, no CHECKs, old CHECK kept, no history row) | pass |
+| | PRE-07 lock bound: an open transaction on `file_attachment_versions` fails the migration with `55P03` after about 5 s, after the `field_encrypted_values` statements had run; the whole transaction rolled back | pass |
+| up | UP-01 migration applied: history row, six nullable columns without defaults (uuid/bytea/integer), six validated CHECKs (definitions recorded), `envelope_positive` dropped | pass |
+| | UP-02 guard ready (runtime role); UP-03 Worker guard starts, API monitor does not stop the host; UP-04 unreachable database = `Unreadable` | pass |
+| | UP-05 CHECK matrix, 32 cases over both tables: v1 accepted; v2 accepted with wrap 1 and 2; v1 with any one v2 column refused; v2 with **each** v2 column NULL alone refused (including the NULL wrap code of D-1); commitment 31 and 33 bytes, wrap codes 0 and 3 refused; both tie directions refused; envelope 3 refused | pass |
+| | UP-06 EF round trip and clone persistence: v1 and v2 field and document rows keep every envelope column, the schema version and their canonical bytes; persisted clones (re-bound as the stager does) keep them too | pass |
+| | UP-07 the runtime role cannot drop or weaken the CHECKs, drop a v2 column, update envelope rows, or delete or forge a migration-history row (`42501`); it can read the history | pass |
+| legacy | the `11e15ee` build writes one v1 field row and one v1 document row through its own EF model (no v2 property) | pass |
+| post | POST-01 the legacy rows satisfy every CHECK, are schema 1 / envelope 1 with NULL metadata, and **both builds encode them to the same canonical bytes** | pass |
+| | POST-02 guarded Down refused while envelope-2 rows exist (`P0001`, fixed message), nothing changed; POST-03 Down runs once none exists (columns and CHECKs removed, `envelope_positive` restored, history row removed, v1 rows intact); POST-04 guard `MigrationMissing` again; POST-05 re-apply over existing v1 data, guard ready, v1 bytes unchanged | pass |
+| restore | RST-01 `pg_restore` of the migrated database: history row, six validated CHECKs, all v1/v2 rows with identical canonical bytes, guard ready; RST-02 the CHECK matrix on the restored database; RST-03 a restored pre-migration database is refused by the guard and unreadable by the new EF model; RST-04 re-applying the migration makes it ready | pass |
+
+Restore boundary: the fixtures have no parent rows, so the restore list omits the dump's FK constraint entries (this migration changes no FK). CHECK constraints belong to the table definitions and applied while the data loaded.
+
+Two runs of record on the final tree (`run-of-record-1`, `run-of-record-2`): 24 / 24 checks each, container removed. Legacy build: `git archive 11e15ee`, Release (no frozen binary; release builds are not byte-reproducible, so no binary hash is claimed).
+
+### 23.9 Enforcement-removal checks
+
+Each mutation was applied to one source file (backup plus sha256), the affected suite rebuilt and run on its focused classes (or the PostgreSQL gate re-run), and the file restored from the backup with its sha256 verified. **22 / 22 detected; 22 / 22 restored.** Evidence: `docs/evidence/e3-m2b2-business/mutations/enforcement-removal.json`.
+
+| ID | Removed or weakened | Detected by |
+|---|---|---|
+| MU-01 / MU-02 | S-1 for field / document rows (schema chosen by type) | Contract: vector reproduction, `TheSignedSchemaFollowsTheEnvelopeVersionNotTheType` |
+| MU-03 | S-1 in document processing (constant 1 restored) | Architecture: `NoProductCodeAssignsAConstantSignedSchemaVersionToAnEnvelopeRow` |
+| MU-04 | S-2 (field rows encoded under schema 1 regardless of the stored version) | Contract: 3 tests (vectors, NULL refusal, no-fallback) |
+| MU-05 | S-2 fallback (unknown stored version encoded as schema 1) | Contract: no-fallback test |
+| MU-06 | S-10 (disagreeing schema/envelope encoded) | Contract: disagreement test |
+| MU-07 / MU-08 / MU-09 | S-3: field clone drops the wrap code; document clone drops the commitment; field clone drops the schema version | Architecture: clone-coverage tests (MU-09 also the constant-schema scan) |
+| MU-10 | S-9 at Prepare and Commit | Authority: Prepare and Commit S-9 tests |
+| MU-11 | S-9 at Commit only | Authority: `S9IsReappliedAtCommitOnTheVerifiedStagedBytes` (the non-conforming row would otherwise commit) |
+| MU-12 | Authority pin drift (`scanned_on` pinned as Text) | Architecture: pin-equality test; Authority: 59 tests (valid documents refused) |
+| MU-13 | D-1 reintroduced in the model constant | Architecture: 3 tests (disjunct, migration equality, nullable-storage exception) |
+| MU-14 | D-1 reintroduced in the migration SQL only | Architecture: migration equality; **PostgreSQL gate**: UP-05 and RST-02 (a v2 row with a NULL wrap code accepted) |
+| MU-15 | S-11 tie CHECKs removed from the migration | Architecture: migration equality; **PostgreSQL gate**: 10 checks (tie cases accepted, PRE-06 atomicity no longer fails, Down/restore expectations) |
+| MU-16 | Guard treats a missing migration as ready | Contract: 3 guard tests; Architecture: Worker startup test |
+| MU-17 | Worker startup guard never refuses | Architecture: `TheWorkerStartsOnlyOnAVerifiedSchema` |
+| MU-18 | API readiness ignores the guard | Contract: `ApiReadinessIs503UntilTheBusinessSchemaIsVerified` |
+| MU-19 | Monitor never stops the host | Contract: monitor test |
+| MU-20 / MU-21 | `EnvelopeRules` schema refusal removed (field / document) | Authority: schema-2 refusal tests on creation, owner edit, share edit and protection migration (see finding below) |
+| MU-22 | `EnvelopeRules` envelope-version allow-list widened to {1, 2} | Authority: 4 tests (existing M2a malformed-envelope tests and the rule-table test) |
+
+**Finding from MU-20 (recorded for owner review).** With the `EnvelopeRules` schema refusal removed, a well-formed schema-2 field row with envelope **1** was **accepted** at Prepare on record creation, owner edit and protection migration (the share path still refused it, by its framing rule); with envelope 2 the version check still refused it. Before this increment the same row was also refused earlier, as an unregistered schema. Registering schema 2 therefore leaves the E3-M2a schema check as the **only Authority barrier** for a schema-2 / envelope-1 pair until the S-4 tie lands (deferred to M2d by D-3). The business does not produce such a row (S-1, S-10), and BusinessDb refuses to store it (S-11), but both are on the untrusted side. The check is now regression-tested on every path (MU-20 detected). Recommendation: either keep D-3 and accept this as R-M2b2-11, or authorize an explicit Authority S-4 tie now (a tightening that Commit can re-derive, so no CARV bump). **Resolved:** the owner authorized the S-4 tie (§23.14).
+
+The first attempt at MU-16 hung the monitor test (a monitor that never stops loops forever). The test now bounds the loop (10 s) and fails instead; the re-run recorded above is the bounded version.
+
+### 23.10 Test results (final tree)
+
+| Suite | Before (RB-CARV-1, §22.10) | Now | New |
+|---|---|---|---|
+| Authority | 779 / 0 / 4 | **803 passed / 0 failed / 4 skipped** (807) | 24 (`ContributorWriteProtocolTests.EnvelopeSchema2`, one protection-migration theory) |
+| Contract | 797 / 0 / 9 | **818 / 0 / 9** (827) | 21 (`EnvelopeSchema2BusinessRegistryTests`, `BusinessSchemaGuardTests`) |
+| Architecture | 124 | **134 / 0** | 10 (`EnvelopeRowFidelityTests`, `EnvelopeMetadataMigrationTests`, `WorkerBusinessSchemaGuardTests`, the pin-equality test) |
+| Integrity | 60 | **73 / 0** | 13 (`EnvelopeSchema2VectorTests`) |
+| Vectors | Python, Node | **46 checks each, pass**; v1 files byte-identical | 12 schema-2 cases |
+| PostgreSQL gate | — | **24 / 24 × 2 runs** | — |
+
+Suites were run by executing the test binaries directly (no `dotnet test` wrapper). Stage B was **not run**. The skip counts are unchanged from §22.10. Totals after the R-M2b2-11 hardening are in §23.14.5 (Authority 849 / 0 / 4; the other suites unchanged). The SpiceDB retry log lines printed by in-process Authority hosts during the Contract suite are pre-existing noise, not failures.
+
+### 23.11 Changes to existing tests and behaviour (for owner review)
+
+| Change | Reason |
+|---|---|
+| `StageBUnitTests.FieldEncryptionSealsCanonicalValuesBindsIdentityAndFailsClosed` assigns the schema version before encoding a freshly sealed row | S-2: `Encode` no longer falls back for an unassigned (0) schema version; the stager always assigns it first |
+| `ReadinessFailsClosedTests.ReadinessIs200WhenTheRealAuthorityHostIsLive` supplies a migrated history | D-5: readiness now also requires a verified business schema; that test host has no database |
+| `SignedColumnRegistryTests` checks by kind and version (D-4), with the single nullable-storage exception, and adds a pin-equality test | Schema 2 registration |
+| Refusal code for a schema-2 candidate: `UNSUPPORTED_SIGNED_SCHEMA` → `ENVELOPE_INVALID: ENVELOPE_SCHEMA_UNSUPPORTED` (both 422) | D-9 |
+| A wrong type or NULL in an envelope-row column is refused with `UNSUPPORTED_SIGNED_SCHEMA` before `EnvelopeRules` runs (previously some reached `ENVELOPE_COLUMN_MISSING`, some were accepted) | S-9 |
+| `/health/ready` adds a `BusinessDb` dependency after the Authority check; the published OpenAPI is unchanged (OpenAPI snapshot test passes) | D-5 |
+| §23.14: refusal text for schema 2 / envelope 1 `ENVELOPE_INVALID: ENVELOPE_SCHEMA_UNSUPPORTED` → `ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH`, and for schema 1 / envelope ≠ 1 `…ENVELOPE_VERSION_UNSUPPORTED` → `…ENVELOPE_SCHEMA_MISMATCH` (both 422, not retryable). Five existing assertions updated (`ContributorWriteProtocolTests.EnvelopeSchema2`: three theories; `ContributorWriteProtocolTests.EnvelopeRules`: the share-editor version-2 case; `ProtectionReconciliationTests`: the "version 2" case and the schema-2 theory) | R-M2b2-11 (S-4 runs before `EnvelopeRules`) |
+
+### 23.12 Remaining risks and deferred release gates
+
+| ID | Risk | Status |
+|---|---|---|
+| R-M2b2-1 | D-6: the migration validates the six CHECKs inside its transaction (full scan of both tables under ACCESS EXCLUSIVE, bounded by the 5 s lock wait only for acquiring the lock, not for the scan). Production-scale duration is unmeasured | **Deferred (D-6)** to PB-09 / staging; options: `NOT VALID` + separate `VALIDATE`, or a measured window |
+| R-M2b2-2 | The business guard is readiness / host stop, not a transactional write fence. Between a restore below the migration and the next re-read (up to 30 s; 90 s before a stale decision), a running instance keeps serving; its envelope-table statements fail (`42703`) and the Authority refuses any schema-2 candidate | Accepted design (D-5); documented. Not a substitute for G14 restore procedure |
+| R-M2b2-3 | Pre-E3-M2b-2 business builds have no guard; after a Down (Development/Testing only) or with mixed fleets they keep writing v1 rows (compatible by design, POST-01) | Accepted; operational (deployment inventory) |
+| R-M2b2-4 | The guard trusts the migration-history row: a privileged database identity could insert a forged row (the runtime role cannot: UP-07). A forged row only makes readiness wrong; the columns' absence still fails every envelope statement | Privileged access governed by G08; documented |
+| R-M2b2-5 | S-9 is pinned for the two envelope kinds only (OD-M2-22); every other kind still matches column names only (F-13 remains for them) | Open; extending it to all kinds is a separate tightening |
+| R-M2b2-6 | The Authority's pinned shapes are a hand-maintained copy of the business registry | Mitigated: architecture test asserts equality (MU-12 detected) |
+| R-M2b2-7 | The S-9 Commit-time refusal (`SIGNED_SCHEMA_INVALID_AT_COMMIT`) is recorded on the operation and is not journaled on the audit stream, like `ENVELOPE_INVALID_AT_COMMIT` | Adds one refusal class to the open R-CARV-12 question |
+| R-M2b2-8 | The gate fixtures are written with foreign keys disabled and restored without FK entries; FK behaviour is not part of this evidence (the migration changes no FK) | Documented boundary |
+| R-M2b2-9 | The refusal code callers see for a schema-2 candidate changed (D-9). No product path produces schema 2 | Accepted (D-9) |
+| R-M2b2-11 | MU-20: until the S-4 tie (deferred to M2d, D-3), the E3-M2a EnvelopeRules schema refusal was the only Authority barrier that refused a schema-2 / envelope-1 row on creation, owner edit and protection migration (§23.9) | **Resolved for Development/Testing (§23.14):** owner amendment of D-3; S-4 tie at Prepare, Commit and census, independent of `EnvelopeRules` (MS4-01/02: S-4 alone refuses the mismatched pairs). Residuals R-S4-1..R-S4-4 |
+| R-M2b2-10 | Constraint definitions are PostgreSQL 18.0 renderings; Azure PostgreSQL behaviour, lock timing and catalog visibility are unverified | Open (with R-CARV-18 / R-CARV-23) |
+
+Carried forward unchanged (none blocks this local increment, none is closed by it): R-CARV-11 (F-17, deferred), R-CARV-12 (audit vs operational alert, open release-gate question), R-CARV-18, R-CARV-21 to R-CARV-27, RB-CARV-1 production configuration and deployment controls (R-CARV-22), PB-11 / PB-12 release governance, V2-IND-01 (independent cryptographic review before production), R-M1-1..8, R-M2a-1..6. E3-M2c and later increments are not authorized.
+
+**Not claimed.** No Envelope v2 acceptance, reader or writer; no signed schema 2 activation in any environment; no data-key ledger (E3-M2e); no Azure, staging or production evidence; no Stage B run; no production readiness or certification. Development/Testing acceptance, if given, is not production approval.
+
+### 23.13 Files
+
+- **Business:** `FormRecord.cs`, `UploadSession.cs` (domain properties); `FormRecordEntityConfigurations.cs`, `DocumentEntityConfigurations.cs`, new `Persistence/EnvelopeMetadataConstraints.cs`, new migration `20261115125042_EnvelopeV2SignedColumns` (+ Designer, model snapshot); `BusinessSignedSchemas.cs`; `UploadSessionHandlers.cs`, `CandidateBuilder.cs` (clones); `DocumentProcessingService.cs`; new `Persistence/BusinessSchemaGuard.cs`; API `Composition/BusinessSchemaMonitor.cs`, `Program.cs`, `PlatformEndpoints.cs`; Worker `Composition/BusinessSchemaStartupGuard.cs`, `Program.cs`.
+- **Authority:** `ContentDeltaRules.cs` (schema-2 rules, S-9 pins, `EnforceRegisteredSchema`); `ContentService.cs` (Commit-time S-9; §23.14: S-4 call sites at Prepare, Commit and census); new `EnvelopeSchemaTie.cs` (§23.14). No AuthorityDb change; `EnvelopeRules.cs` and `ContentAcceptanceRules.cs` unchanged.
+- **Integrity:** new `scripts/integrity/generate_envelope_schema2_vectors.py`; `verify_vectors.py`, `verify-vectors.mjs`; new `trust_authority/row-integrity-v1-envelope-schema2.test-vectors.json`; `.github/workflows/ci.yml` (one step).
+- **Tests:** listed in §23.10 and §23.11; §23.14 adds `EnvelopeSchemaTieTests.cs`, `ContributorWriteProtocolTests.EnvelopeSchemaTie.cs` and one census test in `ProtectionReconciliationTests.cs`.
+- **Gate:** new `scripts/dev/e3-m2b2-business-pg-gate.ps1`, `tools/experiments/e3-m2b2-business-gate/` (harness, legacy writer).
+- **Documents:** this section; `docs/dynamic-forms/row-integrity-format.md` §7 and §8; `docs/evidence/e3-m2b2-business/`; specification manifest regenerated.
+
+### 23.14 R-M2b2-11 targeted hardening: Authority S-4 schema/envelope tie (2026-11-15)
+
+**Status.** Development/Testing only, on top of the E3-M2b-2 tree (base `11e15ee`). **Accepted by the owner for Development/Testing (§23.15).** Owner-led work, not an independent review. Envelope v2 and signed schema 2 remain **not accepted**; no CARV bump, no floor change, no AuthorityDb or BusinessDb migration, no change to the signed schema registry (business or Authority), the canonical encoding or any vector file. Stage B did not run; no persistent database, Azure service or deployment was touched.
+
+#### 23.14.1 Owner decision
+
+The owner conditionally accepted E3-M2b-2 and required R-M2b2-11 to be addressed before a signed local commit. The owner **narrowly amended D-3**: the Authority S-4 tie (§4.4) is implemented now, for Development/Testing, only to the extent needed for S-4. Every other M2d element (the §5.1 version dispatch and v2 rule set, the v2 reuse rules, the downgrade guard OD-M2-06, the acceptance switch, CARV 2) stays deferred. D-6 stays deferred.
+
+#### 23.14.2 Finding and resolution
+
+| | |
+|---|---|
+| Finding (R-M2b2-11, §23.9 MU-20) | Registering schema 2 left the E3-M2a `EnvelopeRules` schema refusal as the only Authority barrier for a schema-2 / envelope-1 row on creation, owner edit and protection migration. With that refusal removed, the row was accepted at Prepare |
+| Resolution | A separate Authority rule, `EnvelopeSchemaTie` (`src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeSchemaTie.cs`), with its own call sites. It admits exactly the closed set {(schema 1, envelope 1), (schema 2, envelope 2)} for both envelope kinds (`field_encrypted_values`, `file_attachment_versions`). Every other pair is refused, including an envelope version the tie cannot read (absent, NULL, not Int32): the tie cannot be proven, so it fails closed. Rows of other kinds are not judged |
+| It accepts nothing | A tied schema-2 / envelope-2 row passes S-4 and is still refused by the unchanged `EnvelopeRules` (`ENVELOPE_SCHEMA_UNSUPPORTED`, D-9; the version allow-list stays {1}) |
+| Independence | Shown by mutation in both directions (§23.14.6): S-4 alone refuses both mismatched pairs on every path with the E3-M2a schema refusal and the version allow-list removed (MS4-01, MS4-02); S-4 removed, weakened, or its Prepare or Commit call site removed, is detected (MS4-03..MS4-05, MS4-08, MS4-09); its census call site alone is behaviour-neutral while `EnvelopeRules` is intact (MS4-06 undetected, MS4-07 detected; R-S4-1) |
+
+#### 23.14.3 Exact enforcement boundaries
+
+| Site | Where | Input | On refusal |
+|---|---|---|---|
+| Prepare | `ContentService.ParseCandidate`, after the per-item identity binding (I1–I3 and the S-9 pins) and immediately **before** `EnvelopeRules.Enforce` | every candidate row (new and carried) | 422 `InvalidCommand`, not retryable, `ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH`. Thrown before the current-snapshot binding, classification, authorization, any MAC call or any insert: no operation, candidate leaf, signature, identity binding or head change. The transaction is never committed |
+| Commit | `ContentService.CommitCoreAsync`, after the staged bytes are proven equal to the signed candidate and after the Commit-time S-9 rule, **before** the Commit-time `EnvelopeRules` | the verified staged rows | the operation becomes `Aborted` with reason `ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT` (no commit rule version recorded), that abort is committed, and the same 422 is returned. No manifest commit, leaf, identity binding, content-integrity revision or head change |
+| Census | `ContentService.EnvelopeLooksApproved` (protection reconciliation), before `EnvelopeRules.Validate` | each verified accepted encrypted row | counted as an envelope issue (blocks attestation completion) |
+
+Every content mutation reaches the Authority through these two sites: there is one Prepare entry (`ParseCandidate`, called once by `PrepareCoreAsync`) and one place that writes a manifest commit (`CommitCoreAsync`). So the tie covers every business write regardless of actor or feature: record creation, owner edits (and the restore, lifecycle, upload and document-processing writes, which reach the Authority as ordinary Prepare/Commit operations), share-editor edits and protection migration (reprotection), for field rows and document rows. Replay paths:
+
+| Path | Behaviour |
+|---|---|
+| Prepare retry after an S-4 refusal (same idempotency key) | Nothing was stored, so the retry is evaluated again and refused again (`APrepareReplayOfAMismatchedCandidateIsRefusedAgainAndStoresNothing`) |
+| Prepare replay of a stored `Prepared` operation | Returned without re-parsing (existing behaviour). It can only hold rows that passed this build's Prepare, or the CARV rule refuses it (`OPERATION_RULES_OUTDATED`); either way Commit re-derives S-4 |
+| Commit of an operation prepared without S-4 (CARV-1 stamp) | Refused and aborted by the Commit-time tie (`S4IsReappliedAtCommitOnTheVerifiedStagedBytesAndAReplayChangesNothing`) |
+| Commit replay after the abort | Refused (the operation is no longer `Prepared`); nothing changes (same test) |
+| Commit replay of a committed operation | Returns the existing revision (existing behaviour); nothing new is accepted. A committed operation passed this build's Commit (so S-4), or an older build's: E3-M2a and later refused every non-(1, 1) envelope row; earlier builds refused schema 2 (unregistered) but did not validate owner-path envelope versions (R-S4-4) |
+
+**Order and refusal codes.** S-4 runs first, so for each pair the caller sees:
+
+| Pair | Before §23.14 | Now |
+|---|---|---|
+| schema 1 / envelope 1 | accepted (subject to the M2a rules) | unchanged |
+| schema 2 / envelope 2 | `ENVELOPE_SCHEMA_UNSUPPORTED` | unchanged |
+| schema 2 / envelope 1 | `ENVELOPE_SCHEMA_UNSUPPORTED` | `ENVELOPE_SCHEMA_MISMATCH` |
+| schema 1 / envelope ≠ 1 | `ENVELOPE_VERSION_UNSUPPORTED` | `ENVELOPE_SCHEMA_MISMATCH` |
+
+All remain 422 `InvalidCommand`, not retryable. No business or frontend code reads these texts (searched). The Commit-time abort reason is new; `operation_quarantine_reason_code` is free text (`varchar(100)`, no CHECK), and the RB-CARV-1 write-fence exemption is structural (a `Prepared` → `Aborted` change of state and reason only), so the abort is persisted exactly like `ENVELOPE_INVALID_AT_COMMIT` and `SIGNED_SCHEMA_INVALID_AT_COMMIT`. `EnvelopeRules.cs` is not modified: its `ENVELOPE_VERSION_UNSUPPORTED` and schema refusals stay in place behind S-4 and keep their direct unit tests (`EnvelopeRulesTests`).
+
+#### 23.14.4 CARV compatibility
+
+`ContentAcceptanceRules.CurrentVersion` stays **1**. The CARV contract (§19, `ContentAcceptanceRules`) requires a bump only when Prepare starts enforcing a rule that Commit does not fully re-derive. S-4 is decided from the canonical bytes alone, and Commit re-applies it to the verified staged bytes, so it is not a Prepare-only rule. Fleet combinations (all stamped CARV 1):
+
+| Prepare build | Commit build | Mismatched row |
+|---|---|---|
+| without S-4 (E3-M2b-2 as reviewed, or E3-M2a/M2b-1) | with S-4 | Already refused at Prepare by `EnvelopeRules` (every non-(1, 1) row); if it were not, Commit refuses it (shown by seeding such an operation) |
+| with S-4 | without S-4 | Refused at Prepare; never stored |
+| without S-4 | without S-4 | Refused by `EnvelopeRules` at Prepare and Commit (pre-existing behaviour) |
+
+No AuthorityDb migration, no floor change and no weakening of an existing protection was needed, so the stop conditions in the owner's instruction (items 9 and 10) did not arise.
+
+#### 23.14.5 Tests
+
+New (all pass):
+
+| Class | Cases | Covers |
+|---|---|---|
+| `EnvelopeSchemaTieTests` | 25 | the full pair matrix for both kinds (8 pairs × 2, only (1,1) and (2,2) tied); both rules as independent barriers on the same rows; fail closed for a NULL, Text, Int64 or absent envelope version (both kinds); non-envelope rows not judged; `TiedPairs` = {(1,1),(2,2)} and `AllowedEnvelopeVersions` = {1} |
+| `ContributorWriteProtocolTests.EnvelopeSchemaTie` | 20 | Prepare refusal before signing, with no operation, leaf, commit or head change, on creation (4: both kinds × both mismatches), owner edit (4) and share edit (2); schema 2 / envelope 2 still unsupported on creation and owner edit (2); schema 1 / envelope 1 still accepted on creation, owner edit, carry and share edit (1); Commit re-derivation on an operation prepared without S-4, abort reason, unchanged head/commits/leaves and a refused commit replay (4); a tied schema-2 row at Commit still refused by `EnvelopeRules` (2); Prepare retry refused again (1) |
+| `ProtectionReconciliationTests` | 1 | the census reports both mismatched pairs (modelled as accepted history) and both are refused on an ordinary write in that harness; protection-migration Prepare coverage comes from the two updated existing tests (§23.11) |
+
+Suite totals on the final tree:
+
+| Suite | §23.10 (E3-M2b-2) | Now | Change |
+|---|---|---|---|
+| Authority | 803 / 0 / 4 (807) | **849 passed / 0 failed / 4 skipped** (853) | +46 new; 5 existing assertions updated (§23.11) |
+| Contract | 818 / 0 / 9 | **818 / 0 / 9** (827) | none |
+| Architecture | 134 / 0 | **134 / 0** | none |
+| Integrity | 73 / 0 | **73 / 0** | none |
+| Vectors | Python and Node, 46 checks each | **46 / 46 each, pass** | v1 files and the schema-2 vector file unchanged |
+| PostgreSQL gate | 24 / 24 × 2 | not re-run here (R-S4-2); the focused S-4 gate followed: 38 / 38 × 2 (§23.15) | — |
+
+Test binaries were run directly (no `dotnet test` wrapper), after a rebuild of all four test projects from the restored tree. Stage B was not run.
+
+#### 23.14.6 Enforcement-removal checks
+
+Driver `docs/evidence/e3-m2b2-business/mutations/s4_mutations.py` (procedure as §23.9; the committed copy differs from the one that produced the evidence only in writing its backups to a temporary directory instead of its own folder): each mutation applied to the Authority source (backup plus sha256), the Authority tests rebuilt and the four focused classes run (`EnvelopeSchemaTieTests`, `ContributorWriteProtocolTests`, `ProtectionReconciliationTests`, `EnvelopeRulesTests`, 220 cases, time-boxed), every file restored and its sha256 verified. Evidence: `docs/evidence/e3-m2b2-business/mutations/s4-enforcement-removal.json` (failing test names per check).
+
+| ID | Removed or weakened | Failing tests (of 220) | Result |
+|---|---|---|---|
+| **MS4-01** | **E3-M2a `EnvelopeRules` schema-version refusal removed** (field and document) | 12, all of them schema 2 / envelope 2 expectations (now `ENVELOPE_VERSION_UNSUPPORTED`, still refused) and the two direct "unregistered schema" / "independent barriers" unit assertions | **Every S-4 test passed**: both mismatched pairs, both kinds, refused with `ENVELOPE_SCHEMA_MISMATCH` on creation, owner edit, share edit and protection migration, aborted at Commit, refused on Prepare retry, and reported by the census. S-4 alone refuses them |
+| **MS4-02** | MS4-01 **plus** the envelope-version allow-list widened to {1, 2} | 16 (the MS4-01 set plus the version-2 malformed cases, the allow-list table test and the rule-version test; schema 2 / envelope 2 now reaches acceptance) | **Every S-4 test passed** again: with both E3-M2a barriers gone, S-4 still refuses both mismatched pairs on every path. Schema 2 / envelope 2 is protected by `EnvelopeRules` only, by design (S-4 accepts nothing) |
+| **MS4-03** | **S-4 disabled** (`Violation` always null) | 44: every pair-matrix and fail-closed unit case, every Prepare, Commit, replay and census S-4 test, and the updated existing assertions | Detected. The mismatched rows were still refused, by `EnvelopeRules`, with its own codes |
+| MS4-04 | S-4 Prepare call removed | 20 (all Prepare-side S-4 assertions: creation, owner, share, protection migration, replay, census writes) | Detected |
+| MS4-05 | S-4 Commit call removed | 4 (`S4IsReappliedAtCommit…`, both kinds × both pairs: the abort reason became `ENVELOPE_INVALID_AT_COMMIT`) | Detected |
+| MS4-06 | S-4 census term removed, `EnvelopeRules` intact | 0 | **Not detected** (expected: behaviour-neutral while the E3-M2a rule refuses the same rows; R-S4-1) |
+| MS4-07 | S-4 census term removed **plus** the schema refusal removed | 13 (the MS4-01 set plus `MismatchedSchemaEnvelopePairsAreReportedByTheCensus`) | Detected: the census use of S-4 is effective on its own (it is what reports the rows in MS4-01) |
+| MS4-08 | S-4 admits (2, 1) | 18 (every schema 2 / envelope 1 case on every path, unit and census) | Detected |
+| MS4-09 | S-4 fail-closed for an unreadable envelope version removed | 7 (`AnEnvelopeVersionTheTieCannotReadFailsClosed`, all variants) | Detected |
+
+**9 / 9 run, 9 / 9 restored (sha256 verified); 8 / 9 detected; MS4-06 undetected as designed.** The two removal tests the owner required are MS4-01 (S-4 still refuses with the existing schema refusal removed; MS4-02 strengthens it) and MS4-03 (S-4 removed, detected by 44 tests).
+
+#### 23.14.7 Residual risks
+
+| ID | Risk | Status |
+|---|---|---|
+| R-S4-1 | The census use of S-4 (MS4-06) is behaviour-neutral while `EnvelopeRules` is intact: removing it alone changes no census outcome and is detected only together with removal of the schema refusal (MS4-07) | **Accepted by the owner** as a defence-in-depth limitation (§23.15, decision 2) |
+| R-S4-2 | No disposable-PostgreSQL run for this increment. Justification: no SQL, migration, constraint, trigger or persistence code changed; the new Commit abort uses the same tracked-entity update, state-guard transition (`Prepared` → `Aborted`) and RB-CARV-1 exemption as the existing Commit-time aborts, of which `OPERATION_RULES_OUTDATED` was exercised on disposable PostgreSQL by the CARV gate harnesses (§20–§22); the reason column is free text. For this increment the in-memory store is the evidence for transaction and replay behaviour | **Closed (§23.15):** the owner required a focused real-PostgreSQL verification; it passed (38 / 38 checks × 2 runs) |
+| R-S4-3 | Refusal texts changed for the two mismatched pairs (§23.14.3). No product path produces either pair | **Accepted by the owner** (§23.15, decision 3) |
+| R-S4-4 | S-4 guards new writes; it does not rewrite history. A schema-1 / envelope-≠1 row could only predate E3-M2a (earlier builds did not validate owner-path envelopes; schema 2 was unregistered before E3-M2b-2). The E3-M2a assessment and the D-8 pre-check found every stored row schema 1 / envelope 1 (1,038 field and 184 document rows; local Development/Testing data only, not production). BusinessDb now refuses the pair (S-11), the census reports one if found, and carrying such a row forward in a new write is refused by S-4 | Accepted; the historical production-data inventory requirement is **retained by the owner** (§23.15, decision 4) before any production release |
+
+R-M2b2-11 is resolved for Development/Testing. R-M2b2-1..10 (D-6 deferred) and every item carried forward in §23.12 are unchanged. Not claimed: Envelope v2 or signed schema 2 acceptance, any M2d rule beyond S-4, Azure or production evidence, independent review.
+
+### 23.15 Final acceptance, focused S-4 PostgreSQL gate and signed local commit (2026-11-15)
+
+**Status.** The owner accepted the E3-M2b-2 implementation (§23.1–§23.13) and the R-M2b2-11 hardening (§23.14) for **Development/Testing**, and authorized exactly one signed local commit, only after the focused real-PostgreSQL verification below passed. Owner-led review, not an independent review or a certification. No push, merge, deployment, Azure call, persistent-database change or Stage B run.
+
+#### 23.15.1 Owner decisions
+
+| # | Decision | Recorded as |
+|---|---|---|
+| 1 | R-M2b2-11 | **Resolved** for Development/Testing (§23.14) |
+| 2 | R-S4-1 | **Accepted** defence-in-depth limitation |
+| 3 | R-S4-3 | **Accepted**: the documented refusal-code changes (§23.14.3) |
+| 4 | R-S4-4 | **Retained**: the historical production-data inventory requirement before any production release |
+| 5 | R-S4-2 | Focused real-PostgreSQL verification **required before commit**: done, passed (§23.15.2); R-S4-2 closed |
+| 6 | D-6 | The production migration CHECK validation strategy **remains deferred** (R-M2b2-1) |
+| 7 | CARV | Remains **version 1** (no bump; S-4 is re-derived at Commit, §23.14.4) |
+| 8 | Envelope v2 / signed schema 2 | Remain **disabled** for Authority acceptance |
+
+#### 23.15.2 Focused S-4 real-PostgreSQL gate
+
+Runner `scripts/dev/e3-m2b2-s4-pg-gate.ps1`, harness `tools/experiments/e3-m2b2-s4-gate/HarnessS4` (built as a copy outside the repository against this tree's Authority Release binaries; not in the solution). One fresh disposable `postgres:18.0` container per run (tmpfs, loopback port, removed afterwards).
+
+| Element | What runs |
+|---|---|
+| Schema | This build's own `--migrate` (all Authority migrations, CARV included), then its explicit `--apply-content-acceptance-floor 1` (floor 1), both as separate processes with the migration identity |
+| Authority | This build's real `ContentService` and EF `AuthorityStore` in-process, **Release B** policy (`RequiredFloor` 1: the RB-CARV-1 write fence runs in every content transaction), connected as an ordinary runtime role (no superuser, no BYPASSRLS, not the table owner: S4-02) |
+| Controlled test-only mechanism | A mismatched candidate cannot pass this build's Prepare (S4-P1/P2), so the harness records an **otherwise valid Prepared operation**: the candidate (header, text value, encrypted field, encrypted document) is signed with the harness's deterministic test-only HMAC provider (the provider the in-process Authority verifies with) and inserted with its candidate leaves, stamped at CARV 1, through an ordinary admin session. Every table constraint, the CARV state guard and the floor CHECK apply to it (S4-Cna). It is the PostgreSQL counterpart of the unit tests' `SeedPreparedWithoutPrepareRulesAsync`. No production code, configuration, verification or validation was changed: Commit verifies the staged bytes and their signatures as in production (4 signatures verified before each S-4 refusal) |
+
+Results, two runs of record on the final tree (`run-of-record-1`, `run-of-record-2`): **38 / 38 checks passed each, container removed.** Evidence: `docs/evidence/e3-m2b2-business/s4-pg-gate/`.
+
+| Owner item | Checks | Observed |
+|---|---|---|
+| 1–3 Construct an otherwise valid Prepared operation with a schema/envelope mismatch; Commit against the real persistence | S4-C1..C4 a/b (field schema 2 / envelope 1, field schema 1 / envelope 2, document schema 2 / envelope 1, document schema 1 / envelope 2) | Seeded operation accepted by every constraint, `1/NULL Prepared`; Release B Commit verified 4 staged signatures, then `AuthorityException INVALID_COMMAND 422 retryable=False`, `ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH` |
+| 4 Aborted with the expected S-4 refusal | S4-Cn c | `1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT` (no commit rule version) |
+| 5–6 Head, manifest, leaf, identity binding, journal and checkpoint do not advance | S4-Cn d | Record snapshot (head revision, root, committed operation, quarantine flag; manifest commits; manifest leaves; item identities; committed operations) and organization snapshot (content-integrity revision, authorization revision, integrity checkpoints, security journal entries, all manifest commits, all identities) byte-identical before and after |
+| 7 Commit replay cannot accept the rejected operation | S4-Cn e | `OPERATION_STATE_INVALID 409` ("operation is Aborted"); still Aborted with the S-4 reason; both snapshots unchanged |
+| 8 A valid schema 1 / envelope 1 operation still commits | S4-03, S4-V1, S4-V2-0..3 | 10 initial real Prepare + Commit writes (`1/1 Committed`); the seeding mechanism with a valid candidate commits (head +1), so the refusals are S-4's, not the fixture's; each record refused at Commit then accepts a valid real write (head +1) |
+| 9 CARV and floor enforcement remain active | S4-01, S4-F1..F4 | Release B readiness ready with floor 1 and live fence verdict `none` (before and after every case); an unstamped Prepared insert refused (`23514 ck_content_operation_rule_floor_v1`); an operation stamped P = 2 refused at Commit (`OPERATION_RULES_OUTDATED 409`, aborted, nothing advanced); a direct C ≠ P Committed update by the migration identity refused (`23514 ck_content_operation_commit_rule_version`); no write-fence alert |
+| Also | S4-P1, S4-P2; S4-T1, S4-T2 | Real Prepare of a mismatched candidate refused with no operation or candidate leaf written. Schema 2 / envelope 2 (field and document) still not accepted at Commit (passes S-4, `ENVELOPE_INVALID: ENVELOPE_SCHEMA_UNSUPPORTED`, aborted `ENVELOPE_INVALID_AT_COMMIT`) |
+
+Final operation inventory of each run: Committed 15; Aborted `ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT` 4, `ENVELOPE_INVALID_AT_COMMIT` 2, `OPERATION_RULES_OUTDATED` 1; Prepared 1 (the S4-F3 operation, deliberately left).
+
+**Removal checks through this gate** (one fresh container each; Authority source file backed up, the gate re-run, the file restored and its sha256 verified; `s4-pg-gate/pg-enforcement-removal.json`):
+
+| ID | Removed | Result |
+|---|---|---|
+| PGM-1 | the S-4 Commit call | **Detected**: 12 / 38 failed (S4-Cn b/c/e). The seeded rows were still refused, by `EnvelopeRules` (`ENVELOPE_SCHEMA_UNSUPPORTED` / `ENVELOPE_VERSION_UNSUPPORTED`, reason `ENVELOPE_INVALID_AT_COMMIT`) |
+| PGM-2 | the E3-M2a `EnvelopeRules` schema-version refusal | **Every S-4 Prepare and Commit check passed** on real PostgreSQL: S-4 alone refuses both mismatched pairs, aborts and advances nothing. Only S4-T1/T2 changed (schema 2 / envelope 2 still refused, now by the version allow-list) |
+
+Both files restored (sha256 equal to the gate runs' source); the Authority Release output was rebuilt from the restored tree afterwards.
+
+#### 23.15.3 Final verification before the commit
+
+| Check | Result |
+|---|---|
+| Diff scope | 108 paths against `11e15ee`, all E3-M2b-2 (§23.13), the S-4 hardening (§23.14) or this gate (§23.15): business schema-2 groundwork, migration and guard; Authority `ContentDeltaRules.cs`, `ContentService.cs`, `EnvelopeSchemaTie.cs`; their tests; integrity scripts and the schema-2 vector file; the two gates and their evidence; this contract, `row-integrity-format.md`, CI (one step), the specification manifest. No other production change |
+| v1 vectors | `row-integrity-v1.test-vectors.json` (`7a42ce58…4899`) and `merkle-v1.test-vectors.json` (`e6f43b37…9245`) byte-identical to `11e15ee` |
+| AuthorityDb / CARV | No Authority migration added or changed; `ContentAcceptanceRules.cs`, `ContentAcceptancePolicy.cs` and `EnvelopeRules.cs` byte-identical to `11e15ee`; `CurrentVersion = 1`; floor unchanged |
+| Envelope v2 / schema 2 | `EnvelopeRules.AllowedEnvelopeVersions` = {1} unchanged; schema 2 / envelope 2 refused at Prepare (unit tests) and Commit (S4-T1/T2) |
+| Suites | No product code changed after §23.14.5; re-run on the final binaries: Authority **849 / 0 / 4**, Architecture **134 / 0**, Integrity **73 / 0**, vectors Python and Node **46 / 46**. Contract **818 / 0 / 9** stands from §23.14.5 (no code it covers changed since; not re-run) |
+| Mutations | All in-process (MS4-01..09) and PostgreSQL (PGM-1/2) modifications restored; `EnvelopeRules.cs` `039cfddd…9d82`, `ContentService.cs` `0bdd6357…f355`, `EnvelopeSchemaTie.cs` `e1c5746b…c335` equal the recorded originals; no backup or probe file in the tree |
+| Specification manifest | Regenerated; `validate-specifications.py --strict` passes |
+| Stage B | Not run |
+
+#### 23.15.4 Remaining release gates (unchanged; none closed by this commit)
+
+- **Envelope v2:** E3-M2c (business reader), M2d (Authority v2 rule set, version dispatch, downgrade guard, CARV 2), M2e (data-key ledger), M4/M5 writers: not authorized. V2-IND-01 independent cryptographic review before production.
+- **E3-M2b-2:** D-6 production CHECK validation strategy (R-M2b2-1, PB-09 / staging); R-M2b2-2..10; R-S4-4 historical production-data inventory.
+- **CARV / RB-CARV-1:** R-CARV-11 (F-17), R-CARV-12 (audit vs operational alert), R-CARV-18, R-CARV-21..27, PB-11 protected configuration (R-CARV-22); Release B not activated in any deployed environment.
+- **Platform:** PB-03 Azure staging evidence (Managed HSM, Confidential Ledger, Azure PostgreSQL behaviour, R-M2b2-10), PB-11 / PB-12 release governance, independent security review. No production readiness or certification is claimed.
 
 ---
 

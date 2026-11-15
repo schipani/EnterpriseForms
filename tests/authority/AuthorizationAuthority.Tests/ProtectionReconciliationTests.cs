@@ -500,8 +500,49 @@ public sealed class ProtectionReconciliationTests
         Assert.Equal(2, attestation.EnvelopeIssueRecordCount);
     }
 
+    /// <summary>
+    /// E3-M2b-2 R-M2b2-11: the census applies the S-4 schema/envelope tie as every write does. Content that a write path can no
+    /// longer produce (schema 2 / envelope 1, schema 1 / envelope 2; modelled as accepted history) is reported as an envelope
+    /// issue and blocks completion.
+    /// </summary>
+    [Fact]
+    public async Task MismatchedSchemaEnvelopePairsAreReportedByTheCensus()
+    {
+        var h = new Harness();
+        var schema2Envelope1 = await h.RecordAsync(h.FormA);
+        var schema1Envelope2 = await h.RecordAsync(h.FormA);
+        var command = h.Decision(h.FormA);
+        var schema2 = new RowSchemaDefinition(EncryptedValues.EntityKind, 2, EncryptedValues.Columns.Concat([
+            new RowSignedColumn("data_key_commitment_bytes", RowColumnType.Bytes, false),
+            new RowSignedColumn("data_key_identifier", RowColumnType.Uuid, false),
+            new RowSignedColumn("key_wrap_algorithm_code", RowColumnType.Int32, false),
+        ]).OrderBy(c => c.ColumnName, StringComparer.Ordinal).ToList());
+        var mismatchedV2 = new List<Row>
+        {
+            Header(h.Org, schema2Envelope1),
+            (Sealed(h.Org, schema2Envelope1, h.Field, h.ItemFor(schema2Envelope1), 51) with { Schema = schema2 })
+                .With("data_key_commitment_bytes", RowValue.Bytes(Fill(32, 0xdd)))
+                .With("data_key_identifier", RowValue.Uuid(Guid.CreateVersion7()))
+                .With("key_wrap_algorithm_code", RowValue.Int32(1)),
+        };
+        var mismatchedV1 = new List<Row> { Header(h.Org, schema1Envelope2), Sealed(h.Org, schema1Envelope2, h.Field, h.ItemFor(schema1Envelope2), 52, envelope: 2) };
+
+        // Neither can be written (S-4 refuses both before signing)…
+        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeSchemaTie.MismatchReason, (await Assert.ThrowsAsync<AuthorityException>(() => h.WriteAsync(schema2Envelope1, mismatchedV2))).Message);
+        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeSchemaTie.MismatchReason, (await Assert.ThrowsAsync<AuthorityException>(() => h.WriteAsync(schema1Envelope2, mismatchedV1))).Message);
+
+        // …and accepted history holding them is reported.
+        await h.AcceptLegacyAsync(schema2Envelope1, mismatchedV2);
+        await h.AcceptLegacyAsync(schema1Envelope2, mismatchedV1);
+
+        var attestation = await h.ReconcileAsync(h.FormA, command);
+        Assert.False(attestation.AttestationComplete);
+        Assert.Equal(ProtectionAttestationReasons.EnvelopeIssues, attestation.AttestationIncompleteReason);
+        Assert.Equal(2, attestation.EnvelopeIssueRecordCount);
+    }
+
     [Theory]
-    [InlineData("version 2", EnvelopeRules.Reasons.VersionUnsupported)]
+    [InlineData("version 2", EnvelopeSchemaTie.MismatchReason)] // R-M2b2-11: schema 1 / envelope 2 is refused by the S-4 tie first
     [InlineData("wrapped key", EnvelopeRules.Reasons.WrappedKeyLength)]
     [InlineData("tag", EnvelopeRules.Reasons.TagLength)]
     [InlineData("purpose", EnvelopeRules.Reasons.KeyReferencePurpose)]
@@ -533,6 +574,40 @@ public sealed class ProtectionReconciliationTests
 
         await h.ReprotectAsync(record, command, Reprotected(r => r.With("encryption_key_reference", RowValue.Text($"vault-transit:{h.Org:D}:field-value:2"))));
         Assert.Equal(head.CommittedContentRevision + 1, h.Head(record).CommittedContentRevision);
+    }
+
+    /// <summary>
+    /// E3-M2b-2 (D-3, D-9): signed schema 2 is registered, but a protection-migration write carrying a schema-2 envelope row
+    /// (well-formed metadata; envelope 2 or a mismatched envelope 1) is still refused before signing, as on every user path.
+    /// </summary>
+    [Theory]
+    [InlineData(2)]
+    [InlineData(1)]
+    public async Task AProtectionMigrationWriteCannotIntroduceASchemaTwoEnvelopeRow(int envelopeVersion)
+    {
+        var h = new Harness();
+        var record = await h.RecordAsync(h.FormA, withContent: false);
+        var other = Guid.CreateVersion7();
+        await h.WriteAsync(record, [Header(h.Org, record), Text(h.Org, record, h.Field, h.ItemFor(record), "secret"), Integer(h.Org, record, h.OtherField, other, 3)]);
+        var command = h.Decision(h.FormA);
+        var head = (h.Head(record).CommittedContentRevision, h.Head(record).CommittedOperationId);
+        var operations = h.Store.Operations.Count;
+
+        var schema2 = new RowSchemaDefinition(EncryptedValues.EntityKind, 2, EncryptedValues.Columns.Concat([
+            new RowSignedColumn("data_key_commitment_bytes", RowColumnType.Bytes, false),
+            new RowSignedColumn("data_key_identifier", RowColumnType.Uuid, false),
+            new RowSignedColumn("key_wrap_algorithm_code", RowColumnType.Int32, false),
+        ]).OrderBy(c => c.ColumnName, StringComparer.Ordinal).ToList());
+        var sealedV2 = (Sealed(h.Org, record, h.Field, h.ItemFor(record), 40) with { Schema = schema2 })
+            .With("encryption_envelope_version", RowValue.Int32(envelopeVersion))
+            .With("data_key_commitment_bytes", RowValue.Bytes(Fill(32, 0xdd)))
+            .With("data_key_identifier", RowValue.Uuid(Guid.CreateVersion7()))
+            .With("key_wrap_algorithm_code", RowValue.Int32(1));
+
+        var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.ReprotectAsync(record, command, [Header(h.Org, record), sealedV2, Integer(h.Org, record, h.OtherField, other, 3)]));
+        Assert.Equal("ENVELOPE_INVALID: " + (envelopeVersion == 2 ? EnvelopeRules.Reasons.SchemaUnsupported : EnvelopeSchemaTie.MismatchReason), ex.Message); // S-4 refuses the mismatched pair first
+        Assert.Equal(operations, h.Store.Operations.Count);
+        Assert.Equal(head, (h.Head(record).CommittedContentRevision, h.Head(record).CommittedOperationId));
     }
 
     [Theory]

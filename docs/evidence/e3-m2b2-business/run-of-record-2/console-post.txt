@@ -1,0 +1,5 @@
+PASS POST-01 a pre-E3-M2b-2 business build (legacy EF model without the columns) writes v1 rows to the migrated database; they satisfy every CHECK, are schema 1 / envelope 1 with NULL metadata, and encode to the same canonical bytes in both builds :: pre-E3-M2b-2 business Release build 11e15ee (git archive)
+PASS POST-02 the guarded Down refuses while envelope-2 rows exist (P0001, fixed message) and changes nothing :: E3-M2b-2 Down refused: envelope version 2 rows exist
+PASS POST-03 the Down runs once no envelope-2 row exists: columns and CHECKs removed, envelope_positive restored, history row removed, v1 rows intact
+PASS POST-04 after the Down the guard reports MigrationMissing again
+PASS POST-05 re-applying the migration over existing v1 data succeeds; the guard is ready and the v1 rows still encode identically

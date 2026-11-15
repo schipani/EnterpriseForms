@@ -114,10 +114,11 @@ public sealed partial class ContributorWriteProtocolTests
         var h = await new Harness().CreatedAsync();
         h.ShareWithContributor("contributor", false, h.SealedItem);
 
-        // A fresh, otherwise well-formed envelope under version 2 is refused by the central rules before the share classifier runs.
+        // A fresh, otherwise well-formed envelope under version 2 on a schema-1 row is refused before the share classifier runs:
+        // by the S-4 tie since R-M2b2-11 (the E3-M2a version allow-list behind it is unchanged and unit-tested in EnvelopeRulesTests).
         var v2 = Guid.CreateVersion7();
         var refused = await Assert.ThrowsAsync<AuthorityException>(() => h.PrepareAsync(h.Contributor, v2, h.Stage(Change(h.Rows(), h.SealedItem, _ => Sealed(h.Org, h.Record, h.SealedField, h.SealedItem, 90, envelope: 2)), v2), withCurrent: true));
-        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeRules.Reasons.VersionUnsupported, refused.Message);
+        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeSchemaTie.MismatchReason, refused.Message);
 
         var foreign = Guid.CreateVersion7();
         var otherOrganization = Change(h.Rows(), h.SealedItem, _ => Sealed(h.Org, h.Record, h.SealedField, h.SealedItem, 90).With("encryption_key_reference", RowValue.Text($"vault-transit:{Guid.CreateVersion7():D}:field-value:1")));

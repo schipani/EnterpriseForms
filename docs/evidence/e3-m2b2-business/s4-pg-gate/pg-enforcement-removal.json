@@ -1,0 +1,125 @@
+{
+  "record": "docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md \u00a723.15",
+  "gate": "scripts/dev/e3-m2b2-s4-pg-gate.ps1 (one fresh disposable postgres:18.0 per check)",
+  "procedure": "each mutation applied to one Authority source file, the gate re-run (it rebuilds the Release build), the file restored from a backup and its sha256 verified",
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeRules.cs": "039cfddd0aa4a6519fc16bc847ba6d56ac66a28a750e051a7b2b94195cf19d82",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs": "0bdd6357e8f61300310b5af36b182c5820eeef90c8792f4bdb383926dfa9f355"
+  },
+  "results": [
+    {
+      "id": "PGM-1",
+      "mutation": "S-4 Commit call removed",
+      "gate_exit": 1,
+      "checks": 38,
+      "failed": 12,
+      "failed_checks": [
+        {
+          "id": "S4-C1b",
+          "observed": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_UNSUPPORTED; signatures verified 4"
+        },
+        {
+          "id": "S4-C1c",
+          "observed": "1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT"
+        },
+        {
+          "id": "S4-C1e",
+          "observed": "AuthorityException OPERATION_STATE_INVALID 409 retryable=False operation is Aborted; 1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT; unchanged (head=1:6c937244b522766fe8f10d3dfeacb47b1470d566def681555d904ad86d10e758:01a1e12b-70e8-7d97-b07b-f73613b31cf5:false; commits=1; leaves=4; identities=4; committedO"
+        },
+        {
+          "id": "S4-C2b",
+          "observed": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_VERSION_UNSUPPORTED; signatures verified 4"
+        },
+        {
+          "id": "S4-C2c",
+          "observed": "1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT"
+        },
+        {
+          "id": "S4-C2e",
+          "observed": "AuthorityException OPERATION_STATE_INVALID 409 retryable=False operation is Aborted; 1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT; unchanged (head=1:d68f8bfbf202a840c68df0956a8eb21f023a5bc856d3d765f8046f1420528126:01a1e12b-7599-7f23-b975-a5608d0c9ccb:false; commits=1; leaves=4; identities=4; committedO"
+        },
+        {
+          "id": "S4-C3b",
+          "observed": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_UNSUPPORTED; signatures verified 4"
+        },
+        {
+          "id": "S4-C3c",
+          "observed": "1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT"
+        },
+        {
+          "id": "S4-C3e",
+          "observed": "AuthorityException OPERATION_STATE_INVALID 409 retryable=False operation is Aborted; 1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT; unchanged (head=1:c5d489bf6c3d73c3204531b3f74e1164658b0dccbad77ec8431cbd8c91bb2dc7:01a1e12b-7601-7a31-80b4-add2a9837d3f:false; commits=1; leaves=4; identities=4; committedO"
+        },
+        {
+          "id": "S4-C4b",
+          "observed": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_VERSION_UNSUPPORTED; signatures verified 4"
+        },
+        {
+          "id": "S4-C4c",
+          "observed": "1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT"
+        },
+        {
+          "id": "S4-C4e",
+          "observed": "AuthorityException OPERATION_STATE_INVALID 409 retryable=False operation is Aborted; 1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT; unchanged (head=1:dd420a26d2a53054e31fd61cc893ffc0b67171252bb4ded0c8ee63537d6cb2b3:01a1e12b-7679-79d2-b0e1-cd80a1579abf:false; commits=1; leaves=4; identities=4; committedO"
+        }
+      ],
+      "passed_s4_checks": [
+        "S4-P1",
+        "S4-P2",
+        "S4-C1a",
+        "S4-C1d",
+        "S4-C2a",
+        "S4-C2d",
+        "S4-C3a",
+        "S4-C3d",
+        "S4-C4a",
+        "S4-C4d"
+      ],
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "PGM-2",
+      "mutation": "EnvelopeRules schema-version refusal removed (field and document)",
+      "gate_exit": 1,
+      "checks": 38,
+      "failed": 2,
+      "failed_checks": [
+        {
+          "id": "S4-T1",
+          "observed": "OK; ENVELOPE_INVALID: ENVELOPE_VERSION_UNSUPPORTED; 1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT; unchanged (head=1:9657e3376bb0b19d85494bd4dcbcf4f9862e4f033d22f820afa6e35bd1ea3a74:01a1e12c-3fdd-7564-834f-89ce4a71b5b3:false; commits=1; leaves=4; identities=4; committedOps=1)"
+        },
+        {
+          "id": "S4-T2",
+          "observed": "OK; ENVELOPE_INVALID: ENVELOPE_VERSION_UNSUPPORTED; 1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT; unchanged (head=1:2d720d057dd5282cb2060345aeb997b7978ae571034a0c6be12864bebecc4dc2:01a1e12c-404b-7feb-8b7b-0fb6c2b9de36:false; commits=1; leaves=4; identities=4; committedOps=1)"
+        }
+      ],
+      "passed_s4_checks": [
+        "S4-P1",
+        "S4-P2",
+        "S4-C1a",
+        "S4-C1b",
+        "S4-C1c",
+        "S4-C1d",
+        "S4-C1e",
+        "S4-C2a",
+        "S4-C2b",
+        "S4-C2c",
+        "S4-C2d",
+        "S4-C2e",
+        "S4-C3a",
+        "S4-C3b",
+        "S4-C3c",
+        "S4-C3d",
+        "S4-C3e",
+        "S4-C4a",
+        "S4-C4b",
+        "S4-C4c",
+        "S4-C4d",
+        "S4-C4e"
+      ],
+      "detected": true,
+      "restored": true
+    }
+  ]
+}

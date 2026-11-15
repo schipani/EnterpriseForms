@@ -1,0 +1,275 @@
+{
+  "harness": "E3-M2b-2 R-M2b2-11 S-4 focused real-PostgreSQL gate (real Authority build, Release B, runtime role)",
+  "build": "Release build of the working tree (new-sha256.txt); ContentAcceptanceRules.CurrentVersion = 1; EnvelopeSchemaTie.TiedPairs = (1,1),(2,2); EnvelopeRules.AllowedEnvelopeVersions = 1",
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "checksTotal": 38,
+  "checksFailed": 0,
+  "checks": [
+    {
+      "Id": "S4-00",
+      "Description": "setup: this build\u0027s --migrate (CARV recorded) and its explicit floor command (floor 1)",
+      "Expected": "exit 0 | exit 0; CARV history 1; floor 1",
+      "Observed": "exit 0 | exit 0; CARV history 1; floor 1",
+      "Pass": true
+    },
+    {
+      "Id": "S4-01",
+      "Description": "Release B readiness of the real guard: ready with floor 1; the live catalog matches the write fence",
+      "Expected": "True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1; verdict none",
+      "Observed": "True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1; verdict none",
+      "Pass": true
+    },
+    {
+      "Id": "S4-02",
+      "Description": "the runtime role is an ordinary role (no superuser, no BYPASSRLS, not the table owner)",
+      "Expected": "f f false",
+      "Observed": "false false false",
+      "Pass": true
+    },
+    {
+      "Id": "S4-03",
+      "Description": "every record receives valid schema 1 / envelope 1 content (text, encrypted field, encrypted document) through real Prepare \u002B Commit, Release B",
+      "Expected": "10 x OK; all 1/1 Committed",
+      "Observed": "OK; committed 1/1: 10",
+      "Pass": true
+    },
+    {
+      "Id": "S4-P1",
+      "Description": "real Prepare of a FieldSchema2Envelope1 candidate: refused by S-4; no operation, candidate leaf or accepted state written",
+      "Expected": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; ops/leaves unchanged; snapshot unchanged",
+      "Observed": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; ops 10-\u003E10; leaves 40-\u003E40; unchanged (head=1:a1263635d88e7a3a99a61c7385b75f2c451ac4034df3c3440b5885cf46c14825:01a1e12a-650f-724f-9002-be1f399a5430:false; commits=1; leaves=4; identities=4; committedOps=1)",
+      "Pass": true
+    },
+    {
+      "Id": "S4-P2",
+      "Description": "real Prepare of a DocumentSchema1Envelope2 candidate: refused by S-4; no operation, candidate leaf or accepted state written",
+      "Expected": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; ops/leaves unchanged; snapshot unchanged",
+      "Observed": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; ops 10-\u003E10; leaves 40-\u003E40; unchanged (head=1:2f51bf80ac33c0b061cb18897f085619564b02a86d6babeda7d4ddb7a234394f:01a1e12a-6579-7677-863f-8dc413f29a64:false; commits=1; leaves=4; identities=4; committedOps=1)",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C1a",
+      "Description": "seeded FieldSchema2Envelope1 operation: accepted by every database constraint, Prepared, stamped P = 1",
+      "Expected": "OK; 1/NULL Prepared",
+      "Observed": "OK; 1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C1b",
+      "Description": "real Release B Commit of the FieldSchema2Envelope1 operation: the staged signatures verify, then S-4 refuses",
+      "Expected": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures verified \u003E 0",
+      "Observed": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures verified 4",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C1c",
+      "Description": "the operation is Aborted with the S-4 Commit reason; no commit rule version recorded",
+      "Expected": "1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT",
+      "Observed": "1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C1d",
+      "Description": "no authoritative state advances: head, manifest commits, manifest leaves, item identities, integrity checkpoints, journal, content-integrity revision, committed operations",
+      "Expected": "record and organization snapshots unchanged",
+      "Observed": "unchanged (head=1:915bbbd3ff88412ad855659150e2749bd07ad09fba373883c4a8f0e3cc7d0c03:01a1e12a-5d95-7fa6-8a7e-10005580375f:false; commits=1; leaves=4; identities=4; committedOps=1) | unchanged (contentIntegrityRevision=10; authorizationRevision=7; checkpoints=10; journal=10; commits=10; identities=40)",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C1e",
+      "Description": "a Commit replay of the rejected operation is refused and accepts nothing",
+      "Expected": "refused (AuthorityException); still 1/NULL Aborted with the S-4 reason; snapshots unchanged",
+      "Observed": "AuthorityException OPERATION_STATE_INVALID 409 retryable=False operation is Aborted; 1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT; unchanged (head=1:915bbbd3ff88412ad855659150e2749bd07ad09fba373883c4a8f0e3cc7d0c03:01a1e12a-5d95-7fa6-8a7e-10005580375f:false; commits=1; leaves=4; identities=4; committedOps=1)",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C2a",
+      "Description": "seeded FieldSchema1Envelope2 operation: accepted by every database constraint, Prepared, stamped P = 1",
+      "Expected": "OK; 1/NULL Prepared",
+      "Observed": "OK; 1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C2b",
+      "Description": "real Release B Commit of the FieldSchema1Envelope2 operation: the staged signatures verify, then S-4 refuses",
+      "Expected": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures verified \u003E 0",
+      "Observed": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures verified 4",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C2c",
+      "Description": "the operation is Aborted with the S-4 Commit reason; no commit rule version recorded",
+      "Expected": "1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT",
+      "Observed": "1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C2d",
+      "Description": "no authoritative state advances: head, manifest commits, manifest leaves, item identities, integrity checkpoints, journal, content-integrity revision, committed operations",
+      "Expected": "record and organization snapshots unchanged",
+      "Observed": "unchanged (head=1:bdb8b241de96b35fae6b9b38abea8009da6ffd913398e67b9670e254ecea99f0:01a1e12a-6218-7c14-bdd0-74b22ddf9710:false; commits=1; leaves=4; identities=4; committedOps=1) | unchanged (contentIntegrityRevision=10; authorizationRevision=7; checkpoints=10; journal=10; commits=10; identities=40)",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C2e",
+      "Description": "a Commit replay of the rejected operation is refused and accepts nothing",
+      "Expected": "refused (AuthorityException); still 1/NULL Aborted with the S-4 reason; snapshots unchanged",
+      "Observed": "AuthorityException OPERATION_STATE_INVALID 409 retryable=False operation is Aborted; 1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT; unchanged (head=1:bdb8b241de96b35fae6b9b38abea8009da6ffd913398e67b9670e254ecea99f0:01a1e12a-6218-7c14-bdd0-74b22ddf9710:false; commits=1; leaves=4; identities=4; committedOps=1)",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C3a",
+      "Description": "seeded DocumentSchema2Envelope1 operation: accepted by every database constraint, Prepared, stamped P = 1",
+      "Expected": "OK; 1/NULL Prepared",
+      "Observed": "OK; 1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C3b",
+      "Description": "real Release B Commit of the DocumentSchema2Envelope1 operation: the staged signatures verify, then S-4 refuses",
+      "Expected": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures verified \u003E 0",
+      "Observed": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures verified 4",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C3c",
+      "Description": "the operation is Aborted with the S-4 Commit reason; no commit rule version recorded",
+      "Expected": "1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT",
+      "Observed": "1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C3d",
+      "Description": "no authoritative state advances: head, manifest commits, manifest leaves, item identities, integrity checkpoints, journal, content-integrity revision, committed operations",
+      "Expected": "record and organization snapshots unchanged",
+      "Observed": "unchanged (head=1:07fe92e349f533e6a05fd550d8c84ff5cf023e13260e9975c215718536276399:01a1e12a-627c-7e0a-9699-4b50183dad7c:false; commits=1; leaves=4; identities=4; committedOps=1) | unchanged (contentIntegrityRevision=10; authorizationRevision=7; checkpoints=10; journal=10; commits=10; identities=40)",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C3e",
+      "Description": "a Commit replay of the rejected operation is refused and accepts nothing",
+      "Expected": "refused (AuthorityException); still 1/NULL Aborted with the S-4 reason; snapshots unchanged",
+      "Observed": "AuthorityException OPERATION_STATE_INVALID 409 retryable=False operation is Aborted; 1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT; unchanged (head=1:07fe92e349f533e6a05fd550d8c84ff5cf023e13260e9975c215718536276399:01a1e12a-627c-7e0a-9699-4b50183dad7c:false; commits=1; leaves=4; identities=4; committedOps=1)",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C4a",
+      "Description": "seeded DocumentSchema1Envelope2 operation: accepted by every database constraint, Prepared, stamped P = 1",
+      "Expected": "OK; 1/NULL Prepared",
+      "Observed": "OK; 1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C4b",
+      "Description": "real Release B Commit of the DocumentSchema1Envelope2 operation: the staged signatures verify, then S-4 refuses",
+      "Expected": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures verified \u003E 0",
+      "Observed": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures verified 4",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C4c",
+      "Description": "the operation is Aborted with the S-4 Commit reason; no commit rule version recorded",
+      "Expected": "1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT",
+      "Observed": "1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C4d",
+      "Description": "no authoritative state advances: head, manifest commits, manifest leaves, item identities, integrity checkpoints, journal, content-integrity revision, committed operations",
+      "Expected": "record and organization snapshots unchanged",
+      "Observed": "unchanged (head=1:2c6870d5496d1dcb5ab4133518be75af60d653cb212c664de97917c849a02209:01a1e12a-630b-74b8-81e2-0e6a51151447:false; commits=1; leaves=4; identities=4; committedOps=1) | unchanged (contentIntegrityRevision=10; authorizationRevision=7; checkpoints=10; journal=10; commits=10; identities=40)",
+      "Pass": true
+    },
+    {
+      "Id": "S4-C4e",
+      "Description": "a Commit replay of the rejected operation is refused and accepts nothing",
+      "Expected": "refused (AuthorityException); still 1/NULL Aborted with the S-4 reason; snapshots unchanged",
+      "Observed": "AuthorityException OPERATION_STATE_INVALID 409 retryable=False operation is Aborted; 1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT; unchanged (head=1:2c6870d5496d1dcb5ab4133518be75af60d653cb212c664de97917c849a02209:01a1e12a-630b-74b8-81e2-0e6a51151447:false; commits=1; leaves=4; identities=4; committedOps=1)",
+      "Pass": true
+    },
+    {
+      "Id": "S4-V1",
+      "Description": "control: the same seeding mechanism with a valid schema 1 / envelope 1 candidate commits (the refusals above are S-4, not the fixture)",
+      "Expected": "seed OK; commit OK; 1/1 Committed; head \u002B1",
+      "Observed": "OK; OK; 1/1 Committed; head 1-\u003E2",
+      "Pass": true
+    },
+    {
+      "Id": "S4-V2-0",
+      "Description": "after the S-4 refusal, a valid schema 1 / envelope 1 operation on the same record commits normally (real Prepare \u002B Commit)",
+      "Expected": "OK; head \u002B1",
+      "Observed": "OK; head 1-\u003E2",
+      "Pass": true
+    },
+    {
+      "Id": "S4-V2-1",
+      "Description": "after the S-4 refusal, a valid schema 1 / envelope 1 operation on the same record commits normally (real Prepare \u002B Commit)",
+      "Expected": "OK; head \u002B1",
+      "Observed": "OK; head 1-\u003E2",
+      "Pass": true
+    },
+    {
+      "Id": "S4-V2-2",
+      "Description": "after the S-4 refusal, a valid schema 1 / envelope 1 operation on the same record commits normally (real Prepare \u002B Commit)",
+      "Expected": "OK; head \u002B1",
+      "Observed": "OK; head 1-\u003E2",
+      "Pass": true
+    },
+    {
+      "Id": "S4-V2-3",
+      "Description": "after the S-4 refusal, a valid schema 1 / envelope 1 operation on the same record commits normally (real Prepare \u002B Commit)",
+      "Expected": "OK; head \u002B1",
+      "Observed": "OK; head 1-\u003E2",
+      "Pass": true
+    },
+    {
+      "Id": "S4-T1",
+      "Description": "FieldSchema2Envelope2: not accepted at Commit (tied, so S-4 passes; EnvelopeRules refuses)",
+      "Expected": "ENVELOPE_INVALID: ENVELOPE_SCHEMA_UNSUPPORTED; 1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT; snapshot unchanged",
+      "Observed": "OK; ENVELOPE_INVALID: ENVELOPE_SCHEMA_UNSUPPORTED; 1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT; unchanged (head=1:22040e3696f331af5bbf9012d1d878e97173294a728b49bb7eb9dd209731003c:01a1e12a-63d0-7b49-8a62-eeddd4ff2cc2:false; commits=1; leaves=4; identities=4; committedOps=1)",
+      "Pass": true
+    },
+    {
+      "Id": "S4-T2",
+      "Description": "DocumentSchema2Envelope2: not accepted at Commit (tied, so S-4 passes; EnvelopeRules refuses)",
+      "Expected": "ENVELOPE_INVALID: ENVELOPE_SCHEMA_UNSUPPORTED; 1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT; snapshot unchanged",
+      "Observed": "OK; ENVELOPE_INVALID: ENVELOPE_SCHEMA_UNSUPPORTED; 1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT; unchanged (head=1:af37f939f758f56ec4fe29ddd67956329dfec656ec2234dd6a076ab9631bec45:01a1e12a-643d-761e-9351-6f841950a739:false; commits=1; leaves=4; identities=4; committedOps=1)",
+      "Pass": true
+    },
+    {
+      "Id": "S4-F1",
+      "Description": "database floor: an unstamped (pre-CARV) Prepared operation cannot be inserted",
+      "Expected": "23514 ck_content_operation_rule_floor_v1",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1",
+      "Pass": true
+    },
+    {
+      "Id": "S4-F2",
+      "Description": "CARV Commit rule: an operation prepared under other rules (P = 2) is refused and aborted; nothing advances",
+      "Expected": "seed OK; OPERATION_RULES_OUTDATED 409; 2/NULL Aborted OPERATION_RULES_OUTDATED; snapshot unchanged",
+      "Observed": "OK; AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; 2/NULL Aborted OPERATION_RULES_OUTDATED; unchanged (head=1:0c8b110c4abeb6257acef22f4e143c4a368d0ead0ef70a43ca14e147adf6f254:01a1e12a-64a8-7814-ab71-f79e705d6b6f:false; commits=1; leaves=4; identities=4; committedOps=1)",
+      "Pass": true
+    },
+    {
+      "Id": "S4-F3",
+      "Description": "database CARV fence: a Committed state with C \u003C\u003E P is refused even for the migration identity",
+      "Expected": "refused (23514 commit-rule CHECK or state guard); still 1/NULL Prepared",
+      "Observed": "OK; 23514 ck_content_operation_commit_rule_version: new row for relation \u0022content_change_operations\u0022 violates check constraint \u0022ck_content_operation_commit_rule_version\u0022; 1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "S4-F4",
+      "Description": "after every case: readiness still ready under Release B, floor 1, live verdict none; no write-fence alert was raised",
+      "Expected": "True ...(floor 1); phase=ReleaseB requiredFloor=1; floor 1; none; alerts 0",
+      "Observed": "True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1; floor 1; verdict none; alerts 0",
+      "Pass": true
+    },
+    {
+      "Id": "S4-99",
+      "Description": "operation inventory of the run (for the record)",
+      "Expected": "only Committed and Aborted, plus the one Prepared operation of S4-F3",
+      "Observed": "Aborted ENVELOPE_INVALID_AT_COMMIT=2, Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT=4, Aborted OPERATION_RULES_OUTDATED=1, Committed=15, Prepared=1",
+      "Pass": true
+    }
+  ]
+}

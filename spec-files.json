@@ -509,8 +509,8 @@
     },
     {
       "path": "docs/dynamic-forms/row-integrity-format.md",
-      "sha256": "c75162ac988be343644d988c1f69ffdd14a09cb4185a940e1d67b08783f7bf05",
-      "bytes": 14113
+      "sha256": "bfac466c0ba2442a5e92752ff14632ee75d40156968554bf72216671543b5044",
+      "bytes": 18477
     },
     {
       "path": "docs/dynamic-forms/search-entry-seal-format.md",
@@ -619,8 +619,8 @@
     },
     {
       "path": "docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md",
-      "sha256": "261eb78798785896fe35f10586ef05ee6d8e34e8fb0f0d0a40ad634b708cce1e",
-      "bytes": 168778
+      "sha256": "0b0dcd2c9fca755ecd3c259d2c4df4e18cd51804a9060ff2f616a11d6f37561b",
+      "bytes": 224335
     },
     {
       "path": "docs/security/E3_M2_AUTHORITY_DATABASE_CONTRACT.md",
@@ -893,6 +893,16 @@
       "bytes": 12353
     },
     {
+      "path": "scripts/dev/e3-m2b2-business-pg-gate.ps1",
+      "sha256": "736540e5167af415ea22b02c0d5133b094ca9e73be59f96495cf324341fa2b85",
+      "bytes": 9682
+    },
+    {
+      "path": "scripts/dev/e3-m2b2-s4-pg-gate.ps1",
+      "sha256": "1fe3705162ba34714e7c0809380adbfe40a54835ef74adf0908004d2b48ecba8",
+      "bytes": 6263
+    },
+    {
       "path": "scripts/dev/e5-vault-hmac-integration.ps1",
       "sha256": "bca0403deea56f23f22a2b449c00916357a66eb22c7615978e9744bcd0586762",
       "bytes": 6703
@@ -928,6 +938,11 @@
       "bytes": 12121
     },
     {
+      "path": "scripts/integrity/generate_envelope_schema2_vectors.py",
+      "sha256": "4932729d035b866e53de04192e05ebad11743429687254763019a6e31f2c37c4",
+      "bytes": 12662
+    },
+    {
       "path": "scripts/integrity/generate_vault_vectors.py",
       "sha256": "d93a892f67493b53b61509289609e713de04023f52138b72a797e3cc59f626de",
       "bytes": 4915
@@ -949,13 +964,13 @@
     },
     {
       "path": "scripts/integrity/verify-vectors.mjs",
-      "sha256": "4fab13dd5feddaf3d0bdf96f75b6647d63b1ba4e2402e825b204aef4d43710c6",
-      "bytes": 15301
+      "sha256": "7c70afcd045d34769a2d204569783583c9be2bf4e8591883bc1e5101a9bddc3a",
+      "bytes": 18039
     },
     {
       "path": "scripts/integrity/verify_vectors.py",
-      "sha256": "c7cdab8cbea6b13aad73debc0a92d3b85028737913f6596288a8a5035388c989",
-      "bytes": 9193
+      "sha256": "b1855ab71240d98377162b3fe57314aa5668edb88a2da1a5bfcd887804801077",
+      "bytes": 12150
     },
     {
       "path": "scripts/measurement/ix1/sealbench/Program.cs",
@@ -1176,6 +1191,11 @@
       "path": "trust_authority/recovery-control-plane.reference.sql",
       "sha256": "e1ed495e552a9ee72ea112a57317c4ac72e57472ddcb8a9d65072767bd80071b",
       "bytes": 8063
+    },
+    {
+      "path": "trust_authority/row-integrity-v1-envelope-schema2.test-vectors.json",
+      "sha256": "1b4d779708628ec90505e83df8ee4cac9324337d3c32e9ac677bd971b045d7ec",
+      "bytes": 34415
     },
     {
       "path": "trust_authority/row-integrity-v1.test-vectors.json",

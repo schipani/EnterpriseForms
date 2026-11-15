@@ -1,0 +1,50 @@
+21:42:43.988 --migrate (s4-migration) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+21:42:45.449 --apply-content-acceptance-floor (s4-floor-command) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+21:42:45.812 PASS S4-00: exit 0 | exit 0; CARV history 1; floor 1
+21:42:48.584 PASS S4-01: True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1; verdict none
+21:42:48.626 PASS S4-02: false false false
+21:42:50.872 PASS S4-03: OK; committed 1/1: 10
+21:42:51.026 PASS S4-P1: AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; ops 10->10; leaves 40->40; unchanged (head=1:481d5f830a3bded76c5cd5c5552757b8b6329e9cd6e16b98209b2ab3b4becd7c:01a1e129-ba15-7bbb-9b2e-4099e5a455d9:false; commits=1; leaves=4; identities=4; committedOps=1)
+21:42:51.171 PASS S4-P2: AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; ops 10->10; leaves 40->40; unchanged (head=1:7dda0c9559f1f710fbad0b126443f9561a5ce85630eaee54b08a2105033d9ea8:01a1e129-ba7d-7579-9a64-c3ebbd1fcf7a:false; commits=1; leaves=4; identities=4; committedOps=1)
+21:42:51.222 seed FieldSchema2Envelope1 P=1 op=01a1e129-bc26-7498-8981-acde3695eb7c: OK
+21:42:51.250 PASS S4-C1a: OK; 1/NULL Prepared
+21:42:51.331 PASS S4-C1b: AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures verified 4
+21:42:51.380 PASS S4-C1c: 1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT
+21:42:51.408 PASS S4-C1d: unchanged (head=1:cebc2c09ec36be46f98c434fd50bf0a7857a944df41f02d210640478987428b5:01a1e129-b235-708c-98a0-44c29210759c:false; commits=1; leaves=4; identities=4; committedOps=1) | unchanged (contentIntegrityRevision=10; authorizationRevision=7; checkpoints=10; journal=10; commits=10; identities=40)
+21:42:51.531 PASS S4-C1e: AuthorityException OPERATION_STATE_INVALID 409 retryable=False operation is Aborted; 1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT; unchanged (head=1:cebc2c09ec36be46f98c434fd50bf0a7857a944df41f02d210640478987428b5:01a1e129-b235-708c-98a0-44c29210759c:false; commits=1; leaves=4; identities=4; committedOps=1)
+21:42:51.563 seed FieldSchema1Envelope2 P=1 op=01a1e129-bd8b-7d41-8674-5a634ebb357d: OK
+21:42:51.589 PASS S4-C2a: OK; 1/NULL Prepared
+21:42:51.671 PASS S4-C2b: AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures verified 4
+21:42:51.723 PASS S4-C2c: 1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT
+21:42:51.752 PASS S4-C2d: unchanged (head=1:68e193f5c33898e457359ec187c8a75a5d8a4ac43291ea9f1ea852abff0b2534:01a1e129-b6b6-7c80-a13b-36513b10c41e:false; commits=1; leaves=4; identities=4; committedOps=1) | unchanged (contentIntegrityRevision=10; authorizationRevision=7; checkpoints=10; journal=10; commits=10; identities=40)
+21:42:51.864 PASS S4-C2e: AuthorityException OPERATION_STATE_INVALID 409 retryable=False operation is Aborted; 1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT; unchanged (head=1:68e193f5c33898e457359ec187c8a75a5d8a4ac43291ea9f1ea852abff0b2534:01a1e129-b6b6-7c80-a13b-36513b10c41e:false; commits=1; leaves=4; identities=4; committedOps=1)
+21:42:51.895 seed DocumentSchema2Envelope1 P=1 op=01a1e129-bed8-7194-a077-fcc3ee0c50fb: OK
+21:42:51.918 PASS S4-C3a: OK; 1/NULL Prepared
+21:42:51.998 PASS S4-C3b: AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures verified 4
+21:42:52.050 PASS S4-C3c: 1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT
+21:42:52.079 PASS S4-C3d: unchanged (head=1:97e2198641b0e2c215a147dbb9bf0d815f42290b2d5031cd4f5653501daee000:01a1e129-b71b-7e86-9694-2a276bd8f4ef:false; commits=1; leaves=4; identities=4; committedOps=1) | unchanged (contentIntegrityRevision=10; authorizationRevision=7; checkpoints=10; journal=10; commits=10; identities=40)
+21:42:52.193 PASS S4-C3e: AuthorityException OPERATION_STATE_INVALID 409 retryable=False operation is Aborted; 1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT; unchanged (head=1:97e2198641b0e2c215a147dbb9bf0d815f42290b2d5031cd4f5653501daee000:01a1e129-b71b-7e86-9694-2a276bd8f4ef:false; commits=1; leaves=4; identities=4; committedOps=1)
+21:42:52.224 seed DocumentSchema1Envelope2 P=1 op=01a1e129-c021-7f8b-acad-22be303dd990: OK
+21:42:52.251 PASS S4-C4a: OK; 1/NULL Prepared
+21:42:52.347 PASS S4-C4b: AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures verified 4
+21:42:52.395 PASS S4-C4c: 1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT
+21:42:52.423 PASS S4-C4d: unchanged (head=1:1bc0a71d3b78de4ce59a9fc1f9550ce87b0591ea72b145df17b6d89dafb10bc9:01a1e129-b79c-7604-9633-27c5c388cf9e:false; commits=1; leaves=4; identities=4; committedOps=1) | unchanged (contentIntegrityRevision=10; authorizationRevision=7; checkpoints=10; journal=10; commits=10; identities=40)
+21:42:52.550 PASS S4-C4e: AuthorityException OPERATION_STATE_INVALID 409 retryable=False operation is Aborted; 1/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT; unchanged (head=1:1bc0a71d3b78de4ce59a9fc1f9550ce87b0591ea72b145df17b6d89dafb10bc9:01a1e129-b79c-7604-9633-27c5c388cf9e:false; commits=1; leaves=4; identities=4; committedOps=1)
+21:42:52.585 seed Valid P=1 op=01a1e129-c186-7a92-82df-54e575a33267: OK
+21:42:52.690 PASS S4-V1: OK; OK; 1/1 Committed; head 1->2
+21:42:52.860 PASS S4-V2-0: OK; head 1->2
+21:42:53.003 PASS S4-V2-1: OK; head 1->2
+21:42:53.150 PASS S4-V2-2: OK; head 1->2
+21:42:53.309 PASS S4-V2-3: OK; head 1->2
+21:42:53.343 seed FieldSchema2Envelope2 P=1 op=01a1e129-c47d-7490-9412-3b24d1cb3cd9: OK
+21:42:53.473 PASS S4-T1: OK; ENVELOPE_INVALID: ENVELOPE_SCHEMA_UNSUPPORTED; 1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT; unchanged (head=1:9439d84069c79c2313b652d69ec55f62a060c384bc7407ac8523834c83cfdcff:01a1e129-b872-738d-a386-adef34a71239:false; commits=1; leaves=4; identities=4; committedOps=1)
+21:42:53.503 seed DocumentSchema2Envelope2 P=1 op=01a1e129-c521-7c0a-8c09-ceb3189a6fd5: OK
+21:42:53.631 PASS S4-T2: OK; ENVELOPE_INVALID: ENVELOPE_SCHEMA_UNSUPPORTED; 1/NULL Aborted ENVELOPE_INVALID_AT_COMMIT; unchanged (head=1:f1a37ed327cf8eaf8e28f443afcc4942ca669ff32b7099b7bc139b27f3ab7ee3:01a1e129-b8e0-7f11-9272-581e7bfa6e7f:false; commits=1; leaves=4; identities=4; committedOps=1)
+21:42:53.675 seed Valid P=NULL op=01a1e129-c5bf-749a-85a5-c148474d999f: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1
+21:42:53.675 PASS S4-F1: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1
+21:42:53.704 seed Valid P=2 op=01a1e129-c5eb-76b5-86b1-25f68332f12f: OK
+21:42:53.822 PASS S4-F2: OK; AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; 2/NULL Aborted OPERATION_RULES_OUTDATED; unchanged (head=1:abc54bba4c45a8ccef217e2696429ae80221c5e5b33ccceba6a3f3c609402f8a:01a1e129-b96d-7257-b5d6-d2fd6d5453b2:false; commits=1; leaves=4; identities=4; committedOps=1)
+21:42:53.854 seed Valid P=1 op=01a1e129-c67e-7b11-b0f6-e2083484e2a1: OK
+21:42:53.893 PASS S4-F3: OK; 23514 ck_content_operation_commit_rule_version: new row for relation "content_change_operations" violates check constraint "ck_content_operation_commit_rule_version"; 1/NULL Prepared
+21:42:53.962 PASS S4-F4: True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1; floor 1; verdict none; alerts 0
+21:42:53.988 PASS S4-99: Aborted ENVELOPE_INVALID_AT_COMMIT=2, Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT=4, Aborted OPERATION_RULES_OUTDATED=1, Committed=15, Prepared=1
