@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- E3-M2b-1 design-gate evidence harness (scratchpad only). It compiles against, and runs, the frozen pre-CARV Authority
+       Release binaries in ..\oldbin (commit 66f0aa7). No repository project is referenced or modified. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Without a deps file the host loads every assembly in the output folder: the byte-identical copies of ..\oldbin. -->
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS1591;CA2007;CA1303</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="..\oldbin\*.dll" Private="true" />
+  </ItemGroup>
+</Project>

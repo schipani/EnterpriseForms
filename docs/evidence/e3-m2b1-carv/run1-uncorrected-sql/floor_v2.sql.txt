@@ -1,0 +1,6 @@
+-- Illustration of a later floor raise (M2d): add the higher floor and drop the lower one in the same transaction.
+SET LOCAL lock_timeout = '5s';
+ALTER TABLE authority.content_change_operations
+    ADD CONSTRAINT ck_content_operation_rule_floor_v2
+        CHECK (operation_state_name NOT IN ('Prepared', 'Committed') OR prepare_acceptance_rule_version >= 2) NOT VALID,
+    DROP CONSTRAINT ck_content_operation_rule_floor_v1;

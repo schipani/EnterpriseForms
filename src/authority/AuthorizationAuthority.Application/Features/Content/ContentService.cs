@@ -87,6 +87,13 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
                 throw new AuthorityException(AuthorityErrorCodes.IdempotencyConflict, 409, false, "idempotency key reused with a different request or actor");
             }
 
+            // E3-M2b-1 CARV (OD-M2-18): a Prepared operation stamped with other rules (an older build's NULL stamp included) is never
+            // handed back for commit; nothing is written. Replays of operations in any other state keep their existing behaviour.
+            if (existing.OperationStateName == ContentOperationStates.Prepared && !ContentAcceptanceRules.IsCommittableByThisBuild(existing.PrepareAcceptanceRuleVersion))
+            {
+                throw new AuthorityException(AuthorityErrorCodes.OperationRulesOutdated, 409, false, "the prepared operation was prepared under other content acceptance rules; start a fresh operation");
+            }
+
             var leaves = await scope.GetCandidateLeavesAsync(existing.ContentChangeOperationId, cancellationToken).ConfigureAwait(false);
             return ToPrepared(existing, leaves, correlationId);
         }
@@ -209,6 +216,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             OperationCreatedOn = clock.GetUtcNow(),
             OperationExpiresOn = clock.GetUtcNow().Add(OperationLifetime),
             ReprotectionCommandId = reprotection?.CommandId,
+
+            // E3-M2b-1 CARV: the rules applied above; immutable after this insert (database state guard).
+            PrepareAcceptanceRuleVersion = ContentAcceptanceRules.CurrentVersion,
         };
         scope.AddOperation(operation);
 
@@ -313,6 +323,16 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             operation.OperationStateName = ContentOperationStates.Aborted;
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             throw new AuthorityException(AuthorityErrorCodes.OperationExpired, 409, false, "prepared operation expired");
+        }
+
+        // E3-M2b-1 CARV (§19.4 step 4): before any verification, an operation prepared under other rules (an older build's NULL
+        // stamp included) is aborted; it can never be accepted by this build. The database refuses the same commit independently.
+        if (!ContentAcceptanceRules.IsCommittableByThisBuild(operation.PrepareAcceptanceRuleVersion))
+        {
+            operation.OperationStateName = ContentOperationStates.Aborted;
+            operation.OperationQuarantineReasonCode = ContentAcceptanceRules.OutdatedAbortReason;
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            throw new AuthorityException(AuthorityErrorCodes.OperationRulesOutdated, 409, false, "the operation was prepared under other content acceptance rules; start a fresh operation");
         }
 
         if (head.ContentHeadQuarantined)
@@ -450,6 +470,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         operation.OperationStateName = ContentOperationStates.Committed;
         operation.OperationCommittedOn = now;
+        operation.CommitAcceptanceRuleVersion = ContentAcceptanceRules.CurrentVersion; // CARV: C = V (= P, checked above and by the database)
 
         // W1 (IX-1): derive and seal the record's search index from the bytes verified above, then advance both revisions (INV-R).
         await revisions.AdvanceForCommitAsync(scope, state, new AuthorizationAuthority.Application.Features.SearchIndex.CommitIndexInput(request.FormRecordId, head, request.StagedItems, now, registeredFormDefinitionId), cancellationToken).ConfigureAwait(false);

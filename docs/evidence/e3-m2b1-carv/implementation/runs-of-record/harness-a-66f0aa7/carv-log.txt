@@ -1,0 +1,76 @@
+02:36:28.252 PASS P0-01: Committed=10, Prepared=1
+02:36:37.487 real --migrate (carv-migration) exit -532462766 in 9151 ms
+02:36:37.491 real --migrate failed: 55P03 : canceling statement due to lock timeout
+02:36:37.534 PASS MG-01: 55P03 : canceling statement due to lock timeout; columns=0
+02:36:37.534 PASS RM-01: history=0; trigger=0; columns=0
+02:36:37.555 PASS MG-01b: OK
+02:36:39.991 carv-migration observed waiting on a lock
+02:36:41.279 real --migrate (carv-migration) exit 0 in 3682 ms
+02:36:41.280 PASS MG-02: waited=True; migration=OK
+02:36:41.292 PASS RM-02: 30 rows; carv=1
+02:36:41.320 PASS MG-03: Committed=11, Prepared=2
+02:36:41.468 PASS MG-04: OK, OK, NULL/NULL Committed
+02:36:41.534 PASS MG-05: OK; unchanged (head=3:3307536b03bca95e7dd8db408e1825624398eed4b51f13e9ed89be5037998c5c; commits=11; leaves=33; identities=21; checkpoints=11; journal=11; committedOps=11)
+02:36:41.564 real_down.sql applied (carv-down)
+02:36:44.668 real --migrate (carv-migration) exit 0 in 3103 ms
+02:36:44.668 PASS MG-06: OK, OK
+02:36:44.745 PASS MG-07a: 23514 trg_content_operation_rule_state_guard: content operation prepare rule version is immutable
+02:36:44.745 PASS MG-07b: 23514 ck_content_operation_commit_rule_version: new row for relation "content_change_operations" violates check constraint "ck_content_operation_commit_rule_version"
+02:36:44.745 PASS MG-07c: 23514 ck_content_operation_commit_rule_version: new row for relation "content_change_operations" violates check constraint "ck_content_operation_commit_rule_version"
+02:36:44.745 PASS MG-07d: 23514 trg_content_operation_rule_state_guard: a terminal content operation is immutable
+02:36:44.747 PASS MG-07e: 23514 trg_content_operation_rule_state_guard: content operation must be inserted as Prepared without a commit rule version
+02:36:44.774 emulation.sql applied in 4 ms (carv-test-setup)
+02:36:44.775 PASS SETUP-EMU: OK
+02:36:44.862 real_down.sql failed: P0001 CARV down refused: operations prepared under CARV rules are in flight
+02:36:44.889 PASS RM-03: P0001 : CARV down refused: operations prepared under CARV rules are in flight; 1/NULL Prepared
+02:36:45.266 PASS MX-01a: 1/NULL Prepared
+02:36:45.266 PASS MX-01b: DbUpdateException <- PostgresException 23514 ck_content_operation_commit_rule_version | DbUpdateException <- PostgresException 23514 ck_content_operation_commit_rule_version
+02:36:45.289 PASS MX-01c: unchanged (head=3:3307536b03bca95e7dd8db408e1825624398eed4b51f13e9ed89be5037998c5c; commits=11; leaves=33; identities=21; checkpoints=11; journal=11; committedOps=11); 1/NULL Prepared
+02:36:45.289 PASS MX-01d: 503 {"errorCode":"AUTHORITY_NOT_READY","correlationId":"01a1dd10-7346-779b-a868-ec2ec574e1c8","retryable":true,"detail":"authority store unavailable"}
+02:36:45.344 PASS MX-01e: OK; 1/1 Committed
+02:36:45.436 PASS MX-02a: DbUpdateException <- PostgresException 23514 ck_content_operation_commit_rule_version
+02:36:45.436 PASS MX-02b: unchanged (head=4:96f5f545e89810b267a459ce1a8979bce0ce325b70c7f0653eba48463d4a5182; commits=12; leaves=36; identities=21; checkpoints=12; journal=12; committedOps=12)
+02:36:45.501 PASS MX-02c: AuthorityException OPERATION_EXPIRED 409 retryable=False; NULL/NULL Aborted
+02:36:45.570 PASS MX-02d: OK
+02:36:46.281 concurrent: ok=14; conflicts=10; unexpected=0; 705 ms
+02:36:46.292 PASS MX-03: ok=14; conflicts=10; unexpected=0; 705 ms
+02:36:46.439 carv-floor observed waiting on a lock
+02:36:46.451 floor_v1.sql applied in 77 ms (carv-floor)
+02:36:46.476 PASS FL-01: waited=True; commit=OK; floor=OK; NULL/NULL Committed
+02:36:46.487 test-only floor reset: OK
+02:36:46.528 carv-floor observed waiting on a lock
+02:36:46.542 floor_v1.sql applied in 17 ms (carv-floor)
+02:36:46.647 PASS FL-02a: waited=True; floor=OK; NULL/NULL Prepared
+02:36:46.647 PASS FL-02b: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1
+02:36:46.647 PASS FL-02c: DbUpdateException <- PostgresException 23514 ck_content_operation_commit_rule_version
+02:36:46.647 PASS FL-02d: unchanged (head=3:f7ae3719901edaef0d3bd1566c2da7deeae2753f4fc15236dd3adfc9255b311c; commits=20; leaves=60; identities=21; checkpoints=20; journal=20; committedOps=20)
+02:36:46.686 PASS FL-02e: AuthorityException OPERATION_EXPIRED 409 retryable=False; NULL/NULL Aborted
+02:36:46.698 test-only floor reset: OK
+02:36:46.737 floor transaction holds: AccessExclusiveLock
+02:36:46.737 PASS LOCK: AccessExclusiveLock
+02:36:46.828 carv-runtime-LB observed waiting on a lock
+02:36:46.883 PASS FL-03: waited=True; DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1; ops 44->44; orphan leaves 0
+02:36:46.894 test-only floor reset: OK
+02:36:46.976 floor transaction holds: AccessExclusiveLock
+02:36:46.976 PASS LOCK: AccessExclusiveLock
+02:36:46.990 carv-runtime-LB observed waiting on a lock
+02:36:47.033 PASS FL-04: waited=True; DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1; unchanged (head=3:f7ae3719901edaef0d3bd1566c2da7deeae2753f4fc15236dd3adfc9255b311c; commits=20; leaves=60; identities=21; checkpoints=20; journal=20; committedOps=20)
+02:36:47.048 test-only floor reset: OK
+02:36:47.388 floor transaction holds: AccessExclusiveLock
+02:36:47.388 PASS LOCK: AccessExclusiveLock
+02:36:49.366 concurrent: ok=24; conflicts=0; unexpected=0; 2317 ms
+02:36:49.395 PASS FL-05: ok=24; conflicts=0; unexpected=0; 2317 ms; floors=1
+02:36:51.469 floor_v2.sql failed: 55P03 canceling statement due to lock timeout
+02:36:51.512 PASS FL-06: 55P03 : canceling statement due to lock timeout; floor=1; OK
+02:36:51.632 PASS PF-01: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1; ops 70->70
+02:36:51.632 PASS PF-01b: 503 {"errorCode":"AUTHORITY_NOT_READY","correlationId":"01a1dd10-8c1a-7dce-8be9-0e832896d875","retryable":true,"detail":"authority store unavailable"}
+02:36:51.717 PASS PF-02: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1 | DbUpdateException <- PostgresException 23514 ck_content_operation_commit_rule_version | unchanged (head=1:dec97697556f2e7d559618f6bda5b0af0e2c095af8d171735a3c7dde56f35ce9; commits=33; leaves=99; identities=21; checkpoints=33; journal=33; committedOps=33)
+02:36:51.786 PASS PF-03: OK
+02:36:51.792 PASS PF-04: 42501 : must be owner of table content_change_operations | 42501 : must be owner of table content_change_operations | 42501 : must be owner of relation content_change_operations | 42501 : permission denied to set parameter "session_replication_role"
+02:36:51.795 PASS PF-05: 1
+02:36:51.809 real_down.sql failed: P0001 CARV down refused: a content acceptance rule floor is installed; floors are never lowered
+02:36:51.809 PASS PF-06: P0001 : CARV down refused: a content acceptance rule floor is installed; floors are never lowered
+02:36:51.822 PASS PF-07: 23514 ck_content_operation_rule_floor_v1: check constraint "ck_content_operation_rule_floor_v1" of relation "content_change_operations" is violated by some row
+02:36:51.835 floor_v2.sql applied in 4 ms (carv-floor)
+02:36:52.004 PASS PF-08: OK; DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v2; OK; floor=2
+02:36:52.018 PASS FINAL: Aborted=11, Committed=57, Prepared=4

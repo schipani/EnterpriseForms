@@ -1,0 +1,18 @@
+-- E3-M2b-1 proposed guarded Down (Development/Testing only).
+SET LOCAL lock_timeout = '5s';
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'authority.content_change_operations'::regclass AND conname LIKE 'ck_content_operation_rule_floor_v%') THEN
+        RAISE EXCEPTION 'CARV down refused: a content acceptance rule floor is installed; floors are never lowered';
+    END IF;
+    IF EXISTS (SELECT 1 FROM authority.content_change_operations WHERE operation_state_name = 'Prepared' AND prepare_acceptance_rule_version IS NOT NULL) THEN
+        RAISE EXCEPTION 'CARV down refused: operations prepared under CARV rules are in flight';
+    END IF;
+END $$;
+DROP TRIGGER trg_content_operation_rule_state_guard ON authority.content_change_operations;
+DROP FUNCTION authority.content_operation_rule_state_guard();
+ALTER TABLE authority.content_change_operations
+    DROP CONSTRAINT ck_content_operation_commit_rule_version,
+    DROP CONSTRAINT ck_content_operation_rule_versions_positive,
+    DROP COLUMN commit_acceptance_rule_version,
+    DROP COLUMN prepare_acceptance_rule_version;

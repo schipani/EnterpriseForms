@@ -1,0 +1,78 @@
+# E3-M2b-1 implementation gate, harness A (scratchpad only). Disposable PostgreSQL 18 container: tmpfs data, loopback port,
+# --rm, removed in finally. Never touches the developer stack, the security-test stack, or any persistent volume.
+# Usage: powershell -File run-A.ps1 -Legacy 66f0aa7|de1729b [-SqlDir <dir>] [-NewBin <dir>] [-Evidence <dir>]
+param(
+    [Parameter(Mandatory = $true)][ValidateSet('66f0aa7', 'de1729b')][string]$Legacy,
+    [string]$SqlDir,
+    [string]$NewBin,
+    [string]$Evidence
+)
+$ErrorActionPreference = 'Stop'
+$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+if (-not $SqlDir) { $SqlDir = Join-Path $root 'sql' }
+if (-not $NewBin) { $NewBin = Join-Path $root 'newbin' }
+if (-not $Evidence) { $Evidence = Join-Path $root "evidence-A-$Legacy" }
+New-Item -ItemType Directory -Force $Evidence | Out-Null
+$bin = Join-Path $root "harnessA-$Legacy\bin\Release\net10.0"
+$oldbin = Join-Path $root "oldbin-$Legacy"
+$name = 'carv-impl-a-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+$port = 55433
+$adminPassword = 'carv-admin-' + [guid]::NewGuid().ToString('N')
+$runtimePassword = 'carv-runtime-' + [guid]::NewGuid().ToString('N')
+
+# 1. The harness runs byte-identical copies of the frozen legacy binary (hashes from the committed design-gate evidence).
+$expectedFile = if ($Legacy -eq '66f0aa7') { 'oldbin-sha256-66f0aa7.txt' } else { 'oldbin-sha256-de1729b.txt' }
+$expected = Get-Content (Join-Path $root $expectedFile) | ForEach-Object { $p = $_ -split ' \*'; @{ Hash = $p[0]; File = $p[1] } }
+$mismatch = 0
+foreach ($e in $expected) {
+    foreach ($dir in @($bin, $oldbin)) {
+        $actual = (Get-FileHash -Algorithm SHA256 (Join-Path $dir $e.File)).Hash.ToLowerInvariant()
+        if ($actual -ne $e.Hash) { $mismatch++; Write-Output "HASH MISMATCH $dir $($e.File)" }
+    }
+}
+Write-Output "legacy binary hash check ($Legacy): $($expected.Count) files x 2 locations, $mismatch mismatches"
+if ($mismatch -ne 0) { exit 3 }
+Copy-Item (Join-Path $root $expectedFile) (Join-Path $Evidence 'oldbin-sha256.txt') -Force
+Get-ChildItem $NewBin -Filter '*.dll' | Where-Object { $_.Name -like 'AuthorizationAuthority.*' -or $_.Name -eq 'EnterpriseForms.Integrity.dll' } | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLowerInvariant()) *$(Split-Path -Leaf $_.Path)" } | Out-File -Encoding ascii (Join-Path $Evidence 'newbin-sha256.txt')
+Get-ChildItem $SqlDir -Filter *.sql | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLowerInvariant()) $(Split-Path -Leaf $_.Path)" } | Out-File -Encoding ascii (Join-Path $Evidence 'sql-sha256.txt')
+
+try {
+    docker run -d --rm --name $name -e "POSTGRES_PASSWORD=$adminPassword" -e POSTGRES_DB=carv -p "127.0.0.1:${port}:5432" --tmpfs /var/lib/postgresql:rw postgres:18.0 | Out-Null
+    for ($i = 0; $i -lt 60; $i++) {
+        docker exec $name pg_isready -U postgres -d carv 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { break }
+        Start-Sleep -Milliseconds 500
+    }
+    Start-Sleep -Seconds 2
+    docker exec $name psql -U postgres -d carv -v ON_ERROR_STOP=1 -qAt -c "CREATE ROLE authority_runtime LOGIN PASSWORD '$runtimePassword' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS" | Out-Null
+
+    $admin = "Host=127.0.0.1;Port=$port;Database=carv;Username=postgres;Password=$adminPassword;Pooling=false;Timeout=30;Command Timeout=120"
+    $runtime = "Host=127.0.0.1;Port=$port;Database=carv;Username=authority_runtime;Password=$runtimePassword;Timeout=30;Command Timeout=120"
+
+    # 2. The LEGACY binary's own migration entry point creates the pre-CARV schema (29 migrations) and grants.
+    $env:ConnectionStrings__AuthorityDbMigration = $admin
+    & dotnet (Join-Path $oldbin 'AuthorizationAuthority.Api.dll') --migrate 2>&1 | Select-Object -Last 2
+    Remove-Item Env:ConnectionStrings__AuthorityDbMigration
+    $migrations = docker exec $name psql -U postgres -d carv -qAt -c 'SELECT count(*) FROM authority.ef_migrations_history'
+    Write-Output "legacy schema: $migrations migrations"
+    "$migrations legacy migrations before the CARV migration" | Out-File -Encoding ascii (Join-Path $Evidence 'schema-migrations.txt')
+    (docker image inspect postgres:18.0 --format '{{.Id}}') | Out-File -Encoding ascii (Join-Path $Evidence 'postgres-image.txt')
+    docker exec $name psql -U postgres -d carv -qAt -c "SELECT version()" | Out-File -Encoding ascii (Join-Path $Evidence 'postgres-version.txt')
+
+    # 3. The scenarios (the real CARV migration is applied inside, by the new binary's --migrate).
+    $env:CARV_NEWBIN = Join-Path $NewBin 'AuthorizationAuthority.Api.dll'
+    $env:CARV_ADMIN = $admin; $env:CARV_RUNTIME = $runtime; $env:CARV_SQL = $SqlDir; $env:CARV_EVIDENCE = $Evidence
+    $env:CARV_LEGACY_LABEL = "legacy Authority Release build of $Legacy (oldbin-sha256.txt)"
+    & (Join-Path $bin 'CarvHarness.exe')
+    $code = $LASTEXITCODE
+    Write-Output "harness exit code: $code"
+    $after = docker exec $name psql -U postgres -d carv -qAt -c 'SELECT count(*) FROM authority.ef_migrations_history'
+    "$migrations legacy migrations before; $after after the scenarios" | Out-File -Encoding ascii (Join-Path $Evidence 'schema-migrations.txt')
+}
+finally {
+    docker rm -f $name 2>$null | Out-Null
+    Remove-Item Env:CARV_NEWBIN, Env:CARV_ADMIN, Env:CARV_RUNTIME, Env:CARV_SQL, Env:CARV_EVIDENCE, Env:CARV_LEGACY_LABEL -ErrorAction SilentlyContinue
+    $left = docker ps -a --filter "name=$name" --format '{{.Names}}'
+    Write-Output "container removed: $([string]::IsNullOrEmpty($left))"
+}
+exit $code

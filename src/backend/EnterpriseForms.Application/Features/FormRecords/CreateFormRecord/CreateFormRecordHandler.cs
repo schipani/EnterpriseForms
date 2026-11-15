@@ -335,9 +335,10 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             {
                 return await authority.CommitContentChangeAsync(context.ToDelegatedUser(), operationId, new CommitContentChangeRequest(context.OrganizationId, formRecordId, staged.Items), cancellationToken).ConfigureAwait(false);
             }
-            catch (AuthorityClientException ex) when (ex.ErrorCode is "OPERATION_EXPIRED" or "OPERATION_STATE_INVALID")
+            catch (AuthorityClientException ex) when (IsAbandonedOperation(ex.ErrorCode))
             {
-                // The earlier operation expired or was aborted: it can never be accepted; a fresh one follows.
+                // The earlier operation expired, was aborted, or was prepared under other content acceptance rules (E3-M2b-1
+                // CARV: the Authority aborts it): it can never be accepted; a fresh one follows.
             }
             catch (AuthorityClientException ex) when (ex.ErrorCode == "CONTENT_REVISION_CONFLICT")
             {
@@ -350,9 +351,10 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         {
             return await stager.StageAndCommitAsync(context, head, candidate, idempotencyKey, cancellationToken).ConfigureAwait(false);
         }
-        catch (AuthorityClientException ex) when (ex.ErrorCode == "IDEMPOTENCY_CONFLICT")
+        catch (AuthorityClientException ex) when (IsUnusableOperationKey(ex.ErrorCode))
         {
-            // An earlier attempt prepared a different (never staged, or expired) candidate under this key.
+            // An earlier attempt prepared a different (never staged, or expired) candidate under this key, or (E3-M2b-1 CARV) the
+            // operation under this key was prepared under other content acceptance rules and is never handed back for commit.
         }
         catch (AuthorityClientException ex) when (ex.ErrorCode == "CONTENT_REVISION_CONFLICT")
         {
@@ -371,6 +373,19 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             return null;
         }
     }
+
+    /// <summary>
+    /// Step 1 of <see cref="CommitInitialContentAsync"/>: Authority refusals meaning the staged operation can never be accepted, so a
+    /// fresh operation follows. E3-M2b-1 adds OPERATION_RULES_OUTDATED (the Authority aborted an operation that crosses content
+    /// acceptance rule versions).
+    /// </summary>
+    public static bool IsAbandonedOperation(string errorCode) => errorCode is "OPERATION_EXPIRED" or "OPERATION_STATE_INVALID" or "OPERATION_RULES_OUTDATED";
+
+    /// <summary>
+    /// Step 2: refusals meaning the creation's own idempotency key cannot produce an acceptable operation, so step 3 uses a fresh
+    /// retry key. E3-M2b-1 adds OPERATION_RULES_OUTDATED (a Prepare replay of an operation prepared under other rules).
+    /// </summary>
+    public static bool IsUnusableOperationKey(string errorCode) => errorCode is "IDEMPOTENCY_CONFLICT" or "OPERATION_RULES_OUTDATED";
 
     /// <summary>The accepted record, read back and verified (a completed earlier attempt of this request).</summary>
     private async Task<FormRecordResponse> CompletedAsync(RequestContext context, Guid formRecordId, CancellationToken cancellationToken)

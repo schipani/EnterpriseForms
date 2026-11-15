@@ -9,8 +9,12 @@ namespace AuthorizationAuthority.Tests;
 internal sealed class CountingMacProvider(IIntegrityMacProvider inner) : IIntegrityMacProvider
 {
     private int signatures;
+    private int verifications;
 
     public int SignatureCount => Volatile.Read(ref signatures);
+
+    /// <summary>E3-M2b-1: verifications, so a test can show that a CARV refusal precedes every signature verification.</summary>
+    public int VerificationCount => Volatile.Read(ref verifications);
 
     public string ProviderName => inner.ProviderName;
 
@@ -20,8 +24,11 @@ internal sealed class CountingMacProvider(IIntegrityMacProvider inner) : IIntegr
         return inner.SignAsync(keyReference, canonicalPayload, cancellationToken);
     }
 
-    public Task<bool> VerifyAsync(IntegrityKeyReference keyReference, ReadOnlyMemory<byte> canonicalPayload, ReadOnlyMemory<byte> expectedMac, CancellationToken cancellationToken) =>
-        inner.VerifyAsync(keyReference, canonicalPayload, expectedMac, cancellationToken);
+    public Task<bool> VerifyAsync(IntegrityKeyReference keyReference, ReadOnlyMemory<byte> canonicalPayload, ReadOnlyMemory<byte> expectedMac, CancellationToken cancellationToken)
+    {
+        Interlocked.Increment(ref verifications);
+        return inner.VerifyAsync(keyReference, canonicalPayload, expectedMac, cancellationToken);
+    }
 
     public Task<int> ProvisionKeyAsync(Guid organizationId, string keyPurpose, string providerKeyName, CancellationToken cancellationToken) =>
         inner.ProvisionKeyAsync(organizationId, keyPurpose, providerKeyName, cancellationToken);

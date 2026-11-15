@@ -1,0 +1,22 @@
+-- TEST-ONLY (never part of any migration): emulates the persistence footprint of a CARV Authority build on top of the real
+-- pre-CARV binary. A session that sets carv.emulate_version writes the Prepare stamp on INSERT and the commit stamp on the
+-- Prepared -> Committed transition, exactly what a CARV build would write. Sessions without the setting behave as the
+-- unmodified pre-CARV binary. Fires before the state guard (trigger names fire in alphabetical order).
+CREATE FUNCTION authority.test_carv_build_emulation() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
+DECLARE
+    emulated text := current_setting('carv.emulate_version', true);
+BEGIN
+    IF emulated IS NULL OR emulated = '' THEN
+        RETURN NEW;
+    END IF;
+    IF TG_OP = 'INSERT' THEN
+        NEW.prepare_acceptance_rule_version := emulated::integer;
+    ELSIF OLD.operation_state_name = 'Prepared' AND NEW.operation_state_name = 'Committed' THEN
+        NEW.commit_acceptance_rule_version := emulated::integer;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER trg_a_test_carv_build_emulation
+    BEFORE INSERT OR UPDATE ON authority.content_change_operations
+    FOR EACH ROW EXECUTE FUNCTION authority.test_carv_build_emulation();

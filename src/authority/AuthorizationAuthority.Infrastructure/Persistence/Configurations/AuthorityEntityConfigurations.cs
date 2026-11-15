@@ -264,7 +264,16 @@ public sealed class ContentChangeOperationConfiguration : IEntityTypeConfigurati
         builder.HasIndex(e => new { e.OrganizationId, e.FormRecordId, e.OperationStateName, e.OperationCreatedOn }).HasDatabaseName("ix_content_ops_org_record_state");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_content_op_org");
         builder.HasOne<IdentityBinding>().WithMany().HasForeignKey(e => e.ActorIdentityBindingId).HasConstraintName("fk_content_op_actor");
-        builder.ToTable(t => t.HasCheckConstraint("ck_content_operation_state", "operation_state_name IN ('Prepared','Committed','Aborted','Quarantined')"));
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_content_operation_state", "operation_state_name IN ('Prepared','Committed','Aborted','Quarantined')");
+
+            // E3-M2b-1 CARV (contract §19.5): the model mirrors migration AuthorityContentAcceptanceRuleVersion, which creates these
+            // with hand-written SQL together with the state-guard trigger. Every comparison is preceded by IS NOT NULL: PostgreSQL
+            // accepts a CHECK that evaluates to NULL (design-gate defect D-1).
+            t.HasCheckConstraint(ContentAcceptanceRuleSql.PositiveCheckName, ContentAcceptanceRuleSql.PositiveCheckSql);
+            t.HasCheckConstraint(ContentAcceptanceRuleSql.CommitCheckName, ContentAcceptanceRuleSql.CommitCheckSql);
+        });
     }
 }
 

@@ -130,9 +130,11 @@ public sealed partial class ContributorWriteProtocolTests
     }
 
     /// <summary>
-    /// An operation prepared by an Authority build before E3-M2a (simulated: candidate leaves signed with the organization's key
-    /// exactly as that build's Prepare did, without envelope rules) cannot commit once the rules exist: the verified staged
-    /// bytes are checked again, the operation is aborted, and nothing is accepted.
+    /// An operation whose candidate leaves were signed with the organization's key without the envelope rules (as a build before
+    /// E3-M2a did) cannot commit: the verified staged bytes are checked again, the operation is aborted, and nothing is accepted.
+    /// E3-M2b-1 split (M2-CARV-06): the operation carries this build's CARV stamp, so it passes the CARV Commit rule and this
+    /// test still proves the commit-time envelope rule (defence in depth). An unstamped operation is refused earlier by CARV
+    /// (ContributorWriteProtocolTests.ContentAcceptanceRules).
     /// </summary>
     [Fact]
     public async Task ACommitOfAnOperationPreparedWithoutTheRulesIsRefusedAndTheOperationAborted()
@@ -169,6 +171,7 @@ public sealed partial class ContributorWriteProtocolTests
             CorrelationIdentifier = Guid.CreateVersion7(),
             OperationCreatedOn = DateTimeOffset.UtcNow,
             OperationExpiresOn = DateTimeOffset.UtcNow.AddMinutes(10),
+            PrepareAcceptanceRuleVersion = ContentAcceptanceRules.CurrentVersion,
         });
         h.Store.CandidateLeaves.AddRange(manifest.SortedLeaves.Select((leaf, i) => new ContentCandidateLeaf
         {

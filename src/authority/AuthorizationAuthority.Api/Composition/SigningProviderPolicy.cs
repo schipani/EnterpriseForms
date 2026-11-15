@@ -80,6 +80,8 @@ public static class SigningProviderRegistration
         services.AddSingleton<SigningProviderPolicy>();
         services.AddHostedService<SigningProviderStartupGuard>();
         services.AddSingleton<AuthorityReadiness>();
+        services.AddSingleton<ContentAcceptanceRuleGuard>(); // E3-M2b-1: CARV startup/readiness guard
+        services.AddHostedService<ContentAcceptanceRuleMonitor>();
 
         // Provider implementation is chosen here and nowhere else. Unsupported/unconfigured kinds register a provider that always fails closed.
         var kind = configuration.GetSection(SigningProviderOptions.SectionName).GetValue<SigningProviderKind>("Provider");
@@ -119,9 +121,10 @@ public sealed class UnavailableMacProvider(string reason) : IIntegrityMacProvide
 
 /// <summary>
 /// Readiness = provider usable AND authority store reachable AND SpiceDB schema present AND archive reachable AND the C8 M4 S1
-/// projection-marker transition completed (until then no decision is pinned and the projector does not write).
+/// projection-marker transition completed (until then no decision is pinned and the projector does not write) AND the E3-M2b-1
+/// content acceptance rule fence matches this build (<see cref="ContentAcceptanceRuleGuard"/>).
 /// </summary>
-public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbProjection spiceDb, ISecurityEventArchive archive, IDbContextFactory<AuthorityDbContext> contextFactory, AuthorizationAuthority.Application.Common.ProjectionMarkerTransitionState transition)
+public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbProjection spiceDb, ISecurityEventArchive archive, IDbContextFactory<AuthorityDbContext> contextFactory, AuthorizationAuthority.Application.Common.ProjectionMarkerTransitionState transition, ContentAcceptanceRuleGuard contentAcceptanceRules)
 {
     public async Task<(bool Ready, string Detail)> CheckAsync(CancellationToken cancellationToken)
     {
@@ -144,6 +147,12 @@ public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbP
             return (false, "AuthorityDbUnreachable");
         }
 
+        var (rulesReady, rulesDetail) = contentAcceptanceRules.Current;
+        if (!rulesReady)
+        {
+            return (false, rulesDetail);
+        }
+
         var (spiceReady, spiceDetail) = await spiceDb.ProbeAsync(cancellationToken).ConfigureAwait(false);
         if (!spiceReady)
         {
@@ -156,7 +165,7 @@ public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbP
             return (false, archiveDetail);
         }
 
-        return transition.Completed ? (true, $"{providerDetail}; {spiceDetail}; {archiveDetail}; projection markers verified") : (false, "ProjectionMarkerTransitionPending");
+        return transition.Completed ? (true, $"{providerDetail}; {spiceDetail}; {archiveDetail}; projection markers verified; {rulesDetail}") : (false, "ProjectionMarkerTransitionPending");
     }
 }
 

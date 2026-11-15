@@ -492,6 +492,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("bytea")
                         .HasColumnName("candidate_manifest_root");
 
+                    b.Property<int?>("CommitAcceptanceRuleVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("commit_acceptance_rule_version");
+
                     b.Property<Guid>("CorrelationIdentifier")
                         .HasColumnType("uuid")
                         .HasColumnName("correlation_identifier");
@@ -546,6 +550,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
 
+                    b.Property<int?>("PrepareAcceptanceRuleVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("prepare_acceptance_rule_version");
+
                     b.Property<Guid?>("ReprotectionCommandId")
                         .HasColumnType("uuid")
                         .HasColumnName("reprotection_command_id");
@@ -563,6 +571,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.ToTable("content_change_operations", "authority", t =>
                         {
+                            t.HasCheckConstraint("ck_content_operation_commit_rule_version", "(operation_state_name = 'Committed'\n                AND ((prepare_acceptance_rule_version IS NULL AND commit_acceptance_rule_version IS NULL)\n                  OR (prepare_acceptance_rule_version IS NOT NULL AND commit_acceptance_rule_version IS NOT NULL\n                      AND commit_acceptance_rule_version = prepare_acceptance_rule_version)))\n            OR (operation_state_name <> 'Committed' AND commit_acceptance_rule_version IS NULL)");
+
+                            t.HasCheckConstraint("ck_content_operation_rule_versions_positive", "(prepare_acceptance_rule_version IS NULL OR prepare_acceptance_rule_version >= 1)\n           AND (commit_acceptance_rule_version IS NULL OR commit_acceptance_rule_version >= 1)");
+
                             t.HasCheckConstraint("ck_content_operation_state", "operation_state_name IN ('Prepared','Committed','Aborted','Quarantined')");
                         });
                 });

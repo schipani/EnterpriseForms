@@ -21,7 +21,7 @@ namespace AuthorizationAuthority.Infrastructure.Persistence;
 /// transaction (PostgreSQL delivers it to every listening Authority instance only if the transaction commits) and signals this instance's
 /// work loop after the commit returned. Neither is a statement that work exists or completed; the loop reads durable state.
 /// </summary>
-public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> contextFactory, AuthorityWorkSignal? workSignal = null, AuthorityWorkOptions? workOptions = null) : IAuthorityStore
+public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> contextFactory, AuthorityWorkSignal? workSignal = null, AuthorityWorkOptions? workOptions = null, ISecurityAlertSink? alerts = null) : IAuthorityStore
 {
     private readonly AuthorityWorkSignal? wakeup = workOptions?.CommitWakeupEnabled == true ? workSignal : null;
 
@@ -29,7 +29,7 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
     {
         var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken).ConfigureAwait(false);
-        return new AuthorityScope(context, transaction, wakeup);
+        return new AuthorityScope(context, transaction, wakeup, alerts);
     }
 
     public async Task<IAuthorityScope> BeginReadOnlySnapshotScopeAsync(CancellationToken cancellationToken)
@@ -37,7 +37,7 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, cancellationToken).ConfigureAwait(false);
         await context.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", cancellationToken).ConfigureAwait(false);
-        return new AuthorityScope(context, transaction, null);
+        return new AuthorityScope(context, transaction, null, alerts);
     }
 
     public async Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken cancellationToken)
@@ -62,7 +62,7 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
             .ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction, AuthorityWorkSignal? wakeup) : IAuthorityScope
+    private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction, AuthorityWorkSignal? wakeup, ISecurityAlertSink? alerts) : IAuthorityScope
     {
         private bool committed;
         private bool authorizationWorkAppended;
@@ -628,11 +628,24 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public Task<int> CountSessionsCreatedSinceAsync(Guid identityBindingId, DateTimeOffset since, CancellationToken cancellationToken) =>
             context.Sessions.AsNoTracking().CountAsync(s => s.IdentityBindingId == identityBindingId && s.SessionCreatedOn >= since, cancellationToken);
 
-        public Task FlushAsync(CancellationToken cancellationToken) => context.SaveChangesAsync(cancellationToken);
+        public Task FlushAsync(CancellationToken cancellationToken) => SaveAsync(cancellationToken);
+
+        /// <summary>E3-M2b-1: every write of the scope goes through here, so a CARV fence refusal is always classified (and alerted).</summary>
+        private async Task SaveAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (DbUpdateException ex) when (ContentAcceptanceRuleRefusals.Translate(ex, alerts) is { } refused)
+            {
+                throw refused;
+            }
+        }
 
         public async Task CommitAsync(CancellationToken cancellationToken)
         {
-            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await SaveAsync(cancellationToken).ConfigureAwait(false);
             var notify = wakeup is not null && authorizationWorkAppended;
             if (notify)
             {

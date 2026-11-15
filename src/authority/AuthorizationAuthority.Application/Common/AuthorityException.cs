@@ -27,6 +27,13 @@ public static class AuthorityErrorCodes
     public const string ArchiveUnavailable = "ARCHIVE_UNAVAILABLE";
     public const string OperationExpired = "OPERATION_EXPIRED";
     public const string OperationStateInvalid = "OPERATION_STATE_INVALID";
+
+    /// <summary>
+    /// E3-M2b-1 CARV: the operation was prepared under content acceptance rules other than this build's (an older build, or a
+    /// build on the other side of a rule-version change), or the database refused its transition under the CARV fence. It can
+    /// never be accepted; the caller starts a fresh operation (new idempotency key). Never retried with the same operation.
+    /// </summary>
+    public const string OperationRulesOutdated = "OPERATION_RULES_OUTDATED";
     public const string KeyUnavailable = "KEY_UNAVAILABLE";
     public const string CandidateMismatch = "CANDIDATE_MISMATCH";
     public const string LimitExceeded = "LIMIT_EXCEEDED";

@@ -9,6 +9,10 @@
 # PublishFormSecurityRevision return COMMAND_KIND_NOT_IMPLEMENTED; (6) operator plane /operator/* with a separate
 # credential; (7) OperationStatus carries projection_gate_state and rejection_reason_code; (8) the delegated user
 # assertion travels in X-Delegated-User-Assertion. Error codes follow CROSS_SYSTEM §6.
+# E3-M2b-1 (2026-11-14): PrepareContentChange and CommitContentChange may return 409 OPERATION_RULES_OUTDATED
+# (retryable=false): the operation was prepared under content acceptance rules other than the committing build's (CARV,
+# docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md §19). Commit aborts such an operation; a Prepare replay of one is refused and
+# writes nothing. The same operation is never retried; the caller starts a fresh operation with a new idempotency key.
 openapi: 3.1.0
 info:
   title: Dynamic Forms Internal Authorization Authority
@@ -441,7 +445,7 @@ components:
       description: Access is not permitted; does not reveal target existence.
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     Conflict:
-      description: Stale security/content revision, idempotency mismatch, or concurrent conflicting operation.
+      description: Stale security/content revision, idempotency mismatch, concurrent conflicting operation, or (content changes) OPERATION_RULES_OUTDATED.
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     InvalidChange:
       description: Invalid scope/delegation or unsupported operation.

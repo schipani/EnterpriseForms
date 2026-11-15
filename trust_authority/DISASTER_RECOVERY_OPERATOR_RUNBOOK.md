@@ -12,6 +12,7 @@
 - [ ] Confirm geo backup/restore features are deployed where required and tested on current Azure PostgreSQL and Storage configurations.
 - [ ] Document separately administered recovery identities, approvers, emergency network isolation and independent recovery epoch controller.
 - [ ] Test ledger service identity and receipt verification after certificate rotation; validate archive payloads, not just digests.
+- [ ] Record which content acceptance rule (CARV) floor migration is in force (`ck_content_operation_rule_floor_v{F}`; E3-M2b-1, `docs/security/E3_M2B1_CARV_OPERATIONS.md` §6), so a restore can re-apply it.
 
 ## During an incident
 
@@ -43,5 +44,6 @@
 - Two distinct approval identities cannot be verified.
 - Recovered database privileges or identity-provider policy are weaker than the currently accepted security baseline.
 - Business app/API can directly edit authority relationships, alter trusted heads, or obtain unrestricted HSM signing access.
+- A restored AuthorityDb lacks a CARV floor migration that was in force before the incident (R-CARV-4): re-apply every such floor and confirm the Authority readiness guard reports it on every instance before reopening any organization gate.
 
 **No emergency button that sets a trusted head to an older revision or blindly re-signs old SQL values is permitted.** Missing accepted content can require an exceptional, separately approved business data-loss remediation; it never justifies an authorization downgrade.

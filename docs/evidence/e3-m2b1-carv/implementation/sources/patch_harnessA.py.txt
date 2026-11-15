@@ -1,0 +1,133 @@
+"""Turns the design-gate harness into harness A: identical scenarios and check ids, but the CARV migration is the REAL
+repository migration (Up = the new binary's own --migrate; Down = the EF-scripted Down of that migration). Additional
+checks get new ids (RM-*). Run: python -I patch_harnessA.py <Program.cs>"""
+import sys
+
+path = sys.argv[1]
+s = open(path, encoding="utf-8").read()
+
+
+def rep(old, new, count=1):
+    global s
+    n = s.count(old)
+    if n != count:
+        raise SystemExit(f"expected {count} occurrence(s), found {n}: {old[:90]!r}")
+    s = s.replace(old, new)
+
+
+# header
+rep("// E3-M2b-1 CARV design-gate evidence harness. Scratchpad only; never part of the repository.",
+    "// E3-M2b-1 CARV implementation gate, harness A (scratchpad only; never part of the repository). Derived unchanged from the\n"
+    "// design-gate harness, except: the CARV migration is the REAL repository migration 20261115014221_AuthorityContentAcceptance-\n"
+    "// RuleVersion, applied by the NEW (E3-M2b-1) binary's own --migrate (Up) and by its EF-scripted Down. Extra checks: RM-*.")
+
+# configuration: the new binary used for --migrate
+rep('''var lab = new Lab(
+    Environment.GetEnvironmentVariable("CARV_ADMIN") ?? throw new InvalidOperationException("CARV_ADMIN"),''',
+    '''var lab = new Lab(
+    Environment.GetEnvironmentVariable("CARV_NEWBIN") ?? throw new InvalidOperationException("CARV_NEWBIN"),
+    Environment.GetEnvironmentVariable("CARV_ADMIN") ?? throw new InvalidOperationException("CARV_ADMIN"),''')
+rep("internal sealed class Lab(string adminCs, string runtimeCs, string sqlDir, string evidenceDir)",
+    "internal sealed class Lab(string newBinary, string adminCs, string runtimeCs, string sqlDir, string evidenceDir)")
+rep('harness = "E3-M2b-1 CARV design gate",', 'harness = "E3-M2b-1 CARV implementation gate, harness A (real migration; legacy binary; CARV-build emulation)",')
+rep('binary = "pre-CARV Authority Release build of 66f0aa7 (see oldbin-sha256.txt)",',
+    'binary = Environment.GetEnvironmentVariable("CARV_LEGACY_LABEL") ?? "legacy",\n            migration = "20261115014221_AuthorityContentAcceptanceRuleVersion (new binary --migrate; see newbin-sha256.txt)",')
+
+# MG-01: real migration with its own 5 s lock timeout
+rep('''            var migration = await ExecFileAsync(adminCs, "carv_up.sql", lockTimeout: "2s", application: "carv-migration");
+            var columns = await CountAsync("SELECT count(*) FROM information_schema.columns WHERE table_schema='authority' AND table_name='content_change_operations' AND column_name LIKE '%acceptance_rule_version'");
+            Record("MG-01", "migration while a legacy commit transaction holds the table: lock timeout, nothing applied", "SQLSTATE 55P03; 0 new columns", $"{migration}; columns={columns}", migration.StartsWith("55P03", StringComparison.Ordinal) && columns == 0);''',
+    '''            var migration = await RealMigrateAsync("carv-migration");
+            var columns = await CountAsync("SELECT count(*) FROM information_schema.columns WHERE table_schema='authority' AND table_name='content_change_operations' AND column_name LIKE '%acceptance_rule_version'");
+            var recorded = await CountAsync($"SELECT count(*) FROM authority.ef_migrations_history WHERE \\"MigrationId\\" = '{CarvMigrationId}'");
+            var guard = await CountAsync("SELECT count(*) FROM pg_catalog.pg_trigger WHERE tgname = 'trg_content_operation_rule_state_guard'");
+            Record("MG-01", "migration while a legacy commit transaction holds the table: lock timeout, nothing applied", "SQLSTATE 55P03; 0 new columns", $"{migration}; columns={columns}", migration.StartsWith("55P03", StringComparison.Ordinal) && columns == 0);
+            Record("RM-01", "the failed real migration is atomic: no history row, no trigger, no column (one transaction)", "history 0; trigger 0; columns 0", $"history={recorded}; trigger={guard}; columns={columns}", recorded == 0 && guard == 0 && columns == 0);''')
+
+# MG-02: real migration waits for the open legacy Prepare
+rep('''            var migration = Task.Run(() => ExecFileAsync(adminCs, "carv_up.sql", lockTimeout: "30s", application: "carv-migration"));''',
+    '''            var migration = Task.Run(() => RealMigrateAsync("carv-migration"));''')
+rep('''            Record("MG-02", "migration waits for an open legacy Prepare, then applies", "migration waited on a lock; Prepare OK; migration OK", $"waited={waited}; migration={migrated}", waited && migrated == "OK");
+        }''',
+    '''            Record("MG-02", "migration waits for an open legacy Prepare, then applies", "migration waited on a lock; Prepare OK; migration OK", $"waited={waited}; migration={migrated}", waited && migrated == "OK");
+            var history = await ScalarAsync(adminCs, $"SELECT count(*)||' rows; carv='||count(*) FILTER (WHERE \\"MigrationId\\" = '{CarvMigrationId}') FROM authority.ef_migrations_history");
+            Record("RM-02", "the real migration is recorded once by EF (30 migrations in total)", "30 rows; carv=1", history, history == "30 rows; carv=1");
+        }''')
+
+# MG-06: the real Down (EF script of the migration's Down) then the real Up (--migrate)
+rep('''            var down = await ExecFileAsync(adminCs, "carv_down.sql", application: "carv-down");
+            var up = await ExecFileAsync(adminCs, "carv_up.sql", application: "carv-migration");''',
+    '''            var down = await ExecScriptAsync(adminCs, "real_down.sql", application: "carv-down");
+            var up = await RealMigrateAsync("carv-migration");''')
+
+# after the emulation is installed: the real Down refuses while a CARV-prepared operation is in flight
+rep('''        var ce = Instance("CE", runtimeCs + ";Options=-c carv.emulate_version=1");
+''',
+    '''        var ce = Instance("CE", runtimeCs + ";Options=-c carv.emulate_version=1");
+        {
+            var inFlight = await PrepareAsync(ce, orgB.Records[1]);
+            var refusedDown = await ExecScriptAsync(adminCs, "real_down.sql", application: "carv-down");
+            Record("RM-03", "the real guarded Down refuses while an operation prepared under CARV rules is in flight", "refused (in flight); migration still recorded", $"{refusedDown}; {await StampsAsync(inFlight.Op.OperationId)}",
+                refusedDown.Contains("in flight", StringComparison.Ordinal) && await CountAsync($"SELECT count(*) FROM authority.ef_migrations_history WHERE \\"MigrationId\\" = '{CarvMigrationId}'") == 1);
+        }
+''')
+
+# PF-06: the real Down refuses once a floor exists
+rep('''            var down = await ExecFileAsync(adminCs, "carv_down.sql", application: "carv-down");
+            Record("PF-06",''', '''            var down = await ExecScriptAsync(adminCs, "real_down.sql", application: "carv-down");
+            Record("PF-06",''')
+
+# helpers
+rep('''    // ------------------------------------------------------------------------------------------------ evidence helpers''',
+    '''    // ------------------------------------------------------------------------------------------------ real migration
+    private const string CarvMigrationId = "20261115014221_AuthorityContentAcceptanceRuleVersion";
+
+    /// <summary>Applies pending migrations with the NEW binary's own --migrate entry point (EF Migrate + runtime grants).</summary>
+    private async Task<string> RealMigrateAsync(string application)
+    {
+        var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        start.ArgumentList.Add(newBinary);
+        start.ArgumentList.Add("--migrate");
+        start.Environment["ConnectionStrings__AuthorityDbMigration"] = new NpgsqlConnectionStringBuilder(adminCs) { ApplicationName = application }.ConnectionString;
+        var started = Stopwatch.StartNew();
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("could not start --migrate");
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        var output = (await stdout) + "\\n" + (await stderr);
+        Log($"real --migrate ({application}) exit {process.ExitCode} in {started.ElapsedMilliseconds} ms");
+        if (process.ExitCode == 0)
+        {
+            return "OK";
+        }
+
+        var match = System.Text.RegularExpressions.Regex.Match(output, @"PostgresException \\(0x[0-9A-Fa-f]+\\): ([0-9A-Z]{5}): ([^\\r\\n]*)");
+        var result = match.Success ? $"{match.Groups[1].Value} : {match.Groups[2].Value}" : "exit " + process.ExitCode + ": " + output.Trim().Split('\\n').FirstOrDefault();
+        Log("real --migrate failed: " + result);
+        return result;
+    }
+
+    /// <summary>Runs an EF-generated script that manages its own transaction (START TRANSACTION ... COMMIT).</summary>
+    private async Task<string> ExecScriptAsync(string cs, string file, string application)
+    {
+        var sql = await File.ReadAllTextAsync(Path.Combine(sqlDir, file));
+        try
+        {
+            await using var connection = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(cs) { ApplicationName = application }.ConnectionString);
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand(sql, connection);
+            await command.ExecuteNonQueryAsync();
+            Log($"{file} applied ({application})");
+            return "OK";
+        }
+        catch (PostgresException ex)
+        {
+            Log($"{file} failed: {ex.SqlState} {ex.MessageText}");
+            return $"{ex.SqlState} {ex.ConstraintName}: {ex.MessageText}";
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------------ evidence helpers''')
+
+open(path, "w", encoding="utf-8", newline="\n").write(s)
+print("harness A patched")

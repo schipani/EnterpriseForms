@@ -1,0 +1,180 @@
+"""E3-M2b-1 enforcement-removal checks on real PostgreSQL. Each mutation removes one part of the fence, builds a mutated
+Release Authority (or a mutated harness SQL directory), runs harness A or B against a disposable PostgreSQL container, and
+records which checks failed. Source files are backed up in the scratchpad, restored after the build, and SHA-256 verified.
+Finally the unmutated Release build is rebuilt and compared with newbin-sha256.txt (restore proof).
+Usage: python -I mutate_pg.py <repo> <scratch-carv-dir>"""
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+repo, S = sys.argv[1], sys.argv[2]
+SQL_CS = "src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceRuleSql.cs"
+STORE = "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityStore.cs"
+READY = "src/authority/AuthorizationAuthority.Api/Composition/SigningProviderPolicy.cs"
+SERVICE = "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs"
+API = "src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj"
+API_OUT = os.path.join(repo, "src/authority/AuthorizationAuthority.Api/bin/Release/net10.0")
+
+
+def sp(n):
+    return " " * n
+
+
+COMMIT_CHECK_BODY = (
+    "AND ((prepare_acceptance_rule_version IS NULL AND commit_acceptance_rule_version IS NULL)\n" + sp(26)
+    + "OR (prepare_acceptance_rule_version IS NOT NULL AND commit_acceptance_rule_version IS NOT NULL\n" + sp(30)
+    + "AND commit_acceptance_rule_version = prepare_acceptance_rule_version)))")
+
+GUARD_INSERT_AND_TERMINAL = (
+    "IF TG_OP = 'INSERT' THEN\n" + sp(16)
+    + "IF NEW.operation_state_name <> 'Prepared' OR NEW.commit_acceptance_rule_version IS NOT NULL THEN\n" + sp(20)
+    + "RAISE EXCEPTION 'content operation must be inserted as Prepared without a commit rule version'\n" + sp(24)
+    + "USING ERRCODE = 'check_violation', CONSTRAINT = 'trg_content_operation_rule_state_guard';\n" + sp(16)
+    + "END IF;\n" + sp(16) + "RETURN NEW;\n" + sp(12) + "END IF;\n" + sp(12)
+    + "IF OLD.operation_state_name <> 'Prepared' THEN\n" + sp(16)
+    + "RAISE EXCEPTION 'a terminal content operation is immutable'\n" + sp(20)
+    + "USING ERRCODE = 'check_violation', CONSTRAINT = 'trg_content_operation_rule_state_guard';\n" + sp(12)
+    + "END IF;")
+
+CREATE_TRIGGER = (
+    "CREATE TRIGGER trg_content_operation_rule_state_guard\n" + sp(12)
+    + "BEFORE INSERT OR UPDATE ON authority.content_change_operations\n" + sp(12)
+    + "FOR EACH ROW EXECUTE FUNCTION authority.content_operation_rule_state_guard();")
+
+FLOOR_V1 = "CHECK (operation_state_name NOT IN ('Prepared', 'Committed') OR (prepare_acceptance_rule_version IS NOT NULL AND prepare_acceptance_rule_version >= 1)) NOT VALID;"
+FLOOR_V2 = "CHECK (operation_state_name NOT IN ('Prepared', 'Committed') OR (prepare_acceptance_rule_version IS NOT NULL AND prepare_acceptance_rule_version >= 2)) NOT VALID,"
+
+# (id, removal, harness, kind, edits): kind "build" = [(file, old, new)], kind "sql" = [(sql file, old, new)]
+MUTATIONS = [
+    ("MD-1", "commit CHECK without its IS NOT NULL terms (design defect D-1)", "A", "build",
+     [(SQL_CS, COMMIT_CHECK_BODY, "AND commit_acceptance_rule_version = prepare_acceptance_rule_version)")]),
+    ("MD-2", "commit CHECK as the drafted '>=' rule instead of exact equality (D-3)", "A", "build",
+     [(SQL_CS, COMMIT_CHECK_BODY, "AND COALESCE(commit_acceptance_rule_version, 0) >= COALESCE(prepare_acceptance_rule_version, 0))")]),
+    ("MD-3", "state guard reduced to Prepare-stamp immutability only (D-5)", "A", "build",
+     [(SQL_CS, GUARD_INSERT_AND_TERMINAL, "IF TG_OP = 'INSERT' THEN\n" + sp(16) + "RETURN NEW;\n" + sp(12) + "END IF;")]),
+    ("MD-4", "state-guard trigger not created at all", "A", "build",
+     [(SQL_CS, CREATE_TRIGGER, "SELECT 1;")]),
+    ("MD-5", "floor restricted to Prepared rows (D-2; harness floor SQL, M2b-1F is not in this release)", "A", "sql",
+     [("floor_v1.sql", FLOOR_V1, "CHECK (operation_state_name <> 'Prepared' OR (prepare_acceptance_rule_version IS NOT NULL AND prepare_acceptance_rule_version >= 1)) NOT VALID;")]),
+    ("MD-6", "floor without its IS NOT NULL term (D-1; harness floor SQL)", "A", "sql",
+     [("floor_v1.sql", FLOOR_V1, "CHECK (operation_state_name NOT IN ('Prepared', 'Committed') OR prepare_acceptance_rule_version >= 1) NOT VALID;"),
+      ("floor_v2.sql", FLOOR_V2, "CHECK (operation_state_name NOT IN ('Prepared', 'Committed') OR prepare_acceptance_rule_version >= 2) NOT VALID,")]),
+    ("MR-1", "store adapter no longer maps CARV database refusals", "B", "build",
+     [(STORE, "catch (DbUpdateException ex) when (ContentAcceptanceRuleRefusals.Translate(ex, alerts) is { } refused)",
+       "catch (DbUpdateException ex) when (ex.Entries.Count < 0 && ContentAcceptanceRuleRefusals.Translate(ex, alerts) is { } refused)")]),
+    ("MR-2", "host readiness no longer consults the CARV guard", "B", "build",
+     [(READY, "var (rulesReady, rulesDetail) = contentAcceptanceRules.Current;",
+       "var (rulesReady, rulesDetail) = contentAcceptanceRules is null ? (false, \"unreachable\") : (true, \"guard ignored\");")]),
+    ("MR-3", "the CARV Commit rule removed (the database fence alone remains)", "B", "build",
+     [(SERVICE, "        if (!ContentAcceptanceRules.IsCommittableByThisBuild(operation.PrepareAcceptanceRuleVersion))\n        {\n            operation.OperationStateName = ContentOperationStates.Aborted;",
+       "        if (operation.PrepareAcceptanceRuleVersion == int.MinValue)\n        {\n            operation.OperationStateName = ContentOperationStates.Aborted;")]),
+]
+
+
+def sha(path):
+    return hashlib.sha256(open(path, "rb").read()).hexdigest()
+
+
+def run(args, cwd=None):
+    return subprocess.run(args, cwd=cwd or repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+
+def hashes(directory, out):
+    lines = []
+    for name in sorted(os.listdir(directory)):
+        if name.endswith(".dll") and (name.startswith("AuthorizationAuthority.") or name == "EnterpriseForms.Integrity.dll"):
+            lines.append(f"{sha(os.path.join(directory, name))} *{name}")
+    open(out, "w", encoding="ascii", newline="\r\n").write("\n".join(lines) + "\n")
+    return lines
+
+
+def build_release():
+    r = run(["dotnet", "build", API, "-c", "Release", "-nologo", "-v", "q"])
+    return r.returncode == 0, (r.stdout + r.stderr)[-1500:]
+
+
+def harness(kind, mid, newbin=None, sqldir=None):
+    evidence = os.path.join(S, "mutation-evidence", mid)
+    shutil.rmtree(evidence, ignore_errors=True)
+    os.makedirs(evidence)
+    args = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(S, f"run-{kind}.ps1"), "-Legacy", "66f0aa7", "-Evidence", evidence]
+    if newbin:
+        args += ["-NewBin", newbin]
+    if sqldir:
+        args += ["-SqlDir", sqldir]
+    if kind == "B" and newbin:
+        harness_bin = os.path.join(S, f"harnessB-bin-{mid}")
+        shutil.rmtree(harness_bin, ignore_errors=True)
+        shutil.copytree(os.path.join(S, "harnessB", "bin", "Release", "net10.0"), harness_bin)
+        for name in os.listdir(newbin):
+            if name.endswith(".dll") and (name.startswith("AuthorizationAuthority.") or name == "EnterpriseForms.Integrity.dll"):
+                shutil.copyfile(os.path.join(newbin, name), os.path.join(harness_bin, name))
+        args += ["-HarnessBin", harness_bin, "-NewBinHashFile", os.path.join(S, f"hashes-{mid}.txt")]
+    r = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    report = os.path.join(evidence, "carv-evidence.json")
+    if not os.path.exists(report):
+        return {"harnessError": (r.stdout + r.stderr)[-2000:]}
+    data = json.load(open(report, encoding="utf-8"))
+    failed = [c for c in data["checks"] if not c["Pass"]]
+    return {"checksTotal": data["checksTotal"], "checksFailed": data["checksFailed"], "failedChecks": [{"id": c["Id"], "observed": c["Observed"][:300]} for c in failed]}
+
+
+results = []
+for mid, removal, kind, how, edits in MUTATIONS:
+    entry = {"id": mid, "removal": removal, "harness": kind}
+    print("running", mid, flush=True)
+    if how == "sql":
+        sqldir = os.path.join(S, f"sql-{mid}")
+        shutil.rmtree(sqldir, ignore_errors=True)
+        shutil.copytree(os.path.join(S, "sql"), sqldir)
+        for name, old, new in edits:
+            p = os.path.join(sqldir, name)
+            text = open(p, encoding="utf-8").read()
+            assert text.count(old) == 1, (mid, name)
+            open(p, "w", encoding="utf-8", newline="").write(text.replace(old, new))
+        entry.update(harness(kind, mid, sqldir=sqldir))
+    else:
+        backups = []
+        try:
+            for rel, old, new in edits:
+                path = os.path.join(repo, rel)
+                backup = os.path.join(S, "mutation-backups", f"{mid}-{os.path.basename(path)}")
+                os.makedirs(os.path.dirname(backup), exist_ok=True)
+                shutil.copyfile(path, backup)
+                backups.append((path, backup, sha(path)))
+                text = open(path, encoding="utf-8").read()
+                assert text.count(old) == 1, (mid, rel, text.count(old))
+                open(path, "w", encoding="utf-8", newline="").write(text.replace(old, new))
+            ok, log = build_release()
+            newbin = os.path.join(S, f"newbin-{mid}")
+            if ok:
+                shutil.rmtree(newbin, ignore_errors=True)
+                shutil.copytree(API_OUT, newbin)
+                hashes(newbin, os.path.join(S, f"hashes-{mid}.txt"))
+        finally:
+            for path, backup, original in backups:
+                shutil.copyfile(backup, path)
+                entry.setdefault("restoredSha256Matches", True)
+                entry["restoredSha256Matches"] = entry["restoredSha256Matches"] and sha(path) == original
+        if not ok:
+            entry["build"] = "FAILED: " + log
+        else:
+            entry.update(harness(kind, mid, newbin=newbin))
+    entry["detected"] = entry.get("checksFailed", 0) > 0
+    results.append(entry)
+    print(json.dumps({k: v for k, v in entry.items() if k != "failedChecks"}), flush=True)
+
+# restore proof: the unmutated Release build reproduces the hashes the evidence runs used
+ok, log = build_release()
+rebuilt = os.path.join(S, "newbin-rebuilt")
+shutil.rmtree(rebuilt, ignore_errors=True)
+shutil.copytree(API_OUT, rebuilt)
+lines = hashes(rebuilt, os.path.join(S, "newbin-rebuilt-sha256.txt"))
+original = [l.strip() for l in open(os.path.join(S, "newbin-sha256.txt"), encoding="utf-8-sig") if l.strip()]
+results.append({"id": "RESTORE", "rebuildOk": ok, "identicalToEvidenceBuild": sorted(lines) == sorted(original)})
+print(json.dumps(results[-1]), flush=True)
+json.dump(results, open(os.path.join(S, "mutation-pg-results.json"), "w", encoding="utf-8"), indent=2)
+print("done")
