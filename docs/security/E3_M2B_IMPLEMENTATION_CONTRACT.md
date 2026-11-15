@@ -7,8 +7,9 @@
 | This document | §0–§19: design for owner review (they changed no code). §20: the record of the authorized E3-M2b-1 implementation. |
 | E3-M1 | Accepted for Development/Testing; local signed commit `de1729be569aa564d8a43a6c422f88a731ca48d1` |
 | E3-M2a | Accepted for Development/Testing; local signed commit `66f0aa7b257d984555533ceb10dfccfa921aa273` (branch `e3/m1-envelope-v2-core`, clean tree at the start of this task) |
-| E3-M2b-1 (CARV) | **Authorized for Development/Testing (2026-11-14) and implemented, uncommitted, owner review pending: §20** |
-| E3-M2b-1F (floor), E3-M2b-2 and later | **Not authorized** |
+| E3-M2b-1 (CARV) | **Implemented and owner-accepted for Development/Testing (2026-11-14, §20.9), signed local commit `c44be41`: §20** |
+| E3-M2b-1F (floor) | **Implemented and owner-accepted for Development/Testing (2026-11-15), signed local commit; Release B not activated; mandatory gate RB-CARV-1 open: §21** |
+| E3-M2b-2 and later | **Not authorized** |
 | Independent cryptographic review (V2-IND-01) | Required before production; not started |
 | Production use of Envelope v2 | Not approved |
 | **E3-M2b-1 CARV final design gate** | **§19** (2026-11-14). The owner conditionally approved the CARV direction. The real-PostgreSQL gate ran against two real pre-CARV Authority binaries (47/47 checks each; evidence in `docs/evidence/e3-m2b1-carv/`). It found and corrected design defects D-1 to D-5. **§19 supersedes §3, §9.1, §9.2, §16 and §17.1.** |
@@ -1231,6 +1232,172 @@ The owner accepted E3-M2b-1 for Development/Testing on the reported implementati
 The Authority's `retryable` flag describes the operation level only; it does not mean the business action is forbidden.
 
 **R-CARV-11 (F-17) backlog entry, preserved.** *Behaviour:* if a record-creation retry reproduced the identical canonical request digest under the same idempotency key, `CreateFormRecordHandler` step 2 would receive the existing (aborted) operation from the Prepare replay, and the subsequent Commit would fail with an unmapped `OPERATION_STATE_INVALID`. *Reachability:* not reachable in practice: every retry rebuilds the candidate with fresh row identities and fresh ciphertext, so the digest differs and the Authority answers `IDEMPOTENCY_CONFLICT`, which step 2 maps to step 3 (fresh retry key). *Safety:* never an acceptance; the aborted operation cannot commit (RB-03c; `ACommitOfAnOperationPreparedUnderOtherRulesIsAbortedBeforeAnyVerificationAndNothingIsAccepted` asserts `OPERATION_STATE_INVALID` on the second commit). *Regression evidence:* M2-CARV-08 (`ContentAcceptanceRuleBusinessMappingTests`) pins the step 1/2 code sets, and MA-8/MA-9 show they are load-bearing. *Status:* open, deferred; resolving it (mapping `OPERATION_STATE_INVALID` in step 2) needs a separate authorization.
+
+---
+
+## 21. E3-M2b-1F CARV database floor — implementation record (2026-11-14)
+
+**Status.** Implemented for **Development/Testing only** on `e3/m1-envelope-v2-core` on top of the signed E3-M2b-1 commit `c44be41c45991e1247de37eb12e871a920182a05`; **owner-accepted for Development/Testing (2026-11-15, §21.10)** and committed as one signed local commit (not pushed). Release B is not activated; gate RB-CARV-1 is open. Owner-led work; not an independent review, not a certification. The floor was activated **only in disposable PostgreSQL containers**; no persistent database, Azure service or deployment was touched; Stage B did not run. Envelope v2, signed schema 2, encryption and key providers are unchanged; E3-M2b-2 was not started.
+
+**Objective.** Close R-CARV-1: after controlled activation, no pre-CARV Authority build can prepare or commit a content operation.
+
+### 21.1 What was implemented
+
+| Area | Change |
+|---|---|
+| Floor migration | `20261115032228_AuthorityContentAcceptanceRuleFloor1` in `Persistence/FloorMigrations/`, belonging to the new model-less `ContentAcceptanceFloorContext` (§21.2). Up = `ContentAcceptanceFloorSql.UpSql`; Down always raises `floors are never lowered`. No existing migration was modified. |
+| Floor SQL (`ContentAcceptanceFloorSql`) | One transaction: `SET LOCAL lock_timeout = '5s'`; `LOCK TABLE authority.content_change_operations IN ACCESS EXCLUSIVE MODE`; preconditions under the lock (§21.3); then exactly the §19.5 floor `ck_content_operation_rule_floor_v1 CHECK (operation_state_name NOT IN ('Prepared', 'Committed') OR (prepare_acceptance_rule_version IS NOT NULL AND prepare_acceptance_rule_version >= 1)) NOT VALID`. |
+| Operator command | `AuthorizationAuthority.Api.dll --apply-content-acceptance-floor 1 [--reinstate-recorded-floor]` (`ContentAcceptanceFloorCommand`): migration identity only, the floor number stated explicitly, refused together with `--migrate`. It migrates only the floor context, then verifies that the constraint exists (exit 4 if the history records it but it is missing; §21.6). |
+| Detection (readiness, additive to E3-M2b-1) | `SchemaFacts.FloorRecorded` (history row of the floor migration); `ContentAcceptanceRules.Evaluate(..., requiredFloor)`; option `ContentAcceptance:RequiredFloor` (`ContentAcceptanceRuleOptions`; invalid values fail at startup). New not-ready reasons: `ContentAcceptanceRuleFloorMissing`, `ContentAcceptanceRuleFloorBelowRequired`, `ContentAcceptanceRuleRequiredFloorAboveBuild`. Every E3-M2b-1 decision and detail string is unchanged. |
+| Unchanged | The E3-M2b-1 migration, its CHECKs and state guard, the Prepare/Commit rules, the store mapping (floor refusals already map to `409 OPERATION_RULES_OUTDATED`), the business mapping, the ordinary `--migrate`. |
+| Gate | Harness F (`tools/experiments/e3-m2b1-carv-gate/HarnessF`) added to `scripts/dev/e3-m2b1-carv-pg-gate.ps1`; the legacy agent gained an optional clock offset (default 0, so harness B is unaffected); the gate passes `--context AuthorityDbContext` to `dotnet ef` (two contexts now exist in the assembly). |
+| Documents | `docs/security/E3_M2B1_CARV_OPERATIONS.md` (Release B procedure, readiness, recovery, rollback); `trust_authority/DISASTER_RECOVERY_OPERATOR_RUNBOOK.md` (the re-apply command); evidence `docs/evidence/e3-m2b1-carv/floor/`. |
+
+### 21.2 Release A / Release B separation (the activation mechanism)
+
+| Property | How it is guaranteed | Proof |
+|---|---|---|
+| The ordinary migration runner can never apply the floor | EF discovers migrations per context by their `[DbContext]` attribute. The floor migration is attributed to `ContentAcceptanceFloorContext`; `--migrate`, the host and `dotnet ef` for the Authority run `AuthorityDbContext`, which cannot see it. This is structural and independent of which build is deployed. | `TheOrdinaryAuthorityMigrationSetNeverContainsTheFloor`, `TheFloorContextOwnsExactlyTheFloorMigrationAndSharesTheAuthorityHistoryTable`; real PostgreSQL FX-02/FX-03 (a build that contains the floor, migrated twice with `--migrate`: E3-M2b-1 applied, floor never); FX-22 (`--migrate` after activation keeps the floor) |
+| Activation is an explicit, separate action | Only `--apply-content-acceptance-floor 1`; refused with `--migrate` or without the explicit floor number | `TheFloorCommandRefusesAnUnstatedFloorOrACombinationWithMigrate` (5 cases) |
+| Activation fails closed before every instance is upgraded and in-flight work is reconciled | Preconditions inside the locked transaction (§21.3) | FX-01, FX-06, FX-08, FX-12a |
+| One history table | The floor context uses `authority.ef_migrations_history`, which the runtime role already reads, so readiness can see that a floor was recorded (no new grant) | FX-25 |
+
+### 21.3 Activation preconditions (inside the floor transaction, after the ACCESS EXCLUSIVE lock)
+
+1. The E3-M2b-1 fence is complete: its migration is recorded, the commit CHECK is present and validated, the state guard is enabled.
+2. No floor is installed yet.
+3. No **unexpired** `Prepared` operation with a NULL Prepare stamp (a pre-CARV build's operation still in flight). Reconcile by expiry or by letting a CARV instance abort it (FX-06/07).
+4. No connected client session of a non-superuser role that may `UPDATE` `content_change_operations`, other than the migration identity, whose `application_name` lacks a `carv-v` marker (the LISTEN-only `authority-work-listener` excepted). A session whose name is not visible counts as unmarked (fail closed).
+
+Because they run under the ACCESS EXCLUSIVE lock, no operation write can happen between the checks and the floor: any writer either finished before the lock or waits and is then checked against the floor (FL-01..FL-06 for the constraint; FX-12a with a legacy Prepare in progress). The preconditions are availability and correctness guards; **security does not depend on them**: once the floor exists, the database refuses every pre-CARV Prepare and Commit whatever happened before.
+
+### 21.4 Real-PostgreSQL results (runs of record)
+
+`scripts/dev/e3-m2b1-carv-pg-gate.ps1 -LegacyBinariesRoot <frozen builds>`: a fresh Release build of this tree, the frozen `66f0aa7` and `de1729b` builds (SHA-256 equal to the design-gate evidence), a fresh `postgres:18.0` container per run. Evidence: `docs/evidence/e3-m2b1-carv/floor/runs-of-record/`.
+
+| Run | 66f0aa7 | de1729b |
+|---|---|---|
+| Harness A (E3-M2b-1 regression: 47 design-gate checks + RM-01..03) | 50/50 | 50/50 |
+| Harness B (E3-M2b-1 regression: the real CARV build) | 36/36 | 36/36 |
+| **Harness F (the floor)** | **30/30** | **30/30** |
+
+**Owner proofs (authorization §4):**
+
+| # | Requirement | Evidence (both legacy builds) |
+|---|---|---|
+| 1 | Legacy Prepare refused after the floor | FX-14 (23514 `ck_content_operation_rule_floor_v1`, nothing persisted, legacy host 503), FX-27 (after re-application) |
+| 2 | Legacy Commit refused after the floor | FX-15: a legacy instance whose clock lags the database by 11 minutes commits its pre-floor operation after activation; refused by the floor, snapshot unchanged |
+| 3 | Legacy-to-legacy cannot reach acceptance | FX-14 + FX-15 + FX-16 (no Committed row with a NULL stamp after activation). Before the floor the same path is accepted (FX-04: the R-CARV-1 exposure this closes) |
+| 4 | Current CARV operations work | FX-12 (4 instances writing concurrently during activation), FX-17, FX-21 |
+| 5 | Version mismatches rejected | FX-18 (forged unstamped or zero-stamped Prepared rows; a commit at another rule version), FX-19 (an operation stamped by a newer rule version is aborted by the v1 Commit rule) |
+| 6 | Historical operations cannot bypass the floor | FX-20 (a Committed row cannot be reopened, an Aborted row cannot be revived, and even a superuser update of an unstamped Prepared row violates the floor), FX-15 |
+| 7 | No rejected operation advances head, manifest, leaves, identities, journal or checkpoint | FX-15 snapshot equality; FX-14 no persisted operation; the E3-M2b-1 snapshot checks in A and B |
+| 8 | Concurrency during activation | FX-12 (concurrent CARV writers wait out the lock and succeed), FX-12a (a legacy Prepare in progress makes activation refuse; it lands pre-floor and is reconciled, FX-12b), harness A FL-01..FL-06 (the identical constraint under held transactions) |
+| 9 | Failure or lock timeout leaves no partial floor | FX-09 (55P03), FX-10 (backend terminated while waiting), FX-01/06/08 (refusals): no constraint and no history row each time |
+| 10 | Re-running is safe | FX-22 (no-op, one history row), FX-26 (re-applied after a simulated restore) |
+
+### 21.5 Concurrency and atomicity
+
+The serialization point is the floor transaction's ACCESS EXCLUSIVE lock, taken before the preconditions (§19.4 still holds: every operation write is wholly before or wholly after the floor commit). A lock timeout, a terminated backend or any refusal rolls the whole migration back, including EF's history row (FX-01, -06, -08, -09, -10). Concurrent CARV writers simply wait (FX-12: 24 writes, no unexpected outcome).
+
+### 21.6 Recovery and rollback (tested)
+
+| Case | Finding |
+|---|---|
+| Interrupted activation | Nothing applied; re-run (FX-09/10) |
+| Constraint dropped, history row present | Readiness `ContentAcceptanceRuleFloorMissing`; the command exits 4; `--reinstate-recorded-floor` re-installs it under the same preconditions (FX-25) |
+| Restore to before the floor (constraint and history gone) | **Undetectable from the database alone** (it looks like Release A); detected by readiness when `ContentAcceptance:RequiredFloor = 1` is configured; the command re-applies the floor (FX-26). While it is missing, pre-CARV builds can write again: during development a harness defect left the floor un-reapplied and a legacy Prepare was accepted, which is exactly this exposure |
+| Lowering or removal | The floor's Down refuses; the E3-M2b-1 Down refuses while a floor exists; the runtime role cannot drop it (FX-23). No downgrade mechanism exists |
+| Legacy binary rollback after activation | Impossible by design: every legacy Prepare is refused (FX-14) and the legacy host reports 503. Roll forward only |
+| Operator actions before reopening writes | Confirm `floor 1` on every instance (readiness with `RequiredFloor = 1`); re-apply the floor after any restore; treat any `FloorMissing` as an incident (operations runbook §6) |
+
+### 21.7 Enforcement-removal checks
+
+Each removal was applied alone, built and tested, then reverted; every file's SHA-256 matched its backup afterwards.
+
+**Application level (Authority tests):**
+
+| ID | Removed | Detected by |
+|---|---|---|
+| MF-1 | the separation (floor migration attributed to `AuthorityDbContext`) | 2 tests (`TheOrdinaryAuthorityMigrationSetNeverContainsTheFloor`, `TheFloorContextOwns...`) |
+| MF-2 | readiness on a recorded-but-missing floor | 1 test |
+| MF-3 | readiness on the required floor | 2 tests |
+| MF-4 | the refusal of `--migrate` in the same invocation | **Not detected at first**: the test cases supplied no connection string, so the command still exited 2, for a different reason. The tests now inject a (non-connectable) configuration, so exit 2 can only come from the refusal, with a positive control (exit 3). Re-run: **detected by 2 tests** |
+| MF-5 | the floor Down's refusal (replaced by a DROP) | 1 test |
+| MF-6 | the lock before the preconditions | 1 test (the only detection; R-CARV-19) |
+
+**Real PostgreSQL (mutated Release build, harness F, legacy `66f0aa7`):**
+
+| ID | Removed | Failed checks |
+|---|---|---|
+| MP-1 | the separation | FX-01..03 and the harness aborts: the ordinary `--migrate` installed the floor (FX-02 `floor=1`), i.e. premature activation in Release A |
+| MP-2 | the in-flight pre-CARV operation precondition | FX-06, FX-08..10 (activation succeeded with a legacy operation in flight) |
+| MP-3 | the unmarked-session precondition | FX-08..10 (activation succeeded with a pre-CARV session connected) |
+| MP-4 | the floor's `Committed` scope (D-2) | FX-13, **FX-15: the lagging legacy instance's Commit of its pre-floor operation was accepted (the head advanced)**, FX-20 |
+| MP-5 | the floor's `IS NOT NULL` term (D-1) | 8 checks: FX-13..15, -18, -20, -25..27 (legacy Prepare and Commit accepted) |
+| MP-6 | the floor Down's refusal | FX-23..25 (the Down removed the floor) |
+| MP-7 | the command's check that the recorded floor exists | FX-25 |
+
+### 21.8 Test results
+
+| Suite | Result |
+|---|---|
+| Authority (full) | 724 total: **720 passed, 0 failed, 4 skipped** (real-Vault classes). Before E3-M2b-1F: 704. +20 new tests (`ContentAcceptanceFloorTests`) |
+| Contract (full) | 792 total: **783 passed, 0 failed, 9 skipped** (real-Vault classes) |
+| Architecture | **124/124** |
+| Integrity | **60/60** |
+| Real PostgreSQL | §21.4: A 50/50 ×2, B 36/36 ×2, F 30/30 ×2 |
+| Specification manifest | regenerated (the operations runbook, the DR runbook, the gate script and this contract changed); `validate-specifications.py --strict` passes |
+| Stage B | **Not run** |
+
+### 21.9 Residual risks
+
+| ID | Risk | Disposition |
+|---|---|---|
+| R-CARV-1 | Legacy builds committing under old rules | **Closed after activation** (Development/Testing evidence), as long as the floor stays installed. Reopens while the floor is missing (restore, privileged drop): R-CARV-4/-17 |
+| R-CARV-4 | A restore removes the floor | Mitigated: re-apply command, `RequiredFloor` detection, runbook entries. Still an operator duty |
+| R-CARV-16 | The session precondition trusts a self-declared `application_name` marker and ignores the LISTEN-only connection name; a pre-CARV instance holding no store connection at the moment of activation is not seen | **Accepted by the owner (§21.10)** with this limitation. Availability guard only: after activation such an instance is refused by the database anyway |
+| R-CARV-17 | Without `ContentAcceptance:RequiredFloor`, a restore to before the floor is not detected by readiness | **Mandatory Release B gate RB-CARV-1 (§21.10)**: protected deployment configuration and fail-closed writes. Open |
+| R-CARV-18 | `pg_stat_activity` visibility for a non-superuser migration identity (Azure) is unverified; invisible names count as unmarked, so activation could be refused | **Accepted by the owner (§21.10)** with this limitation. Fail closed; verify on Azure PostgreSQL |
+| R-CARV-19 | The lock-before-preconditions order is enforced by a unit test only; no PostgreSQL test fails if it is removed, because the floor itself still refuses later legacy writes | **Retained (§21.10)**: recommendation to add stronger PostgreSQL regression evidence before Release B. Defence in depth; documented |
+| R-CARV-20 | Two DbContexts in the Authority Infrastructure assembly: `dotnet ef` now needs `--context` | **Accepted by the owner (§21.10)**. Developer workflow change; the gate is updated |
+| R-CARV-5, -11, -12, -13 and the rest | As before | Unchanged (R-CARV-12 remains an open release-gate question; R-CARV-11/F-17 remains open) |
+
+**Deployment prerequisites (Release B):** owner approval of this record (given for Development/Testing, §21.10); PB-11/PB-12 approvals; Release A fully rolled out and pre-CARV instances drained (deployment inventory plus the `carv-v` marker check); in-flight pre-CARV operations reconciled; a low-traffic window; **gate RB-CARV-1 satisfied (§21.10)**; verification on Azure PostgreSQL (R-CARV-18); recommended: PostgreSQL regression evidence for the lock order (R-CARV-19).
+
+### 21.10 Owner acceptance and the mandatory Release B safeguard (2026-11-15)
+
+**Owner acceptance (Development/Testing).** The owner accepted the E3-M2b-1F implementation on the reported implementation and test evidence and authorized one signed local commit. Owner-led review; not an independent review, not a certification, not a Release B activation.
+
+| # | Owner decision |
+|---|---|
+| 1 | The separate `ContentAcceptanceFloorContext` and the dedicated activation command `--apply-content-acceptance-floor 1` are approved (§21.2) |
+| 2 | The ACCESS EXCLUSIVE table lock before the activation preconditions is approved (§21.3, §21.5) |
+| 3 | The additive readiness detection of a missing or lowered floor is approved (§21.1) |
+| 4 | The optional clock offset in the test-only legacy agent is approved (§21.1 Gate) |
+| 5 | R-CARV-16, R-CARV-18 and R-CARV-20 are accepted with their documented limitations (§21.9) |
+| 6 | R-CARV-19 is retained as a recommendation for stronger PostgreSQL regression evidence before Release B |
+| 7 | R-CARV-11 and R-CARV-12 remain open risks |
+
+**Mandatory Release B gate RB-CARV-1 (open).** This is a release requirement. It is **not** a claim that the current implementation already satisfies it or has been proven in any deployment configuration.
+
+1. **Protected configuration.** After floor activation, `ContentAcceptance:RequiredFloor = 1` must be enforced through protected deployment configuration on every Authority instance. Business deployers and the Authority runtime must not be able to remove or lower it (PB-11 separately permissioned Authority pipeline), and changes must be audited. A Release B deployment without the setting fails the release gate (PB-12 evidence).
+2. **Fail closed.** A Release B Authority instance must refuse Authority writes when its required floor is absent, lowered, or cannot be verified.
+3. **Restore.** After a restore of AuthorityDb to a pre-floor state, Authority writes must not resume until the floor has been safely reinstated (`--apply-content-acceptance-floor 1` with the migration identity) and every instance reports `floor 1`.
+4. **Evidence.** Executed tests in Azure staging, linked through the PB-12 chain, for items 1–3.
+
+**What exists today (Development/Testing) and what does not:**
+
+| Item | Status |
+|---|---|
+| Detection of an absent, lowered or recorded-but-missing floor when `RequiredFloor` is set | **Implemented and tested**: not-ready `ContentAcceptanceRuleFloorBelowRequired` / `ContentAcceptanceRuleFloorMissing` (unit tests; FX-25/26) |
+| Floor that cannot be verified | **Implemented**: a failed schema read, a decision never made, or a decision older than `MaximumDecisionAge` is not ready |
+| Invalid setting (below 1) | **Implemented**: startup fails |
+| Write refusal on a not-ready decision | **Not implemented.** The guard feeds Authority readiness only; no write path consults it. Writes stop only if the deployment removes a not-ready instance from every write path and the organization gates stay closed. Neither is proven for any deployment configuration |
+| Protected delivery of `RequiredFloor` | **Not implemented.** It is ordinary configuration today; an absent setting silently means Release A semantics (R-CARV-17) |
+| Azure staging evidence | **None** |
+
+Satisfying item 2 therefore needs either a separately authorized production change that makes Authority writes refuse on the guard's not-ready decision (the recommended, stronger option), or proven deployment wiring that withdraws a not-ready instance from all write traffic, including internal callers and background work. No production code was changed for this record.
 
 ---
 

@@ -29,6 +29,13 @@ public sealed class Program
             return probeExitCode;
         }
 
+        // E3-M2b-1F: Release B only, an explicit operator action; ordinary --migrate never applies the floor, and the two are
+        // never combined in one invocation (the command refuses --migrate alongside it).
+        if (ContentAcceptanceFloorCommand.TryRun(args, out var floorExitCode))
+        {
+            return floorExitCode;
+        }
+
         if (MigrateCommand.TryRun(args, out var migrateExitCode))
         {
             return migrateExitCode;

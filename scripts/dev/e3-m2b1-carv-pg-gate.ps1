@@ -11,6 +11,8 @@
                own `--migrate` and its EF-scripted Down; CARV instances are a test-only database emulation.
     Harness B  the REAL CARV build of this tree in-process (its ContentService rules, store refusal mapping, readiness guard),
                with the legacy build driven through the legacy agent child process. No emulation trigger.
+    Harness F  E3-M2b-1F: the REAL floor migration, applied only by this tree's explicit --apply-content-acceptance-floor
+               command (never by --migrate), with the real CARV build and the legacy agent (including a lagging clock).
 
   Legacy builds come from -LegacyBinariesRoot\<first 7 characters of the commit>\ when present (for example the frozen
   design-gate builds whose hashes are in docs/evidence/e3-m2b1-carv), otherwise from `git archive` of the commit, built in the
@@ -66,8 +68,9 @@ Copy-Item (Join-Path $repo 'src\authority\AuthorizationAuthority.Api\bin\Release
 Save-Hashes $new (Join-Path $Evidence 'new-sha256.txt')
 Push-Location (Join-Path $repo 'src\authority\AuthorizationAuthority.Infrastructure')
 try {
-    Invoke-Checked 'dotnet' @('ef', 'migrations', 'script', $previousMigration, $carvMigration, '-o', (Join-Path $WorkDir 'sql\real_up.sql'))
-    Invoke-Checked 'dotnet' @('ef', 'migrations', 'script', $carvMigration, $previousMigration, '-o', (Join-Path $WorkDir 'sql\real_down.sql'))
+    # Two contexts live in the Infrastructure assembly since E3-M2b-1F (the floor has its own): name the Authority context.
+    Invoke-Checked 'dotnet' @('ef', 'migrations', 'script', $previousMigration, $carvMigration, '--context', 'AuthorityDbContext', '-o', (Join-Path $WorkDir 'sql\real_up.sql'))
+    Invoke-Checked 'dotnet' @('ef', 'migrations', 'script', $carvMigration, $previousMigration, '--context', 'AuthorityDbContext', '-o', (Join-Path $WorkDir 'sql\real_down.sql'))
 }
 finally { Pop-Location }
 foreach ($file in Get-ChildItem (Join-Path $gate 'sql') -Filter '*.sql.txt') { Copy-Item $file.FullName (Join-Path $WorkDir ('sql\' + $file.Name -replace '\.txt$', '')) }
@@ -98,6 +101,7 @@ foreach ($commit in $LegacyCommits) {
 
 # 3. Harness builds (copies outside the repository).
 $harnessB = Build-Copy (Join-Path $gate 'HarnessB') (Join-Path $WorkDir 'harnessB') $new
+$harnessF = Build-Copy (Join-Path $gate 'HarnessF') (Join-Path $WorkDir 'harnessF') $new
 $harnessA = @{}; $agents = @{}
 foreach ($short in $legacy.Keys) {
     $harnessA[$short] = Build-Copy (Join-Path $gate 'HarnessA') (Join-Path $WorkDir "harnessA-$short") $legacy[$short]
@@ -137,7 +141,8 @@ function Invoke-GateRun([string]$kind, [string]$short) {
         else {
             $env:CARV_AGENT = Join-Path $agents[$short] 'LegacyAgent.exe'
             $env:CARV_LEGACY = "legacy Authority Release build $short (legacy-$short-sha256.txt), driven by the legacy agent"
-            & (Join-Path $harnessB 'CarvHarnessB.exe') *> (Join-Path $runEvidence 'console.txt')
+            $exe = if ($kind -eq 'F') { Join-Path $harnessF 'CarvHarnessF.exe' } else { Join-Path $harnessB 'CarvHarnessB.exe' }
+            & $exe *> (Join-Path $runEvidence 'console.txt')
         }
 
         $code = $LASTEXITCODE
@@ -156,7 +161,7 @@ function Invoke-GateRun([string]$kind, [string]$short) {
     }
 }
 
-$results = foreach ($short in $legacy.Keys | Sort-Object) { Invoke-GateRun 'A' $short; Invoke-GateRun 'B' $short }
+$results = foreach ($short in $legacy.Keys | Sort-Object) { Invoke-GateRun 'A' $short; Invoke-GateRun 'B' $short; Invoke-GateRun 'F' $short }
 $results | Format-Table -AutoSize | Out-String | Write-Output
 $results | ConvertTo-Json | Set-Content -Encoding ascii (Join-Path $Evidence 'summary.json')
 if ($results | Where-Object { $_.ExitCode -ne 0 -or $_.Failed -ne 0 -or -not $_.ContainerRemoved }) {

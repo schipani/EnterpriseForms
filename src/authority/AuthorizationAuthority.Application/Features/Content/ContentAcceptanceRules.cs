@@ -47,14 +47,20 @@ public static class ContentAcceptanceRules
     /// <summary>The Commit rule: only an operation prepared under exactly this build's rules may be committed by it.</summary>
     public static bool IsCommittableByThisBuild(int? prepareAcceptanceRuleVersion) => prepareAcceptanceRuleVersion == CurrentVersion;
 
-    /// <summary>What the readiness guard reads from the database (one query; see the Infrastructure reader).</summary>
-    public sealed record SchemaFacts(bool MigrationApplied, bool ColumnsPresent, bool CommitCheckPresent, bool StateGuardEnabled, int? InstalledFloor);
+    /// <summary>
+    /// What the readiness guard reads from the database (one query; see the Infrastructure reader). E3-M2b-1F adds
+    /// <paramref name="FloorRecorded"/>: the migration history records that a floor migration was applied.
+    /// </summary>
+    public sealed record SchemaFacts(bool MigrationApplied, bool ColumnsPresent, bool CommitCheckPresent, bool StateGuardEnabled, int? InstalledFloor, bool FloorRecorded = false);
 
     /// <summary>
     /// The startup and readiness decision (§19.8): ready only if the CARV migration, both columns, the commit CHECK and an
     /// enabled state guard are present, and no installed floor exceeds this build's version. Unknown facts are not ready.
+    /// E3-M2b-1F (§21.6) adds the detection of a missing or lowered floor: not ready when the history records a floor whose
+    /// constraint is absent, or when the deployment's <paramref name="requiredFloor"/> is above the installed floor (or above this
+    /// build). Readiness is detection only; the database enforces the floor.
     /// </summary>
-    public static (bool Ready, string Detail) Evaluate(SchemaFacts? facts, int compiledVersion = CurrentVersion)
+    public static (bool Ready, string Detail) Evaluate(SchemaFacts? facts, int compiledVersion = CurrentVersion, int? requiredFloor = null)
     {
         if (facts is null)
         {
@@ -79,6 +85,21 @@ public static class ContentAcceptanceRules
         if (facts.InstalledFloor is { } floor && floor > compiledVersion)
         {
             return (false, $"ContentAcceptanceRuleFloorAboveBuild(floor={floor}, build={compiledVersion})");
+        }
+
+        if (requiredFloor is { } required && required > compiledVersion)
+        {
+            return (false, $"ContentAcceptanceRuleRequiredFloorAboveBuild(required={required}, build={compiledVersion})");
+        }
+
+        if (facts.FloorRecorded && facts.InstalledFloor is null)
+        {
+            return (false, "ContentAcceptanceRuleFloorMissing(recorded in the migration history, constraint absent)");
+        }
+
+        if (requiredFloor is { } minimum && (facts.InstalledFloor ?? 0) < minimum)
+        {
+            return (false, $"ContentAcceptanceRuleFloorBelowRequired(installed={(facts.InstalledFloor is { } i ? i.ToString(System.Globalization.CultureInfo.InvariantCulture) : "none")}, required={minimum})");
         }
 
         return (true, $"content acceptance rules v{compiledVersion} (floor {(facts.InstalledFloor is { } f ? f.ToString(System.Globalization.CultureInfo.InvariantCulture) : "none")})");

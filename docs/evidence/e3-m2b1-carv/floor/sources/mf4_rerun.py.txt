@@ -1,0 +1,19 @@
+import hashlib, json, re, shutil, subprocess, sys
+repo, out = sys.argv[1], sys.argv[2]
+p = repo + "/src/authority/AuthorizationAuthority.Api/Composition/ContentAcceptanceFloorCommand.cs"
+sha = lambda f: hashlib.sha256(open(f, "rb").read()).hexdigest()
+original = sha(p); backup = out + ".bak"; shutil.copyfile(p, backup)
+text = open(p, encoding="utf-8").read()
+old = '        if (Array.IndexOf(args, "--migrate") >= 0)\n'
+assert text.count(old) == 1
+try:
+    open(p, "w", encoding="utf-8", newline="").write(text.replace(old, '        if (Array.IndexOf(args, "--migrate") > args.Length)\n'))
+    b = subprocess.run(["dotnet", "build", "tests/authority/AuthorizationAuthority.Tests", "-c", "Debug", "-nologo", "-v", "q"], cwd=repo, capture_output=True, text=True)
+    t = subprocess.run([repo + "/tests/authority/AuthorizationAuthority.Tests/bin/Debug/net10.0/AuthorizationAuthority.Tests.exe", "--filter-class", "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests"], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    txt = t.stdout + t.stderr
+finally:
+    shutil.copyfile(backup, p)
+result = {"id": "MF-4 (re-run after strengthening the test)", "buildOk": b.returncode == 0, "testsRun": int(re.search(r"total: (\d+)", txt).group(1)), "testsFailed": int(re.search(r"failed: (\d+)", txt).group(1)),
+          "failingTests": sorted(set(re.findall(r"failed ([A-Za-z0-9_.]+(?:\([^)]*\))?)", txt))), "restoredSha256Matches": sha(p) == original}
+json.dump(result, open(out, "w"), indent=2); print(json.dumps(result))
+subprocess.run(["dotnet", "build", "tests/authority/AuthorizationAuthority.Tests", "-c", "Debug", "-nologo", "-v", "q"], cwd=repo, capture_output=True)

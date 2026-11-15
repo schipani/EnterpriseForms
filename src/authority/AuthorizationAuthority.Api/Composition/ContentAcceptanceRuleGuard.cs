@@ -10,8 +10,10 @@ namespace AuthorizationAuthority.Api.Composition;
 /// floor overtakes becomes not ready. This is operational hygiene only: the database itself refuses every crossing write,
 /// whatever the guard says, and enforcement never depends on this interval.
 /// </summary>
-public sealed partial class ContentAcceptanceRuleGuard(IContentAcceptanceRuleSchemaReader reader, TimeProvider clock, ILogger<ContentAcceptanceRuleGuard> logger)
+public sealed partial class ContentAcceptanceRuleGuard(IContentAcceptanceRuleSchemaReader reader, TimeProvider clock, ILogger<ContentAcceptanceRuleGuard> logger, ContentAcceptanceRuleOptions? options = null)
 {
+    private readonly int? requiredFloor = (options ?? new ContentAcceptanceRuleOptions()).RequiredFloor;
+
     /// <summary>A decision older than this (the monitor stopped or keeps failing) is treated as unknown: not ready.</summary>
     public static readonly TimeSpan MaximumDecisionAge = ContentAcceptanceRules.ReadinessRecheckInterval * 3;
 
@@ -47,7 +49,7 @@ public sealed partial class ContentAcceptanceRuleGuard(IContentAcceptanceRuleSch
             LogReadFailure(logger, ex.GetType().Name);
         }
 
-        var (ready, detail) = ContentAcceptanceRules.Evaluate(facts);
+        var (ready, detail) = ContentAcceptanceRules.Evaluate(facts, ContentAcceptanceRules.CurrentVersion, requiredFloor);
         var previous = Volatile.Read(ref latest);
         Volatile.Write(ref latest, new Decision(ready, detail, clock.GetUtcNow()));
         if (previous is null || previous.Ready != ready || !string.Equals(previous.Detail, detail, StringComparison.Ordinal))
@@ -97,5 +99,29 @@ public sealed class ContentAcceptanceRuleMonitor(ContentAcceptanceRuleGuard guar
         {
             // host stopping
         }
+    }
+}
+
+/// <summary>
+/// E3-M2b-1F (§21.6): section <c>ContentAcceptance</c>. <see cref="RequiredFloor"/> is the floor this deployment must find installed
+/// (set it to 1 once Release B has applied floor 1). Absent = no requirement (Release A). Detection only: a missing or lowered
+/// floor makes the instance not ready, so an operator notices a restore that removed it before reopening writes.
+/// </summary>
+public sealed class ContentAcceptanceRuleOptions
+{
+    public const string SectionName = "ContentAcceptance";
+
+    public int? RequiredFloor { get; set; }
+
+    /// <summary>Fail closed at startup on a value no build could satisfy honestly (below 1).</summary>
+    public static ContentAcceptanceRuleOptions Validate(ContentAcceptanceRuleOptions? options)
+    {
+        var value = options ?? new ContentAcceptanceRuleOptions();
+        if (value.RequiredFloor is < 1)
+        {
+            throw new InvalidOperationException($"{SectionName}:RequiredFloor must be 1 or greater when set.");
+        }
+
+        return value;
     }
 }

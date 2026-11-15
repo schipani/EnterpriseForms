@@ -1,0 +1,69 @@
+04:19:19.643 LB prepare: OK
+04:19:22.426 LB commit: OK
+04:19:25.609 LB prepare: OK
+04:19:28.680 LB commit: OK
+04:19:31.841 LB prepare: OK
+04:19:34.828 LB commit: OK
+04:19:37.402 LB prepare: OK
+04:19:40.067 LB commit: OK
+04:19:42.496 LB prepare: OK
+04:19:45.113 LB commit: OK
+04:19:47.624 LB prepare: OK
+04:19:50.339 LB commit: OK
+04:19:52.806 LB prepare: OK
+04:19:55.993 LB commit: OK
+04:19:58.778 LB prepare: OK
+04:20:01.636 LB commit: OK
+04:20:02.657 floor command (carv-floor-command) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: the content acceptance rule fence (E3-M2b-1) is not fully installed
+04:20:02.721 PASS FX-01: exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: the content acceptance rule fence (E3-M2b-1) is not fully installed; floor=none; history=0
+04:20:06.015 real --migrate (carv-migration) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+04:20:06.104 PASS FX-02: OK; carv=1; floor=none; floorHistory=0
+04:20:09.132 real --migrate (carv-migration) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+04:20:09.185 PASS FX-03: OK; floor=none; floorHistory=0
+04:20:12.762 LB prepare: OK
+04:20:15.332 LB commit: OK
+04:20:15.366 PASS FX-04: OK; legacy=accepted; NULL/NULL Committed
+04:20:15.428 PASS FX-05: True content acceptance rules v1 (floor none) | False ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1)
+04:20:18.055 LB prepare: OK
+04:20:19.133 floor command (carv-floor-command) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: 1 unexpired operation(s) prepared by a pre-CARV build are in flight; let them expire or abort them first
+04:20:19.192 PASS FX-06: exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: 1 unexpired operation(s) prepared by a pre-CARV build are in flight; let them expire or abort them first; floor=none; history=0
+04:20:19.246 PASS FX-07: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; NULL/NULL Aborted
+04:20:20.596 floor command (carv-floor-command) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: 1 session(s) able to write content operations are connected without a CARV build marker (a pre-CARV Authority instance may still run)
+04:20:20.662 PASS FX-08: exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: 1 session(s) able to write content operations are connected without a CARV build marker (a pre-CARV Authority instance may still run); floor=none; history=0
+04:20:26.865 floor command (carv-floor-command) exit 3: content acceptance rule floor NOT applied: 55P03: canceling statement due to lock timeout
+04:20:26.920 PASS FX-09: exit 3: content acceptance rule floor NOT applied: 55P03: canceling statement due to lock timeout; floor=none; history=0
+04:20:28.229 floor command (carv-floor-interrupted) exit 3: content acceptance rule floor NOT applied: 57P01: terminating connection due to administrator command
+04:20:28.282 PASS FX-10: waited=True; killed=1; exit 3: content acceptance rule floor NOT applied: 57P01: terminating connection due to administrator command; floor=none; history=0
+04:20:31.043 LB prepare: OK
+04:20:31.100 PASS FX-11: NULL/NULL Prepared; expired=True
+04:20:34.084 floor command (carv-floor-queued) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: 1 session(s) able to write content operations are connected without a CARV build marker (a pre-CARV Authority instance may still run)
+04:20:34.900 LB prepare: OK
+04:20:34.983 PASS FX-12a: legacy waited=True; exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: 1 session(s) able to write content operations are connected without a CARV build marker (a pre-CARV Authority instance may still run); legacy=prepared NULL/NULL Prepared; floor=none; history=0
+04:20:35.027 PASS FX-12b: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; NULL/NULL Aborted
+04:20:36.091 concurrent: ok=24; conflicts=0; unexpected=0; 1059 ms
+04:20:36.864 floor command (carv-floor-command) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+04:20:36.917 PASS FX-12: exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; history=1; ok=24; conflicts=0; unexpected=0; 1059 ms
+04:20:36.929 PASS FX-13: false CHECK ((((operation_state_name)::text <> ALL ((ARRAY['Prepared'::character varying, 'Committed'::character varying])::text[])) OR ((prepare_acceptance_rule_version IS NOT NULL) AND (prepare_acceptance_rule_version >= 1)))) NOT VALID
+04:20:39.579 LB prepare: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1
+04:20:39.608 PASS FX-14: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1; 503 {"errorCode":"AUTHORITY_NOT_READY"; ops 37->37
+04:20:42.183 LB commit: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1
+04:20:42.226 PASS FX-15: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1; unchanged (head=1:651ecb2ecbe21ef3cd26bf2180857c25e6b0fb1b46b60e1756a5adfc42628117; commits=20; leaves=60; identities=18; checkpoints=20; journal=20; committedOps=20); NULL/NULL Prepared
+04:20:42.239 PASS FX-16: 0
+04:20:42.348 PASS FX-17: 1/1 Committed
+04:20:42.444 PASS FX-18: 23514 ck_content_operation_rule_floor_v1: new row for relation "content_change_operations" violates check constraint "ck_content_operation_rule_floor_v1" | 23514 ck_content_operation_rule_floor_v1: new row for relation "content_change_operations" violates check constraint "ck_content_operation_rule_floor_v1" | 23514 ck_content_operation_commit_rule_version: new row for relation "content_change_operations" violates check constraint "ck_content_operation_commit_rule_version"
+04:20:42.500 PASS FX-19: OK; AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; 2/NULL Aborted
+04:20:42.572 PASS FX-20: 23514 trg_content_operation_rule_state_guard: a terminal content operation is immutable | 23514 trg_content_operation_rule_state_guard: a terminal content operation is immutable | 23514 ck_content_operation_rule_floor_v1: new row for relation "content_change_operations" violates check constraint "ck_content_operation_rule_floor_v1"
+04:20:42.592 PASS FX-21: OK
+04:20:43.886 floor command (carv-floor-command) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+04:20:47.249 real --migrate (carv-migration) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+04:20:47.302 PASS FX-22: exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; OK; floor=1; history=1
+04:20:47.553 PASS FX-23: P0001 : CARV floor down refused: content acceptance rule floors are never lowered | P0001 : CARV down refused: a content acceptance rule floor is installed; floors are never lowered | 42501 : must be owner of table content_change_operations; floor=1
+04:20:47.565 PASS FX-24: True content acceptance rules v1 (floor 1) | True content acceptance rules v1 (floor 1)
+04:20:49.087 floor command (carv-floor-command) exit 4: content acceptance rule floor 1 is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with --reinstate-recorded-floor
+04:20:50.522 floor command (carv-floor-command) exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+04:20:50.560 PASS FX-25: False ContentAcceptanceRuleFloorMissing(recorded in the migration history, constraint absent) | exit 4: content acceptance rule floor 1 is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with --reinstate-recorded-floor | exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; ready=True content acceptance rules v1 (floor 1)
+04:20:51.997 floor command (carv-floor-command) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+04:20:52.028 PASS FX-26: True content acceptance rules v1 (floor none) | False ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1) | exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; ready=True content acceptance rules v1 (floor 1)
+04:20:54.577 LB prepare: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1
+04:20:54.577 PASS FX-27: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1
+04:20:54.594 PASS FINAL: Aborted=3, Committed=35, Prepared=2; legacy agent calls=24

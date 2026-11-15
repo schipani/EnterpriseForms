@@ -24,7 +24,9 @@ var runtime = Environment.GetEnvironmentVariable("CARV_RUNTIME") ?? throw new In
 var cs = new NpgsqlConnectionStringBuilder(runtime) { ApplicationName = "carv-runtime-LB" }.ConnectionString;
 var options = new DbContextOptionsBuilder<AuthorityDbContext>().UseNpgsql(cs, n => n.MigrationsHistoryTable("ef_migrations_history", AuthorityDbContext.SchemaName)).Options;
 var store = new AuthorityStore(new Factory(options));
-var clock = TimeProvider.System;
+// E3-M2b-1F: optional clock offset (minutes) models a legacy instance whose clock lags the database; default 0 (harness B).
+var offsetMinutes = int.TryParse(Environment.GetEnvironmentVariable("CARV_CLOCK_OFFSET_MINUTES"), System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out var parsedOffset) ? parsedOffset : 0;
+TimeProvider clock = offsetMinutes == 0 ? TimeProvider.System : new OffsetClock(TimeSpan.FromMinutes(offsetMinutes));
 var mac = new TestMac();
 var verifier = new ProjectionIntegrityVerifier(store, ThrowingProxy.Create<ISpiceDbProjection>(), new ProjectionMarkerTransitionState(), new NoAlerts(), new ProjectionIntegrityMetrics(), clock);
 var service = new ContentService(store, mac, verifier, new NoFaults(), clock, new ShareContributorWriteSwitch(false, false));
@@ -74,6 +76,11 @@ static string Describe(Exception ex)
 internal sealed class Factory(DbContextOptions<AuthorityDbContext> options) : IDbContextFactory<AuthorityDbContext>
 {
     public AuthorityDbContext CreateDbContext() => new(options);
+}
+
+internal sealed class OffsetClock(TimeSpan offset) : TimeProvider
+{
+    public override DateTimeOffset GetUtcNow() => base.GetUtcNow().Add(offset);
 }
 
 internal sealed class NoAlerts : ISecurityAlertSink
