@@ -638,6 +638,11 @@
       "bytes": 37056
     },
     {
+      "path": "docs/security/E3_M2E2_VERIFICATION_RECORD.md",
+      "sha256": "37c272a62472b713c29c59c96ffbe2221996f3d26ba4f1dfecb188b3058b4863",
+      "bytes": 37638
+    },
+    {
       "path": "docs/security/E3_M2E_CONTRACT_CLOSURE.md",
       "sha256": "ce1115509f9fc7c3dea498f68e7c1c76586c2ef3b7d1d56d063831152f1c1486",
       "bytes": 40123
@@ -941,6 +946,16 @@
       "path": "scripts/dev/e3-m2e1-ledger-pg-gate.ps1",
       "sha256": "db8adf5fc0250615dd290fbf5f0f319b5c768650adf3531cbef3318180ddf666",
       "bytes": 11405
+    },
+    {
+      "path": "scripts/dev/e3-m2e2-acceptance-pg-gate.ps1",
+      "sha256": "a0939e13baab703eb4c3e515c9a16011da50788010c993297f32df662a127019",
+      "bytes": 20995
+    },
+    {
+      "path": "scripts/dev/e3-m2e2-mutations.ps1",
+      "sha256": "8d41e63a664ab39aebf0b1b9f258c9b79369222b4e30575a004bebb50c7a55da",
+      "bytes": 14081
     },
     {
       "path": "scripts/dev/e5-vault-hmac-integration.ps1",

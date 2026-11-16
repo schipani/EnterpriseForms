@@ -1,0 +1,17 @@
+{
+    "Label":  "MX-03",
+    "Groups":  "N",
+    "ExitCode":  1,
+    "Checks":  62,
+    "Failed":  4,
+    "ExpectedGapDemonstrations":  0,
+    "ContainersRemoved":  true,
+    "ContainerListUnchanged":  true,
+    "DeadlocksInServerLog":  0,
+    "LockTimeoutsInServerLog":  0,
+    "ExpectedPermissionDenied":  6,
+    "UnexpectedPermissionDenied":  0,
+    "ConfigEnablersBefore":  0,
+    "ConfigEnablersAfter":  0,
+    "EvidenceLeaksAfterScrub":  0
+}

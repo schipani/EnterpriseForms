@@ -1,0 +1,5 @@
+4a71dbc6a436ec812ae0db059bd1acc4860cad6a plus the working tree below
+?? docs/evidence/e3-m2e2/
+?? scripts/dev/e3-m2e2-acceptance-pg-gate.ps1
+?? scripts/dev/e3-m2e2-mutations.ps1
+?? tools/experiments/e3-m2e2-acceptance-gate/

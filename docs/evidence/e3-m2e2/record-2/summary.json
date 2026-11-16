@@ -1,0 +1,17 @@
+{
+    "Label":  "record-2",
+    "Groups":  "all",
+    "ExitCode":  0,
+    "Checks":  138,
+    "Failed":  0,
+    "ExpectedGapDemonstrations":  5,
+    "ContainersRemoved":  true,
+    "ContainerListUnchanged":  true,
+    "DeadlocksInServerLog":  0,
+    "LockTimeoutsInServerLog":  0,
+    "ExpectedPermissionDenied":  6,
+    "UnexpectedPermissionDenied":  0,
+    "ConfigEnablersBefore":  0,
+    "ConfigEnablersAfter":  0,
+    "EvidenceLeaksAfterScrub":  0
+}
