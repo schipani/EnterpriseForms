@@ -41,6 +41,15 @@ public static class AuthorityErrorCodes
     /// conflict: retrying cannot help until an operator restores the floor or the configuration.
     /// </summary>
     public const string ContentAcceptanceFloorNotEnforced = "CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED";
+
+    /// <summary>E3-M2e L-13: the data-key ledger's unique index or P-1/P-2 triggers are not verified in the write transaction (503, not retryable).</summary>
+    public const string ContentDataKeyLedgerNotEnforced = "CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED";
+
+    /// <summary>E3-M2e DK-6 / P-4: the staged v2 data-key groups disagree with the ledger; the operation is aborted and an incident is journaled (409).</summary>
+    public const string DataKeyBindingMismatch = "DATA_KEY_BINDING_MISMATCH";
+
+    /// <summary>E3-M2e L-12: the database refused a ledger write through the P-1 binding guard or P-2 immutability (an invariant failure; 503, not retryable).</summary>
+    public const string DataKeyLedgerInvariantViolated = "DATA_KEY_LEDGER_INVARIANT_VIOLATED";
     public const string KeyUnavailable = "KEY_UNAVAILABLE";
     public const string CandidateMismatch = "CANDIDATE_MISMATCH";
     public const string LimitExceeded = "LIMIT_EXCEEDED";

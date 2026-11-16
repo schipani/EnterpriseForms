@@ -57,13 +57,13 @@ public sealed partial class ContributorWriteProtocolTests
         /// <summary>The provider the content service signs through (E3-M2a: counts signatures, so a refusal can be shown to precede signing).</summary>
         public CountingMacProvider Signer { get; }
 
-        public Harness(bool contributorWritesEnabled = true)
+        public Harness(bool contributorWritesEnabled = true, EnvelopeV2AcceptanceSwitch? envelopeV2Acceptance = null)
         {
             var mac = Mac = new LocalHmacProvider();
             mac.ProvisionKeyAsync(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", CancellationToken.None).GetAwaiter().GetResult();
             Switch = new ShareContributorWriteSwitch(contributorWritesEnabled, testingOverrideAllowed: true);
             Signer = new CountingMacProvider(mac);
-            Service = new ContentService(Store, Signer, TestProjection.Verifier(Store, ThrowingProxy.Create<ISpiceDbProjection>()), new NoOpFaultInjector(), TimeProvider.System, Switch);
+            Service = new ContentService(Store, Signer, TestProjection.Verifier(Store, ThrowingProxy.Create<ISpiceDbProjection>()), new NoOpFaultInjector(), TimeProvider.System, Switch, envelopeV2Acceptance: envelopeV2Acceptance);
             State = new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous };
             Store.Organizations.Add(State);
             foreach (var user in new[] { Owner, Contributor })

@@ -37,7 +37,7 @@ public sealed record WriteFenceFacts(
 /// floor and the E3-M2b-1 fence it builds on. Used by <see cref="AuthorityStore"/> for every Release B content write and by the
 /// readiness reader (outside a transaction, as a signal only).
 /// <para>
-/// <b>Race safety.</b> <see cref="LockSql"/> runs first and takes ROW EXCLUSIVE on <c>content_change_operations</c>, held to the end
+/// <b>Race safety.</b> <see cref="LockSql"/> runs before the facts (right after <see cref="HistoryLockSql"/>, A-1) and takes ROW EXCLUSIVE on <c>content_change_operations</c>, held to the end
 /// of the transaction. Every statement that can remove, replace or weaken these objects (<c>ALTER TABLE ... DROP/ADD CONSTRAINT</c>,
 /// <c>... ALTER COLUMN ... SET DEFAULT</c>, <c>DISABLE TRIGGER</c>, <c>DROP TRIGGER</c>, <c>CREATE RULE</c>, the floor migration itself)
 /// needs a lock that conflicts with ROW EXCLUSIVE, so it cannot commit between this verification and the transaction's commit.
@@ -48,6 +48,17 @@ public sealed record WriteFenceFacts(
 /// superuser editing the catalogs directly (R-CARV-24).
 /// </para>
 /// <para>
+/// <b>Lock order (RB-CARV-1 amendment A-1, F-E1).</b> <see cref="HistoryLockSql"/> (ACCESS SHARE on <c>ef_migrations_history</c>) is
+/// taken before <see cref="LockSql"/>. Every EF Core migration, the floor command included, locks the history table in ACCESS EXCLUSIVE
+/// mode first and only then the tables it changes; a writer that held the operations lock and then read the history formed the
+/// cycle writer → history → floor command → operations → writer (F-E1, a deadlock that refused the writer fail closed). With the
+/// history first, every party locks history before operations, so the cycle cannot form. The facts statement is unchanged and still
+/// runs after both locks, so it reads the history and the catalog in one snapshot. Holding the history lock also means no EF
+/// migration can start or commit until this transaction ends. Direct history DML by a privileged role is not excluded (ROW
+/// EXCLUSIVE does not conflict with ACCESS SHARE), which was already true before A-1: the history can only add refusals; the
+/// enforced floor is the catalog checked under the operations lock.
+/// </para>
+/// <para>
 /// <b>Exact definitions.</b> The expected texts are PostgreSQL 18's rendering of the objects the two migrations create
 /// (<c>pg_get_constraintdef</c>, <c>pg_get_triggerdef</c>, <c>pg_proc.prosrc</c>), captured from postgres:18.0. A different server
 /// rendering is refused (fail closed, availability only) until verified (R-CARV-23).
@@ -55,6 +66,12 @@ public sealed record WriteFenceFacts(
 /// </summary>
 public static class ContentAcceptanceWriteFence
 {
+    /// <summary>
+    /// RB-CARV-1 amendment A-1 (F-E1): the first statement of the fence, before <see cref="LockSql"/>. ACCESS SHARE needs only the
+    /// SELECT privilege the runtime role already has, and conflicts only with ACCESS EXCLUSIVE (the EF migration lock).
+    /// </summary>
+    public const string HistoryLockSql = "LOCK TABLE authority.ef_migrations_history IN ACCESS SHARE MODE";
+
     public const string LockSql = "LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE";
 
     public const string ExpectedFloorDefinition =

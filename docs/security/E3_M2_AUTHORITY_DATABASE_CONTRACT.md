@@ -302,6 +302,8 @@ All column names are descriptive multiword snake_case, and the primary key follo
 - **Accepted state is derived, not stored:** a binding is *accepted* if and only if its operation is `Committed`, which is equivalent to a `record_manifest_commits` row with `committed_operation_id = binding_content_change_operation_id`. Deriving it keeps the table insert-only.
 - What the ledger does **not** bind: the wrapped key and the key reference. A future M5 Rewrap legitimately changes them while keeping the id and commitment (§4.8).
 
+> **E3-M2e owner decisions (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §1.2, §3).** Uniqueness is global (OD-M2e-01) and ids are bound at Prepare as permanent reservations (OD-M2e-02/03). The table additionally carries the P-1 binding guard (insert only for a `Prepared` operation of the same organization and record with a Prepare rule version ≥ 3) and the P-2 immutability triggers (no UPDATE, DELETE or TRUNCATE), which resolve OD-M2-23 in the database (OD-M2e-04; L-6, L-7). No wrapped-key digest (P-3) is added in E3-M2e.
+
 ### 4.3 Classification of each v2 candidate row
 
 Let *R* be a schema-2 candidate row with item key *K*, and *C* the verified current-head row with key *K*, if any.
@@ -335,6 +337,8 @@ The exemption covers carry-forward from the **current accepted head only** (OD-M
 
 The operation's `envelope_rule_version` (§7.2) must equal 2. A Prepared operation created by an older Authority (NULL) is aborted at Commit (`OPERATION_RULES_OUTDATED`).
 
+> **E3-M2e contract closure (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §2, §3).** AM-7: the `envelope_rule_version` sentence is superseded by CARV (OD-M2-17); the CARV-3 reading is P = C = 3. AM-2: DK-7 is satisfied by the Prepare classification (DK-1), CARV 3 and the head CAS, because Commit holds only digests and cannot re-classify; P-4 adds a Commit-time check that every carried v2 id is bound to an accepted operation of the same organization and record with the same kind and commitment and no more rows than its binding. AM-8 (OD-M2e-12): DK-4 runs after authorization and before signing. AM-11 (OD-M2e-11): a DK-6 or P-4 mismatch aborts the operation and writes a minimal content-stream incident. AM-10 (OD-M2e-07): with the switch off, New groups are refused at Prepare and at Commit; carried groups are judged by P-4.
+
 ### 4.5 Coverage of the brief's cases
 
 | Case | Behaviour |
@@ -365,6 +369,8 @@ The operation's `envelope_rule_version` (§7.2) must equal 2. A Prepared operati
   2. Bindings of commits after the restore point are recovered from archived `ContentHeadCommitted` bodies.
   3. Bindings of operations that never committed are **not** recoverable. The stricter Prepare-reservation guarantee is best-effort across a restore; the decided "accepted" guarantee is preserved.
 - **Until E3-M6 implements content-stream replay:** after any AuthorityDb restore, v2 acceptance stays disabled (switch off) until a ledger rebuild has been run. The rebuild uses verifier-workload bytes of every accepted commit, checked against Authority leaves (§6.3), plus the archive. Two authorized approvers are required (§8). Because M2 never enables v2 outside Development/Testing, this bounds the gap.
+
+> **E3-M2e contract closure (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §3.6, §4).** AM-3 (C-4, amends OD-M2-15): the body carries the **complete binding tuple** of every New group (binding id, data-key id, kind, commitment, item count, bound-on time; organization, record and operation from the stream and the body), present on every CARV ≥ 3 commit. Archived identifiers alone do not prove ledger correctness: archive completeness needs the anchored journal chain, and agreement with the committed rows after the fact needs independently verified content bytes. AM-4 (C-7): turning the switch off is not an enforcement mechanism, because the switch is outside the restored database. Persistent activation requires an Authority-enforced, fail-closed, restore-resistant barrier (RB2-1..RB2-8); its mechanism is blocking decision BD-1, and re-insertion of bindings with their operations is blocking decision BD-2. Until both are decided, implemented and verified, v2 acceptance is limited to disposable Development/Testing environments.
 
 ### 4.7 Atomicity and failure behaviour
 
@@ -559,13 +565,15 @@ Each M2+ host checks at startup that its migrations history contains the **requi
 
 If any is missing (a database restored below the migration, or a migration not applied), the host refuses readiness: it fails closed and the error message carries no identifiers. This also protects every later fence: a future binary refuses an older schema. The startup guard is read-only (the runtime role can read `ef_migrations_history`; this is confirmed in M2b/M2f).
 
+> **E3-M2e contract closure (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §2 AM-12).** The Authority required-migration guard includes the E3-M2e ledger migration id. Floor 3 additionally requires the ledger objects to exist exactly as created (AM-1).
+
 ### 7.5 Deployment patterns
 
 | Pattern | Contract |
 |---|---|
 | **Rolling (business)** | M2 and pre-M2 instances can coexist while no v2 binding exists, which is always the case in M2 outside Development/Testing. Before enabling v2 anywhere, drain every pre-M2 instance; the floor then refuses stragglers. |
 | **Blue/green (business)** | As rolling. Switching back to a pre-M2 colour is safe until the first v2 binding in an organization, and refused for that organization afterwards. |
-| **Authority** | Migration first (the M2 migration adds only nullable columns, tables and the trigger), then the M2 binary. A pre-M2 Authority instance still running keeps working for organizations without bindings. Drain it before enabling v2. |
+| **Authority** | Migration first (the M2 migration adds only nullable columns, tables and the trigger), then the M2 binary. A pre-M2 Authority instance still running keeps working for organizations without bindings. Drain it before enabling v2. **(E3-M2e closure, 2026-11-15, AM-6:** floor 2 must be installed before the first v2 binding or acceptance, because CARV-1 builds have no downgrade guard; the full sequence is `E3_M2E_CONTRACT_CLOSURE.md` §5.1.**)** |
 | **Failed rollout** | Expand-only migrations stay. Roll the binaries back. No v2 exists unless the switch was enabled, so nothing is fenced. |
 | **Application rollback, no v2 present** | Allowed without a database restore (business and Authority) |
 | **Application rollback, v2 present** | Business: to M2c+ only. Authority: to M2e+ only, per organization. Below that: refused; roll forward. **No database restore is needed**, because compatible versions exist. |
@@ -603,6 +611,15 @@ Principle (consistent with E-4, E-5 and `CRYPTOGRAPHIC_SIGNING_AUTHORITY.md` §5
 | Lower the business capability floor | Not permitted below a derived organization floor; the deployment floor is lowered only in Development/Testing | — | n/a | — |
 
 No new bypass is introduced. The Authority stays the only acceptance point, and the switch only narrows what it accepts.
+
+> **E3-M2e owner decisions (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §1.2, §2, §5).** OD-M2-10 is decided as OD-M2e-07:
+> - The Authority refuses to start with the switch on in any environment other than Development/Testing, Staging included (AM-9: wrap codes {1, 2} only in Development/Testing).
+> - With the switch on, it also requires Release B with `RequiredFloor = 3` and the ledger migration (AM-5). Acceptance happens only inside a transaction whose Release B fence has verified floor ≥ 3.
+> - The Testing override may enable only when these prerequisites hold, and may always disable.
+> - `EnvelopeAcceptancePolicyObserved` is written to the platform journal (OD-M2e-13).
+> - Enabling the switch needs a separate owner authorization, even in a disposable environment (OD-M2e-16).
+>
+> No persistent-environment activation is authorized under E3-M2e.
 
 ---
 
@@ -688,6 +705,8 @@ Each increment is independently reviewable, needs its own owner authorization, k
 | Gate | Owner; Authority change |
 
 ### E3-M2e — OD-E3-16 ledger and acceptance switch
+
+> **E3-M2e contract closure (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §6).** E3-M2e is split into **E3-M2e-1** (dark ledger: ledger, constraints, CARV 3, floor-3 support, default-off switch, migration guard, error mapping, journal changes, focused tests; no acceptance activation) and **E3-M2e-2** (controlled acceptance verification in disposable PostgreSQL only). Each needs its own owner authorization. The scope below is refined by that record; where they differ, the record governs.
 
 | Aspect | Content |
 |---|---|
@@ -777,6 +796,14 @@ Still open from E-3 §13.8 and prerequisites for M2b/M2d/M2e:
 - item 2: authorize an Authority behaviour change;
 - item 3: authorize the business migration;
 - item 4: OD-E3-4 (W1, wrap in the signed row) and OD-E3-14 (batch scope (record, operation, purpose)). M2's schema fixes both.
+
+> **Decided for E3-M2e (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §1.2):**
+> - OD-M2-03: Prepare (OD-M2e-02).
+> - OD-M2-04: global (OD-M2e-01).
+> - OD-M2-10: decided as OD-M2e-07.
+> - OD-M2-15: amended to the full binding tuple (OD-M2e-10, AM-3).
+>
+> OD-M2-05 was already decided for classification (E3-M2d D-7).
 
 ---
 

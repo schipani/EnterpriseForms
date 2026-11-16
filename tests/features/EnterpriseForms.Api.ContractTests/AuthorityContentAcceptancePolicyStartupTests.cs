@@ -68,7 +68,7 @@ public sealed class AuthorityContentAcceptancePolicyStartupTests
         { "ReleaseB", null, ContentAcceptancePolicy.FloorMissing },
         { "ReleaseB", "one", ContentAcceptancePolicy.FloorMalformed },
         { "ReleaseB", "0", ContentAcceptancePolicy.FloorBelowMinimum },
-        { "ReleaseB", "3", ContentAcceptancePolicy.FloorUnsupported }, // E3-M2d: floor 2 is recognized; 3 is above this build
+        { "ReleaseB", "4", ContentAcceptancePolicy.FloorUnsupported }, // E3-M2e: floors 1-3 are recognized; 4 is above this build
         { "ReleaseA", "1", ContentAcceptancePolicy.FloorNotPermittedInReleaseA },
     };
 
@@ -111,5 +111,57 @@ public sealed class AuthorityContentAcceptancePolicyStartupTests
         using var floor2Client = floor2.CreateClient();
         var floor2Policy = floor2.Services.GetRequiredService<ContentAcceptancePolicy>();
         Assert.Equal(("phase=ReleaseB requiredFloor=2", true), (floor2Policy.Describe(), floor2Policy.GuardsContentWrites));
+    }
+
+    // ---- E3-M2e: the Envelope v2 acceptance switch on the composed host (OD-M2e-07, AM-5; default off, never enabled here) ----
+
+    [Fact]
+    public void TheComposedHostHasTheSwitchOffByDefaultWithDevelopmentWrapCodes()
+    {
+        using var development = Authority("Development", []);
+        using var client = development.CreateClient();
+        var acceptance = development.Services.GetRequiredService<EnvelopeV2AcceptanceSwitch>();
+        Assert.Equal((false, false, false), (acceptance.ConfiguredEnabled, acceptance.Requested, acceptance.Enabled));
+        Assert.Equal([1, 2], acceptance.AllowedWrapCodes.Order());
+        Assert.Same(acceptance, development.Services.GetRequiredService<EnvelopeV2AcceptanceSwitch>()); // one instance, resolved once
+    }
+
+    [Fact]
+    public void AStagingHostRefusesToStartWithAcceptanceConfiguredOn()
+    {
+        var values = StagingBaseline("ReleaseB", "3");
+        values["Content:EnvelopeV2AcceptanceEnabled"] = "true";
+        using var authority = Authority("Staging", values);
+        Assert.Contains("must not be enabled outside Development/Testing", Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient())), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ADevelopmentHostRefusesToStartWithAcceptanceOnInReleaseA()
+    {
+        using var authority = Authority("Development", new Dictionary<string, string?> { ["Content:EnvelopeV2AcceptanceEnabled"] = "true" });
+        Assert.Contains("requires ContentAcceptance:EnforcementPhase = ReleaseB and ContentAcceptance:RequiredFloor = 3", Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient())), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ADevelopmentHostRefusesToStartWithAcceptanceOnWhenTheLedgerMigrationCannotBeVerified()
+    {
+        // Release B floor 3 satisfies the static prerequisites; no reachable AuthorityDb means the ledger migration is not verified: refused.
+        using var authority = Authority("Development", new Dictionary<string, string?>
+        {
+            ["Content:EnvelopeV2AcceptanceEnabled"] = "true",
+            ["ContentAcceptance:EnforcementPhase"] = "ReleaseB",
+            ["ContentAcceptance:RequiredFloor"] = "3",
+            ["ConnectionStrings:AuthorityDb"] = "Host=unreachable.invalid;Database=authority;Username=nobody;Password=none;Timeout=2",
+        });
+        var ex = Assert.ThrowsAny<Exception>(() => authority.CreateClient());
+        var types = new List<string>();
+        for (Exception? e = ex; e is not null; e = e.InnerException)
+        {
+            types.Add(e.GetType().FullName ?? string.Empty);
+        }
+
+        Assert.Contains(types, t => t.StartsWith("Npgsql.", StringComparison.Ordinal) || t.StartsWith("System.Net.Sockets.", StringComparison.Ordinal)); // the ledger read itself failed
+        Assert.DoesNotContain("must not be enabled outside", Flatten(ex), StringComparison.Ordinal);
+        Assert.DoesNotContain("requires ContentAcceptance:EnforcementPhase", Flatten(ex), StringComparison.Ordinal);
     }
 }

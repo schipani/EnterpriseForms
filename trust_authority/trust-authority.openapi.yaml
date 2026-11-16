@@ -21,6 +21,16 @@
 # ENVELOPE_KEY_REFERENCE_FAMILY, ENVELOPE_DATA_KEY_IDENTIFIER_INVALID, ENVELOPE_COMMITMENT_LENGTH, ENVELOPE_CIPHERTEXT_LENGTH and
 # ENVELOPE_CIPHERTEXT_SIZE, besides the existing v1 reasons. A Commit refusal aborts the operation. 409 OPERATION_RULES_OUTDATED is
 # also returned for an operation prepared by a version-1 build. The request and response schemas are unchanged.
+# E3-M2e-1 (2026-11-16, docs/security/E3_M2E_CONTRACT_CLOSURE.md; record docs/security/E3_M2E1_IMPLEMENTATION_RECORD.md): content
+# acceptance rule version 3 (409 OPERATION_RULES_OUTDATED also for an operation prepared by a version-2 build) and the dark data-key
+# ledger. Envelope v2 acceptance is off: a New v2 group is still refused ENVELOPE_VERSION_NOT_ENABLED at Prepare, and at Commit when
+# its binding matches (DK-6) but acceptance is off. New refusals of CommitContentChange: 409 DATA_KEY_BINDING_MISMATCH (DK-6 / P-4:
+# the staged v2 data keys disagree with the ledger; the operation is aborted and an identifier-free incident is journaled), 503
+# CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED (the ledger is not verified in the transaction; nothing decided) and 503
+# DATA_KEY_LEDGER_INVARIANT_VIOLATED (the database binding guard or immutability trigger refused a ledger write). PrepareContentChange
+# may also return 422 "ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED" for an identifier already bound in the ledger (any organization,
+# any state), and "ENVELOPE_INVALID: ENVELOPE_WRAP_ALGORITHM_UNSUPPORTED" for any v2 row outside Development/Testing. All are
+# retryable=false. The request and response schemas are unchanged.
 openapi: 3.1.0
 info:
   title: Dynamic Forms Internal Authorization Authority

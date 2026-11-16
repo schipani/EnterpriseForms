@@ -99,7 +99,7 @@ public sealed partial class ContributorWriteProtocolTests
             Assert.Equal((ContentOperationStates.Committed, (int?)ContentAcceptanceRules.CurrentVersion, (int?)ContentAcceptanceRules.CurrentVersion), (stored.OperationStateName, stored.PrepareAcceptanceRuleVersion, stored.CommitAcceptanceRuleVersion));
         }
 
-        Assert.Equal(2, ContentAcceptanceRules.CurrentVersion); // E3-M2d (D-2) = version 1 plus the Prepare-only Envelope v2 rules (a bump is a reviewed change)
+        Assert.Equal(3, ContentAcceptanceRules.CurrentVersion); // E3-M2e = version 2 plus the Prepare-only data-key ledger rules (a bump is a reviewed change)
         Assert.All(h.Store.Operations, o => Assert.Equal(o.PrepareAcceptanceRuleVersion, o.CommitAcceptanceRuleVersion));
     }
 

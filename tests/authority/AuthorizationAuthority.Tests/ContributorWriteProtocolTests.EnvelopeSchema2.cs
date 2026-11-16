@@ -234,7 +234,7 @@ public sealed partial class ContributorWriteProtocolTests
         }
 
         // D-2 (E3-M2b-2): S-9 is re-derived at Commit and did not bump the rule version; E3-M2d's Prepare-only v2 rules did (its D-2).
-        Assert.Equal(2, ContentAcceptanceRules.CurrentVersion);
+        Assert.Equal(3, ContentAcceptanceRules.CurrentVersion);
         Assert.Equal(new HashSet<int> { 1 }, EnvelopeRules.AllowedEnvelopeVersions);
         Assert.Null(ContentDeltaRules.FindRule("form_records", 2)!.PinnedShapes); // OD-M2-22: only the envelope kinds are pinned
     }

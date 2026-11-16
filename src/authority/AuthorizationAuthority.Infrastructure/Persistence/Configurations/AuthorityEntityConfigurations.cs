@@ -331,6 +331,33 @@ public sealed class ContentItemIdentityConfiguration : IEntityTypeConfiguration<
     }
 }
 
+/// <summary>
+/// E3-M2e (docs/security/E3_M2E_CONTRACT_CLOSURE.md §3.1): the data-key ledger. The relationship to the operation is modelled so EF
+/// inserts the operation before its bindings in the Prepare transaction (L-5). The P-1 binding guard and P-2 immutability triggers
+/// are created by the migration's SQL (<see cref="Persistence.ContentDataKeyLedgerSql"/>).
+/// </summary>
+public sealed class ContentDataKeyBindingConfiguration : IEntityTypeConfiguration<ContentDataKeyBinding>
+{
+    public void Configure(EntityTypeBuilder<ContentDataKeyBinding> builder)
+    {
+        builder.MapSnakeCase("content_data_key_bindings");
+        builder.HasKey(e => e.ContentDataKeyBindingId);
+        builder.HasIndex(e => e.DataKeyIdentifier).IsUnique().HasDatabaseName(Persistence.ContentDataKeyLedgerSql.UniqueIdentifierIndex);
+        builder.HasIndex(e => new { e.OrganizationId, e.FormRecordId }).HasDatabaseName("ix_content_data_key_bindings_record");
+        builder.HasIndex(e => e.BindingContentChangeOperationId).HasDatabaseName("ix_content_data_key_bindings_operation");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_content_data_key_binding_org").OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ContentChangeOperation>().WithMany().HasForeignKey(e => e.BindingContentChangeOperationId).HasConstraintName("fk_content_data_key_binding_operation").OnDelete(DeleteBehavior.Restrict);
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_content_data_key_binding_kind", "envelope_payload_kind_code IN (1, 2)");
+            t.HasCheckConstraint("ck_content_data_key_binding_commitment", "octet_length(data_key_commitment_bytes) = 32");
+            t.HasCheckConstraint("ck_content_data_key_binding_count", "binding_item_count >= 1 AND (envelope_payload_kind_code = 1 OR binding_item_count = 1)");
+            t.HasCheckConstraint("ck_content_data_key_binding_identifier_v7",
+                "substring(data_key_identifier::text FROM 15 FOR 1) = '7' AND substring(data_key_identifier::text FROM 20 FOR 1) IN ('8', '9', 'a', 'b')");
+        });
+    }
+}
+
 public sealed class RecordManifestLeafConfiguration : IEntityTypeConfiguration<RecordManifestLeaf>
 {
     public void Configure(EntityTypeBuilder<RecordManifestLeaf> builder)

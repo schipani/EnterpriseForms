@@ -614,13 +614,13 @@
     },
     {
       "path": "docs/security/E3_M2B1_CARV_OPERATIONS.md",
-      "sha256": "74c1b8d652a9d6dc7b0afefad964bd8df038ff3409538644efd0d873bc40baa7",
-      "bytes": 24766
+      "sha256": "c00e71ae2bf458953361a67812c24498bd5a3e0e0da6cdafd681d2480fad3170",
+      "bytes": 31282
     },
     {
       "path": "docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md",
-      "sha256": "73d9684e9c658ac64286bd9882fa3286bebbae33701382be6df36d1972a45835",
-      "bytes": 226568
+      "sha256": "77cca5eadaff296ebbec25c50a06947ff4d1c40a13adfea97c22319c345da4d2",
+      "bytes": 248463
     },
     {
       "path": "docs/security/E3_M2C_IMPLEMENTATION_RECORD.md",
@@ -633,9 +633,19 @@
       "bytes": 45353
     },
     {
+      "path": "docs/security/E3_M2E1_IMPLEMENTATION_RECORD.md",
+      "sha256": "8c83b5c349fef4b2bc7cc87d017b3b150f3c4ab6897c11069dae439533d45406",
+      "bytes": 37056
+    },
+    {
+      "path": "docs/security/E3_M2E_CONTRACT_CLOSURE.md",
+      "sha256": "ce1115509f9fc7c3dea498f68e7c1c76586c2ef3b7d1d56d063831152f1c1486",
+      "bytes": 40123
+    },
+    {
       "path": "docs/security/E3_M2_AUTHORITY_DATABASE_CONTRACT.md",
-      "sha256": "567b3187587f122e3b5a7d56b2f357635b60bd21a9905af658866a7115f19dc8",
-      "bytes": 86298
+      "sha256": "8ff9db0c5ccc156136fb92736309462001ffa1110fd08cbd649cbb5a0618f28b",
+      "bytes": 90833
     },
     {
       "path": "docs/security/E4_CONTROLLED_KEY_ACTIVATION.md",
@@ -651,6 +661,11 @@
       "path": "docs/security/E6A_MANAGED_HSM_COMPATIBILITY_PROBE.md",
       "sha256": "9193277ba655b7c4c8b779cbc691976fc50c78c92044f329c144196e685fe6a4",
       "bytes": 30373
+    },
+    {
+      "path": "docs/security/F-E2_MIGRATE_GRANT_WINDOW_DEFECT.md",
+      "sha256": "4b0a8f806e50c1b6f205235bebe5a63543759e0c84c1ffe1e9ba842edbdf528d",
+      "bytes": 11098
     },
     {
       "path": "docs/security/FIELD_PROTECTION_RECONCILIATION.md",
@@ -921,6 +936,11 @@
       "path": "scripts/dev/e3-m2d-carv2-pg-gate.ps1",
       "sha256": "c4508af5b54b2c6c009fa6af2c2e4f45fb8afc6f8285f6b1fd96d3af9099e4be",
       "bytes": 8492
+    },
+    {
+      "path": "scripts/dev/e3-m2e1-ledger-pg-gate.ps1",
+      "sha256": "db8adf5fc0250615dd290fbf5f0f319b5c768650adf3531cbef3318180ddf666",
+      "bytes": 11405
     },
     {
       "path": "scripts/dev/e5-vault-hmac-integration.ps1",
@@ -1234,8 +1254,8 @@
     },
     {
       "path": "trust_authority/trust-authority.openapi.yaml",
-      "sha256": "e0445453cd67eb4eb701144ed2402af68ca95e451947c46307d1ea39f7da0363",
-      "bytes": 21959
+      "sha256": "6f18ce2249def83e5b375aa46886051040330ef2be8a1157ba87f789df7f1349",
+      "bytes": 23189
     }
   ]
 }

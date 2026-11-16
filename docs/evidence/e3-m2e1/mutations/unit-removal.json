@@ -1,0 +1,401 @@
+{
+  "note": "original_sha256: the working-copy files when the mutation runs were made, before the touched files were normalized from CRLF to LF (line endings only; the restored files were verified byte-identical to these values after every mutation).",
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs": "6a654f2a23dec313d948c8ff8d4b6957ed7376a4a031291ef138bffe75cc4103",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/DataKeyLedgerRules.cs": "f8ba23c2ff20ccf92c516ca892cdd0622484285cbfa26acb90dab62254d34630",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeV2AcceptanceSwitch.cs": "debce7af7226ac2abe2fe787fa29880112ac4aac79028e5bf568d42985454326",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeAcceptancePolicyObserver.cs": "2089cbce3aa51fb37d85cec24fe1047a9e616c3775f0ba14d147e94365cfd894",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/ContentAcceptanceRules.cs": "cd359ca7aec6533594a8be68615e02d5925a6deeb72be3c58513c1cd3ca79d21",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeV2Rules.cs": "f1a4bbc5702a24fc8315c09e97d76478a5a45b6f06d917fb881e53050511db5d",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentDataKeyLedgerSql.cs": "7e7d4b3bcf476932fe6d99d69ee47792b9ef4c05040135affd4dc28d449f0f3e",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceFloor3Sql.cs": "8f5d984e687f9c2377225e21ae5fab7a91c4455f6336b0c34547f6818203b1ee",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityStore.cs": "1bc1ce6f4607b480413037537db1ecf3b7f23f5260ad67622e354369ca965984",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityRuntimeGrants.cs": "e8ccecb73d1fb4d9b6311d63d56f3dde24bb4684ad347eff0bf3f7bb994af594",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/DataKeyLedgerRefusals.cs": "e5afa8be396519b38c8ede9b2809f341352a7a7fa38823cbccb49e1a704ba1ca",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/Migrations/20261116031706_AuthorityContentDataKeyBindings.cs": "a858de1d409d8871143a05a5615dff49e53e468e58ef9eb1c0ca61dccf23e737"
+  },
+  "results": [
+    {
+      "id": "ME-01",
+      "mutation": "DK-4 removed: a bound identifier is no longer refused",
+      "mode": "unit",
+      "failed": 2,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AReservationSurvivesTheExpiryAbortOfItsOperation",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.Dk4RefusesANewIdentifierBoundAnywhereInAnyStateAndAdmitsAFreshOne"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-02",
+      "mutation": "DK-5 removed: New groups are not bound in the Prepare transaction",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "EnterpriseForms.ArchitectureTests.EnvelopeV2RuleBoundaryTests.Dk4RunsAfterAuthorizationAndBeforeSigningAndDk5InsertsWithTheOperation"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-03",
+      "mutation": "the Prepare refusal of New v2 groups with acceptance off removed",
+      "mode": "unit",
+      "failed": 14,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAShareEdit",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"a new item in a fresh batch\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"document re-sealed under a fresh id\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"fresh data-key id for an existing v2 item\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCannotBeCreatedWithASchemaTwoEnvelopeRow(kind: \"document\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCannotBeCreatedWithASchemaTwoEnvelopeRow(kind: \"field\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditorCannotIntroduceASchemaTwoEnvelopeRow(envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV1ItemCannotBecomeAV2RowOrStartAV2Batch",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCannotIntroduceASchemaTwoEnvelopeRow(kind: \"document\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCannotIntroduceASchemaTwoEnvelopeRow(kind: \"field\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.SchemaTwoWithEnvelopeTwoPassesTheTieAndIsNotEnabled(kind: \"document\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.SchemaTwoWithEnvelopeTwoPassesTheTieAndIsNotEnabled(kind: \"field\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.WithAcceptanceOffANewV2GroupIsRefusedAtPrepareBeforeTheLedgerIsConsultedAndNothingIsBound",
+        "EnterpriseForms.ArchitectureTests.EnvelopeV2RuleBoundaryTests.ThePrepareOnlyV2RulesRunOnceInPrepareAfterTheSnapshotProofAndBeforeSigning"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-04",
+      "mutation": "AM-9 environment wrap codes no longer enforced at Prepare",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.OutsideDevelopmentOrTestingNoV2RowIsAdmittedAtPrepareOrCommitAndV1IsUnaffected"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-05",
+      "mutation": "DK-6 / P-4: the commitment is no longer compared",
+      "mode": "unit",
+      "failed": 3,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.Dk6AForgedOrInconsistentOperationIsAbortedWithAMinimalIncident(variant: \"commitment differs\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.Dk6AcceptsOnlyBindingsOfThisOperationThatEqualTheStagedNewGroups",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.P4AcceptsACarriedGroupOnlyWhenBoundToACommittedOperationOfTheSameRecordKindAndCommitment"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-06",
+      "mutation": "DK-6: the item count of a New group is no longer compared",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.Dk6AForgedOrInconsistentOperationIsAbortedWithAMinimalIncident(variant: \"item count differs\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-07",
+      "mutation": "P-4: an unbound v2 identifier is accepted",
+      "mode": "unit",
+      "failed": 7,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditCarryingTheV2RowsPassesPrepareAndWithoutALedgerBindingIsNotCommitted",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCarryingATwoItemV2BatchAndAV2DocumentPassesPrepareAndWithoutALedgerBindingIsNotCommitted",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AtCommitATiedSchemaTwoRowIsStillRefused(kind: \"document\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AtCommitATiedSchemaTwoRowIsStillRefused(kind: \"field\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.Dk6AForgedOrInconsistentOperationIsAbortedWithAMinimalIncident(variant: \"no binding\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.P4ACarriedGroupThatTheLedgerDoesNotConfirmIsAbortedWithAnIncident(variant: \"unbound\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.Dk6AcceptsOnlyBindingsOfThisOperationThatEqualTheStagedNewGroups"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-08",
+      "mutation": "P-4: a binding of an operation that is not Committed is accepted",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.P4AcceptsACarriedGroupOnlyWhenBoundToACommittedOperationOfTheSameRecordKindAndCommitment"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-09",
+      "mutation": "P-4: more staged rows than the batch accepted",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.P4AcceptsACarriedGroupOnlyWhenBoundToACommittedOperationOfTheSameRecordKindAndCommitment"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-10",
+      "mutation": "the Commit switch re-check removed (a New group commits with acceptance off)",
+      "mode": "unit",
+      "failed": 2,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.Dk6ANewGroupMatchingItsBindingIsStillRefusedAtCommitWhileAcceptanceIsOff",
+        "EnterpriseForms.ArchitectureTests.EnvelopeV2RuleBoundaryTests.TheLedgerBackedCommitDecisionRunsOnceAfterTheStagedRulesAndBeforeTheHeadAdvances"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-11",
+      "mutation": "L-13 no longer required at Commit",
+      "mode": "unit",
+      "failed": 2,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.Dk6ANewGroupMatchingItsBindingIsStillRefusedAtCommitWhileAcceptanceIsOff",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.TheLedgerIsVerifiedBeforeItIsConsultedAndAnUnverifiedLedgerLeavesTheOperationPrepared"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-12",
+      "mutation": "DK-6 / P-4 mismatch journals no incident",
+      "mode": "unit",
+      "failed": 8,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditCarryingTheV2RowsPassesPrepareAndWithoutALedgerBindingIsNotCommitted",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCarryingATwoItemV2BatchAndAV2DocumentPassesPrepareAndWithoutALedgerBindingIsNotCommitted",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.Dk6AForgedOrInconsistentOperationIsAbortedWithAMinimalIncident(variant: \"an extra binding of this operation\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.Dk6AForgedOrInconsistentOperationIsAbortedWithAMinimalIncident(variant: \"another organization\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.Dk6AForgedOrInconsistentOperationIsAbortedWithAMinimalIncident(variant: \"another record\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.Dk6AForgedOrInconsistentOperationIsAbortedWithAMinimalIncident(variant: \"commitment differs\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.Dk6AForgedOrInconsistentOperationIsAbortedWithAMinimalIncident(variant: \"item count differs\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.Dk6AForgedOrInconsistentOperationIsAbortedWithAMinimalIncident(variant: \"no binding\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-13",
+      "mutation": "DK-8: the archived tuples are dropped from the body",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "EnterpriseForms.ArchitectureTests.EnvelopeV2RuleBoundaryTests.TheLedgerBackedCommitDecisionRunsOnceAfterTheStagedRulesAndBeforeTheHeadAdvances"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true,
+      "superseded_first_run": {
+        "id": "ME-13",
+        "mutation": "DK-8: the archived tuples are dropped from the body",
+        "mode": "unit",
+        "failed": 0,
+        "failed_tests": [],
+        "timed_out": false,
+        "detected": false,
+        "restored": true
+      }
+    },
+    {
+      "id": "ME-14",
+      "mutation": "CARV reverted to version 2",
+      "mode": "unit",
+      "failed": 24,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.ReadinessReportsARecordedHigherFloorWhoseConstraintIsMissing",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.ReleaseBRequiresARecognizedFloorUpToThisBuild(floor: \"3\", valid: True, described: \"phase=ReleaseB requiredFloor=3\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheRecognizedFloorsAreOneTwoAndThreeAndMatchTheFloorMigrations",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 2, floor 3 required\", required: 3, expected: \"FloorLowered\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.AMissingOrLoweredFloorIsNotReady(scenario: \"release A: no floor, none required\", ready: True, detail: \"content acceptance rules v3 (floor none)\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.AMissingOrLoweredFloorIsNotReady(scenario: \"release B: floor installed and recorded, required\", ready: True, detail: \"content acceptance rules v3 (floor 1)\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.AMissingOrLoweredFloorIsNotReady(scenario: \"required floor above this build\", ready: False, detail: \"ContentAcceptanceRuleRequiredFloorAboveBuild(requi\"\ufffd\ufffd\ufffd)",
+        "AuthorizationAuthority.Tests.ContentAcceptancePolicyTests.ReleaseBReadinessRequiresTheFloorAndTheWriteFence",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.ARunningInstanceBecomesNotReadyWhenANewerFloorAppearsOrTheFenceCannotBeRead",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.StoreConnectionsCarryTheBuildRuleVersion(configured: \"Host=db;Database=authority;Username=authority_runt\"\ufffd\ufffd\ufffd, applicationName: \"authority carv-v3\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.StoreConnectionsCarryTheBuildRuleVersion(configured: \"Host=db;Database=authority;Username=authority_runt\"\ufffd\ufffd\ufffd, applicationName: \"authority-api carv-v3\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.TheGuardIsReadyOnlyForACompleteFenceAtOrBelowThisBuild(scenario: \"complete, no floor\", ready: True, detail: \"content acceptance rules v3 (floor none)\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.TheGuardIsReadyOnlyForACompleteFenceAtOrBelowThisBuild(scenario: \"floor 1 below the build\", ready: True, detail: \"content acceptance rules v3 (floor 1)\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.TheGuardIsReadyOnlyForACompleteFenceAtOrBelowThisBuild(scenario: \"floor 2 below the build\", ready: True, detail: \"content acceptance rules v3 (floor 2)\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.TheGuardIsReadyOnlyForACompleteFenceAtOrBelowThisBuild(scenario: \"floor above the build\", ready: False, detail: \"ContentAcceptanceRuleFloorAboveBuild(floor=4, buil\"\ufffd\ufffd\ufffd)",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.TheGuardIsReadyOnlyForACompleteFenceAtOrBelowThisBuild(scenario: \"floor equal to the build\", ready: True, detail: \"content acceptance rules v3 (floor 3)\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AVersion2PreparedOperationCannotBeCommittedByAVersion3Build",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.PrepareStampsTheBuildRuleVersionAndCommitStampsItWithTheCommittedTransition",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.SchemaTwoIsRegisteredForBothEnvelopeKindsWithPinnedShapesAndTheV1AllowListIsUnchanged",
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.AcceptanceIsNeverEffectiveBeforeItsExactPolicyIsRecorded",
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.TheDescriptorIsSecretFreeAndNamesThePolicy"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-15",
+      "mutation": "the switch admits Staging",
+      "mode": "unit",
+      "failed": 3,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.OutsideDevelopmentOrTestingNoV2RowIsAdmittedAtPrepareOrCommitAndV1IsUnaffected",
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.ConfiguredOnOutsideDevelopmentOrTestingRefusesTheStart(environment: \"Staging\")",
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.WrapCodesAreAdmittedOnlyInDevelopmentOrTesting"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-16",
+      "mutation": "the switch no longer requires Release B with RequiredFloor 3",
+      "mode": "unit",
+      "failed": 4,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.ConfiguredOnWithoutReleaseBFloor3RefusesTheStart(phase: \"ReleaseA\", floor: null)",
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.ConfiguredOnWithoutReleaseBFloor3RefusesTheStart(phase: \"ReleaseB\", floor: \"1\")",
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.ConfiguredOnWithoutReleaseBFloor3RefusesTheStart(phase: \"ReleaseB\", floor: \"2\")",
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.TheTestingOverrideIsTestingOnlyAndCannotEnableWithoutTheFloorPrerequisite"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-17",
+      "mutation": "acceptance no longer needs the recorded policy",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.AcceptanceIsNeverEffectiveBeforeItsExactPolicyIsRecorded"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-18",
+      "mutation": "the observer skips recording a changed policy",
+      "mode": "unit",
+      "failed": 2,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.ATamperedPreviousRecordIsNotTrustedAndAnUnreachableArchiveRecordsNothing",
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.ThePolicyIsRecordedOnceOnThePlatformJournalAndAgainOnlyWhenItChanges"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-19",
+      "mutation": "the observer trusts a previous record whose body no longer matches its digest",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.ATamperedPreviousRecordIsNotTrustedAndAnUnreachableArchiveRecordsNothing"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-20",
+      "mutation": "the RB-CARV-1 catch-all no longer treats a binding as a content-acceptance write",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "EnterpriseForms.ArchitectureTests.EnvelopeV2RuleBoundaryTests.LedgerBindingsAreContentAcceptanceWritesAndNoCodeUpdatesOrDeletesThem"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-21",
+      "mutation": "the ledger is not insert-only to the runtime (dropped from InsertOnlyTables)",
+      "mode": "unit",
+      "failed": 3,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.TheLedgerSqlHasTheBindingGuardImmutabilityAndNoBraceOrSecurityDefiner",
+        "AuthorizationAuthority.Tests.RuntimeGrantsTests.EveryModelTableHasARuntimeGrant",
+        "EnterpriseForms.ArchitectureTests.EnvelopeV2RuleBoundaryTests.LedgerBindingsAreContentAcceptanceWritesAndNoCodeUpdatesOrDeletesThem"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-22",
+      "mutation": "floor-3 SQL: the data-key ledger preconditions removed",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.Floor3IsAddedAfterItsPreconditionsUnderTheLockThenFloor2IsDropped"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-23",
+      "mutation": "floor-3 SQL: floor 2 not dropped by the raise",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.Floor3IsAddedAfterItsPreconditionsUnderTheLockThenFloor2IsDropped"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-24",
+      "mutation": "the ledger verification ignores the binding guard",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.TheLedgerVerificationRefusesEveryWeakenedObjectInAFixedOrder"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-25",
+      "mutation": "P-1 guard SQL no longer requires a Prepared operation",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DataKeyLedgerTests.TheLedgerSqlHasTheBindingGuardImmutabilityAndNoBraceOrSecurityDefiner"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-26",
+      "mutation": "readiness no longer requires the data-key ledger migration",
+      "mode": "unit",
+      "failed": 2,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.TheGuardIsReadyOnlyForACompleteFenceAtOrBelowThisBuild(scenario: \"data-key ledger migration missing\", ready: False, detail: \"ContentDataKeyLedgerMigrationMissing\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.TheGuardIsReadyOnlyForACompleteFenceAtOrBelowThisBuild(scenario: \"data-key ledger migration unknown\", ready: False, detail: \"ContentDataKeyLedgerMigrationMissing\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    }
+  ]
+}

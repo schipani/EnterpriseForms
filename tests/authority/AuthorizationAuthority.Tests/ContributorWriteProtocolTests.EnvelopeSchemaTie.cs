@@ -154,8 +154,9 @@ public sealed partial class ContributorWriteProtocolTests
     }
 
     /// <summary>
-    /// At Commit a tied, well-formed schema-2 / envelope-2 row passes S-4 and the v2 shape rules and is still refused: E3-M2d commits
-    /// no v2 row (EnvelopeV2Rules.CommitViolation), even for an operation recorded outside this build's Prepare with a current stamp.
+    /// At Commit a tied, well-formed schema-2 / envelope-2 row passes S-4 and the v2 shape rules and is still refused: E3-M2e commits a v2
+    /// row only with a matching data-key ledger binding (DK-6 / P-4), so an operation recorded outside this build's Prepare with a current
+    /// stamp and no binding is aborted as a ledger mismatch, with a minimal incident.
     /// </summary>
     [Theory]
     [InlineData("field")]
@@ -168,8 +169,8 @@ public sealed partial class ContributorWriteProtocolTests
         var staged = await SeedPreparedWithoutPrepareRulesAsync(h, operation, h.Stage(WithPair(h, kind, "schema 2 / envelope 2"), operation));
 
         var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.Service.CommitAsync(Harness.Actor(h.Owner), operation, new CommitContentChangeRequest(h.Org, h.Record, staged), Guid.CreateVersion7(), CancellationToken.None));
-        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeV2Rules.Reasons.VersionNotEnabled, ex.Message);
-        Assert.Equal(EnvelopeV2Rules.NotEnabledAtCommitReason, h.Store.Operations.Single(o => o.ContentChangeOperationId == operation).OperationQuarantineReasonCode);
+        Assert.Equal(AuthorityErrorCodes.DataKeyBindingMismatch, ex.ErrorCode);
+        Assert.Equal(DataKeyLedgerFailures.BindingMismatchReason, h.Store.Operations.Single(o => o.ContentChangeOperationId == operation).OperationQuarantineReasonCode);
         Assert.Equal(head, h.Head.CommittedContentRevision);
     }
 

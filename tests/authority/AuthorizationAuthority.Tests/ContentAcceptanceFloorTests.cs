@@ -36,8 +36,8 @@ public sealed class ContentAcceptanceFloorTests
     public void TheFloorContextOwnsExactlyTheFloorMigrationAndSharesTheAuthorityHistoryTable()
     {
         using var floor = new ContentAcceptanceFloorContext(ContentAcceptanceFloorContext.OptionsFor(Placeholder));
-        // E3-M2d: exactly the two floor migrations, in order (floor 2 is never applied implicitly: the command targets one migration).
-        Assert.Equal([ContentAcceptanceFloorSql.MigrationId, ContentAcceptanceFloor2Sql.MigrationId], floor.Database.GetMigrations().ToList());
+        // E3-M2d/E3-M2e (AM-1): exactly the three floor migrations, in order (a floor is never applied implicitly: the command targets one migration).
+        Assert.Equal([ContentAcceptanceFloorSql.MigrationId, ContentAcceptanceFloor2Sql.MigrationId, ContentAcceptanceFloor3Sql.MigrationId], floor.Database.GetMigrations().ToList());
         Assert.Empty(floor.Model.GetEntityTypes()); // SQL-only: it can never map or change an Authority table
         var history = floor.GetService<Microsoft.EntityFrameworkCore.Migrations.IHistoryRepository>();
         var script = history.GetCreateIfNotExistsScript();
@@ -75,15 +75,15 @@ public sealed class ContentAcceptanceFloorTests
 
     // ---- detection of a missing or lowered floor (§21.6) --------------------------------------------------------------------
 
-    private static readonly ContentAcceptanceRules.SchemaFacts Fence = new(MigrationApplied: true, ColumnsPresent: true, CommitCheckPresent: true, StateGuardEnabled: true, InstalledFloor: null);
+    private static readonly ContentAcceptanceRules.SchemaFacts Fence = new(MigrationApplied: true, ColumnsPresent: true, CommitCheckPresent: true, StateGuardEnabled: true, InstalledFloor: null, DataKeyLedgerApplied: true);
 
     public static TheoryData<string, bool, string> FloorDecisions => new()
     {
-        { "release A: no floor, none required", true, "content acceptance rules v2 (floor none)" },
-        { "release B: floor installed and recorded, required", true, "content acceptance rules v2 (floor 1)" },
+        { "release A: no floor, none required", true, "content acceptance rules v3 (floor none)" },
+        { "release B: floor installed and recorded, required", true, "content acceptance rules v3 (floor 1)" },
         { "floor recorded but its constraint dropped", false, "ContentAcceptanceRuleFloorMissing(recorded in the migration history, constraint absent)" },
         { "restore removed floor and history, floor required", false, "ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1)" },
-        { "required floor above this build", false, "ContentAcceptanceRuleRequiredFloorAboveBuild(required=3, build=2)" },
+        { "required floor above this build", false, "ContentAcceptanceRuleRequiredFloorAboveBuild(required=4, build=3)" },
     };
 
     [Theory]
@@ -96,7 +96,7 @@ public sealed class ContentAcceptanceFloorTests
             "release B: floor installed and recorded, required" => (Fence with { InstalledFloor = 1, FloorRecorded = true }, 1),
             "floor recorded but its constraint dropped" => (Fence with { FloorRecorded = true }, null),
             "restore removed floor and history, floor required" => (Fence, 1),
-            "required floor above this build" => (Fence with { InstalledFloor = 1, FloorRecorded = true }, 3),
+            "required floor above this build" => (Fence with { InstalledFloor = 1, FloorRecorded = true }, 4),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
         };
         Assert.Equal((ready, detail), ContentAcceptanceRules.Evaluate(facts, ContentAcceptanceRules.CurrentVersion, required));
@@ -135,7 +135,7 @@ public sealed class ContentAcceptanceFloorTests
 
     [Theory]
     [InlineData("--apply-content-acceptance-floor")]
-    [InlineData("--apply-content-acceptance-floor 3")] // E3-M2d: floor 2 is recognized now; 3 is not
+    [InlineData("--apply-content-acceptance-floor 4")] // E3-M2e: floors 1-3 are recognized now; 4 is not
     [InlineData("--apply-content-acceptance-floor 0")]
     [InlineData("--apply-content-acceptance-floor 02")]
     [InlineData("--apply-content-acceptance-floor one")]

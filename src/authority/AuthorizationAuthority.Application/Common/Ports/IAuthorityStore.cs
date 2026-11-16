@@ -121,6 +121,26 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>R-53: the given item ids that appear in any accepted manifest of any organization (identities predating the bindings).</summary>
     Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken);
 
+    /// <summary>E3-M2e DK-4 / P-4: the ledger bindings of the given data-key identifiers, in every organization and operation state.</summary>
+    Task<List<ContentDataKeyBinding>> FindDataKeyBindingsAsync(IReadOnlyCollection<Guid> dataKeyIdentifiers, CancellationToken cancellationToken);
+
+    /// <summary>E3-M2e DK-6: every ledger binding whose binding operation is <paramref name="contentChangeOperationId"/>.</summary>
+    Task<List<ContentDataKeyBinding>> GetDataKeyBindingsForOperationAsync(Guid contentChangeOperationId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// E3-M2e DK-5: inserts ledger bindings with the operation that introduces them, in this transaction (never updated or deleted).
+    /// The global unique identifier refuses a second binding; the store reports it as <c>422 DATA_KEY_IDENTIFIER_REUSED</c> and the
+    /// whole transaction rolls back.
+    /// </summary>
+    void AddDataKeyBindings(IEnumerable<ContentDataKeyBinding> bindings);
+
+    /// <summary>
+    /// E3-M2e L-13: in this transaction, verifies that the ledger's unique identifier index and its P-1 binding guard and P-2
+    /// immutability triggers exist exactly as created, holding a lock that keeps them from being dropped or disabled until the
+    /// transaction ends. Called before any binding insert and before P-4 consults the ledger. Throws (fail closed) otherwise.
+    /// </summary>
+    Task RequireDataKeyLedgerAsync(CancellationToken cancellationToken);
+
     void AddEdge(AuthorityRelationshipEdge edge);
 
     /// <summary>Phase C8 AC-9: every desired-state edge (active and removed) of one exact relationship, read-only.</summary>
@@ -264,6 +284,9 @@ public interface IAuthorityScope : IAsyncDisposable
 
     /// <summary>Pending-archive platform entries in revision order (tracked).</summary>
     Task<List<PlatformJournalEntry>> GetPendingPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken);
+
+    /// <summary>E3-M2e (OD-M2e-13): the newest platform journal entries, highest revision first, at most <paramref name="limit"/> (a bounded read of the unique revision index).</summary>
+    Task<List<PlatformJournalEntry>> GetLatestPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken);
 
     Task<int> CountPendingPlatformArchiveAsync(CancellationToken cancellationToken);
 

@@ -25,6 +25,9 @@ public static class ContentAcceptanceFloorCommand
     public const string Flag = "--apply-content-acceptance-floor";
     public const string ReinstateFlag = "--reinstate-recorded-floor";
 
+    /// <summary>A-1 (F-E1): the session lock timeout of the floor command, the same bound as the floor migrations' <c>SET LOCAL</c>.</summary>
+    public const string SessionLockTimeoutSql = "SET lock_timeout = '5s'";
+
     private const string InstalledFloorSql = "SELECT coalesce(max(substring(conname FROM '^ck_content_operation_rule_floor_v([0-9]+)$')::integer), 0) AS \"Value\" FROM pg_catalog.pg_constraint WHERE conrelid = 'authority.content_change_operations'::regclass AND contype = 'c'";
 
     public static bool TryRun(string[] args, out int exitCode) => TryRun(args, null, out exitCode);
@@ -71,6 +74,13 @@ public static class ContentAcceptanceFloorCommand
         try
         {
             using var context = new ContentAcceptanceFloorContext(ContentAcceptanceFloorContext.OptionsFor(connectionString));
+
+            // RB-CARV-1 amendment A-1 (F-E1): Release B writers now hold ACCESS SHARE on the history table for their whole transaction,
+            // so a floor raise waits for them at EF's migration lock on that table (before the operations table, never in a cycle).
+            // The session lock timeout bounds that wait as the floor migration's own 5 s timeout bounds the operations lock; a timeout
+            // applies nothing (exit 3). The connection stays open so the setting covers EF's lock statement.
+            context.Database.OpenConnection();
+            context.Database.ExecuteSqlRaw(SessionLockTimeoutSql);
 
             // E3-M2d: monotonic, one step at a time. A floor above the requested one already recorded is never undone by applying a
             // lower one; a floor is applied only after the floor below it (no skipping). Both are refusals, nothing is changed.

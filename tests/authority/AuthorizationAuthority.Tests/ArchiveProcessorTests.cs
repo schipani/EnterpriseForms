@@ -98,6 +98,17 @@ public sealed class ArchiveProcessorTests
 
     private sealed class FakeStore(Guid organizationId) : IAuthorityStore, IAuthorityScope
     {
+        // E3-M2e ports (not used by these tests).
+        public Task<List<ContentDataKeyBinding>> FindDataKeyBindingsAsync(IReadOnlyCollection<Guid> dataKeyIdentifiers, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<ContentDataKeyBinding>> GetDataKeyBindingsForOperationAsync(Guid contentChangeOperationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddDataKeyBindings(IEnumerable<ContentDataKeyBinding> bindings) => throw new NotSupportedException();
+
+        public Task RequireDataKeyLedgerAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<PlatformJournalEntry>> GetLatestPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public ISearchIndexStore SearchIndex => throw new NotSupportedException();
 
         public ISearchAccessStore SearchAccess => throw new NotSupportedException();

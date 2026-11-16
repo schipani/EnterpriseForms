@@ -75,6 +75,7 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         private bool authorizationWorkAppended;
         private const string FenceSavepoint = "content_acceptance_fence";
         private bool contentFenceVerified;
+        private bool dataKeyLedgerVerified;
         private Guid lockedOrganizationId;
         private SearchIndexStore? searchIndex;
 
@@ -97,7 +98,9 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
                 await transaction.CreateSavepointAsync(FenceSavepoint, cancellationToken).ConfigureAwait(false);
                 try
                 {
-                    // The lock first, then the facts in a later statement (READ COMMITTED: a fresh snapshot after the lock is granted).
+                    // The locks first, then the facts in a later statement (READ COMMITTED: a fresh snapshot after the locks are granted).
+                    // A-1 (F-E1): the history before the operations table, the order every EF migration uses, so no lock cycle can form.
+                    await context.Database.ExecuteSqlRawAsync(ContentAcceptanceWriteFence.HistoryLockSql, cancellationToken).ConfigureAwait(false);
                     await context.Database.ExecuteSqlRawAsync(ContentAcceptanceWriteFence.LockSql, cancellationToken).ConfigureAwait(false);
                     var facts = await ContentAcceptanceWriteFence.ReadAsync(context.Database.GetDbConnection(), transaction.GetDbTransaction(), policy.RequiredFloor!.Value, cancellationToken).ConfigureAwait(false);
                     failure = ContentAcceptanceWriteFence.Evaluate(facts, policy.RequiredFloor.Value);
@@ -125,6 +128,41 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
             }
 
             contentFenceVerified = true;
+        }
+
+        /// <summary>
+        /// E3-M2e L-13: verifies the data-key ledger's unique index and its P-1/P-2 triggers in this transaction, after a ROW
+        /// EXCLUSIVE lock on the ledger that conflicts with every statement able to drop, replace or disable them until the
+        /// transaction ends. Once per transaction. Any failure (including a missing table or an unreadable catalog) refuses with
+        /// <c>503 CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED</c> and an alert; nothing is written (the transaction is rolled back on disposal).
+        /// </summary>
+        public async Task RequireDataKeyLedgerAsync(CancellationToken cancellationToken)
+        {
+            if (dataKeyLedgerVerified)
+            {
+                return;
+            }
+
+            string? failure;
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync(ContentDataKeyLedgerSql.LockSql, cancellationToken).ConfigureAwait(false);
+                var facts = await ContentDataKeyLedgerSql.ReadAsync(context.Database.GetDbConnection(), transaction.GetDbTransaction(), cancellationToken).ConfigureAwait(false);
+                failure = ContentDataKeyLedgerSql.Evaluate(facts);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                failure = ContentDataKeyLedgerSql.Failures.Unverifiable;
+            }
+
+            if (failure is not null)
+            {
+                alerts?.Raise(new SecurityAlert(DataKeyLedgerFailures.AlertKind, "Critical", lockedOrganizationId, Guid.Empty, null,
+                    $"data-key ledger not enforced: reason={failure} build={ContentAcceptanceRules.CurrentVersion}", Guid.Empty));
+                throw DataKeyLedgerFailures.NotEnforced();
+            }
+
+            dataKeyLedgerVerified = true;
         }
 
         /// <summary>
@@ -162,8 +200,8 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
                         }
 
                         return true;
-                    case RecordManifestCommit or RecordManifestLeaf or ContentItemIdentity or ContentCandidateLeaf or ContentIntegrityCheckpoint:
-                        return true;
+                    case RecordManifestCommit or RecordManifestLeaf or ContentItemIdentity or ContentCandidateLeaf or ContentIntegrityCheckpoint or ContentDataKeyBinding:
+                        return true; // E3-M2e (L-11): a data-key binding is content-acceptance state
                 }
             }
 
@@ -329,6 +367,16 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public void AddItemIdentities(IEnumerable<ContentItemIdentity> identities) => context.ContentItemIdentities.AddRange(identities);
 
+        public Task<List<ContentDataKeyBinding>> FindDataKeyBindingsAsync(IReadOnlyCollection<Guid> dataKeyIdentifiers, CancellationToken cancellationToken) =>
+            dataKeyIdentifiers.Count == 0
+                ? Task.FromResult(new List<ContentDataKeyBinding>())
+                : context.ContentDataKeyBindings.AsNoTracking().Where(b => dataKeyIdentifiers.Contains(b.DataKeyIdentifier)).ToListAsync(cancellationToken);
+
+        public Task<List<ContentDataKeyBinding>> GetDataKeyBindingsForOperationAsync(Guid contentChangeOperationId, CancellationToken cancellationToken) =>
+            context.ContentDataKeyBindings.AsNoTracking().Where(b => b.BindingContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken);
+
+        public void AddDataKeyBindings(IEnumerable<ContentDataKeyBinding> bindings) => context.ContentDataKeyBindings.AddRange(bindings);
+
         public Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken)
         {
             var ids = manifestItemIds.Distinct().ToList();
@@ -462,6 +510,9 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public void AddPlatformJournalHead(PlatformJournalHead head) => context.PlatformJournalHeads.Add(head);
 
         public void AddPlatformJournalEntry(PlatformJournalEntry entry) => context.PlatformJournalEntries.Add(entry);
+
+        public Task<List<PlatformJournalEntry>> GetLatestPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken) =>
+            context.PlatformJournalEntries.AsNoTracking().OrderByDescending(e => e.PlatformJournalRevision).Take(limit).ToListAsync(cancellationToken);
 
         public Task<List<PlatformJournalEntry>> GetPendingPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken) =>
             context.PlatformJournalEntries.AsTracking().Where(e => e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending).OrderBy(e => e.PlatformJournalRevision).Take(limit).ToListAsync(cancellationToken);
@@ -757,6 +808,10 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
             catch (DbUpdateException ex) when (ContentAcceptanceRuleRefusals.Translate(ex, alerts) is { } refused)
             {
                 throw refused;
+            }
+            catch (DbUpdateException ex) when (DataKeyLedgerRefusals.Translate(ex, alerts) is { } refused)
+            {
+                throw refused; // E3-M2e: 23505 on the ledger identifier (L-3) or a P-1/P-2 refusal (L-12); the transaction rolls back
             }
         }
 

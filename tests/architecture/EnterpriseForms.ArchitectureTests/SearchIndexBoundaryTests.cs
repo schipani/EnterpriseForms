@@ -61,7 +61,7 @@ public sealed partial class SearchIndexBoundaryTests
         var service = AuthoritySources().Single(s => s.Path.EndsWith("Features/Content/ContentService.cs", StringComparison.Ordinal)).Text;
         var calls = CoordinatorCall().Matches(service).Select(m => m.Groups[1].Value).ToList();
         Assert.Equal(1, calls.Count(c => c == "AdvanceForCommitAsync"));          // W1
-        Assert.Equal(3, calls.Count(c => c == "AdvanceWithoutIndexChangeAsync")); // W2, W3, W4
+        Assert.Equal(4, calls.Count(c => c == "AdvanceWithoutIndexChangeAsync")); // W2, W3, W4, and E3-M2e's data-key ledger incident at Commit (DK-6 / P-4)
         Assert.DoesNotMatch(@"ContentIntegrityRevision\s*(\+\+|\+=|-=)", service);
     }
 

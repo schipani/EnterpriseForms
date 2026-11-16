@@ -20,17 +20,20 @@ namespace AuthorizationAuthority.Tests;
 /// </summary>
 public sealed class ContentAcceptanceRuleGuardTests
 {
-    private static readonly ContentAcceptanceRules.SchemaFacts Complete = new(MigrationApplied: true, ColumnsPresent: true, CommitCheckPresent: true, StateGuardEnabled: true, InstalledFloor: null);
+    private static readonly ContentAcceptanceRules.SchemaFacts Complete = new(MigrationApplied: true, ColumnsPresent: true, CommitCheckPresent: true, StateGuardEnabled: true, InstalledFloor: null, DataKeyLedgerApplied: true);
 
     // ---- M2-CARV-09: the decision ------------------------------------------------------------------------------------------
 
     public static TheoryData<string, bool, string> Decisions => new()
     {
         { "unknown", false, "ContentAcceptanceRulesUnverified" },
-        { "complete, no floor", true, "content acceptance rules v2 (floor none)" },
-        { "floor 1 below the build", true, "content acceptance rules v2 (floor 1)" }, // E3-M2d: a version-2 build accepts floor 1 (a minimum)
-        { "floor equal to the build", true, "content acceptance rules v2 (floor 2)" },
-        { "floor above the build", false, "ContentAcceptanceRuleFloorAboveBuild(floor=3, build=2)" },
+        { "complete, no floor", true, "content acceptance rules v3 (floor none)" },
+        { "floor 1 below the build", true, "content acceptance rules v3 (floor 1)" }, // E3-M2d: a build accepts a lower floor (a minimum)
+        { "floor 2 below the build", true, "content acceptance rules v3 (floor 2)" },
+        { "floor equal to the build", true, "content acceptance rules v3 (floor 3)" }, // E3-M2e: CARV 3
+        { "floor above the build", false, "ContentAcceptanceRuleFloorAboveBuild(floor=4, build=3)" },
+        { "data-key ledger migration missing", false, "ContentDataKeyLedgerMigrationMissing" }, // E3-M2e (AM-12)
+        { "data-key ledger migration unknown", false, "ContentDataKeyLedgerMigrationMissing" }, // unknown is not ready
         { "migration missing", false, "ContentAcceptanceRuleMigrationMissing" },
         { "columns missing", false, "ContentAcceptanceRuleSchemaIncomplete" },
         { "commit check missing", false, "ContentAcceptanceRuleSchemaIncomplete" },
@@ -42,8 +45,11 @@ public sealed class ContentAcceptanceRuleGuardTests
         "unknown" => null,
         "complete, no floor" => Complete,
         "floor 1 below the build" => Complete with { InstalledFloor = 1 },
-        "floor equal to the build" => Complete with { InstalledFloor = 2 },
-        "floor above the build" => Complete with { InstalledFloor = 3 },
+        "floor 2 below the build" => Complete with { InstalledFloor = 2 },
+        "floor equal to the build" => Complete with { InstalledFloor = 3 },
+        "floor above the build" => Complete with { InstalledFloor = 4 },
+        "data-key ledger migration missing" => Complete with { DataKeyLedgerApplied = false },
+        "data-key ledger migration unknown" => Complete with { DataKeyLedgerApplied = null },
         "migration missing" => Complete with { MigrationApplied = false },
         "columns missing" => Complete with { ColumnsPresent = false },
         "commit check missing" => Complete with { CommitCheckPresent = false },
@@ -90,10 +96,10 @@ public sealed class ContentAcceptanceRuleGuardTests
         Assert.True((await guard.RefreshAsync(CancellationToken.None)).Ready);
         Assert.True(guard.Current.Ready);
 
-        reader.Next = () => Complete with { InstalledFloor = 3 }; // a newer floor installed while this instance runs
+        reader.Next = () => Complete with { InstalledFloor = 4 }; // a newer floor installed while this instance runs
         clock.Now += ContentAcceptanceRules.ReadinessRecheckInterval;
         await guard.RefreshAsync(CancellationToken.None);
-        Assert.Equal((false, "ContentAcceptanceRuleFloorAboveBuild(floor=3, build=2)"), guard.Current);
+        Assert.Equal((false, "ContentAcceptanceRuleFloorAboveBuild(floor=4, build=3)"), guard.Current);
 
         reader.Next = () => throw new NpgsqlException("unreachable");
         clock.Now += ContentAcceptanceRules.ReadinessRecheckInterval;
@@ -184,10 +190,11 @@ public sealed class ContentAcceptanceRuleGuardTests
     // ---- versioned application name (§19.9 step 3) ------------------------------------------------------------------------
 
     [Theory]
-    [InlineData("Host=db;Database=authority;Username=authority_runtime", "authority carv-v2")]
-    [InlineData("Host=db;Database=authority;Username=authority_runtime;Application Name=authority-api", "authority-api carv-v2")]
-    [InlineData("Host=db;Database=authority;Username=authority_runtime;Application Name=authority-api carv-v2", "authority-api carv-v2")]
-    [InlineData("Host=db;Database=authority;Username=authority_runtime;Application Name=authority-api carv-v1", "authority-api carv-v2")] // E3-M2d: a stale marker is replaced, never kept beside the build's
+    [InlineData("Host=db;Database=authority;Username=authority_runtime", "authority carv-v3")]
+    [InlineData("Host=db;Database=authority;Username=authority_runtime;Application Name=authority-api", "authority-api carv-v3")]
+    [InlineData("Host=db;Database=authority;Username=authority_runtime;Application Name=authority-api carv-v3", "authority-api carv-v3")]
+    [InlineData("Host=db;Database=authority;Username=authority_runtime;Application Name=authority-api carv-v2", "authority-api carv-v3")]
+    [InlineData("Host=db;Database=authority;Username=authority_runtime;Application Name=authority-api carv-v1", "authority-api carv-v3")] // E3-M2d: a stale marker is replaced, never kept beside the build's
     public void StoreConnectionsCarryTheBuildRuleVersion(string configured, string applicationName) =>
         Assert.Equal(applicationName, new NpgsqlConnectionStringBuilder(ContentAcceptanceRuleConnection.WithVersionedApplicationName(configured)).ApplicationName);
 
@@ -229,13 +236,16 @@ public sealed class ContentAcceptanceRuleGuardTests
     }
 
     [Fact]
-    public void NoMigrationInstallsAFloorAndTheCarvMigrationIsTheLatest()
+    public void NoMigrationInstallsAFloorAndTheDataKeyLedgerMigrationIsTheLatest()
     {
         var migrations = Directory.EnumerateFiles(RepositoryRoot("src", "authority", "AuthorizationAuthority.Infrastructure", "Persistence", "Migrations"), "*.cs").ToList();
         Assert.DoesNotContain(migrations, f => File.ReadAllText(f).Contains("ck_content_operation_rule_floor", StringComparison.Ordinal)); // OD-M2-21: M2b-1F is a separate release
         Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix + "1", ContentAcceptanceRuleSql.UpSql, StringComparison.Ordinal);
         var ids = migrations.Select(Path.GetFileNameWithoutExtension).Where(n => n is not null && !n.EndsWith(".Designer", StringComparison.Ordinal) && n != "AuthorityDbContextModelSnapshot").Order(StringComparer.Ordinal).ToList();
-        Assert.Equal(ContentAcceptanceRuleSql.MigrationId, ids[^1]);
+        Assert.Equal(ContentDataKeyLedgerSql.MigrationId, ids[^1]); // E3-M2e: the ledger migration follows the CARV migration and installs no floor (AM-1)
+        Assert.Equal(ContentAcceptanceRuleSql.MigrationId, ids[^2]);
+        Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix, ContentDataKeyLedgerSql.TriggersSql, StringComparison.Ordinal);
+        Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix, ContentDataKeyLedgerSql.LockTimeoutSql + ContentDataKeyLedgerSql.DownGuardSql, StringComparison.Ordinal);
     }
 
     private static string RepositoryRoot(params string[] parts)

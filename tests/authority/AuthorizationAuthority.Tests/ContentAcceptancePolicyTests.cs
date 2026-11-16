@@ -35,7 +35,7 @@ public sealed class ContentAcceptancePolicyTests
         { "ReleaseB", "1e0", ContentAcceptancePolicy.FloorMalformed },
         { "ReleaseB", "9999999999", ContentAcceptancePolicy.FloorMalformed },
         { "ReleaseB", "0", ContentAcceptancePolicy.FloorBelowMinimum }, // the downgrade attempt
-        { "ReleaseB", "3", ContentAcceptancePolicy.FloorUnsupported },  // E3-M2d: above this build (2) and not a recognized floor
+        { "ReleaseB", "4", ContentAcceptancePolicy.FloorUnsupported },  // E3-M2e: above this build (3) and not a recognized floor
     };
 
     [Theory]
@@ -139,7 +139,7 @@ public sealed class ContentAcceptancePolicyTests
             "a rewrite rule" => Enforced with { RuleCount = 1 },
             "an inheritance child" => Enforced with { ChildCount = 1 },
             "a partitioned table" => Enforced with { RelationKind = "p" },
-            "a floor above this build" => Enforced with { HighestFloor = 3 }, // E3-M2d: floor 2 is this build's own version
+            "a floor above this build" => Enforced with { HighestFloor = 4 }, // E3-M2e: floor 3 is this build's own version
             "no facts" => null,
             _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
         };
@@ -150,9 +150,10 @@ public sealed class ContentAcceptancePolicyTests
     [Fact]
     public void TheFenceNeverComparesAFloorItDoesNotDefine()
     {
-        Assert.Equal(ContentAcceptanceFloorFailures.FloorUnverifiable, ContentAcceptanceWriteFence.Evaluate(Enforced, 3)); // E3-M2d: 3 is neither recognized nor <= the build
+        Assert.Equal(ContentAcceptanceFloorFailures.FloorUnverifiable, ContentAcceptanceWriteFence.Evaluate(Enforced, 4)); // E3-M2e: 4 is neither recognized nor <= the build
         Assert.Equal(ContentAcceptanceFloorFailures.FloorUnverifiable, ContentAcceptanceWriteFence.Evaluate(Enforced, 0));
         Assert.Equal(ContentAcceptanceFloorFailures.FloorUnverifiable, ContentAcceptanceWriteFence.Evaluate(Enforced, 2, buildVersion: 1)); // a recognized floor above the build
+        Assert.Equal(ContentAcceptanceFloorFailures.FloorUnverifiable, ContentAcceptanceWriteFence.Evaluate(Enforced, 3, buildVersion: 2)); // E3-M2e: floor 3 above a version-2 build
     }
 
     [Fact]
@@ -168,6 +169,14 @@ public sealed class ContentAcceptancePolicyTests
     [Fact]
     public void TheLockIsRowExclusiveOnTheOperationsTable() =>
         Assert.Equal("LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE", ContentAcceptanceWriteFence.LockSql);
+
+    /// <summary>RB-CARV-1 amendment A-1 (F-E1): the history lock the fence takes first, and the floor command's session lock timeout.</summary>
+    [Fact]
+    public void TheHistoryLockIsAccessShareOnTheMigrationHistoryAndTheFloorCommandWaitIsBounded()
+    {
+        Assert.Equal("LOCK TABLE authority.ef_migrations_history IN ACCESS SHARE MODE", ContentAcceptanceWriteFence.HistoryLockSql);
+        Assert.Equal("SET lock_timeout = '5s'", AuthorizationAuthority.Api.Composition.ContentAcceptanceFloorCommand.SessionLockTimeoutSql);
+    }
 
     // ---- diagnostics ------------------------------------------------------------------------------------------------------
 
@@ -200,7 +209,7 @@ public sealed class ContentAcceptancePolicyTests
 
     // ---- readiness ---------------------------------------------------------------------------------------------------------
 
-    private static readonly ContentAcceptanceRules.SchemaFacts FloorFacts = new(MigrationApplied: true, ColumnsPresent: true, CommitCheckPresent: true, StateGuardEnabled: true, InstalledFloor: 1, FloorRecorded: true);
+    private static readonly ContentAcceptanceRules.SchemaFacts FloorFacts = new(MigrationApplied: true, ColumnsPresent: true, CommitCheckPresent: true, StateGuardEnabled: true, InstalledFloor: 1, FloorRecorded: true, DataKeyLedgerApplied: true);
 
     [Fact]
     public void ReleaseAReadinessIsExactlyTheE3M2b1Decision()
@@ -215,7 +224,7 @@ public sealed class ContentAcceptancePolicyTests
     public void ReleaseBReadinessRequiresTheFloorAndTheWriteFence()
     {
         var b = ContentAcceptancePolicy.Resolve("ReleaseB", "1");
-        Assert.Equal((true, "content acceptance rules v2 (floor 1); phase=ReleaseB requiredFloor=1"), ContentAcceptanceRules.EvaluateForPolicy(FloorFacts, b));
+        Assert.Equal((true, "content acceptance rules v3 (floor 1); phase=ReleaseB requiredFloor=1"), ContentAcceptanceRules.EvaluateForPolicy(FloorFacts, b));
         Assert.Equal((false, "ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1)"), ContentAcceptanceRules.EvaluateForPolicy(FloorFacts with { InstalledFloor = null, FloorRecorded = false }, b));
         Assert.Equal((false, "ContentAcceptanceFloorNotEnforced(reason=FloorDefinitionMismatch, category=WeakenedFence)"),
             ContentAcceptanceRules.EvaluateForPolicy(FloorFacts with { WriteFenceFailure = ContentAcceptanceFloorFailures.FloorDefinitionMismatch }, b));

@@ -1,0 +1,5 @@
+failed EnterpriseForms.ArchitectureTests.FloorLockOrderTests.TheFenceLocksTheHistoryBeforeTheOperationsTableAndReadsTheFactsAfterBoth (2ms)
+    at EnterpriseForms.ArchitectureTests.FloorLockOrderTests.TheFenceLocksTheHistoryBeforeTheOperationsTableAndReadsTheFactsAfterBoth() in tests\architecture\EnterpriseForms.ArchitectureTests\FloorLockOrderTests.cs:37
+  total: 3
+  failed: 1
+  succeeded: 2

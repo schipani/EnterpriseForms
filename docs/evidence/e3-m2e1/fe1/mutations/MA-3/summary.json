@@ -1,0 +1,8 @@
+{
+    "ExitCode":  1,
+    "Checks":  63,
+    "Failed":  3,
+    "ContainerRemoved":  true,
+    "Mode":  "fe1",
+    "DeadlockLinesInServerLog":  0
+}

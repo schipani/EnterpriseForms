@@ -14,13 +14,13 @@ namespace AuthorizationAuthority.Tests;
 /// </summary>
 public sealed class ContentAcceptanceFloor2Tests
 {
-    private static readonly int[] OneAndTwo = [1, 2];
+    private static readonly int[] OneTwoAndThree = [1, 2, 3];
 
     [Fact]
-    public void TheRecognizedFloorsAreOneAndTwoAndMatchTheFloorMigrations()
+    public void TheRecognizedFloorsAreOneTwoAndThreeAndMatchTheFloorMigrations()
     {
-        Assert.Equal(2, ContentAcceptanceRules.CurrentVersion);
-        Assert.Equal(OneAndTwo, ContentAcceptanceRules.RecognizedFloors);
+        Assert.Equal(3, ContentAcceptanceRules.CurrentVersion); // E3-M2e: CARV 3
+        Assert.Equal(OneTwoAndThree, ContentAcceptanceRules.RecognizedFloors); // E3-M2e (AM-1): floor 3
         Assert.Equal(ContentAcceptanceRules.RecognizedFloors, ContentAcceptanceFloors.Recognized.Select(f => f.Version));
         Assert.All(ContentAcceptanceFloors.Recognized, f => Assert.Equal(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix + f.Version, f.ConstraintName));
         Assert.All(ContentAcceptanceFloors.Recognized, f => Assert.True(ContentAcceptanceRules.DatabaseObjects.IsFenceObject(f.ConstraintName))); // refusals map to 409
@@ -28,8 +28,11 @@ public sealed class ContentAcceptanceFloor2Tests
         Assert.Equal(1, ContentAcceptancePolicy.ReleaseBFloor);
         Assert.Equal(ContentAcceptanceFloorSql.MigrationId, ContentAcceptanceFloors.Find(1)!.MigrationId);
         Assert.Equal(ContentAcceptanceFloor2Sql.MigrationId, ContentAcceptanceFloors.Find(2)!.MigrationId);
-        Assert.Null(ContentAcceptanceFloors.Find(3));
+        Assert.Equal(ContentAcceptanceFloor3Sql.MigrationId, ContentAcceptanceFloors.Find(3)!.MigrationId);
+        Assert.Null(ContentAcceptanceFloors.Find(4));
         Assert.True(string.CompareOrdinal(ContentAcceptanceFloorSql.MigrationId, ContentAcceptanceFloor2Sql.MigrationId) < 0); // applied in order
+        Assert.True(string.CompareOrdinal(ContentAcceptanceFloor2Sql.MigrationId, ContentAcceptanceFloor3Sql.MigrationId) < 0);
+        Assert.True(string.CompareOrdinal(ContentDataKeyLedgerSql.MigrationId, ContentAcceptanceFloor3Sql.MigrationId) < 0); // the ledger migration precedes floor 3
     }
 
     // ---- policy (D-4: minimum semantics) --------------------------------------------------------------------------------
@@ -37,7 +40,8 @@ public sealed class ContentAcceptanceFloor2Tests
     [Theory]
     [InlineData("1", true, "phase=ReleaseB requiredFloor=1")]
     [InlineData("2", true, "phase=ReleaseB requiredFloor=2")]
-    [InlineData("3", false, "phase=Unresolved failure=RequiredFloorUnsupported")]
+    [InlineData("3", true, "phase=ReleaseB requiredFloor=3")] // E3-M2e: floor 3 is recognized by a CARV-3 build
+    [InlineData("4", false, "phase=Unresolved failure=RequiredFloorUnsupported")]
     [InlineData("0", false, "phase=Unresolved failure=RequiredFloorBelowMinimum")]
     [InlineData("02", true, "phase=ReleaseB requiredFloor=2")]
     public void ReleaseBRequiresARecognizedFloorUpToThisBuild(string floor, bool valid, string described)
@@ -78,8 +82,9 @@ public sealed class ContentAcceptanceFloor2Tests
         { "floor 2 covering Prepared only", 1, ContentAcceptanceFloorFailures.FloorDefinitionMismatch },
         { "floors 1 and 2 both present", 1, ContentAcceptanceFloorFailures.FloorDefinitionMismatch },
         { "an unparseable floor name", 1, ContentAcceptanceFloorFailures.FloorDefinitionMismatch },
-        { "floor 3 (above this build)", 1, ContentAcceptanceFloorFailures.FloorAboveBuild },
-        { "floor 2, floor 3 required", 3, ContentAcceptanceFloorFailures.FloorUnverifiable },
+        { "floor 4 (above this build)", 1, ContentAcceptanceFloorFailures.FloorAboveBuild },
+        { "floor 2, floor 3 required", 3, ContentAcceptanceFloorFailures.FloorLowered }, // E3-M2e: floor 3 is recognized, so floor 2 is below the required minimum
+        { "floor 2, floor 4 required", 4, ContentAcceptanceFloorFailures.FloorUnverifiable },
         { "floor 2 on a version-1 build", 1, ContentAcceptanceFloorFailures.FloorAboveBuild },
     };
 
@@ -89,7 +94,7 @@ public sealed class ContentAcceptanceFloor2Tests
     {
         var facts = scenario switch
         {
-            "floor 2, floor 1 required (a minimum)" or "floor 2, floor 2 required" or "floor 2, floor 3 required" or "floor 2 on a version-1 build" => Floor2Enforced,
+            "floor 2, floor 1 required (a minimum)" or "floor 2, floor 2 required" or "floor 2, floor 3 required" or "floor 2, floor 4 required" or "floor 2 on a version-1 build" => Floor2Enforced,
             "floor 2 validated" => Floor2Enforced with { FloorDefinition = ContentAcceptanceFloor2Sql.ExpectedDefinition[..^" NOT VALID".Length] },
             "floor 1, floor 1 required (unchanged)" or "floor 1, floor 2 required" => Floor1Enforced,
             "floor 1 put back after floor 2 was recorded, floor 1 required" or "floor 1 put back after floor 2 was recorded, floor 2 required" => Floor1Enforced with { RecordedFloors = new HashSet<int> { 1, 2 } },
@@ -101,7 +106,7 @@ public sealed class ContentAcceptanceFloor2Tests
             "floor 2 covering Prepared only" => Floor2Enforced with { FloorDefinition = "CHECK ((((operation_state_name)::text <> 'Prepared'::text) OR ((prepare_acceptance_rule_version IS NOT NULL) AND (prepare_acceptance_rule_version >= 2)))) NOT VALID" },
             "floors 1 and 2 both present" => Floor2Enforced with { FloorConstraintCount = 2 },
             "an unparseable floor name" => Floor2Enforced with { FloorDefinition = null, HighestFloor = null, FloorConstraintCount = 1 },
-            "floor 3 (above this build)" => Floor2Enforced with { HighestFloor = 3 },
+            "floor 4 (above this build)" => Floor2Enforced with { HighestFloor = 4 },
             _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
         };
 
@@ -111,7 +116,7 @@ public sealed class ContentAcceptanceFloor2Tests
 
     // ---- readiness ------------------------------------------------------------------------------------------------------
 
-    private static readonly ContentAcceptanceRules.SchemaFacts Fence = new(MigrationApplied: true, ColumnsPresent: true, CommitCheckPresent: true, StateGuardEnabled: true, InstalledFloor: null);
+    private static readonly ContentAcceptanceRules.SchemaFacts Fence = new(MigrationApplied: true, ColumnsPresent: true, CommitCheckPresent: true, StateGuardEnabled: true, InstalledFloor: null, DataKeyLedgerApplied: true);
 
     [Fact]
     public void ReadinessReportsARecordedHigherFloorWhoseConstraintIsMissing()
@@ -122,9 +127,9 @@ public sealed class ContentAcceptanceFloor2Tests
         Assert.Equal((false, "ContentAcceptanceRuleFloorBelowRequired(installed=1, required=2)"),
             ContentAcceptanceRules.Evaluate(Fence with { InstalledFloor = 1, FloorRecorded = true, HighestRecordedFloor = 1 }, 2, 2));
         Assert.Equal((false, "ContentAcceptanceRuleFloorAboveBuild(floor=2, build=1)"), ContentAcceptanceRules.Evaluate(Fence with { InstalledFloor = 2, FloorRecorded = true, HighestRecordedFloor = 2 }, 1));
-        Assert.Equal((true, "content acceptance rules v2 (floor 2); phase=ReleaseB requiredFloor=2"),
+        Assert.Equal((true, "content acceptance rules v3 (floor 2); phase=ReleaseB requiredFloor=2"),
             ContentAcceptanceRules.EvaluateForPolicy(Fence with { InstalledFloor = 2, FloorRecorded = true, HighestRecordedFloor = 2 }, ContentAcceptancePolicy.Resolve("ReleaseB", "2")));
-        Assert.Equal((true, "content acceptance rules v2 (floor 2); phase=ReleaseB requiredFloor=1"),
+        Assert.Equal((true, "content acceptance rules v3 (floor 2); phase=ReleaseB requiredFloor=1"),
             ContentAcceptanceRules.EvaluateForPolicy(Fence with { InstalledFloor = 2, FloorRecorded = true, HighestRecordedFloor = 2 }, ContentAcceptancePolicy.Resolve("ReleaseB", "1")));
     }
 

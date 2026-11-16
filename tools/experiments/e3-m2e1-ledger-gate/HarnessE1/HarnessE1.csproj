@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    E3-M2e-1 dark data-key ledger real-PostgreSQL gate (docs/security/E3_M2E1_IMPLEMENTATION_RECORD.md). Development/Testing only; not
+    part of EnterpriseForms.All.slnx and never built in place: scripts/dev/e3-m2e1-ledger-pg-gate.ps1 copies this folder to a temporary
+    work directory (outside the repository, so no repository build settings apply) and builds it against this tree's Authority Release
+    binaries passed as M2eBinaries. It references no repository project.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>M2e1Harness</AssemblyName>
+    <!-- Without a deps file the host loads every assembly in the output folder: the copies of M2eBinaries. -->
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS1591;CA2007;CA1303</NoWarn>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="$(M2eBinaries)\*.dll" Private="true" />
+  </ItemGroup>
+  <Target Name="RequireM2eBinaries" BeforeTargets="ResolveAssemblyReferences" Condition="'$(M2eBinaries)' == '' Or !Exists('$(M2eBinaries)\AuthorizationAuthority.Api.dll')">
+    <Error Text="Build through scripts/dev/e3-m2e1-ledger-pg-gate.ps1 (M2eBinaries must name a folder of Authority Release binaries)." />
+  </Target>
+</Project>

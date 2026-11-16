@@ -1,6 +1,7 @@
 using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Features.Content;
 using AuthorizationAuthority.Contracts.V1;
+using AuthorizationAuthority.Domain.Features.Content;
 using EnterpriseForms.Integrity.Canonical;
 using Xunit;
 using static AuthorizationAuthority.Tests.ContributorWriteFixtures;
@@ -352,12 +353,21 @@ public sealed class EnvelopeV2RulesTests
 
     // ---- Commit and census -------------------------------------------------------------------------------------------------
 
+    /// <summary>E3-M2e (replaces the E3-M2d CommitViolation test): only v2 rows form data-key groups; v1, plaintext and header rows never do.</summary>
     [Fact]
-    public void CommitRefusesEveryV2RowAndNothingElse()
+    public void OnlyV2RowsFormDataKeyGroupsAtCommit()
     {
-        Assert.Equal(EnvelopeV2Rules.Reasons.VersionNotEnabled, EnvelopeV2Rules.CommitViolation([Doc(FieldV1(Guid.CreateVersion7(), 40)), Doc(FieldV2(Guid.CreateVersion7(), Guid.CreateVersion7()))]));
-        Assert.Equal(EnvelopeV2Rules.Reasons.VersionNotEnabled, EnvelopeV2Rules.CommitViolation([Doc(DocumentV2(Guid.CreateVersion7(), Guid.CreateVersion7()))]));
-        Assert.Null(EnvelopeV2Rules.CommitViolation([Doc(FieldV1(Guid.CreateVersion7(), 40)), Doc(Attachment(Org, Record, Guid.CreateVersion7())), Doc(Header(Org, Record))]));
+        var batch = Guid.CreateVersion7();
+        var document = Guid.CreateVersion7();
+        var groups = DataKeyLedgerRules.GroupsOf([Doc(FieldV1(Guid.CreateVersion7(), 40)), Doc(FieldV2(Guid.CreateVersion7(), batch, nonce: 1)), Doc(FieldV2(Guid.CreateVersion7(), batch, nonce: 2)),
+            Doc(DocumentV2(Guid.CreateVersion7(), document)), Doc(Attachment(Org, Record, Guid.CreateVersion7())), Doc(Header(Org, Record))]);
+        Assert.Equal(2, groups.Count);
+        var field = Assert.Single(groups, g => g.DataKeyIdentifier == batch);
+        Assert.Equal((ContentDataKeyBindingKinds.FieldValueBatch, 2), (field.KindCode, field.ItemCount));
+        Assert.Equal(Fill(32, 0xdd), field.Commitment);
+        var doc = Assert.Single(groups, g => g.DataKeyIdentifier == document);
+        Assert.Equal((ContentDataKeyBindingKinds.DocumentVersion, 1), (doc.KindCode, doc.ItemCount));
+        Assert.Empty(DataKeyLedgerRules.GroupsOf([Doc(FieldV1(Guid.CreateVersion7(), 40)), Doc(Attachment(Org, Record, Guid.CreateVersion7())), Doc(Header(Org, Record))]));
     }
 
     [Fact]
@@ -392,5 +402,134 @@ public sealed class EnvelopeV2RulesTests
         Assert.Equal(new HashSet<int> { 1 }, EnvelopeRules.AllowedEnvelopeVersions); // D-12: the v1 allow-list is not widened
         Assert.Same(EnvelopeRules.AllowedEnvelopeVersions, ContentDeltaRules.AllowedEnvelopeVersions); // the share check still sees {1} only
         Assert.All(EnvelopeV2Rules.WrapAlgorithms.Values, w => Assert.Contains(w.Family, EnvelopeRules.ScopedReferenceFamilies));
+    }
+
+    // ---- E3-M2e data-key ledger rules (pure; docs/security/E3_M2E_CONTRACT_CLOSURE.md §3) ------------------------------------
+
+    private static readonly Guid Operation = Guid.CreateVersion7();
+
+    private static ContentDataKeyBinding Binding(Guid id, Guid operation, short kind = ContentDataKeyBindingKinds.FieldValueBatch, int count = 2, byte commitment = 0xdd, Guid? organization = null, Guid? record = null) => new()
+    {
+        ContentDataKeyBindingId = Guid.CreateVersion7(),
+        DataKeyIdentifier = id,
+        OrganizationId = organization ?? Org,
+        FormRecordId = record ?? Record,
+        EnvelopePayloadKindCode = kind,
+        DataKeyCommitmentBytes = Fill(32, commitment),
+        BindingItemCount = count,
+        BindingContentChangeOperationId = operation,
+        DataKeyBoundOn = DateTimeOffset.UtcNow,
+    };
+
+    private static IReadOnlyList<DataKeyLedgerRules.DataKeyGroup> TwoItemBatch(Guid id) =>
+        DataKeyLedgerRules.GroupsOf([Doc(FieldV2(Guid.CreateVersion7(), id, nonce: 1)), Doc(FieldV2(Guid.CreateVersion7(), id, nonce: 2))]);
+
+    private static (string? Violation, IReadOnlyList<DataKeyLedgerRules.DataKeyGroup> NewGroups) Decide(IReadOnlyList<DataKeyLedgerRules.DataKeyGroup> staged, IReadOnlyCollection<ContentDataKeyBinding> ofOperation, IReadOnlyCollection<ContentDataKeyBinding> ofStaged, params Guid[] committed) =>
+        DataKeyLedgerRules.CommitDecision(staged, ofOperation, ofStaged, committed.ToHashSet(), Org, Record, Operation);
+
+    [Fact]
+    public void Dk4RefusesANewIdentifierBoundAnywhereInAnyStateAndAdmitsAFreshOne()
+    {
+        var id = Guid.CreateVersion7();
+        var groups = TwoItemBatch(id);
+        Assert.Null(DataKeyLedgerRules.PrepareViolation(groups, []));
+        Assert.Equal(EnvelopeV2Rules.Reasons.DataKeyIdentifierReused, DataKeyLedgerRules.PrepareViolation(groups, [Binding(id, Guid.CreateVersion7())])); // any operation, any state
+        Assert.Equal(EnvelopeV2Rules.Reasons.DataKeyIdentifierReused, DataKeyLedgerRules.PrepareViolation(groups, [Binding(id, Guid.CreateVersion7(), organization: Guid.CreateVersion7(), record: Guid.CreateVersion7())])); // another organization (OD-M2e-01)
+        Assert.Null(DataKeyLedgerRules.PrepareViolation(groups, [Binding(Guid.CreateVersion7(), Guid.CreateVersion7())]));
+    }
+
+    [Fact]
+    public void Dk5BindsEachNewGroupToTheOperationOrganizationRecordKindCommitmentAndCount()
+    {
+        var id = Guid.CreateVersion7();
+        var now = new DateTimeOffset(2026, 11, 16, 1, 2, 3, TimeSpan.Zero).AddTicks(1234567);
+        var binding = Assert.Single(DataKeyLedgerRules.BindingsFor(TwoItemBatch(id), Org, Record, Operation, now));
+        Assert.Equal((id, Org, Record, Operation, ContentDataKeyBindingKinds.FieldValueBatch, 2), (binding.DataKeyIdentifier, binding.OrganizationId, binding.FormRecordId, binding.BindingContentChangeOperationId, binding.EnvelopePayloadKindCode, binding.BindingItemCount));
+        Assert.Equal(Fill(32, 0xdd), binding.DataKeyCommitmentBytes);
+        Assert.True(EnvelopeV2Rules.IsDataKeyIdentifier(binding.ContentDataKeyBindingId)); // UUIDv7 surrogate key
+        Assert.Equal(0, binding.DataKeyBoundOn.UtcTicks % 10); // microsecond precision, as PostgreSQL stores it
+        Assert.Equal(TimeSpan.Zero, binding.DataKeyBoundOn.Offset);
+    }
+
+    [Fact]
+    public void Dk6AcceptsOnlyBindingsOfThisOperationThatEqualTheStagedNewGroups()
+    {
+        var id = Guid.CreateVersion7();
+        var staged = TwoItemBatch(id);
+        var matching = Binding(id, Operation);
+        var (violation, newGroups) = Decide(staged, [matching], [matching]);
+        Assert.Null(violation);
+        Assert.Equal(id, Assert.Single(newGroups).DataKeyIdentifier);
+
+        const string mismatch = DataKeyLedgerFailures.BindingMismatchReason;
+        Assert.Equal(mismatch, Decide(staged, [], []).Violation); // a staged v2 group with no binding at all
+        Assert.Equal(mismatch, Decide(staged, [Binding(id, Operation, count: 3)], [Binding(id, Operation, count: 3)]).Violation); // item count differs
+        Assert.Equal(mismatch, Decide(staged, [Binding(id, Operation, commitment: 0x01)], []).Violation); // commitment differs
+        Assert.Equal(mismatch, Decide(staged, [Binding(id, Operation, kind: ContentDataKeyBindingKinds.DocumentVersion, count: 2)], []).Violation); // kind differs
+        Assert.Equal(mismatch, Decide(staged, [Binding(id, Operation, organization: Guid.CreateVersion7())], []).Violation); // organization differs
+        Assert.Equal(mismatch, Decide(staged, [Binding(id, Operation, record: Guid.CreateVersion7())], []).Violation); // record differs
+        Assert.Equal(mismatch, Decide(staged, [matching, Binding(Guid.CreateVersion7(), Operation)], [matching]).Violation); // a binding of this operation that nothing staged carries
+        Assert.Equal(mismatch, Decide([], [Binding(Guid.CreateVersion7(), Operation)], []).Violation); // bindings but no v2 row at all
+        Assert.Null(Decide([], [], []).Violation); // a v1-only commit
+    }
+
+    [Fact]
+    public void P4AcceptsACarriedGroupOnlyWhenBoundToACommittedOperationOfTheSameRecordKindAndCommitment()
+    {
+        var id = Guid.CreateVersion7();
+        var earlier = Guid.CreateVersion7();
+        var staged = TwoItemBatch(id);
+        var carried = Binding(id, earlier);
+        var (violation, newGroups) = Decide(staged, [], [carried], earlier);
+        Assert.Null(violation);
+        Assert.Empty(newGroups); // carried, not New: the switch re-check does not apply to it
+        Assert.Null(Decide(DataKeyLedgerRules.GroupsOf([Doc(FieldV2(Guid.CreateVersion7(), id, nonce: 1))]), [], [carried], earlier).Violation); // a partial carry (one item removed)
+
+        const string mismatch = DataKeyLedgerFailures.BindingMismatchReason;
+        Assert.Equal(mismatch, Decide(staged, [], [carried]).Violation); // the binding operation is not Committed (aborted, expired, still Prepared)
+        Assert.Equal(mismatch, Decide(staged, [], [Binding(id, earlier, record: Guid.CreateVersion7())], earlier).Violation); // another record's batch
+        Assert.Equal(mismatch, Decide(staged, [], [Binding(id, earlier, organization: Guid.CreateVersion7())], earlier).Violation); // another organization's batch
+        Assert.Equal(mismatch, Decide(staged, [], [Binding(id, earlier, commitment: 0x02)], earlier).Violation); // substituted commitment
+        Assert.Equal(mismatch, Decide(staged, [], [Binding(id, earlier, kind: ContentDataKeyBindingKinds.DocumentVersion, count: 2)], earlier).Violation); // substituted kind
+        Assert.Equal(mismatch, Decide(staged, [], [Binding(id, earlier, count: 1)], earlier).Violation); // more rows than the batch ever had
+    }
+
+    [Fact]
+    public void Dk8ArchivesTheCompleteTuplesInIdentifierByteOrder()
+    {
+        var low = new Guid("01990000-0000-7000-8000-000000000001");
+        var high = new Guid("ff990000-0000-7000-8000-000000000001"); // greater in RFC 9562 byte order
+        var boundOn = new DateTimeOffset(2026, 11, 16, 1, 2, 3, TimeSpan.FromHours(-5));
+        var a = Binding(high, Operation);
+        a.DataKeyBoundOn = boundOn;
+        var b = Binding(low, Operation, kind: ContentDataKeyBindingKinds.DocumentVersion, count: 1, commitment: 0x0f);
+        var tuples = DataKeyLedgerRules.ArchiveTuples([a, b]);
+        Assert.Equal([low, high], tuples.Select(x => x.DataKeyIdentifier));
+        Assert.Equal((b.ContentDataKeyBindingId, ContentDataKeyBindingKinds.DocumentVersion, Convert.ToHexStringLower(Fill(32, 0x0f)), 1), (tuples[0].ContentDataKeyBindingId, tuples[0].EnvelopePayloadKindCode, tuples[0].DataKeyCommitmentHex, tuples[0].BindingItemCount));
+        Assert.Equal(boundOn.ToUniversalTime(), tuples[1].DataKeyBoundOn);
+        Assert.Equal(TimeSpan.Zero, tuples[1].DataKeyBoundOn.Offset);
+        Assert.Empty(DataKeyLedgerRules.ArchiveTuples([]));
+    }
+
+    [Fact]
+    public void EnvironmentWrapCodesAdmitV2OnlyInDevelopmentOrTestingAndNeverAffectV1()
+    {
+        var rows = new[] { Doc(FieldV2(Guid.CreateVersion7(), Guid.CreateVersion7())), Doc(FieldV1(Guid.CreateVersion7(), 40)) };
+        EnvelopeV2Rules.EnforceEnvironmentWrapCodes(rows, new HashSet<int> { 1, 2 });
+        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeV2Rules.Reasons.WrapAlgorithmUnsupported, Refusal(() => EnvelopeV2Rules.EnforceEnvironmentWrapCodes(rows, new HashSet<int>())));
+        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeV2Rules.Reasons.WrapAlgorithmUnsupported, Refusal(() => EnvelopeV2Rules.EnforceEnvironmentWrapCodes([Doc(FieldV2(Guid.CreateVersion7(), Guid.CreateVersion7(), wrapCode: 2, family: "vault-transit"))], new HashSet<int> { 1 })));
+        EnvelopeV2Rules.EnforceEnvironmentWrapCodes([Doc(FieldV1(Guid.CreateVersion7(), 40))], new HashSet<int>()); // v1 rows are never affected
+    }
+
+    [Fact]
+    public void ClassificationReturnsTheNewRowsWhileTheE3M2dRefusalIsUnchanged()
+    {
+        var batch = Guid.CreateVersion7();
+        var current = FieldV2(Guid.CreateVersion7(), batch, nonce: 1);
+        var fresh = FieldV2(Guid.CreateVersion7(), Guid.CreateVersion7(), nonce: 3, wrapped: 0xbb, commitment: 0xcc);
+        Assert.Single(EnvelopeV2Rules.ClassifyAgainstCurrent([Item(current), Item(fresh)], [Item(current)]));
+        Assert.Empty(EnvelopeV2Rules.ClassifyAgainstCurrent([Item(current)], [Item(current)])); // a byte-identical carry is not New
+        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeV2Rules.Reasons.VersionNotEnabled, Refusal(() => EnvelopeV2Rules.EnforceAgainstCurrent([Item(current), Item(fresh)], [Item(current)])));
+        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeV2Rules.Reasons.DataKeyIdentifierReused, Refusal(() => EnvelopeV2Rules.ClassifyAgainstCurrent([Item(current), Item(FieldV2(Guid.CreateVersion7(), batch, nonce: 2))], [Item(current)]))); // DK-3 unchanged
     }
 }

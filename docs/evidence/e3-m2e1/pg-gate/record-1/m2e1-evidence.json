@@ -1,0 +1,317 @@
+{
+  "harness": "E3-M2e-1 dark data-key ledger focused real-PostgreSQL gate (real Authority build in-process, acceptance off; CARV-1 build 8915f77 and CARV-2 build a1127a1 through LegacyAgent)",
+  "build": "Release build of the working tree (new-sha256.txt); ContentAcceptanceRules.CurrentVersion = 3; RecognizedFloors = 1,2,3; EnvelopeRules.AllowedEnvelopeVersions = 1",
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "checksTotal": 44,
+  "checksFailed": 1,
+  "checks": [
+    {
+      "Id": "E-00",
+      "Description": "setup: this build\u0027s ordinary --migrate applies the CARV fence and the data-key ledger migration and never a floor (AM-1)",
+      "Expected": "exit 0; floors none; floor history none; ledger history 20261116031706_AuthorityContentDataKeyBindings",
+      "Observed": "exit 0; floors none; floor history none; ledger history 20261116031706_AuthorityContentDataKeyBindings",
+      "Pass": true
+    },
+    {
+      "Id": "E-01",
+      "Description": "the ledger\u0027s unique index and P-1/P-2 triggers render exactly as the L-13 verification expects (PostgreSQL 18 renderings, R-CARV-23); the live verdict is none",
+      "Expected": "renderings equal the constants; verdict none",
+      "Observed": "renderings equal; verdict none",
+      "Pass": true
+    },
+    {
+      "Id": "E-02",
+      "Description": "runtime grants on the ledger (L-8): SELECT and INSERT only",
+      "Expected": "select=true insert=true update=false delete=false truncate=false",
+      "Observed": "select=true insert=true update=false delete=false truncate=false",
+      "Pass": true
+    },
+    {
+      "Id": "E-03",
+      "Description": "P-1 admits a binding inserted by the runtime role for a Prepared operation of the same organization and record stamped 3",
+      "Expected": "OK",
+      "Observed": "OK",
+      "Pass": true
+    },
+    {
+      "Id": "E-04",
+      "Description": "the runtime role cannot UPDATE, DELETE or TRUNCATE a binding (no privilege, L-8)",
+      "Expected": "42501 x3",
+      "Observed": "42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings",
+      "Pass": true
+    },
+    {
+      "Id": "E-05",
+      "Description": "P-2: even the table owner / superuser is refused UPDATE, DELETE and TRUNCATE by the immutability triggers",
+      "Expected": "23514 trg_content_data_key_binding_permanent x3; binding intact",
+      "Observed": "23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated; bindings for the id 1",
+      "Pass": true
+    },
+    {
+      "Id": "E-06",
+      "Description": "P-1 refuses a binding for a Committed, Aborted, version-2, other-organization, other-record or nonexistent operation (the guard fires before the foreign key)",
+      "Expected": "23514 trg_content_data_key_binding_guard x6",
+      "Observed": "a Committed operation: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later | an Aborted operation: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later | a Prepared operation stamped 2: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later | another organization: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later | another record: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later | a nonexistent operation: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later",
+      "Pass": true
+    },
+    {
+      "Id": "E-07",
+      "Description": "the ledger CHECKs refuse a non-UUIDv7 identifier, a 31-byte commitment, an unknown kind, a two-row document and an empty count",
+      "Expected": "23514 ck_content_data_key_binding_* x5",
+      "Observed": "UUIDv4 identifier: 23514 ck_content_data_key_binding_identifier_v7: new row for relation \u0022content_data_key_bindings\u0022 violates check constraint \u0022ck_content_data_key_binding_identifier_v7\u0022 | 31-byte commitment: 23514 ck_content_data_key_binding_commitment: new row for relation \u0022content_data_key_bindings\u0022 violates check constraint \u0022ck_content_data_key_binding_commitment\u0022 | kind 3: 23514 ck_content_data_key_binding_kind: new row for relation \u0022content_data_key_bindings\u0022 violates check constraint \u0022ck_content_data_key_binding_kind\u0022 | document with 2 items: 23514 ck_content_data_key_binding_count: new row for relation \u0022content_data_key_bindings\u0022 violates check constraint \u0022ck_content_data_key_binding_count\u0022 | item count 0: 23514 ck_content_data_key_binding_count: new row for relation \u0022content_data_key_bindings\u0022 violates check constraint \u0022ck_content_data_key_binding_count\u0022",
+      "Pass": true
+    },
+    {
+      "Id": "E-08",
+      "Description": "global uniqueness (OD-M2e-01): another organization\u0027s operation cannot bind an identifier already reserved",
+      "Expected": "23505 uq_content_data_key_binding_identifier",
+      "Observed": "23505 uq_content_data_key_binding_identifier: duplicate key value violates unique constraint \u0022uq_content_data_key_binding_identifier\u0022",
+      "Pass": true
+    },
+    {
+      "Id": "E-09",
+      "Description": "the real store inserts an operation and its binding in one transaction: EF orders the operation first and P-1 admits the binding",
+      "Expected": "OK; operation and binding persisted",
+      "Observed": "OK; ops 5-\u003E6; binding 1",
+      "Pass": true
+    },
+    {
+      "Id": "E-10",
+      "Description": "L-3: a binding of an already reserved identifier from another organization rolls back the whole transaction (operation, leaves, binding) and reports the approved refusal",
+      "Expected": "AuthorityException INVALID_COMMAND 422 retryable=False; no operation persisted",
+      "Observed": "AuthorityException INVALID_COMMAND 422 retryable=False; ops 6-\u003E6",
+      "Pass": true
+    },
+    {
+      "Id": "E-11",
+      "Description": "concurrent registration of one identifier by two organizations: the second waits on the unique index, then is refused and rolled back (M2-CON-02)",
+      "Expected": "second blocked; first committed; second AuthorityException INVALID_COMMAND 422; one binding",
+      "Observed": "blocked True; second AuthorityException INVALID_COMMAND 422 retryable=False; bindings 1",
+      "Pass": true
+    },
+    {
+      "Id": "E-12",
+      "Description": "L-13 on a real store scope: the ledger verification passes on the migrated schema",
+      "Expected": "OK",
+      "Observed": "OK",
+      "Pass": true
+    },
+    {
+      "Id": "E-13",
+      "Description": "L-13 refuses every weakened ledger object (disabled or replaced guard, dropped truncate trigger, non-unique index, extra trigger) in the write transaction, and passes again once restored",
+      "Expected": "each: verdict = its reason, store CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503, restored none",
+      "Observed": "guard disabled: OK -\u003E DataKeyLedgerGuardMismatch, AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; restored OK -\u003E none | guard body replaced: OK -\u003E DataKeyLedgerGuardMismatch, AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; restored OK -\u003E none | truncate trigger dropped: OK -\u003E DataKeyLedgerPermanenceMismatch, AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; restored OK -\u003E none | unique index replaced by a plain one: OK -\u003E DataKeyLedgerUniqueIndexMismatch, AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; restored OK -\u003E none | an extra trigger: OK -\u003E DataKeyLedgerUnexpectedTableObject, AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; restored OK -\u003E none",
+      "Pass": true
+    },
+    {
+      "Id": "E-14",
+      "Description": "L-13 lock: while a verified ledger transaction is open, disabling the guard cannot commit (ROW EXCLUSIVE conflicts with it); the guard stays enabled",
+      "Expected": "55P03 lock timeout; verdict none",
+      "Observed": "55P03 ProcessInterrupts: canceling statement due to lock timeout; verdict none",
+      "Pass": true
+    },
+    {
+      "Id": "E-15",
+      "Description": "CARV 3 on the real write path: Prepare stamps P = 3, Commit C = 3; the DK-8 body carries an empty binding array; the connection marker names carv-v3",
+      "Expected": "3/3; new_data_key_bindings []; marker carv-v3",
+      "Observed": "3/3; new_data_key_bindings []; marker carv-v3",
+      "Pass": true
+    },
+    {
+      "Id": "E-16",
+      "Description": "with acceptance off a New v2 group is refused at Prepare before DK-4: nothing signed, no operation, no binding",
+      "Expected": "ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; signatures, bindings, snapshot unchanged",
+      "Observed": "ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; signatures 24-\u003E24; bindings 4-\u003E4; unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "E-17",
+      "Description": "DK-6 / P-4 on real persistence: a forged Prepared operation (stamp 3) staging a v2 row with no binding is aborted, one minimal incident is journaled, the content-integrity revision advances, nothing is accepted",
+      "Expected": "AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; Aborted DATA_KEY_BINDING_MISMATCH; incidents \u002B1 with the reason; integrity \u002B1; record unchanged",
+      "Observed": "AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; 3/NULL Aborted DATA_KEY_BINDING_MISMATCH; incidents 0-\u003E1; integrity 2-\u003E3; unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "E-18",
+      "Description": "DK-6 consistent but acceptance off: the New group bound to this operation is refused by the switch re-check (tightening wins); no incident; the reservation stays",
+      "Expected": "binding OK; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; Aborted ENVELOPE_VERSION_NOT_ENABLED_AT_COMMIT; incidents unchanged; binding kept; record unchanged",
+      "Observed": "binding OK; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; 3/NULL Aborted ENVELOPE_VERSION_NOT_ENABLED_AT_COMMIT; incidents 1-\u003E1; binding 1; unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "E-19",
+      "Description": "DK-6: a binding whose commitment differs from the staged v2 rows aborts the operation as a ledger mismatch",
+      "Expected": "binding OK; AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; record unchanged",
+      "Observed": "binding OK; AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "E-20",
+      "Description": "a Commit that must consult the ledger refuses while the ledger is weakened (L-13) and leaves the operation Prepared; nothing decided",
+      "Expected": "AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; Prepared",
+      "Observed": "AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; 3/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "E-21",
+      "Description": "the ledger migration\u0027s Down is refused while any binding exists; the table, its rows and the history row stay",
+      "Expected": "PostgresException P0001; ledger history kept; bindings kept",
+      "Observed": "PostgresException P0001 ; ledger history 20261116031706_AuthorityContentDataKeyBindings; bindings 6",
+      "Pass": true
+    },
+    {
+      "Id": "E-22",
+      "Description": "floor 3 cannot be applied before floors 1 and 2 (one step at a time)",
+      "Expected": "exit 2; floors none",
+      "Observed": "exit 2; floors none",
+      "Pass": true
+    },
+    {
+      "Id": "E-23",
+      "Description": "floor 1 applies exactly floor 1",
+      "Expected": "exit 0; floors 1",
+      "Observed": "exit 0; floors 1",
+      "Pass": true
+    },
+    {
+      "Id": "E-24",
+      "Description": "setup (controlled test-only mechanism): two records hold an accepted Envelope v2 field row in their head (no build accepts v2)",
+      "Expected": "OK OK; head revisions 1 1",
+      "Observed": "OK OK; head revisions 1 1",
+      "Pass": true
+    },
+    {
+      "Id": "E-25",
+      "Description": "C-14 finding: on floor 1 the CARV-1 build (8915f77) accepts an owner save that rewrites the v2 item of the head as a v1 envelope (it has no downgrade guard)",
+      "Expected": "Prepare OK; Commit OK; head revision 2",
+      "Observed": "Prepare OK; Commit OK; head revision 2",
+      "Pass": true
+    },
+    {
+      "Id": "E-26",
+      "Description": "this build refuses the same downgrade at Prepare (the CARV-2\u002B guard), before anything is signed or stored",
+      "Expected": "ENVELOPE_INVALID: ENVELOPE_DOWNGRADE; record unchanged",
+      "Observed": "ENVELOPE_INVALID: ENVELOPE_DOWNGRADE; unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "E-27",
+      "Description": "floor 2 applies exactly floor 2 (floor 1 dropped)",
+      "Expected": "exit 0; floors 2",
+      "Observed": "exit 0; floors 2",
+      "Pass": true
+    },
+    {
+      "Id": "E-28",
+      "Description": "C-14 remedy: on floor 2 the CARV-1 build can no longer prepare the downgrade (the floor refuses its Prepare insert); nothing persisted",
+      "Expected": "refused (ck_content_operation_rule_floor_v2); no operation; record unchanged",
+      "Observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v2) refused a content operation write; this build applies rule version 1 (mixed-version fleet or a newer floor); ops 15-\u003E15; unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "E-29",
+      "Description": "the ordinary --migrate never installs floor 3",
+      "Expected": "exit 0; floors 2",
+      "Observed": "exit 0; floors 2",
+      "Pass": true
+    },
+    {
+      "Id": "E-30",
+      "Description": "floor 3 is refused while a session able to write operations carries a carv-v marker below 3 (an older instance may run)",
+      "Expected": "exit 3; floors 2; message names the sessions",
+      "Observed": "exit 3; floors 2; names the sessions",
+      "Pass": true
+    },
+    {
+      "Id": "E-31",
+      "Description": "floor 3 is refused while an unexpired operation prepared below version 3 is in flight",
+      "Expected": "seed OK; exit 3; floors 2; message names the operations",
+      "Observed": "seed OK; exit 3; floors 2; names the operations",
+      "Pass": true
+    },
+    {
+      "Id": "E-32",
+      "Description": "AM-1 / C-11: floor 3 is refused while the data-key ledger objects are not exactly as created (guard disabled)",
+      "Expected": "exit 3; floors 2; message names the ledger",
+      "Observed": "exit 3; floors 2; names the ledger",
+      "Pass": true
+    },
+    {
+      "Id": "E-33",
+      "Description": "floor 3 applied while four Release B (floor 2) writers run (security invariants): exit 0, floor 2 dropped in the same transaction, the live definition equals the recognized one, all three floors recorded; every write either committed or was refused fail-closed (no other outcome), and every committed operation has P = C",
+      "Expected": "exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; outcomes within OK / AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; committed P\u003C\u003EC: 0",
+      "Observed": "exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; outcomes AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False,OK x24; committed P\u003C\u003EC: 0",
+      "Pass": true
+    },
+    {
+      "Id": "E-33b",
+      "Description": "availability during the floor-3 raise (the E3-M2d D-F6 expectation): every concurrent Release B write commits; a refusal names its fence reason",
+      "Expected": "24 x OK",
+      "Observed": "OK 23 of 24; refusal reasons FloorUnverifiable",
+      "Pass": false
+    },
+    {
+      "Id": "E-34",
+      "Description": "Release B with RequiredFloor = 3 (AM-5): ready on floor 3; the live write fence verdict is none; a write commits with P = C = 3",
+      "Expected": "True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3 | none | OK",
+      "Observed": "True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3 | none | OK",
+      "Pass": true
+    },
+    {
+      "Id": "E-35",
+      "Description": "the CARV-2 build (a1127a1) cannot prepare after floor 3 (the database refuses its Prepare insert); nothing persisted",
+      "Expected": "refused (ck_content_operation_rule_floor_v3); no operation; record unchanged",
+      "Observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v3) refused a content operation write; this build applies rule version 2 (mixed-version fleet or a newer floor); ops 41-\u003E41; unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "E-36",
+      "Description": "the floor-3 CHECK refuses a direct insert stamped 2 and admits one stamped 3",
+      "Expected": "23514 ck_content_operation_rule_floor_v3; OK",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v3; OK",
+      "Pass": true
+    },
+    {
+      "Id": "E-37",
+      "Description": "monotonic: re-applying floor 3 is a no-op; applying floor 2 after floor 3 is refused (never lowered)",
+      "Expected": "exit 0, floors 3; exit 2, floors 3",
+      "Observed": "exit 0, floors 3; exit 2, floors 3",
+      "Pass": true
+    },
+    {
+      "Id": "E-38",
+      "Description": "floor 3 dropped (a restore or privileged change): a Release B instance requiring floor 3 refuses every write in the write transaction",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorRecordedButMissing; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e29d-ea65-75fd-b4dc-49857ff6e8c7, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorRecordedButMissing category=MissingFloor recovery=RecoveryRequired:ReinstateRecordedFloor phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 42-\u003E42; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "E-39",
+      "Description": "recovery: the floor command reports the recorded-but-missing floor 3 (exit 4) and reinstates it with the flag; writes resume",
+      "Expected": "exit 4; exit 0; floors 3; write OK",
+      "Observed": "exit 4; exit 0; floors 3; write OK",
+      "Pass": true
+    },
+    {
+      "Id": "E-40",
+      "Description": "floor 3 replaced by floor 2: a Release B instance requiring floor 3 refuses every write",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorLowered; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e29d-ea65-75fd-b4dc-49857ff6e8c7, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorLowered category=LoweredFloor recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 44-\u003E44; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "E-41",
+      "Description": "reinstatement adds floor 3 and drops the lower floor that replaced it",
+      "Expected": "exit 0; floors 3",
+      "Observed": "exit 0; floors 3",
+      "Pass": true
+    },
+    {
+      "Id": "E-42",
+      "Description": "end state: the runtime role is ordinary, the ledger verdict is none and the fence verdict at floor 3 is none",
+      "Expected": "false false false | none | none",
+      "Observed": "false false false | none | none",
+      "Pass": true
+    }
+  ]
+}

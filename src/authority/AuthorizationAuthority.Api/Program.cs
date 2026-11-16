@@ -75,6 +75,9 @@ public sealed class Program
             builder.Configuration[AuthorizationAuthority.Application.Features.Content.ShareContributorWriteSwitch.ConfigurationKey],
             builder.Environment.IsProduction(),
             builder.Environment.IsEnvironment("Testing")));
+        // E3-M2e (OD-M2e-07): Envelope v2 acceptance; off unless the deployment sets exactly "true"; refused outside Development/Testing,
+        // without Release B RequiredFloor 3, or without the data-key ledger migration. E3-M2e-1 is dark: never enabled.
+        builder.Services.AddEnvelopeV2Acceptance();
         AuthorizationAuthority.Api.Features.Health.TestStackIdentityEndpoints.RefuseOutsideTesting(builder.Configuration, builder.Environment);
         builder.Services.AddInternalAuthentication(builder.Configuration);
         // Phase C8 AC-9: read-only outcome lookup for the business reconciler (own credential, rate limit; bad limits fail at startup).

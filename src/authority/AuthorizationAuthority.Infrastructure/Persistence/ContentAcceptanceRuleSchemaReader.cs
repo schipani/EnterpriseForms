@@ -32,7 +32,8 @@ public sealed class ContentAcceptanceRuleSchemaReader(IDbContextFactory<Authorit
             WHERE c.conrelid = 'authority.content_change_operations'::regclass AND c.contype = 'c') AS installed_floor,
           EXISTS (SELECT 1 FROM authority.ef_migrations_history h WHERE h."MigrationId" = @floor) AS floor_recorded,
           (SELECT coalesce(array_agg(h."MigrationId"), ARRAY[]::text[]) FROM authority.ef_migrations_history h
-            WHERE h."MigrationId" = ANY(@floor_migrations)) AS recorded_floor_migrations
+            WHERE h."MigrationId" = ANY(@floor_migrations)) AS recorded_floor_migrations,
+          EXISTS (SELECT 1 FROM authority.ef_migrations_history h WHERE h."MigrationId" = @ledger) AS ledger_applied
         """;
 
     public async Task<ContentAcceptanceRules.SchemaFacts> ReadAsync(CancellationToken cancellationToken)
@@ -56,6 +57,10 @@ public sealed class ContentAcceptanceRuleSchemaReader(IDbContextFactory<Authorit
             floorMigrations.ParameterName = "floor_migrations";
             floorMigrations.Value = ContentAcceptanceFloors.Recognized.Select(f => f.MigrationId).ToArray(); // E3-M2d: every recognized floor
             command.Parameters.Add(floorMigrations);
+            var ledger = command.CreateParameter();
+            ledger.ParameterName = "ledger";
+            ledger.Value = ContentDataKeyLedgerSql.MigrationId; // E3-M2e (AM-12): the required data-key ledger migration
+            command.Parameters.Add(ledger);
             ContentAcceptanceRules.SchemaFacts facts;
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
@@ -67,7 +72,7 @@ public sealed class ContentAcceptanceRuleSchemaReader(IDbContextFactory<Authorit
                 var recordedFloors = ContentAcceptanceFloors.RecordedFloors(reader.GetFieldValue<string[]>(6));
                 facts = new ContentAcceptanceRules.SchemaFacts(
                     reader.GetBoolean(0), reader.GetBoolean(1), reader.GetBoolean(2), reader.GetBoolean(3), reader.IsDBNull(4) ? null : reader.GetInt32(4), reader.GetBoolean(5),
-                    HighestRecordedFloor: recordedFloors.Count == 0 ? null : recordedFloors.Max());
+                    HighestRecordedFloor: recordedFloors.Count == 0 ? null : recordedFloors.Max(), DataKeyLedgerApplied: reader.GetBoolean(7));
             }
 
             // RB-CARV-1: the write fence verdict (used by Release B readiness only). Contained, so Release A readiness never depends on it.

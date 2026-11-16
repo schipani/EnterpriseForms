@@ -52,6 +52,9 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
 
     public DbSet<ContentItemIdentity> ContentItemIdentities => Set<ContentItemIdentity>();
 
+    /// <summary>E3-M2e: the Authority-owned data-key ledger (insert-only to the runtime).</summary>
+    public DbSet<ContentDataKeyBinding> ContentDataKeyBindings => Set<ContentDataKeyBinding>();
+
     public DbSet<ContentIntegrityCheckpoint> ContentCheckpoints => Set<ContentIntegrityCheckpoint>();
 
     public DbSet<IntegrityKeyRegistration> KeyRegistrations => Set<IntegrityKeyRegistration>();

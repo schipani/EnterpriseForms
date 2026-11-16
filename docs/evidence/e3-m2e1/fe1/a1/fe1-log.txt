@@ -1,0 +1,330 @@
+07:10:37.264 F-E1 build under test: A-1 (history lock before the operations lock); iterations 20
+07:10:42.780 --migrate (fe1-migrate) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:10:43.005 PASS FE-00: exit 0; floors none
+---- fe1_da
+07:10:46.374 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:10:46.414 PASS DA-setup1: exit 0; floors 1
+07:10:47.514 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:10:47.542 PASS DA-setup2: exit 0; floors 2
+07:10:51.293 --apply-content-acceptance-floor 3 (fe1-floor-da) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:10:51.609 DA lock graph while the writer is paused after the operations lock: floor WAITS FOR AccessExclusiveLock on authority.ef_migrations_history (blocked by writer); writer holds RowExclusiveLock on authority.content_change_operations; writer holds AccessShareLock on authority.ef_migrations_history
+07:10:51.609 DA lock graph after the writer is released: writer holds AccessShareLock on authority.content_change_operations; writer holds RowExclusiveLock on authority.content_change_operations; writer holds AccessShareLock on authority.ef_migrations_history; mutual blocking: False
+07:10:51.609 PASS DA-1: LOCK TABLE authority.ef_migrations_history IN ACCESS SHARE MODE | LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE
+07:10:51.609 PASS DA-2: authority.ef_migrations_history AccessExclusiveLock
+07:10:51.609 PASS DA-3: no mutual blocking; writer holds AccessShareLock on authority.content_change_operations; writer holds RowExclusiveLock on authority.content_change_operations; writer holds AccessShareLock on authority.ef_migrations_history
+07:10:51.609 PASS DA-4: OK; refusal reasons none
+07:10:51.729 PASS DA-5: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; P<>C 0
+07:10:54.252 PASS DL: 0
+07:10:54.277 drop fe1_da: OK
+---- fe1_db
+07:10:55.513 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:10:55.549 PASS DB-setup1: exit 0; floors 1
+07:10:56.642 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:10:56.670 PASS DB-setup2: exit 0; floors 2
+07:10:58.550 --apply-content-acceptance-floor 3 (fe1-floor-db) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:10:59.182 DB lock graph while the writer is paused after the operations lock: floor WAITS FOR AccessExclusiveLock on authority.ef_migrations_history (blocked by writer); writer holds RowExclusiveLock on authority.content_change_operations; writer holds AccessShareLock on authority.ef_migrations_history
+07:10:59.182 DB lock graph after the writer is released: none; mutual blocking: False
+07:10:59.182 PASS DB-1: LOCK TABLE authority.ef_migrations_history IN ACCESS SHARE MODE | LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE
+07:10:59.182 PASS DB-2: authority.ef_migrations_history AccessExclusiveLock
+07:10:59.182 PASS DB-3: no mutual blocking; none
+07:10:59.182 PASS DB-4: OK; refusal reasons none
+07:10:59.283 PASS DB-5: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; P<>C 0
+07:11:01.806 PASS DL: 0
+07:11:01.825 drop fe1_db: OK
+---- fe1_d2
+07:11:03.032 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:11:03.070 PASS D2-setup1: exit 0; floors 1
+07:11:05.998 --apply-content-acceptance-floor 2 (fe1-floor-d2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:11:06.608 D2 lock graph while the writer is paused after the operations lock: floor WAITS FOR AccessExclusiveLock on authority.ef_migrations_history (blocked by writer); writer holds RowExclusiveLock on authority.content_change_operations; writer holds AccessShareLock on authority.ef_migrations_history
+07:11:06.608 D2 lock graph after the writer is released: none; mutual blocking: False
+07:11:06.608 PASS D2-1: LOCK TABLE authority.ef_migrations_history IN ACCESS SHARE MODE | LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE
+07:11:06.608 PASS D2-2: authority.ef_migrations_history AccessExclusiveLock
+07:11:06.608 PASS D2-3: no mutual blocking; none
+07:11:06.608 PASS D2-4: OK; refusal reasons none
+07:11:06.705 PASS D2-5: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; P<>C 0
+07:11:09.220 PASS DL: 0
+07:11:09.236 drop fe1_d2: OK
+---- fe1_lt
+07:11:10.413 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:11:10.451 PASS LT-setup1: exit 0; floors 1
+07:11:11.539 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:11:11.568 PASS LT-setup2: exit 0; floors 2
+07:11:17.733 --apply-content-acceptance-floor 3 (fe1-floor-lt) exit 3: content acceptance rule floor NOT applied: 55P03: canceling statement due to lock timeout
+07:11:17.871 PASS LT-1: waits on authority.ef_migrations_history AccessExclusiveLock; exit 3 (55P03) after 6.1 s
+07:11:17.871 PASS LT-2: floors 2; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; floor-3 constraint none
+07:11:17.871 PASS LT-3: OK; OK; refusal reasons none
+07:11:19.108 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:11:19.156 PASS LT-4: exit 0; floors 3; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3
+07:11:21.675 PASS DL: 0
+07:11:21.692 drop fe1_lt: OK
+---- fe1_h
+07:11:22.909 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:11:22.948 PASS H-setup1: exit 0; floors 1
+07:11:24.147 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:11:24.177 PASS H-setup2: exit 0; floors 2
+07:11:25.417 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:11:25.444 PASS H-0: exit 0; floors 3
+07:11:25.704 PASS H-ok: OK; OK
+07:11:25.886 PASS H-1a: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e332-3889-7d56-a922-95c624abe594, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 2->2; unchanged | unchanged
+07:11:26.040 PASS H-1b: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e332-3889-7d56-a922-95c624abe594, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=2 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 2->2; unchanged | unchanged
+07:11:27.196 --apply-content-acceptance-floor 3 (fe1-floor3-history-missing) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor 3 refused: floor 2 must be installed and recorded, and be the only floor (floors are raised one step at a time)
+07:11:27.243 PASS H-1c: exit 3; floors 3; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2
+07:11:27.350 PASS H-1d: OK
+07:11:27.504 PASS H-2: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e332-3889-7d56-a922-95c624abe594, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 3->3; unchanged | unchanged
+07:11:27.677 PASS H-3: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e332-3889-7d56-a922-95c624abe594, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FenceMigrationNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 3->3; unchanged | unchanged
+07:11:27.842 PASS H-4: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e332-3889-7d56-a922-95c624abe594, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorUnverifiable category=UnverifiableFloor recovery=CheckAuthorityDbReachabilityAndPrivileges phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 3->3; unchanged | unchanged
+07:11:27.941 PASS H-4b: OK
+07:11:28.101 PASS H-5a: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e332-3889-7d56-a922-95c624abe594, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorRecordedButMissing category=MissingFloor recovery=RecoveryRequired:ReinstateRecordedFloor phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 4->4; unchanged | unchanged
+07:11:29.277 --apply-content-acceptance-floor 3 (fe1-floor3-missing) exit 4: content acceptance rule floor 3 is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with --reinstate-recorded-floor
+07:11:30.384 --apply-content-acceptance-floor 3 --reinstate-recorded-floor (fe1-floor3-reinstate) exit 0: content acceptance rule floor 3 re-installed (recorded floor reinstated)  content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:11:30.433 PASS H-5b: exit 4; exit 0; floors 3; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3
+restored: 07:11:30.611 PASS H-6a: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e332-3889-7d56-a922-95c624abe594, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorLowered category=LoweredFloor recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 0->0; unchanged | unchanged
+restored: 07:11:31.720 --apply-content-acceptance-floor 3 (fe1-floor3-restored) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+restored: 07:11:31.843 PASS H-6b: exit 0; floors 3; OK
+07:11:34.364 PASS H-6c: 0
+07:11:34.395 drop fe1_h_snap2: OK
+07:11:37.788 legacy net10.0 prepare exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False mapped=409 {"errorCode":"OPERATION_RULES_OUTDATED","correlationId":"01a1e332-7708-7e44-9e4c-511fae0bb9fb","retryable":false,"detail":"the operation crosses content acceptance rule versions and was refused; start a fresh operation"} build=2 
+07:11:37.812 PASS H-7: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v3) ; ops 4->4
+07:11:37.860 PASS H-8: P<>C 0; definition exact
+07:11:40.386 PASS DL: 0
+07:11:40.405 drop fe1_h: OK
+---- fe1_s01
+07:11:43.452 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:11:44.085 PASS F1: exit 0; floors 1; definition exact; RA OK x108, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x80, RB1e OK x6; reasons FloorNotInstalled; before 20, during 150, after 24
+07:11:46.763 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:11:47.547 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x97; reasons none; before 7, during 68, after 22
+07:11:49.998 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:11:50.771 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x103; reasons none; before 8, during 65, after 30
+07:11:55.603 --migrate (fe1-migrate-s01) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:11:56.247 PASS FM: exit 0; floors 3; RB3- OK x134, RB3- PostgresException 42501  x51, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x57; reasons FloorUnverifiable
+07:11:56.273 PASS PC: 0
+07:11:58.801 PASS DL: 0
+07:11:58.819 drop fe1_s01: OK
+---- fe1_s02
+07:12:01.423 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:12:02.127 PASS F1: exit 0; floors 1; definition exact; RA OK x109, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x75, RB1e OK x8; reasons FloorNotInstalled; before 24, during 140, after 28
+07:12:04.705 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:12:05.446 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x106; reasons none; before 8, during 72, after 26
+07:12:07.784 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:12:08.603 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x102; reasons none; before 8, during 67, after 27
+07:12:14.386 --migrate (fe1-migrate-s02) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:12:15.014 PASS FM: exit 0; floors 3; RB3- OK x140, RB3- DbUpdateException <- PostgresException 42501  x1, RB3- PostgresException 42501  x51, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x55; reasons FloorUnverifiable
+07:12:15.042 PASS PC: 0
+07:12:17.559 PASS DL: 0
+07:12:17.578 drop fe1_s02: OK
+---- fe1_s03
+07:12:20.145 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:12:20.823 PASS F1: exit 0; floors 1; definition exact; RA OK x104, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x72, RB1e OK x8; reasons FloorNotInstalled; before 20, during 137, after 27
+07:12:23.214 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:12:23.949 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x102; reasons none; before 8, during 68, after 26
+07:12:26.300 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:12:27.008 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x97; reasons none; before 8, during 64, after 25
+07:12:32.243 --migrate (fe1-migrate-s03) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:12:32.868 FAIL FM: exit 0; floors 3; RB3- OK x115, RB3- PostgresException 42501  x56, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x58, RB3- AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False x39; reasons FloorUnverifiable
+07:12:32.893 PASS PC: 0
+07:12:35.412 PASS DL: 0
+07:12:35.432 drop fe1_s03: OK
+---- fe1_s04
+07:12:38.590 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:12:39.237 PASS F1: exit 0; floors 1; definition exact; RA OK x116, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x82, RB1e OK x6; reasons FloorNotInstalled; before 22, during 154, after 28
+07:12:41.847 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:12:42.608 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x103; reasons none; before 8, during 71, after 24
+07:12:45.092 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:12:45.892 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x104; reasons none; before 8, during 68, after 28
+07:12:50.839 --migrate (fe1-migrate-s04) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:12:51.443 FAIL FM: exit 0; floors 3; RB3- OK x126, RB3- PostgresException 42501  x52, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x58, RB3- AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False x20; reasons FloorUnverifiable
+07:12:51.471 PASS PC: 0
+07:12:54.003 PASS DL: 0
+07:12:54.022 drop fe1_s04: OK
+---- fe1_s05
+07:12:56.579 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:12:57.244 PASS F1: exit 0; floors 1; definition exact; RA OK x109, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x75, RB1e OK x8; reasons FloorNotInstalled; before 20, during 142, after 30
+07:12:59.726 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:13:00.515 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x104; reasons none; before 8, during 70, after 26
+07:13:02.902 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:13:03.737 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x101; reasons none; before 8, during 65, after 28
+07:13:09.513 --migrate (fe1-migrate-s05) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:13:10.152 PASS FM: exit 0; floors 3; RB3- OK x143, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x58, RB3- PostgresException 42501  x50; reasons FloorUnverifiable
+07:13:10.178 PASS PC: 0
+07:13:12.699 PASS DL: 0
+07:13:12.717 drop fe1_s05: OK
+---- fe1_s06
+07:13:15.371 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:13:16.047 PASS F1: exit 0; floors 1; definition exact; RA OK x111, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x77, RB1e OK x8; reasons FloorNotInstalled; before 26, during 140, after 30
+07:13:18.489 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:13:19.254 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x104; reasons none; before 8, during 67, after 29
+07:13:21.648 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:13:22.372 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x104; reasons none; before 8, during 68, after 28
+07:13:27.445 --migrate (fe1-migrate-s06) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:13:28.092 PASS FM: exit 0; floors 3; RB3- OK x137, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x58, RB3- PostgresException 42501  x48; reasons FloorUnverifiable
+07:13:28.120 PASS PC: 0
+07:13:30.643 PASS DL: 0
+07:13:30.663 drop fe1_s06: OK
+---- fe1_s07
+07:13:33.813 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:13:34.533 PASS F1: exit 0; floors 1; definition exact; RA OK x112, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x82, RB1e OK x6; reasons FloorNotInstalled; before 20, during 157, after 23
+07:13:37.451 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:13:38.177 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x104; reasons none; before 8, during 72, after 24
+07:13:40.509 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:13:41.315 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x97; reasons none; before 6, during 65, after 26
+07:13:46.301 --migrate (fe1-migrate-s07) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:13:46.968 PASS FM: exit 0; floors 3; RB3- OK x135, RB3- PostgresException 42501  x51, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x56; reasons FloorUnverifiable
+07:13:46.999 PASS PC: 0
+07:13:49.532 PASS DL: 0
+07:13:49.551 drop fe1_s07: OK
+---- fe1_s08
+07:13:52.162 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:13:52.866 PASS F1: exit 0; floors 1; definition exact; RA OK x107, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x75, RB1e OK x8; reasons FloorNotInstalled; before 21, during 141, after 28
+07:13:55.353 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:13:56.126 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x104; reasons none; before 8, during 69, after 27
+07:13:58.447 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:13:59.200 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x100; reasons none; before 8, during 66, after 26
+07:14:04.891 --migrate (fe1-migrate-s08) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:14:05.478 PASS FM: exit 0; floors 3; RB3- OK x138, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x58, RB3- PostgresException 42501  x49; reasons FloorUnverifiable
+07:14:05.504 PASS PC: 0
+07:14:08.025 PASS DL: 0
+07:14:08.044 drop fe1_s08: OK
+---- fe1_s09
+07:14:10.635 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:14:11.313 PASS F1: exit 0; floors 1; definition exact; RA OK x110, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x76, RB1e OK x8; reasons FloorNotInstalled; before 22, during 142, after 30
+07:14:13.699 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:14:14.491 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x101; reasons none; before 8, during 65, after 28
+07:14:16.946 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:14:17.705 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x105; reasons none; before 8, during 71, after 26
+07:14:22.548 --migrate (fe1-migrate-s09) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:14:23.164 PASS FM: exit 0; floors 3; RB3- OK x134, RB3- PostgresException 42501  x51, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x56, RB3- DbUpdateException <- PostgresException 42501  x1; reasons FloorUnverifiable
+07:14:23.189 PASS PC: 0
+07:14:25.717 PASS DL: 0
+07:14:25.736 drop fe1_s09: OK
+---- fe1_s10
+07:14:28.758 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:14:29.395 PASS F1: exit 0; floors 1; definition exact; RA OK x116, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x84, RB1e OK x6; reasons FloorNotInstalled; before 26, during 154, after 26
+07:14:32.239 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:14:33.020 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x105; reasons none; before 8, during 71, after 26
+07:14:35.598 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:14:36.331 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x102; reasons none; before 8, during 66, after 28
+07:14:41.455 --migrate (fe1-migrate-s10) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:14:42.079 FAIL FM: exit 0; floors 3; RB3- OK x126, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x58, RB3- PostgresException 42501  x51, RB3- AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False x20; reasons FloorUnverifiable
+07:14:42.105 PASS PC: 0
+07:14:44.624 PASS DL: 0
+07:14:44.642 drop fe1_s10: OK
+---- fe1_s11
+07:14:47.245 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:14:47.939 PASS F1: exit 0; floors 1; definition exact; RA OK x112, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x77, RB1e OK x8; reasons FloorNotInstalled; before 26, during 141, after 30
+07:14:50.395 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:14:51.173 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x104; reasons none; before 8, during 67, after 29
+07:14:53.443 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:14:54.191 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x96; reasons none; before 8, during 64, after 24
+07:14:59.788 --migrate (fe1-migrate-s11) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:15:00.420 FAIL FM: exit 0; floors 3; RB3- OK x115, RB3- PostgresException 42501  x53, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x57, RB3- AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False x39; reasons FloorUnverifiable
+07:15:00.446 PASS PC: 0
+07:15:02.966 PASS DL: 0
+07:15:02.983 drop fe1_s11: OK
+---- fe1_s12
+07:15:05.932 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:15:06.638 PASS F1: exit 0; floors 1; definition exact; RA OK x114, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x78, RB1e OK x8; reasons FloorNotInstalled; before 24, during 147, after 29
+07:15:09.202 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:15:09.956 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x104; reasons none; before 8, during 70, after 26
+07:15:12.704 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:15:13.482 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x98; reasons none; before 9, during 69, after 20
+07:15:18.392 --migrate (fe1-migrate-s12) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:15:18.988 PASS FM: exit 0; floors 3; RB3- OK x130, RB3- DbUpdateException <- PostgresException 42501  x4, RB3- PostgresException 42501  x47, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x56; reasons FloorUnverifiable
+07:15:19.016 PASS PC: 0
+07:15:21.547 PASS DL: 0
+07:15:21.565 drop fe1_s12: OK
+---- fe1_s13
+07:15:24.661 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:15:25.288 PASS F1: exit 0; floors 1; definition exact; RA OK x114, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x81, RB1e OK x6; reasons FloorNotInstalled; before 21, during 154, after 26
+07:15:28.017 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:15:28.844 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x108; reasons none; before 8, during 73, after 27
+07:15:31.276 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:15:32.056 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x102; reasons none; before 8, during 66, after 28
+07:15:37.043 --migrate (fe1-migrate-s13) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:15:37.627 FAIL FM: exit 0; floors 3; RB3- OK x118, RB3- PostgresException 42501  x53, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x55, RB3- AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False x39, RB3- DbUpdateException <- PostgresException 42501  x1; reasons FloorUnverifiable
+07:15:37.651 PASS PC: 0
+07:15:40.168 PASS DL: 0
+07:15:40.185 drop fe1_s13: OK
+---- fe1_s14
+07:15:42.774 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:15:43.474 PASS F1: exit 0; floors 1; definition exact; RA OK x112, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x79, RB1e OK x8; reasons FloorNotInstalled; before 25, during 146, after 28
+07:15:46.150 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:15:46.903 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x104; reasons none; before 8, during 69, after 27
+07:15:49.439 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:15:50.259 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x104; reasons none; before 8, during 68, after 28
+07:15:55.936 --migrate (fe1-migrate-s14) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:15:56.536 FAIL FM: exit 0; floors 3; RB3- OK x131, RB3- DbUpdateException <- PostgresException 42501  x1, RB3- PostgresException 42501  x49, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x59, RB3- AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False x20; reasons FloorUnverifiable
+07:15:56.582 PASS PC: 0
+07:15:59.108 PASS DL: 0
+07:15:59.127 drop fe1_s14: OK
+---- fe1_s15
+07:16:01.770 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:16:02.416 PASS F1: exit 0; floors 1; definition exact; RA OK x111, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x77, RB1e OK x8; reasons FloorNotInstalled; before 27, during 139, after 30
+07:16:04.950 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:16:05.723 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x103; reasons none; before 8, during 69, after 26
+07:16:08.108 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:16:08.880 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x98; reasons none; before 8, during 65, after 25
+07:16:13.594 --migrate (fe1-migrate-s15) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:16:14.225 PASS FM: exit 0; floors 3; RB3- OK x127, RB3- PostgresException 42501  x49, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x58; reasons FloorUnverifiable
+07:16:14.252 PASS PC: 0
+07:16:16.785 PASS DL: 0
+07:16:16.806 drop fe1_s15: OK
+---- fe1_s16
+07:16:19.848 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:16:20.510 PASS F1: exit 0; floors 1; definition exact; RA OK x113, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x82, RB1e OK x6; reasons FloorNotInstalled; before 21, during 156, after 24
+07:16:23.238 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:16:23.977 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x103; reasons none; before 8, during 70, after 25
+07:16:26.478 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:16:27.272 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x104; reasons none; before 8, during 65, after 31
+07:16:32.119 --migrate (fe1-migrate-s16) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:16:32.761 PASS FM: exit 0; floors 3; RB3- OK x130, RB3- PostgresException 42501  x55, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x58; reasons FloorUnverifiable
+07:16:32.789 PASS PC: 0
+07:16:35.309 PASS DL: 0
+07:16:35.328 drop fe1_s16: OK
+---- fe1_s17
+07:16:37.933 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:16:38.660 PASS F1: exit 0; floors 1; definition exact; RA OK x112, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x79, RB1e OK x8; reasons FloorNotInstalled; before 27, during 142, after 30
+07:16:41.062 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:16:41.819 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x103; reasons none; before 8, during 68, after 27
+07:16:44.219 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:16:44.985 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x101; reasons none; before 8, during 66, after 27
+07:16:50.765 --migrate (fe1-migrate-s17) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:16:51.402 PASS FM: exit 0; floors 3; RB3- OK x139, RB3- PostgresException 42501  x50, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x58; reasons FloorUnverifiable
+07:16:51.429 PASS PC: 0
+07:16:53.947 PASS DL: 0
+07:16:53.965 drop fe1_s17: OK
+---- fe1_s18
+07:16:56.685 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:16:57.345 PASS F1: exit 0; floors 1; definition exact; RA OK x109, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x75, RB1e OK x8; reasons FloorNotInstalled; before 21, during 142, after 29
+07:16:59.787 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:17:00.585 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x105; reasons none; before 8, during 68, after 29
+07:17:03.233 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:17:04.027 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x103; reasons none; before 8, during 69, after 26
+07:17:08.933 --migrate (fe1-migrate-s18) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:17:09.517 FAIL FM: exit 0; floors 3; RB3- OK x91, RB3- PostgresException 42501  x59, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x56, RB3- AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False x79; reasons FloorUnverifiable
+07:17:09.542 PASS PC: 0
+07:17:12.064 PASS DL: 0
+07:17:12.082 drop fe1_s18: OK
+---- fe1_s19
+07:17:15.208 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:17:15.900 PASS F1: exit 0; floors 1; definition exact; RA OK x114, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x84, RB1e OK x8; reasons FloorNotInstalled; before 26, during 154, after 26
+07:17:18.853 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:17:19.569 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x104; reasons none; before 8, during 72, after 24
+07:17:22.157 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:17:22.918 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x101; reasons none; before 8, during 66, after 27
+07:17:27.881 --migrate (fe1-migrate-s19) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:17:28.498 FAIL FM: exit 0; floors 3; RB3- OK x127, RB3- PostgresException 42501  x50, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x58, RB3- AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False x19, RB3- DbUpdateException <- PostgresException 42501  x1; reasons FloorUnverifiable
+07:17:28.525 PASS PC: 0
+07:17:31.052 PASS DL: 0
+07:17:31.071 drop fe1_s19: OK
+---- fe1_s20
+07:17:33.552 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:17:34.258 PASS F1: exit 0; floors 1; definition exact; RA OK x110, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x76, RB1e OK x7; reasons FloorNotInstalled; before 27, during 139, after 27
+07:17:36.681 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:17:37.430 PASS F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x102; reasons none; before 8, during 66, after 28
+07:17:39.759 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:17:40.522 PASS F3: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x101; reasons none; before 8, during 64, after 29
+07:17:46.192 --migrate (fe1-migrate-s20) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:17:46.803 PASS FM: exit 0; floors 3; RB3- OK x137, RB3- PostgresException 42501  x51, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x58; reasons FloorUnverifiable
+07:17:46.829 PASS PC: 0
+07:17:49.354 PASS DL: 0
+07:17:49.373 drop fe1_s20: OK

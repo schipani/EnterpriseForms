@@ -12,6 +12,7 @@
 | RB-CARV-1 (Release B write fence) | **Implemented and conditionally owner-accepted for Development/Testing (2026-11-15), signed local commit; not production-closed: deployment protection, Azure compatibility, privileged schema mutation and performance remain open release gates: §22** |
 | E3-M2b-2 (signed schema 2 groundwork) | **Implemented for Development/Testing (2026-11-15), uncommitted, owner review pending; Envelope v2 not activated, no AuthorityDb change, CARV unchanged: §23** |
 | E3-M2c and later | **Not authorized** (status at the time of this contract; E3-M2c: `E3_M2C_IMPLEMENTATION_RECORD.md`; E3-M2d, owner-accepted for Development/Testing (2026-11-15), signed local commit: `E3_M2D_IMPLEMENTATION_RECORD.md`, whose §12 records the owner-approved contract readings OA-M2d-1..8, applied below as dated inline notes; E3-M2e and later not authorized) |
+| E3-M2e owner decisions and contract closure | **Recorded (2026-11-15): `E3_M2E_CONTRACT_CLOSURE.md`** (OD-M2e-01..16, amendments AM-1..AM-12, blocking decisions BD-1/BD-2), applied below as dated inline notes. Documentation only; E3-M2e-1 and E3-M2e-2 each still need their own authorization |
 | Independent cryptographic review (V2-IND-01) | Required before production; not started |
 | Production use of Envelope v2 | Not approved |
 | **E3-M2b-1 CARV final design gate** | **§19** (2026-11-14). The owner conditionally approved the CARV direction. The real-PostgreSQL gate ran against two real pre-CARV Authority binaries (47/47 checks each; evidence in `docs/evidence/e3-m2b1-carv/`). It found and corrected design defects D-1 to D-5. **§19 supersedes §3, §9.1, §9.2, §16 and §17.1.** |
@@ -260,6 +261,8 @@ The reuse rules split as follows (F-14):
 
 Every check that only Prepare can run is covered by CARV. Every check Commit can re-derive from staged bytes is re-run there.
 
+> **E3-M2e contract closure (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §2 AM-10, §3.4–§3.5).** "Acceptance switch" row: with the switch off, New groups (the bindings of this operation) are refused at Prepare and at Commit. Carried groups are judged at Commit by P-4: bound to an accepted operation of the same organization and record, with the same kind and commitment, and no more rows than the binding. Ledger row: DK-6 plus P-4 at Commit.
+
 ---
 
 ## 6. Compatibility rules: Envelope v1 / schema 1 and Envelope v2 / schema 2 [PROPOSED]
@@ -343,6 +346,10 @@ As in the package §4.2, with exact constraints in §9.4. Changes: an added UUID
 
 Idempotent replay returns before step 1 and inserts nothing (existing early return), subject to the §3.3 CARV replay rule.
 
+> **E3-M2e contract closure (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §1.2, §2, §3).**
+> - **Prepare.** OD-M2-03 and OD-M2-04 are decided: Prepare-time binding with global uniqueness. AM-8: DK-4 (step 4) runs **after authorization and before signing**. The binding insert (step 6) follows signing in the same transaction, guarded in the database by P-1 (the operation is `Prepared`, has the same organization and record, and P ≥ 3) and protected by P-2. The operation is stamped P = 3 (CARV 3).
+> - **Commit.** DK-6 is followed by P-4 and by the switch re-check. A mismatch aborts the operation and writes a minimal content-stream incident (OD-M2e-11). DK-8 archives the full binding tuple (AM-3).
+
 **Commit** (`CommitCoreAsync`), after `VerifyStagedAgainstLeavesAsync` and the CARV check:
 
 1. Re-derive the New groups from the verified staged bytes. The head CAS guarantees the same current head as at Prepare.
@@ -362,6 +369,12 @@ Bindings never change. "Accepted" is derived from the operation's `Committed` st
 | Ledger ↔ archive mismatch | Integrity incident; the organization stays gated; no automatic repair. |
 
 The ledger is never written by an operator command or a business API, and never deleted by the runtime role.
+
+> **E3-M2e contract closure (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §3.6, §4).**
+> - **Step (4)** of the AuthorityDb-restore row is **not** satisfied by turning the switch off or by a G14 operator procedure alone. The switch is outside the restored database and may remain enabled.
+> - **Persistent activation** requires an Authority-enforced, fail-closed, restore-resistant barrier (RB2-1..RB2-8). Its mechanism is blocking decision **BD-1**.
+> - **Re-insertion** of bindings together with the operations they reference, without weakening P-1, is blocking decision **BD-2**.
+> - **Step (2)** uses the full archived binding tuple (AM-3). Archived identifiers alone do not prove ledger correctness.
 
 ---
 
@@ -507,6 +520,11 @@ CREATE INDEX ix_content_data_key_bindings_operation ON authority.content_data_ke
 - **Same migration:** raise the CARV floor to 3 (§9.2 pattern).
 - **Down:** guarded. It refuses while any binding exists. Development/Testing only.
 
+> **[CORRECTION] E3-M2e contract closure (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §2 AM-1, §3).**
+> - **The "Same migration" bullet above is superseded (C-1).** This ordinary migration installs **no floor**. Floor 3 is a separate migration in `ContentAcceptanceFloorContext` (`AuthorityContentAcceptanceRuleFloor3`), applied only by `--apply-content-acceptance-floor 3`, in a later step, following the accepted floor mechanism (§21.2, OD-M2-28, OA-M2d-6).
+> - **Floor-3 preconditions** (under the ACCESS EXCLUSIVE lock) also require floor 2 to be installed, recorded and the only floor, and the ledger migration and objects to be present exactly as created.
+> - **The table gains the P-1 binding-guard and P-2 immutability triggers** (L-6, L-7). P-3 is not added.
+
 ### 9.5 AuthorityDb — E3-M2g census tables
 
 As in package §6.2, unchanged.
@@ -526,6 +544,13 @@ As in package §6.2, unchanged.
 | Acceptance switch | Unauthorized v2 acceptance | Package §8; a Production-designated Authority refuses to start with it on. **New precondition:** the switch cannot be on unless the floor-3 migration id is present (startup guard). | M2e |
 | Per-organization data-conditional fence (OD-M2-07) | An older Authority serving an organization that has v2 | **Reframed by CARV** (§14) | M2f, if still wanted |
 
+> **E3-M2e contract closure (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §2 AM-5, AM-9).** The "Acceptance switch" precondition above is strengthened (C-12). With the switch on, the Authority refuses to start unless:
+> - the environment is Development or Testing (Staging and Production refuse);
+> - the policy is **Release B with `RequiredFloor = 3`** (Release A with the switch on is a startup failure);
+> - the ledger migration is recorded.
+>
+> A New group is accepted only inside a Prepare or Commit transaction whose Release B fence has verified floor ≥ 3. A startup check alone is not sufficient.
+
 **OD-M2-07 reframed:**
 - **F0 (recommended).** The CARV floor is the fence. It is raised to the ledger rule version (3) before v2 acceptance can be enabled anywhere. It is global, declarative and migration-governed, and needs no trigger reading the ledger.
 - **F2 (package).** Additionally keep a per-organization trigger: an organization with bindings requires `prepare_acceptance_rule_version >= 3`, even if the global floor were lower. This is only useful if older Authority builds must keep serving v2-free organizations after the floor is raised. With a single Authority deployment, that is not a current need.
@@ -541,6 +566,18 @@ This remains the owner's decision.
 5. Optionally `VALIDATE` once old Prepared rows have expired.
 
 Rolling back before step 4 needs no database change.
+
+> **E3-M2e contract closure (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §2 AM-6, §5.1).** **Floor 2 must be installed and verified before the first v2 binding or acceptance** (C-14). CARV-1 builds have no downgrade guard and are admitted by floor 1. The mandatory E3-M2e activation sequence is:
+> 1. the ledger migration;
+> 2. CARV-3 code with the switch off;
+> 3. floor 2;
+> 4. drain CARV ≤ 2;
+> 5. floor 3;
+> 6. Release B `RequiredFloor = 3`;
+> 7. verify the ledger and recovery prerequisites (BD-1/BD-2 for any persistent environment);
+> 8. the switch, only under a separate owner authorization.
+>
+> Outside Development/Testing acceptance stays prohibited, and no persistent activation is authorized.
 
 ---
 
@@ -630,6 +667,15 @@ No business API, organization setting, form JSON or user role can change any rul
 
 None of the above is decided by this document.
 
+> **Decided for E3-M2e by the owner (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §1.2):**
+> - OD-M2-03: Prepare (OD-M2e-02).
+> - OD-M2-04: global (OD-M2e-01).
+> - OD-M2-10: decided as OD-M2e-07.
+> - OD-M2-15: amended to the full binding tuple (OD-M2e-10).
+> - OD-M2-23: resolved in the database by the P-1 binding guard (OD-M2e-04).
+>
+> OD-M2-05 was already decided for classification (E3-M2d D-7). OD-M2-07, OD-M2-08 (M2f), OD-M2-11 (M2g), OD-M2-13 and OD-M2-24 remain open.
+
 ---
 
 ## 15. Revised increment plan
@@ -646,6 +692,12 @@ None of the above is decided by this document.
 | E3-M2g | Census (package §6) | §9.5 | OD-M2-11 | Additive |
 
 The package's M2a → M2b ordering rationale still holds: tighten v1 → fence → schema → readers → acceptance → ledger → fences → census. CARV is placed first because every later rule depends on it to be enforceable across a deployment.
+
+> **E3-M2e contract closure (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §6).** The E3-M2e row is split into two increments, each needing its own owner authorization:
+> - **E3-M2e-1** (dark ledger: ledger and constraints, CARV 3, floor-3 support without persistent installation, default-off switch, migration guard, error mapping, journal changes, focused tests);
+> - **E3-M2e-2** (controlled acceptance verification, disposable PostgreSQL only).
+>
+> The row's "§9.4" schema reference is read together with the §9.4 correction (no floor in the ordinary migration).
 
 ---
 
@@ -724,6 +776,8 @@ These extend the package's M2-ENV, M2-DK, M2-CON, M2-IDM and M2-REP groups:
 | M2-CARV-09 | An operation prepared at version 2 cannot be committed by a version-3 build, and the reverse is refused by the CHECK |
 
 **Not run:** Stage B, Azure, a real HSM, PB-09 performance, V2-IND-01.
+
+> **E3-M2e contract closure (2026-11-15; `E3_M2E_CONTRACT_CLOSURE.md` §6.2).** M2-ENV-16 and M2-ENV-18 run end to end through Commit in E3-M2e-2, in disposable PostgreSQL only. M2-RST-06 is met by deterministic reconstruction from the full archived binding tuple (AM-3), compared with the original ledger, without inserting into a live database (BD-2).
 
 ---
 
@@ -1459,11 +1513,11 @@ Satisfying item 2 therefore needs either a separately authorized production chan
 
 ### 22.4 Transactional enforcement and race safety
 
-1. Write transactions run READ COMMITTED (unchanged). The fence takes ROW EXCLUSIVE on `content_change_operations` first and keeps it to commit or rollback.
+1. Write transactions run READ COMMITTED (unchanged). The fence takes ROW EXCLUSIVE on `content_change_operations` first and keeps it to commit or rollback. *(Amended 2026-11-16 by A-1, §22.14: ACCESS SHARE on `ef_migrations_history` is now taken first, then ROW EXCLUSIVE on `content_change_operations`; both are held to commit or rollback.)*
 2. Every statement that can remove, replace or weaken what the fence checks needs a lock that conflicts with ROW EXCLUSIVE: `ALTER TABLE … DROP/ADD CONSTRAINT`, `ALTER COLUMN … SET DEFAULT`, `DISABLE/ENABLE TRIGGER`, `DROP/CREATE TRIGGER`, `CREATE/DROP RULE`, and the floor migration (ACCESS EXCLUSIVE). None can commit between the verification and this transaction's commit. Deterministic proof RX-H1: with a verified writer open, a privileged `DROP CONSTRAINT` times out (`55P03`) and the floor stays.
 3. The facts are read by a later statement, so its READ COMMITTED snapshot includes every catalog change committed before the lock was granted, which is also the definition PostgreSQL enforces on this transaction's later writes (the relation cache is refreshed when the lock is acquired).
 4. A writer that finished before a removal committed was verified against the floor that existed then; a writer that starts or waits after it sees the removal and refuses. Concurrency proof RX-H2: four Release B instances writing while the floor is dropped — every accepted operation's commit timestamp precedes the drop's commit timestamp, and every later write was refused.
-5. A floor activation or reinstatement (ACCESS EXCLUSIVE, 5 s lock timeout) waits for in-flight writers or times out without applying anything; it never deadlocks with them (the writers' other lock, the organization row, is not taken by the floor transaction).
+5. A floor activation or reinstatement (ACCESS EXCLUSIVE, 5 s lock timeout) waits for in-flight writers or times out without applying anything; it never deadlocks with them (the writers' other lock, the organization row, is not taken by the floor transaction). *(Corrected 2026-11-16, F-E1 / A-1, §22.14: this statement was wrong for floor activation. It overlooked EF's ACCESS EXCLUSIVE lock on `ef_migrations_history`, which the floor transaction takes before the operations table and the writers read after it. That produced a reproducible deadlock. Since A-1 it holds for builds containing A-1. Reinstatement runs outside EF's migration lock: it only reads the history under ACCESS SHARE, which is compatible with the writers' lock, so it was not affected.)*
 6. **Not serialized:** `CREATE OR REPLACE FUNCTION` of the state-guard function takes no table lock (the fence verifies its source at every write, and RX-C9 shows the refusal, but a replacement committed during an open write is not excluded); a superuser editing the catalogs directly (R-CARV-24). The floor CHECK itself cannot be changed without ACCESS EXCLUSIVE.
 
 ### 22.5 What the fence verifies (in order; the first failure is the reason)
@@ -1603,6 +1657,135 @@ The owner **conditionally accepted RB-CARV-1 for Development/Testing** and autho
 | 9 | Every earlier unresolved risk is preserved, including R-CARV-11, R-CARV-12 and R-CARV-18 |
 
 **Open release gates (unchanged by this acceptance):** protection and audit of the Release B configuration (R-CARV-22, PB-11/PB-12); Azure PostgreSQL compatibility of the fence definitions and the floor (R-CARV-18, R-CARV-23); privileged schema mutation outside the lock (R-CARV-24, G08); performance of the Release B write path (R-CARV-25, PB-09); Azure staging evidence (§22.11 item 4). The MP-1 and MP-3 removal results are recorded as narrower evidence (§22.9).
+
+### 22.14 Amendment A-1: floor-activation lock order (F-E1, 2026-11-16)
+
+**Status.** Narrowly scoped amendment to RB-CARV-1, implemented for **Development/Testing only** on `e3/m1-envelope-v2-core` (on `a1127a1`, with the E3-M2e work). **Owner-accepted for Development/Testing on 2026-11-16 (OA-FE1-1, §22.14.8)** and included in the signed E3-M2e-1 local commit. Owner-led work, not an independent review; not production-closed. It changes no ledger, cryptographic, writer or activation rule.
+
+#### 22.14.1 Defect and verified lock order
+
+F-E1 was reported by E-33b in `E3_M2E1_IMPLEMENTATION_RECORD.md` §10. Floor activation deadlocks with concurrent Release B writers. The order below was observed in disposable PostgreSQL 18.0: from the statement log of the floor command (`log_statement = all`, `fe1_da`), from `pg_locks` / `pg_blocking_pids`, and from PostgreSQL's own deadlock report.
+
+| Party | Lock sequence (pre-A-1) |
+|---|---|
+| Floor command, one EF Core 10.0.13 / Npgsql 10.0.3 migration transaction | `LOCK TABLE authority.ef_migrations_history IN ACCESS EXCLUSIVE MODE` (EF's migration lock) → `SELECT "MigrationId", "ProductVersion" …` → floor Up: `SET LOCAL lock_timeout = '5s'` → `LOCK TABLE authority.content_change_operations IN ACCESS EXCLUSIVE MODE` → preconditions → `ALTER TABLE … ADD / DROP CONSTRAINT` → `INSERT INTO … ef_migrations_history` → `COMMIT` |
+| Release B writer (Prepare, Commit, record registration) | organization row `FOR UPDATE` → fence savepoint → `LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE` → facts statement reads `ef_migrations_history` (ACCESS SHARE, held to the end of the transaction); the L-13 ledger facts read it again later |
+
+**Wait-for graph** (identical in `fe1_da`, `fe1_db` and `fe1_d2`):
+
+- The floor command **holds** ACCESS EXCLUSIVE on `ef_migrations_history` and **waits for** ACCESS EXCLUSIVE on `content_change_operations`, blocked by the writer.
+- The writer **holds** ROW EXCLUSIVE on `content_change_operations` and **waits for** ACCESS SHARE on `ef_migrations_history`, blocked by the floor command.
+
+PostgreSQL reported: "Process 327 waits for AccessExclusiveLock on relation 16519; blocked by process 300. Process 300 waits for AccessShareLock on relation 16387; blocked by process 327."
+
+**Victim.** Each waiter runs the deadlock check once, `deadlock_timeout` after it starts waiting. The one that finds the cycle is aborted, normally the one that started waiting second. **Both outcomes were observed:**
+
+- **Writer aborted** (`fe1_da`, `fe1_d2`, and E-33b's original shape): `503 CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED`, reason `FloorUnverifiable`, Critical alert. Nothing is written and the raise commits.
+- **Floor command aborted** (`fe1_db`): exit 3 (`40P01`). Nothing is applied: the lower floor and its history are unchanged.
+
+In both cases nothing is accepted; this is an availability fault.
+
+**Floors affected (verified):**
+
+| Floor | Evidence (pre-A-1 run of record, 6 iterations) |
+|---|---|
+| Floor 1, with Release B writers present (refused until floor 1 exists) | The floor command was aborted in 4 of 6 iterations; writers were aborted in the other 2 |
+| Floor 2 | `fe1_d2`; one floor-command abort and two iterations with aborted writers |
+| Floor 3 | `fe1_da`, `fe1_db`; one floor-command abort and one iteration with aborted writers. The other floor-3 raises never ran, because a lower floor was already missing |
+
+Floor 1 with only Release A writers is not exposed: Release A writers never read the history. This is inferred from the code, and consistent with the Release A writers never being refused in the stress runs.
+
+The E3-M2d D-F6 runs passed by timing: the window is the gap between the writer's two statements.
+
+#### 22.14.2 Options evaluated
+
+| Option | Assessment |
+|---|---|
+| **A** Read the history before the operations lock | **Selected, in a stricter form (A-1):** the writer *locks* the history before the operations table, and the facts statement stays a single statement after both locks. Reading the history in a separate earlier statement would have split the facts across two snapshots, so that was not done. A-1 removes the inversion for every EF migration, the floor command and the ordinary `--migrate`, because EF always locks the history first |
+| **B** The floor command locks the operations table before EF's history lock | Rejected. EF's migrator opens its own transaction and takes the history lock at the start. Placing a lock before it means running `Migrate` inside a caller transaction, which EF 9+ refuses by default (`MigrationsUserTransactionWarning`). That changes migration infrastructure. It also leaves the ordinary `--migrate` in history→table order, and A and B cannot be combined (each inverts the other) |
+| **C** Retry the deadlock victim | Rejected. It keeps the inversion, and either party can be the victim, so the floor command would fail too. Retrying inside the fence would also need a new refusal classification |
+| **D** Pause writers during a floor raise | Not needed as a defect remedy. A floor raise in a low-traffic window remains a deployment prerequisite (§21) |
+
+#### 22.14.3 The correction (A-1)
+
+1. **Fence** (`ContentAcceptanceWriteFence.HistoryLockSql`, executed by `AuthorityStore.RequireContentAcceptanceFloorAsync`): `LOCK TABLE authority.ef_migrations_history IN ACCESS SHARE MODE` is the first statement in the fence savepoint, then the unchanged `LockSql`, then the unchanged facts statement.
+   - ACCESS SHARE needs only the runtime's existing SELECT grant. No privilege changed.
+   - It conflicts only with ACCESS EXCLUSIVE.
+2. **Floor command** (`ContentAcceptanceFloorCommand.SessionLockTimeoutSql`): it opens its connection and runs `SET lock_timeout = '5s'` before EF's migration lock. Writers now hold the history lock for their whole transaction, so the raise waits at EF's lock. This keeps the existing 5 s bound on how long a raise can stall writers: a timeout exits 3 and applies nothing.
+
+Nothing else changed: the facts SQL, `Evaluate`, the floor migrations, the preconditions, the reinstatement, the readiness reader, the policy, the ledger verification and the switch are untouched.
+
+#### 22.14.4 Why the invariants hold
+
+1. **One lock order.** Every party takes the history before the operations table:
+   - EF's migrator does so by construction (statement log above).
+   - Under A-1 the fence does so too.
+   - Every explicit fence entry call (Prepare, Commit, record registration) comes after the organization row lock and **before** the transaction first touches `content_change_operations` (§22.3).
+   - The fence is the only code that runs `LockSql` (architecture check `OnlyTheFenceTakesTheFenceOperationsLock`).
+   - The floor transaction takes neither the organization row nor any lock that writers take before the history.
+   - So the F-E1 cycle cannot form. No cycle was observed in any A-1 run.
+2. **The facts remain one snapshot.** The facts statement is unchanged. It runs after both locks are granted, so it reads the history and the catalog in one READ COMMITTED snapshot, as before (§22.4 item 3).
+3. **Exclusion is strictly stronger.** While a writer holds ACCESS SHARE on the history, no EF migration transaction can start (it needs ACCESS EXCLUSIVE first), so none can commit before the writer ends. Before A-1 only the operations-table DDL was excluded.
+4. **History DML is no more exposed than before.** Direct privileged `INSERT` / `UPDATE` / `DELETE` on the history (ROW EXCLUSIVE) is still not excluded, and was not before A-1 either. The history can only add refusals (`FenceMigrationNotRecorded`, `FloorNotRecorded`, `FloorRecordedButMissing`). The enforced floor is the catalog, verified under the operations lock (unchanged).
+5. **No stale history can let a write through:**
+   - after a failed or rolled-back raise, nothing was applied (`fe1_db`, LT-2);
+   - after a restore to an older floor, the restored catalog is verified (H-6a `FloorLowered`);
+   - after a downgrade (E-40) the same holds;
+   - a partial state fails: history missing (H-1, H-3), history corrupted (H-2), the history table missing (H-4 `FloorUnverifiable`), the constraint missing (H-5, E-38).
+6. **Unchanged:** RequiredFloor enforcement, monotonic one-step progression and the no-lower rule (E-37); CARV P = C (E-33, PC in every iteration, H-8); old-build refusal (E-30, E-35, H-7); acceptance off (the switch is never configured); the protective-abort exemption.
+7. **Refusals still release cleanly.** On a refusal, `ROLLBACK TO SAVEPOINT` releases both fence locks.
+
+#### 22.14.5 Changed behaviour (impact on accepted RB-CARV-1 behaviour)
+
+- **Cost.** Each Release B content-write transaction issues one more statement (a table lock). It holds ACCESS SHARE on the history from the start of the fence rather than from the facts statement (R-CARV-25).
+- **Migrations wait instead of deadlocking.** An EF migration (floor or ordinary) now waits at its history lock for in-flight fenced writes, and new fenced writes queue behind a waiting migration. Before A-1 this could form a cycle.
+- **The floor command's wait is bounded at 5 s (LT-1).** The ordinary `--migrate` wait is not bounded; that code is unchanged.
+- **§22.4 item 5 is corrected** (inline note above).
+
+#### 22.14.6 Evidence (`docs/evidence/e3-m2e1/fe1/`)
+
+The fe1 runs use one disposable container and a fresh database per scenario. Containers were removed after every run, and no persistent database was touched.
+
+| Run | Result |
+|---|---|
+| `pre-a1`: the pre-A-1 build (this tree before A-1), 6 stress iterations | 88 checks, **46 failed**; 26 `deadlock detected` lines in the server log. Deterministic cycles DA, DB and D2 all reproduced, with both victims |
+| `a1`: A-1, 20 stress iterations | 171 checks, 8 failed, **0 deadlocks** (server log and `pg_stat_database` per database). **Every floor check passed:** F1, F2 and F3 in 20 of 20 iterations; 2,070 + 2,023 concurrent floor-2 and floor-3 writes all committed; DA, DB, D2, LT and H (history, catalog, restore, old build) pass. **All 8 failures are the FM sub-check** (the ordinary `--migrate` under load) in 8 of 20 iterations, caused by F-E2 (§22.14.7) and independent of A-1. The earlier 10-iteration A-1 run passed 111 of 111 |
+| `gate-a1-run1..3`: the full E3-M2e-1 gate, unchanged checks | **44 of 44 in each run; E-33 and E-33b pass** (23 of 23, 22 of 22 and 23 of 23 concurrent writes committed); 0 deadlock lines. Before A-1: E-33b failed in both runs of record |
+| `mutations/` (enforcement removal) | **MA-1** (no history lock) and **MA-2** (history lock after the operations lock): 26 PostgreSQL failures each plus the architecture check. **MA-3** (no floor-command lock timeout): LT-1 and LT-2 (the raise waited 21 s and then applied) plus the architecture check. All restored by hash and rebuilt |
+
+A first MA-3 run was **invalid** and discarded. Restoring the earlier mutation kept the backup's old file time, so MSBuild did not recompile it and MA-3 ran on a stale MA-2 binary. The driver now touches restored files and rebuilds with `--no-incremental`.
+
+The gate script gained `-Mode fe1`, `-NewBinaries` and `-Iterations` (the default mode is unchanged) and `log_lock_waits`. Suites: Authority 1029 / 0 / 4, contract 912 / 0 / 12, architecture 154 / 0 (3 new `FloorLockOrderTests`), integrity 73 / 0.
+
+#### 22.14.7 Residual risks and a new finding
+
+- **R-A1-1, old builds.** Builds without A-1 keep the old order. The committed `8915f77` and `a1127a1` builds were never deployed outside Development/Testing, but a raise while any Release B instance runs such a build can still deadlock (fail closed).
+  - The `carv-v` marker cannot tell a CARV-3 build with A-1 from the uncommitted pre-A-1 CARV-3 tree.
+  - **Requirement:** raise floors only when every Release B instance runs an A-1 build (deployment inventory).
+- **R-A1-2, the catch-all fence path.** A path that read `content_change_operations` before reaching the store catch-all (§22.3) would take the operations table before the history. No such path exists today (code inspection); the architecture checks constrain the explicit fence, not every future path.
+- **R-A1-3, other ordinary migrations.** Ordinary migrations that change tables writers lock before the fence (the organization row) can still form a cycle with fenced writers (history → organization vs organization → history). This predates A-1, is not F-E1 and is not tested here.
+- **R-A1-4, privileged history DML.** Unchanged (point 4 of §22.14.4; R-CARV-24).
+- **R-A1-5, provider dependence.** The order relies on EF's migration lock coming first. A provider upgrade could change it. The fe1 PostgreSQL gate (DA-2) detects that; the source-shape checks do not. Azure PostgreSQL verification (R-CARV-18) still applies.
+- **Not tested:** three-party interleavings (reinstatement plus an EF migration plus writers).
+- **New F-E2 (observed, not fixed, owner decision).** After its migrations the ordinary `--migrate` re-applies the runtime grants in separate autocommit statements, starting with `REVOKE ALL ON ALL TABLES` (`AuthorityRuntimeGrants.Apply`). While it does so, concurrent writes are denied (`42501`, or `FloorUnverifiable` when the fence's own lock or read is denied). Those refusals fail closed.
+  - The exception: a Commit whose transaction had already committed can report `42501`, because `ToRevisionAsync` reads after the commit. The client is told the write failed although it took effect; an idempotent replay returns the committed result.
+  - Observed with and without A-1 (pre-A-1: `42501` and `FloorUnverifiable`; the post-commit misreport appeared in 8 of 20 A-1 iterations).
+  - It is a defect of the ordinary `--migrate` under live writers, outside RB-CARV-1's floor mechanism.
+  - *(2026-11-16, OA-FE1-3: tracked separately as an open defect in `F-E2_MIGRATE_GRANT_WINDOW_DEFECT.md`. The replay statement above rests on source and in-memory unit tests; no F-E2 run retried a misreported Commit in PostgreSQL. See that record §4.)*
+
+**Status.** R-M2e-13 / F-E1 is **remedied in Development/Testing by A-1 and owner-accepted (§22.14.8)**. RB-CARV-1 is still not production-closed. All §22.13 release gates are unchanged.
+
+#### 22.14.8 Owner acceptance of A-1 (2026-11-16)
+
+Owner-led acceptance for **Development/Testing**; not an independent security audit, not Release B deployment approval, not production closure. It extends §22.13 item 3 to the A-1 lock order.
+
+| # | Owner decision |
+|---|---|
+| **OA-FE1-1** | A-1 approved: one history-before-operations lock order for the Release B fence and EF migrations, and the floor command's 5 s session lock timeout |
+| **OA-FE1-2** | **New release prerequisite:** before **any persistent floor raise**, a **verified deployment inventory** must show that every Release B instance runs an A-1-capable build. The CARV connection marker alone is insufficient (R-A1-1) |
+| **OA-FE1-3** | F-E2 is a separate open defect (`F-E2_MIGRATE_GRANT_WINDOW_DEFECT.md`); not fixed here; does not block the E3-M2e-1 local commit |
+
+Basis: the verified root cause (§22.14.1); three passing full gate runs (`gate-a1-run1..3`, 44 of 44 each); 20 focused concurrency iterations with 0 observed deadlocks (`a1`); MA-1..MA-3 detected (§22.14.6). Remaining unverified: R-A1-2 (catch-all paths), R-A1-3 (other migration lock interactions), three-party interleavings, R-A1-5 (provider dependence), Azure PostgreSQL (R-CARV-18). This acceptance does not authorize E3-M2e-2 or any persistent floor installation.
 
 ---
 

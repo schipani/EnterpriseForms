@@ -9,7 +9,7 @@ namespace AuthorizationAuthority.Application.Features.Content;
 /// the Authority's Envelope v2 rules, used only for rows of signed schema 2 / envelope 2 (the S-4 tie admits no other schema-2
 /// pair). They are dark: they evaluate v2 rows, but no v2 row is accepted anywhere (<see cref="Reasons.VersionNotEnabled"/>). At
 /// Prepare only a byte-identical carry of a v2 row of the current accepted head passes (and no product path produces such a head);
-/// Commit refuses every v2 row (<see cref="CommitViolation"/>). Decided from canonical bytes alone; the Authority holds no key and never checks AEAD authentication or the commitment's
+/// E3-M2e: Commit accepts a v2 row only when the data-key ledger confirms it (DK-6, P-4) and, for a New group, only with acceptance on. Decided from canonical bytes alone; the Authority holds no key and never checks AEAD authentication or the commitment's
 /// correctness (the business opener does, E3-M1). The v1 rules (<see cref="EnvelopeRules"/>) are unchanged and never see a v2 row.
 /// <para>
 /// The Authority keeps its own copy of the M1 registry (wrap codes, families, lengths); an architecture test cross-checks it
@@ -56,7 +56,7 @@ public static class EnvelopeV2Rules
         public const string Downgrade = "ENVELOPE_DOWNGRADE";
     }
 
-    /// <summary>Abort reason of a Commit whose verified staged bytes hold any v2 row (E3-M2d commits no v2 row, <see cref="CommitViolation"/>).</summary>
+    /// <summary>Abort reason of a Commit that would accept a New v2 group while Envelope v2 acceptance is off (E3-M2e; in E3-M2d: any v2 row).</summary>
     public const string NotEnabledAtCommitReason = "ENVELOPE_VERSION_NOT_ENABLED_AT_COMMIT";
 
     /// <summary>True for an envelope row of signed schema 2 (the S-4 tie guarantees envelope 2 wherever this is consulted).</summary>
@@ -179,6 +179,19 @@ public static class EnvelopeV2Rules
     /// </summary>
     public static void EnforceAgainstCurrent(IReadOnlyList<(Guid ItemId, RowCanonicalDocument Document)> candidate, IReadOnlyList<(Guid ItemId, RowCanonicalDocument Document)> current)
     {
+        if (ClassifyAgainstCurrent(candidate, current).Count > 0)
+        {
+            throw EnvelopeRules.Refused(Reasons.VersionNotEnabled);
+        }
+    }
+
+    /// <summary>
+    /// E3-M2e: the Prepare-only rules of <see cref="EnforceAgainstCurrent"/> (classification against the current accepted head, DK-3,
+    /// the downgrade guard, no v1 reuse of a current v2 wrapped key; every refusal unchanged) without the blanket refusal of New
+    /// rows. Returns the New v2 rows; the caller refuses them unless Envelope v2 acceptance is enabled (the switch, OD-M2e-07).
+    /// </summary>
+    public static IReadOnlyList<RowCanonicalDocument> ClassifyAgainstCurrent(IReadOnlyList<(Guid ItemId, RowCanonicalDocument Document)> candidate, IReadOnlyList<(Guid ItemId, RowCanonicalDocument Document)> current)
+    {
         ArgumentNullException.ThrowIfNull(candidate);
         ArgumentNullException.ThrowIfNull(current);
         var currentByItem = new Dictionary<(string Kind, Guid ItemId), RowCanonicalDocument>();
@@ -249,24 +262,7 @@ public static class EnvelopeV2Rules
             }
         }
 
-        if (newRows.Count > 0)
-        {
-            throw EnvelopeRules.Refused(Reasons.VersionNotEnabled);
-        }
-    }
-
-    /// <summary>
-    /// Commit, E3-M2d (dark): no v2 row is committed by this build, carried or new. Commit holds only digests of the current revision,
-    /// so it cannot re-derive the carried/new decision; refusing every v2 row keeps the accepted E3-M2b-2 property that schema 2 /
-    /// envelope 2 is never accepted at Commit (S-4 gate S4-T1/T2), even for an operation recorded outside this build's Prepare with a
-    /// version-2 stamp. Carried rows are still classified and validated at Prepare, and the v2 shape and batch rules still run on the
-    /// staged bytes first. Committing carried v2 rows is left to the activation increment (E3-M2e, with the data-key ledger).
-    /// Null when no staged row is v2; otherwise <see cref="Reasons.VersionNotEnabled"/>.
-    /// </summary>
-    public static string? CommitViolation(IEnumerable<RowCanonicalDocument> staged)
-    {
-        ArgumentNullException.ThrowIfNull(staged);
-        return staged.Any(IsV2) ? Reasons.VersionNotEnabled : null;
+        return newRows;
     }
 
     /// <summary>
@@ -543,6 +539,26 @@ public static class EnvelopeV2Rules
         identifier.TryWriteBytes(bytes, bigEndian: true, out _);
         return bytes[6] >> 4 == 7 && (bytes[8] & 0xC0) == 0x80;
     }
+
+    /// <summary>
+    /// E3-M2e (AM-9): every v2 row's wrap-algorithm code must be one this environment admits (Development/Testing: {1, 2}; elsewhere
+    /// none). Throws <c>ENVELOPE_WRAP_ALGORITHM_UNSUPPORTED</c>; v1 rows are not affected.
+    /// </summary>
+    public static void EnforceEnvironmentWrapCodes(IEnumerable<RowCanonicalDocument> documents, IReadOnlySet<int> allowedWrapCodes)
+    {
+        ArgumentNullException.ThrowIfNull(documents);
+        ArgumentNullException.ThrowIfNull(allowedWrapCodes);
+        foreach (var document in documents)
+        {
+            if (IsV2(document) && (ReadInt32(document.Column("key_wrap_algorithm_code")) is not { } code || !allowedWrapCodes.Contains(code)))
+            {
+                throw EnvelopeRules.Refused(Reasons.WrapAlgorithmUnsupported);
+            }
+        }
+    }
+
+    /// <summary>E3-M2e: the data-key identifier of a v2 row (null when absent; the shape rules refuse that first).</summary>
+    public static Guid? DataKeyIdentifierOf(RowCanonicalDocument document) => IdentifierOf(document);
 
     private static Guid? IdentifierOf(RowCanonicalDocument document) =>
         document.Column("data_key_identifier") is { IsNull: false, Type: RowColumnType.Uuid } column ? column.AsUuid() : null;

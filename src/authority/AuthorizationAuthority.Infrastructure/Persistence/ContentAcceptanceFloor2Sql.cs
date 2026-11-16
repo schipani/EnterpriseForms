@@ -128,6 +128,7 @@ public static class ContentAcceptanceFloors
     [
         new(ContentAcceptanceFloorSql.FloorVersion, ContentAcceptanceFloorSql.MigrationId, ContentAcceptanceFloorSql.ConstraintName, ContentAcceptanceWriteFence.ExpectedFloorDefinition, ContentAcceptanceFloorSql.UpSql, ContentAcceptanceFloorSql.ReinstateSql),
         new(ContentAcceptanceFloor2Sql.FloorVersion, ContentAcceptanceFloor2Sql.MigrationId, ContentAcceptanceFloor2Sql.ConstraintName, ContentAcceptanceFloor2Sql.ExpectedDefinition, ContentAcceptanceFloor2Sql.UpSql, ContentAcceptanceFloor2Sql.ReinstateSql),
+        new(ContentAcceptanceFloor3Sql.FloorVersion, ContentAcceptanceFloor3Sql.MigrationId, ContentAcceptanceFloor3Sql.ConstraintName, ContentAcceptanceFloor3Sql.ExpectedDefinition, ContentAcceptanceFloor3Sql.UpSql, ContentAcceptanceFloor3Sql.ReinstateSql),
     ];
 
     public static Floor? Find(int version) => Recognized.FirstOrDefault(f => f.Version == version);

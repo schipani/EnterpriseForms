@@ -13,19 +13,22 @@ namespace AuthorizationAuthority.Application.Features.Content;
 /// not fully re-derive. Version 1 = the E3-M2a rule set, including the cross-revision envelope rule. Version 2 (E3-M2d, owner
 /// decision D-2) = version 1 plus the Prepare-only Envelope v2 rules: carried/new classification against the current accepted
 /// head, DK-3, the refusal of every new v2 row and the v2-to-v1 downgrade guard (EnvelopeV2Rules.EnforceAgainstCurrent).
+/// Version 3 (E3-M2e, docs/security/E3_M2E_CONTRACT_CLOSURE.md) = version 2 plus the Prepare-only data-key ledger rules: the
+/// carried/new classification now leads to acceptance (behind the default-off switch), DK-4 against the ledger and the DK-5
+/// binding insert in the Prepare transaction. Commit re-derives DK-6 and P-4 from the staged bytes and the ledger.
 /// </para>
 /// </summary>
 public static class ContentAcceptanceRules
 {
     /// <summary>V: the rule version this build applies at Prepare and requires at Commit.</summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     /// <summary>
     /// E3-M2d (D-3/D-4): the floors this build recognizes, each with an exact database definition (floor migrations
-    /// AuthorityContentAcceptanceRuleFloor1 and -Floor2). A Release B deployment requires one of them as a minimum; an installed
-    /// floor outside this set, or above <see cref="CurrentVersion"/>, fails closed.
+    /// AuthorityContentAcceptanceRuleFloor1, -Floor2 and, E3-M2e (AM-1), -Floor3). A Release B deployment requires one of them as a
+    /// minimum; an installed floor outside this set, or above <see cref="CurrentVersion"/>, fails closed.
     /// </summary>
-    public static readonly IReadOnlyList<int> RecognizedFloors = [1, 2];
+    public static readonly IReadOnlyList<int> RecognizedFloors = [1, 2, 3];
 
     /// <summary>The lowest recognized floor (floor 1, E3-M2b-1F).</summary>
     public const int MinimumFloor = 1;
@@ -65,7 +68,9 @@ public static class ContentAcceptanceRules
     /// </summary>
     /// E3-M2d adds <paramref name="HighestRecordedFloor"/>: the highest recognized floor whose migration the history records (null
     /// when the reader cannot tell; then <paramref name="FloorRecorded"/> alone means floor 1, as in E3-M2b-1F).
-    public sealed record SchemaFacts(bool MigrationApplied, bool ColumnsPresent, bool CommitCheckPresent, bool StateGuardEnabled, int? InstalledFloor, bool FloorRecorded = false, string? WriteFenceFailure = null, int? HighestRecordedFloor = null);
+    /// E3-M2e (AM-12) adds <paramref name="DataKeyLedgerApplied"/>: the history records the data-key ledger migration. Null (unknown)
+    /// is not ready, like every other unknown fact.
+    public sealed record SchemaFacts(bool MigrationApplied, bool ColumnsPresent, bool CommitCheckPresent, bool StateGuardEnabled, int? InstalledFloor, bool FloorRecorded = false, string? WriteFenceFailure = null, int? HighestRecordedFloor = null, bool? DataKeyLedgerApplied = null);
 
     /// <summary>
     /// RB-CARV-1 (contract §22): the readiness decision for this instance's policy. Release A (or no policy, as in the E3-M2b-1
@@ -127,6 +132,12 @@ public static class ContentAcceptanceRules
         if (!facts.StateGuardEnabled)
         {
             return (false, "ContentAcceptanceRuleStateGuardMissing");
+        }
+
+        // E3-M2e (AM-12): a CARV-3 build requires the data-key ledger migration (a database restored below it, or never migrated).
+        if (facts.DataKeyLedgerApplied is not true)
+        {
+            return (false, "ContentDataKeyLedgerMigrationMissing");
         }
 
         if (facts.InstalledFloor is { } floor && floor > compiledVersion)

@@ -11,7 +11,8 @@ namespace AuthorizationAuthority.Tests;
 /// <summary>
 /// E3-M2d (CARV 2; owner decisions D-6, D-7, D-10, D-12) on the real <see cref="ContentService"/> write paths: the Prepare-only
 /// Envelope v2 rules. A v2 head is modelled as accepted history (<see cref="Harness.AcceptDirectlyAsync"/>): no build accepts v2
-/// before E3-M2e. Carried v2 rows (byte-identical to the current head) pass Prepare and are never committed; every new v2 row,
+/// before E3-M2e. Carried v2 rows (byte-identical to the current head) pass Prepare; E3-M2e: their Commit is decided by the data-key
+/// ledger (P-4), and a head accepted outside it has no binding, so they are refused there as a ledger mismatch; every new v2 row,
 /// a data-key id reused by a new row (DK-3), a v2-to-v1 downgrade and a v1 row reusing a current v2 wrapped key are refused before
 /// anything is signed. The rules themselves are in EnvelopeV2RulesTests.
 /// </summary>
@@ -47,7 +48,12 @@ public sealed partial class ContributorWriteProtocolTests
         return head;
     }
 
-    private static async Task CommitRefusedAsNotEnabledAsync(Harness h, Guid actor, List<Row> rows)
+    /// <summary>
+    /// E3-M2e (replaces the E3-M2d not-enabled refusal): carried v2 rows of a head accepted outside the data-key ledger pass Prepare
+    /// (OA-M2d-2) but cannot be committed: P-4 finds no binding, the operation is aborted and a minimal content-stream incident is
+    /// journaled (OD-M2e-11). Nothing is accepted.
+    /// </summary>
+    private static async Task CommitRefusedAsUnboundAsync(Harness h, Guid actor, List<Row> rows)
     {
         var head = (h.Head.CommittedContentRevision, h.Head.CommittedOperationId, h.Head.CommittedManifestRoot);
         var commits = h.Store.Commits.Count;
@@ -55,29 +61,34 @@ public sealed partial class ContributorWriteProtocolTests
         var candidate = h.Stage(rows, operation);
         var prepared = await h.PrepareAsync(actor, operation, candidate, withCurrent: true); // carried v2 rows pass Prepare
 
+        var incidents = h.Store.Journal.Count(j => j.JournalEventKind == "IntegrityVerificationFailed");
         var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.CommitAsync(actor, prepared, candidate));
-        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeV2Rules.Reasons.VersionNotEnabled, ex.Message);
+        Assert.Equal((AuthorityErrorCodes.DataKeyBindingMismatch, 409), (ex.ErrorCode, ex.HttpStatusCode));
         var stored = h.Store.Operations.Single(o => o.ContentChangeOperationId == operation);
-        Assert.Equal((ContentOperationStates.Aborted, EnvelopeV2Rules.NotEnabledAtCommitReason, (int?)ContentAcceptanceRules.CurrentVersion, (int?)null),
+        Assert.Equal((ContentOperationStates.Aborted, DataKeyLedgerFailures.BindingMismatchReason, (int?)ContentAcceptanceRules.CurrentVersion, (int?)null),
             (stored.OperationStateName, stored.OperationQuarantineReasonCode, stored.PrepareAcceptanceRuleVersion, stored.CommitAcceptanceRuleVersion));
+        var incident = h.Store.Journal.Last(j => j.JournalEventKind == "IntegrityVerificationFailed");
+        Assert.Equal(incidents + 1, h.Store.Journal.Count(j => j.JournalEventKind == "IntegrityVerificationFailed"));
+        Assert.Contains("\"failure_reason_code\":\"" + DataKeyLedgerFailures.BindingMismatchReason + "\"", incident.JournalEventBodyJson, StringComparison.Ordinal);
+        Assert.Empty(h.Store.DataKeyBindings);
         Assert.Equal(head, (h.Head.CommittedContentRevision, h.Head.CommittedOperationId, h.Head.CommittedManifestRoot));
         Assert.Equal(commits, h.Store.Commits.Count);
     }
 
     [Fact]
-    public async Task AnOwnerEditCarryingATwoItemV2BatchAndAV2DocumentPassesPrepareAndIsNotCommitted()
+    public async Task AnOwnerEditCarryingATwoItemV2BatchAndAV2DocumentPassesPrepareAndWithoutALedgerBindingIsNotCommitted()
     {
         var v2 = await AcceptedV2HeadAsync();
         var rows = Change(v2.Rows(), v2.H.Other, r => r.With("string_value", RowValue.Text("owner edit")));
-        await CommitRefusedAsNotEnabledAsync(v2.H, v2.H.Owner, rows);
+        await CommitRefusedAsUnboundAsync(v2.H, v2.H.Owner, rows);
     }
 
     [Fact]
-    public async Task AShareEditCarryingTheV2RowsPassesPrepareAndIsNotCommitted()
+    public async Task AShareEditCarryingTheV2RowsPassesPrepareAndWithoutALedgerBindingIsNotCommitted()
     {
         var v2 = await AcceptedV2HeadAsync();
         v2.H.ShareWithContributor("contributor", false, v2.H.Shared);
-        await CommitRefusedAsNotEnabledAsync(v2.H, v2.H.Contributor, Change(v2.Rows(), v2.H.Shared, r => r.With("string_value", RowValue.Text("contributor edit"))));
+        await CommitRefusedAsUnboundAsync(v2.H, v2.H.Contributor, Change(v2.Rows(), v2.H.Shared, r => r.With("string_value", RowValue.Text("contributor edit"))));
     }
 
     public static TheoryData<string, string> NewV2Rows => new()
