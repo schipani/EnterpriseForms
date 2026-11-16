@@ -648,6 +648,11 @@
       "bytes": 41444
     },
     {
+      "path": "docs/security/E3_M2F1_IMPLEMENTATION_RECORD.md",
+      "sha256": "e853c45e2e7c9917d82d686cd2e2d22438b27152d04f2941f4ddd45aac128080",
+      "bytes": 13807
+    },
+    {
       "path": "docs/security/E3_M2F_CONTRACT_CLOSURE.md",
       "sha256": "3cd2e738b6efbda09da85bfeb49710596022b023d6ecf925433d5e7b751ac49e",
       "bytes": 45184
