@@ -654,6 +654,8 @@ This section builds on G14 (`COORDINATED_DISASTER_RECOVERY.md`): the Authority's
 | **Interrupted campaign** | leased jobs; head CAS | the partially resealed organization is consistent per record; the census shows the remaining records | Resume. Nothing is half-written per record. |
 | **Corrupted envelope metadata** | a database edit fails RowHmac/Merkle → quarantine (existing). A writer bug that HMAC accepted → commitment or AEAD failure. | quarantine, or `423` with `KEY_MISMATCH` / `AUTHENTICATION_FAILED`; never released | G14 quarantine handling. A writer bug needs a fix plus a Reseal from a trusted earlier revision, if one exists. |
 
+> **E3-M2f contract closure (2026-11-16; `E3_M2F_CONTRACT_CLOSURE.md` §2).** The "Authority rollback below E-3" fence above is realized by F0: CARV 3, floors 1–3 and the Release B fence; no additional trigger. The "Application rollback, business host below E-3" row is complemented by the E3-M2f business capability floor, enforced before verification. Profiles (§4) remain E-9; catalog and routing remain E3-M3.
+
 **Never permitted:**
 - re-signing tampered rows;
 - substituting another key version or an older content revision;

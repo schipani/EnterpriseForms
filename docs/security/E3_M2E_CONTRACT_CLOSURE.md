@@ -58,7 +58,7 @@ The owner approved decisions 1–16 of the readiness report as recommended, subj
 | **OD-M2e-06** | Floor-3 mechanism and prerequisites | M2b §9.4 vs §21.2 / OA-M2d-6 (conflict C-1); C-11; C-14 | **Separate floor-context migration**, applied only by `--apply-content-acceptance-floor 3`; the ledger migration recorded and the ledger objects present as a precondition; floor 2 installed first | The ordinary migration never installs a floor (AM-1) | Floor-3 SQL, reinstatement SQL, registry, policy, command, fence (§6.1) |
 | **OD-M2e-07** | Acceptance switch behaviour | OD-M2-10; package §8; C-5, C-6, C-12 | (a) refuse to start when on in any environment other than Development/Testing, **Staging included**; (b) prerequisite **Release B with `RequiredFloor = 3`**, enforced transactionally (AM-5); (c) switch off refuses **New** groups only; carried groups remain subject to P-4; (d) the Testing override may enable only when the static prerequisites hold and may always disable | OD-M2-10 is decided in this form. With the switch off, a carried v2 group commits only if P-4 finds it bound to an accepted operation, which is impossible in an environment where the switch was never on (§5.3) | §6.1 switch items |
 | **OD-M2e-08** | Mixed-fleet compatibility | package §7.5; M2b §10 | CARV-2 and CARV-3 instances may coexist before floor 3 while the switch is off. **Floor 2 must be installed before any v2 binding or acceptance** (AM-6) | CARV ≤ 2 builds cannot accept any v2 row. CARV-1 builds can accept a v2 → v1 downgrade, so floor 2 is mandatory | Gate evidence for C-14 (E3-M2e-2, §6.2) |
-| **OD-M2e-09** | M2f dependency | package §7.3; M2b §15 | E3-M2e **without** M2f; acceptance only in isolated Development/Testing (disposable) | A mixed business fleet with pre-M2c builds needs M2f before any activation there | None in E3-M2e; M2f stays a separate increment |
+| **OD-M2e-09** | M2f dependency | package §7.3; M2b §15 | E3-M2e **without** M2f; acceptance only in isolated Development/Testing (disposable) | A mixed business fleet with pre-M2f-1 builds needs M2f before any activation there *(corrected 2026-11-16: originally "pre-M2c"; E3-M2c to E3-M2e-2 builds send no capability and count as level 1, `E3_M2F_CONTRACT_CLOSURE.md` CAP-S5)* | None in E3-M2e; M2f stays a separate increment. *(2026-11-16: M2f contract closed in `E3_M2F_CONTRACT_CLOSURE.md`; implementation not authorized.)* |
 | **OD-M2e-10** | Recovery: archive content and restore enforcement | OD-M2-15; package §4.6; M2b §7.4; C-4, C-7 | Archive the **full binding tuple** (AM-3). The body field is **always present from CARV 3** (an empty array when there are no New groups). The G14 gate plus the runbook apply in Development/Testing only. **An enforceable restore barrier is required before any persistent activation** (AM-4, BD-1) | OD-M2-15 is amended. A G14 operator procedure alone does not satisfy persistent activation | §3.6, §4 |
 | **OD-M2e-11** | DK-6 failure handling | package §4.7; C-9 | **Abort the operation and write a minimal content-stream incident**, using the existing integrity-incident path | Durable evidence of a ledger or operation inconsistency | The abort plus incident must commit; verify against the RB-CARV-1 catch-all (§6.1) |
 | **OD-M2e-12** | DK-4 ordering | M2b §7.3 step 4 | **After authorization, before signing** (amends M2b §7.3; AM-8) | No existence oracle for unauthorized callers; still nothing is signed when refused | Order of calls in Prepare |
@@ -134,7 +134,7 @@ Indexes: `ix_content_data_key_bindings_record (organization_id, form_record_id)`
 | L-7 | **P-2 immutability**: `BEFORE UPDATE OR DELETE` (row level) and `BEFORE TRUNCATE` (statement level) raise unconditionally; same function properties as L-6 |
 | L-8 | Grants: the runtime role gets `SELECT, INSERT` only (`AuthorityRuntimeGrants.InsertOnlyTables`); no UPDATE, DELETE or TRUNCATE. No API, operator command or business path writes or removes a binding |
 | L-9 | "Accepted" is derived (the binding's operation is `Committed`), never stored |
-| L-10 | Reads, verification, search and history never consult the ledger |
+| L-10 | Reads, verification, search and history never consult the ledger. *(Amended 2026-11-16 by AM-F1, `E3_M2F_CONTRACT_CLOSURE.md` §5: the single exception is one organization-level binding-existence query returning a boolean, called only by the E3-M2f capability check at its seven entry points, under the organization lock, only when the client level is below 2 and not below the deployment floor, used only to refuse, failing closed on error. No binding detail is read or exposed.)* |
 | L-11 | The store catch-all (`AuthorityStore`, R-CARV-26) treats a binding insert as a content-acceptance write |
 | L-12 | A P-1 refusal is an invariant failure: fail closed, operational alert, never success, never `OPERATION_RULES_OUTDATED` |
 | L-13 | Any transaction that inserts a binding or performs P-4 verifies, in that transaction, that the ledger's unique index and the P-1/P-2 triggers exist exactly as created (the same verification style as the Release B fence; PostgreSQL 18.0 renderings, R-CARV-23) |
@@ -239,6 +239,13 @@ The design must define, without weakening P-1 for the runtime, how the recovery 
 | 2. **Persistent Development/Testing activation** | Any environment whose AuthorityDb outlives one run: the developer stack, the security-test stack when its volumes are kept, any shared or long-lived instance | **Prohibited** | BD-1 and BD-2 decided, implemented and verified; a read-only v2-absence inventory of that environment; floors 2 and 3 installed there under their own approval; Release B `RequiredFloor = 3` in protected configuration; a homogeneous business fleet at E3-M2c+, or M2f; the §5 sequence; a separate owner authorization |
 | 3. **Production (and Staging)** | Anything other than Development/Testing | **Prohibited**; the Authority refuses to start with the switch on (OD-M2e-07) | Everything in class 2, plus M2f, E3-M3, E3-M4, V2-IND-01, E-9, PB-03 Azure staging evidence, PB-11/PB-12 governance and protected configuration, RB-CARV-1 production closure, R-S4-4 inventory, Azure PostgreSQL verification (R-CARV-18/23), M2g census, dual control |
 
+> **E3-M2f contract closure (2026-11-16; `E3_M2F_CONTRACT_CLOSURE.md` §11.5).** Where M2f is a prerequisite above, "M2f" means:
+> - E3-M2f-1, E3-M2f-2, E3-M2f-2G and E3-M2f-3 accepted;
+> - a verified Authority deployment inventory (INV-1/INV-2; CARV markers are insufficient);
+> - OA-FE1-2 where a floor is raised.
+>
+> The alternative in class 2 ("a homogeneous business fleet at E3-M2c+") is narrowed: a homogeneous fleet at **E3-M2f-1+**, because E3-M2c..E3-M2e-2 builds send no capability and count as level 1. Nothing here changes any class or authorizes activation.
+
 ---
 
 ## 5. Activation safety
@@ -330,7 +337,7 @@ OD-M2e-07(c) lets a carried v2 group commit with the switch off when P-4 finds a
 
 ### 6.3 Not in E3-M2e
 
-- M2f (capability header and floor, OD-M2-07/08), M2g census, M3 catalog, M4 writers and the business mapping (OD-M2e-14), M5 Reseal/Rewrap, M6 content-stream replay.
+- M2f (capability header and floor, OD-M2-07/08; contract closed 2026-11-16 in `E3_M2F_CONTRACT_CLOSURE.md`, not implemented), M2g census, M3 catalog, M4 writers and the business mapping (OD-M2e-14), M5 Reseal/Rewrap, M6 content-stream replay.
 - The BD-1 and BD-2 mechanisms (design decisions first).
 - P-3, PB-13 disposition (OD-M2e-15), production configuration protection (PB-11).
 

@@ -558,6 +558,10 @@ As in package §6.2, unchanged.
 
 This remains the owner's decision.
 
+> **E3-M2f contract closure (2026-11-16; `E3_M2F_CONTRACT_CLOSURE.md` OD-M2f-02, §2, §10).** Decided: **F0**. No CARV 4, floor 4 or per-organization trigger. The "Business capability header and floor" row above is specified in that record (per organization, three clients, seven entry points, enforcement before verification).
+>
+> A CARV-3 build without E3-M2f is admitted by floor 3. Persistent use therefore requires a verified Authority deployment inventory (INV-1..INV-3). The CARV marker is not sufficient, and OA-FE1-2 still applies separately.
+
 **Order of a rollout (Development/Testing first, then any later environment):**
 1. Apply the migration (expand-only).
 2. Deploy the new binaries.
@@ -676,6 +680,8 @@ None of the above is decided by this document.
 >
 > OD-M2-05 was already decided for classification (E3-M2d D-7). OD-M2-07, OD-M2-08 (M2f), OD-M2-11 (M2g), OD-M2-13 and OD-M2-24 remain open.
 
+> **Decided for E3-M2f by the owner (2026-11-16; `E3_M2F_CONTRACT_CLOSURE.md` §1):** OD-M2-07 = F0 (OD-M2f-02); OD-M2-08 = per organization (OD-M2f-03). OD-M2-11, OD-M2-13 and OD-M2-24 remain open.
+
 ---
 
 ## 15. Revised increment plan
@@ -698,6 +704,12 @@ The package's M2a → M2b ordering rationale still holds: tighten v1 → fence �
 > - **E3-M2e-2** (controlled acceptance verification, disposable PostgreSQL only).
 >
 > The row's "§9.4" schema reference is read together with the §9.4 correction (no floor in the ordinary migration).
+
+> **E3-M2f contract closure (2026-11-16; `E3_M2F_CONTRACT_CLOSURE.md` §12).** The E3-M2f row is refined into four increments, each needing its own owner authorization:
+> - **E3-M2f-1** — business capability emission by the three clients;
+> - **E3-M2f-2** — Authority enforcement, error mapping, configuration and focused tests (schema: none, F0);
+> - **E3-M2f-2G** — disposable PostgreSQL verification;
+> - **E3-M2f-3** — durable bounded refusal evidence, after a separate design decision.
 
 ---
 

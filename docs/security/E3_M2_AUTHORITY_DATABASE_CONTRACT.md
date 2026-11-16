@@ -549,6 +549,8 @@ Minimum safe versions:
 
 The trigger function is owned by the schema owner, uses a fixed `search_path` with `pg_temp` last, has no SECURITY DEFINER, and is listed in the G08 privilege inventory.
 
+> **E3-M2f contract closure (2026-11-16; `E3_M2F_CONTRACT_CLOSURE.md` OD-M2f-02, §2).** OD-M2-07 is decided as **F0**: CARV 3, floors 1–3 and the Release B transactional fence are the Authority rollback fence. The `envelope_rule_version` column and the trigger above (F2) and the F1 alternative are **not built**; no CARV 4, floor 4 or trigger is introduced for M2f. Residual limitations are listed in that record §2 (R-M2f-1..R-M2f-4).
+
 ### 7.3 Business capability floor (Authority-enforced)
 
 - Business hosts (API and Worker, through the shared Authority client) send `EnterpriseForms-Envelope-Capability: 2` on every internal Authority call. It is defined in the internal Authority OpenAPI and is **not** part of the request digest. Pre-M2 builds do not send it, which counts as level 1.
@@ -556,6 +558,15 @@ The trigger function is owned by the schema owner, uses a fixed `search_path` wi
 - A Prepare, Commit, Verify or batch-Verify below the floor is refused with `409 CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT`, before any work. Reads by an old build therefore fail with one clear refusal instead of per-row decryption failures. The refusal is journaled once per (organization, client) per interval on the audit stream; no identifiers beyond the organization appear.
 - **Trust:** this stops **honest old builds**. A compromised business runtime can send the header (A3 is already trusted with wrap and unwrap). That is stated, not hidden.
 - Scope per organization (recommended) or per record: OD-M2-08.
+
+> **E3-M2f contract closure (2026-11-16; `E3_M2F_CONTRACT_CLOSURE.md` §1, §3–§9).** OD-M2-08 is decided: **per organization**. Effective floor = `max(deployment floor, organization floor)`, where the organization floor is 2 when any data-key binding exists for the organization, in any state.
+> - The header is sent by `AuthorityHttpClient`, `ProtectionVerifierHttpClient` and `SearchIndexBuilderHttpClient` on every request. A missing, unknown or malformed value counts as level 1.
+> - The check is enforced at **seven** entry points: Prepare, Commit, Verify, batch Verify, the verifier census, search-index backfill and deep-sweep verify.
+> - It runs in the transaction, after the organization lock (and after the Release B fence where present), and before any verification or quarantine-capable step (finding G-2: an honest pre-E3-M2b-2 reader otherwise causes a false quarantine or integrity incident).
+> - The ledger query is narrowed by AM-F1 (an L-10 exception).
+> - The error code above is kept. "Journaled once per (organization, client) per interval" is replaced by an approved requirement for durable, bounded refusal evidence whose design is deferred to E3-M2f-3.
+> - `Content:MinimumBusinessEnvelopeCapability` is governed by PB-11 procedures. "Production may only raise it" is procedural, not mechanical.
+> - Where the text above differs, that record governs.
 
 ### 7.4 Required-migration startup guards (both hosts)
 
@@ -731,6 +742,15 @@ Each increment is independently reviewable, needs its own owner authorization, k
 | Rollback | Dropping the trigger is Development/Testing only; production rollback below M2f is fenced by design |
 | Gate | Owner; Authority change; G08 review |
 
+> **E3-M2f contract closure (2026-11-16; `E3_M2F_CONTRACT_CLOSURE.md` §11, §12).** This block is superseded:
+> - The §7.2 trigger is not built (F0).
+> - The NULL `envelope_rule_version` Commit rule is met by CARV (AM-7).
+> - The startup guards were delivered in E3-M2b-1, E3-M2b-2 and E3-M2e-1.
+> - E3-M2f is now the business capability floor only, split into E3-M2f-1 (business emission), E3-M2f-2 (Authority enforcement, no database change), E3-M2f-2G (disposable PostgreSQL verification) and E3-M2f-3 (durable refusal evidence, after a separate design decision).
+> - G08 is unchanged under F0.
+>
+> Each increment needs its own owner authorization.
+
 ### E3-M2g — Envelope census
 
 | Aspect | Content |
@@ -769,6 +789,12 @@ Focused runs only: run the test executable directly with `--filter-class`. Real-
 
 **Not run in M2:** Stage B shards (manual and on demand); Azure; real HSM; PB-09 performance; V2-IND-01.
 
+> **E3-M2f contract closure (2026-11-16; `E3_M2F_CONTRACT_CLOSURE.md` §11.1, §13).** The M2-FEN group is reassigned:
+> - M2-FEN-01/-02 (F2 trigger): withdrawn (F0).
+> - M2-FEN-03: met by CARV.
+> - M2-FEN-05..08: met by E3-M2b-1, E3-M2b-2 and E3-M2e-1.
+> - M2-FEN-04: replaced by M2F-01..M2F-40.
+
 ---
 
 ## 12. Open decisions requiring owner approval
@@ -804,6 +830,8 @@ Still open from E-3 §13.8 and prerequisites for M2b/M2d/M2e:
 > - OD-M2-15: amended to the full binding tuple (OD-M2e-10, AM-3).
 >
 > OD-M2-05 was already decided for classification (E3-M2d D-7).
+
+> **Decided for E3-M2f (2026-11-16; `E3_M2F_CONTRACT_CLOSURE.md` §1):** OD-M2-07 = F0 (OD-M2f-02); OD-M2-08 = per organization (OD-M2f-03).
 
 ---
 

@@ -609,8 +609,8 @@
     },
     {
       "path": "docs/security/E3_ENVELOPE_V2_KEY_HIERARCHY_DESIGN.md",
-      "sha256": "d2c175130e088c575efc4077006d6f4d213008f2b5417d530bb2d04bda09d32d",
-      "bytes": 101026
+      "sha256": "afa3240c2bf370755f9bc0ea1ff8bf495179d4b1885800d65f495a47820bb4ea",
+      "bytes": 101444
     },
     {
       "path": "docs/security/E3_M2B1_CARV_OPERATIONS.md",
@@ -619,8 +619,8 @@
     },
     {
       "path": "docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md",
-      "sha256": "77cca5eadaff296ebbec25c50a06947ff4d1c40a13adfea97c22319c345da4d2",
-      "bytes": 248463
+      "sha256": "000695f54dfba09260b1fec01f210a43e2babe7a6e0c97b2411df12d29a23e4b",
+      "bytes": 249717
     },
     {
       "path": "docs/security/E3_M2C_IMPLEMENTATION_RECORD.md",
@@ -644,13 +644,18 @@
     },
     {
       "path": "docs/security/E3_M2E_CONTRACT_CLOSURE.md",
-      "sha256": "ce1115509f9fc7c3dea498f68e7c1c76586c2ef3b7d1d56d063831152f1c1486",
-      "bytes": 40123
+      "sha256": "b77443d5cb02983669447791fd3d5d9514101088f96269def22717e36620ffc2",
+      "bytes": 41444
+    },
+    {
+      "path": "docs/security/E3_M2F_CONTRACT_CLOSURE.md",
+      "sha256": "3cd2e738b6efbda09da85bfeb49710596022b023d6ecf925433d5e7b751ac49e",
+      "bytes": 45184
     },
     {
       "path": "docs/security/E3_M2_AUTHORITY_DATABASE_CONTRACT.md",
-      "sha256": "8ff9db0c5ccc156136fb92736309462001ffa1110fd08cbd649cbb5a0618f28b",
-      "bytes": 90833
+      "sha256": "2296365ffdb902f656d510005c847d8fd3ec00b2aa56c56fe05f93568b61f786",
+      "bytes": 93750
     },
     {
       "path": "docs/security/E4_CONTROLLED_KEY_ACTIVATION.md",
