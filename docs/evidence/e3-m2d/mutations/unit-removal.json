@@ -1,0 +1,502 @@
+{
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeV2Rules.cs": "b8c2212bb1aa45af327845b285cc1b1082a570e980aa06742bfb427c67f64056",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeRules.cs": "c05d460ca389d3a8c3220562033acd9a1588521cda15add2e0d10b0ad9c1e9b7",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs": "1aa338340927bdfd5c3882811cab47172c0a21969b54cda010685242569b9394",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/ContentAcceptanceRules.cs": "8b650827b0f48607141bf242b21955cb9455e9ec927108186e26461a6a21be17",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/ContentAcceptancePolicy.cs": "9cda0a804cea7b1f08b5e3cf8b32766ef5297a0529e88cea37fbe43ba8ddec9e",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceWriteFence.cs": "6ec996f2e48ba2940a4a112081646d6d31c3ee5126b37623ec679659644ac107",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceFloor2Sql.cs": "93f8d505445c8b73242964a3b085810266387bb538f4f5000af9cad3b4351815",
+    "src/authority/AuthorizationAuthority.Api/Composition/ContentAcceptanceFloorCommand.cs": "11754d0b78e4ab79407d0b9de90ad2985e10532260a4027587c30036b2bb30eb"
+  },
+  "results": [
+    {
+      "id": "MD-01",
+      "mutation": "dispatch removed: v2 rows judged by the v1 rules again",
+      "mode": "unit",
+      "failed": 40,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAShareEdit",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"a new item in a fresh batch\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"a new item joining the current batch\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"a new item taking the document's id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"ciphertext changed under the carried id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"document re-sealed under a fresh id\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"fresh data-key id for an existing v2 item\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"nonce changed under the carried id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCannotBeCreatedWithASchemaTwoEnvelopeRow(kind: \"document\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCannotBeCreatedWithASchemaTwoEnvelopeRow(kind: \"field\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditCarryingTheV2RowsPassesPrepareAndIsNotCommitted",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditorCannotIntroduceASchemaTwoEnvelopeRow(envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV1ItemCannotBecomeAV2RowOrStartAV2Batch",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV1RowCannotReuseAWrappedKeyOfTheCurrentV2Batch",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV2ItemCannotBeDowngradedToAV1EnvelopeByAShareEditor",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV2ItemCannotBeDowngradedToAV1EnvelopeByTheOwner(kind: \"document\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV2ItemCannotBeDowngradedToAV1EnvelopeByTheOwner(kind: \"field\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnInconsistentV2BatchIsRefusedAtPrepareBeforeTheAcceptanceDecision",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCannotIntroduceASchemaTwoEnvelopeRow(kind: \"document\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCannotIntroduceASchemaTwoEnvelopeRow(kind: \"field\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCarryingATwoItemV2BatchAndAV2DocumentPassesPrepareAndIsNotCommitted",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AtCommitATiedSchemaTwoRowIsStillRefused(kind: \"document\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AtCommitATiedSchemaTwoRowIsStillRefused(kind: \"field\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AtCommitTheV2RulesAreReappliedToTheStagedBytesBeforeTheNotEnabledRefusal",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.SchemaTwoWithEnvelopeTwoPassesTheTieAndIsNotEnabled(kind: \"document\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.SchemaTwoWithEnvelopeTwoPassesTheTieAndIsNotEnabled(kind: \"field\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"a field and a document under one id\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"a v2 document wrapped key equal to a v1 document w\"\ufffd\ufffd\ufffd, reason: \"ENVELOPE_WRAPPED_KEY_REUSED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"a v2 wrapped key equal to a v1 wrapped key\", reason: \"ENVELOPE_WRAPPED_KEY_REUSED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"different commitment\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"different reference\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"different wrap code\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"different wrapped key under one id\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"one wrapped key under two ids\", reason: \"ENVELOPE_WRAPPED_KEY_REUSED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"repeated item\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"repeated nonce\", reason: \"ENVELOPE_NONCE_REUSED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"two documents under one id\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.TheV1RulesStillJudgeV1RowsWhenV2RowsArePresent",
+        "AuthorizationAuthority.Tests.ProtectionReconciliationTests.AProtectionMigrationWriteCannotIntroduceASchemaTwoEnvelopeRow(envelopeVersion: 2)",
+        "EnterpriseForms.ArchitectureTests.EnvelopeV2RuleBoundaryTests.TheCandidateV2RulesAreReachedOnlyThroughTheDispatchingV1EntryPoint"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-02",
+      "mutation": "the v2 candidate rules are no longer reached from the dispatching entry point",
+      "mode": "unit",
+      "failed": 14,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnInconsistentV2BatchIsRefusedAtPrepareBeforeTheAcceptanceDecision",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AtCommitTheV2RulesAreReappliedToTheStagedBytesBeforeTheNotEnabledRefusal",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"a field and a document under one id\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"a v2 document wrapped key equal to a v1 document w\"\ufffd\ufffd\ufffd, reason: \"ENVELOPE_WRAPPED_KEY_REUSED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"a v2 wrapped key equal to a v1 wrapped key\", reason: \"ENVELOPE_WRAPPED_KEY_REUSED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"different commitment\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"different reference\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"different wrap code\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"different wrapped key under one id\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"one wrapped key under two ids\", reason: \"ENVELOPE_WRAPPED_KEY_REUSED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"repeated item\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"repeated nonce\", reason: \"ENVELOPE_NONCE_REUSED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"two documents under one id\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "EnterpriseForms.ArchitectureTests.EnvelopeV2RuleBoundaryTests.TheCandidateV2RulesAreReachedOnlyThroughTheDispatchingV1EntryPoint"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-03",
+      "mutation": "new-v2 refusal removed (a new v2 row reaches signing)",
+      "mode": "unit",
+      "failed": 17,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAShareEdit",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"a new item in a fresh batch\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"document re-sealed under a fresh id\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"fresh data-key id for an existing v2 item\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCannotBeCreatedWithASchemaTwoEnvelopeRow(kind: \"document\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCannotBeCreatedWithASchemaTwoEnvelopeRow(kind: \"field\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditorCannotIntroduceASchemaTwoEnvelopeRow(envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV1ItemCannotBecomeAV2RowOrStartAV2Batch",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCannotIntroduceASchemaTwoEnvelopeRow(kind: \"document\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCannotIntroduceASchemaTwoEnvelopeRow(kind: \"field\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.SchemaTwoWithEnvelopeTwoPassesTheTieAndIsNotEnabled(kind: \"document\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.SchemaTwoWithEnvelopeTwoPassesTheTieAndIsNotEnabled(kind: \"field\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.PerItemTransitionsFollowTheM2dRules(transition: \"a carry from an older revision\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.PerItemTransitionsFollowTheM2dRules(transition: \"none -> v2 (creation)\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.PerItemTransitionsFollowTheM2dRules(transition: \"v1 -> v2\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.PerItemTransitionsFollowTheM2dRules(transition: \"v2 -> v2 re-sealed under a fresh id\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ProtectionReconciliationTests.AProtectionMigrationWriteCannotIntroduceASchemaTwoEnvelopeRow(envelopeVersion: 2)"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-04",
+      "mutation": "downgrade guard removed",
+      "mode": "unit",
+      "failed": 5,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV2ItemCannotBeDowngradedToAV1EnvelopeByAShareEditor",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV2ItemCannotBeDowngradedToAV1EnvelopeByTheOwner(kind: \"document\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV2ItemCannotBeDowngradedToAV1EnvelopeByTheOwner(kind: \"field\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.PerItemTransitionsFollowTheM2dRules(transition: \"v2 -> v1 document\", reason: \"ENVELOPE_DOWNGRADE\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.PerItemTransitionsFollowTheM2dRules(transition: \"v2 -> v1 field\", reason: \"ENVELOPE_DOWNGRADE\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-05",
+      "mutation": "DK-3 removed",
+      "mode": "unit",
+      "failed": 7,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"a new item joining the current batch\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"a new item taking the document's id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"ciphertext changed under the carried id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"nonce changed under the carried id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.PerItemTransitionsFollowTheM2dRules(transition: \"a new item joining a carried batch\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.PerItemTransitionsFollowTheM2dRules(transition: \"v2 -> v2 content changed under the same id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.PerItemTransitionsFollowTheM2dRules(transition: \"v2 -> v2 identity changed under the same id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-06",
+      "mutation": "the Prepare call of the Prepare-only v2 rules removed",
+      "mode": "unit",
+      "failed": 22,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAShareEdit",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"a new item in a fresh batch\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"a new item joining the current batch\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"a new item taking the document's id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"ciphertext changed under the carried id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"document re-sealed under a fresh id\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"fresh data-key id for an existing v2 item\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"nonce changed under the carried id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCannotBeCreatedWithASchemaTwoEnvelopeRow(kind: \"document\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCannotBeCreatedWithASchemaTwoEnvelopeRow(kind: \"field\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditorCannotIntroduceASchemaTwoEnvelopeRow(envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV1ItemCannotBecomeAV2RowOrStartAV2Batch",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV1RowCannotReuseAWrappedKeyOfTheCurrentV2Batch",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV2ItemCannotBeDowngradedToAV1EnvelopeByAShareEditor",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV2ItemCannotBeDowngradedToAV1EnvelopeByTheOwner(kind: \"document\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV2ItemCannotBeDowngradedToAV1EnvelopeByTheOwner(kind: \"field\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCannotIntroduceASchemaTwoEnvelopeRow(kind: \"document\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCannotIntroduceASchemaTwoEnvelopeRow(kind: \"field\", envelopeVersion: 2)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.SchemaTwoWithEnvelopeTwoPassesTheTieAndIsNotEnabled(kind: \"document\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.SchemaTwoWithEnvelopeTwoPassesTheTieAndIsNotEnabled(kind: \"field\")",
+        "AuthorizationAuthority.Tests.ProtectionReconciliationTests.AProtectionMigrationWriteCannotIntroduceASchemaTwoEnvelopeRow(envelopeVersion: 2)",
+        "EnterpriseForms.ArchitectureTests.EnvelopeV2RuleBoundaryTests.ThePrepareOnlyV2RulesRunOnceInPrepareAfterTheSnapshotProofAndBeforeSigning"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-07",
+      "mutation": "the Commit refusal of v2 rows removed",
+      "mode": "unit",
+      "failed": 4,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditCarryingTheV2RowsPassesPrepareAndIsNotCommitted",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCarryingATwoItemV2BatchAndAV2DocumentPassesPrepareAndIsNotCommitted",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AtCommitATiedSchemaTwoRowIsStillRefused(kind: \"document\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AtCommitATiedSchemaTwoRowIsStillRefused(kind: \"field\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-08",
+      "mutation": "the Commit refusal weakened (never refuses)",
+      "mode": "unit",
+      "failed": 5,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditCarryingTheV2RowsPassesPrepareAndIsNotCommitted",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCarryingATwoItemV2BatchAndAV2DocumentPassesPrepareAndIsNotCommitted",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AtCommitATiedSchemaTwoRowIsStillRefused(kind: \"document\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AtCommitATiedSchemaTwoRowIsStillRefused(kind: \"field\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.CommitRefusesEveryV2RowAndNothingElse"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-09",
+      "mutation": "batch consistency weakened (commitment not compared)",
+      "mode": "unit",
+      "failed": 3,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnInconsistentV2BatchIsRefusedAtPrepareBeforeTheAcceptanceDecision",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"different commitment\", reason: \"ENVELOPE_BATCH_INCONSISTENT\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.TheCensusJudgesV1RowsAsBeforeAndV2RowsByTheV2Rules"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-10",
+      "mutation": "v1/v2 wrapped-key separation removed (within a candidate)",
+      "mode": "unit",
+      "failed": 2,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"a v2 document wrapped key equal to a v1 document w\"\ufffd\ufffd\ufffd, reason: \"ENVELOPE_WRAPPED_KEY_REUSED\")",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.AnInconsistentBatchOrACrossVersionWrappedKeyIsRefused(variant: \"a v2 wrapped key equal to a v1 wrapped key\", reason: \"ENVELOPE_WRAPPED_KEY_REUSED\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-11",
+      "mutation": "v1 rows may reuse a current v2 wrapped key",
+      "mode": "unit",
+      "failed": 2,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV1RowCannotReuseAWrappedKeyOfTheCurrentV2Batch",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.PerItemTransitionsFollowTheM2dRules(transition: \"v1 reusing a current v2 wrapped key\", reason: \"ENVELOPE_WRAPPED_KEY_REUSED\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-12",
+      "mutation": "the codec-derived field bound removed",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.EveryMalformedV2FieldColumnIsRefusedWithItsReason(variant: \"ciphertext 12,001 bytes\", reason: \"ENVELOPE_CIPHERTEXT_LENGTH\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-13",
+      "mutation": "the document size formula removed",
+      "mode": "unit",
+      "failed": 8,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.MalformedV2DocumentColumnsAreRefused",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.TheDocumentCiphertextSizeFormulaMatchesTheE3M1Vectors(plaintext: 0, ciphertext: 20)",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.TheDocumentCiphertextSizeFormulaMatchesTheE3M1Vectors(plaintext: 1, ciphertext: 21)",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.TheDocumentCiphertextSizeFormulaMatchesTheE3M1Vectors(plaintext: 1048576, ciphertext: 1048596)",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.TheDocumentCiphertextSizeFormulaMatchesTheE3M1Vectors(plaintext: 1048577, ciphertext: 1048617)",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.TheDocumentCiphertextSizeFormulaMatchesTheE3M1Vectors(plaintext: 1048581, ciphertext: 1048621)",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.TheDocumentCiphertextSizeFormulaMatchesTheE3M1Vectors(plaintext: 2097152, ciphertext: 2097192)",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.TheDocumentCiphertextSizeFormulaMatchesTheE3M1Vectors(plaintext: 37, ciphertext: 57)"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-14",
+      "mutation": "the v1 cross-revision rule indexes v2 rows again (F-14 regression)",
+      "mode": "unit",
+      "failed": 14,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAShareEdit",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"a new item in a fresh batch\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"a new item joining the current batch\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"a new item taking the document's id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"ciphertext changed under the carried id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"document re-sealed under a fresh id\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"fresh data-key id for an existing v2 item\", reason: \"ENVELOPE_VERSION_NOT_ENABLED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ANewV2RowIsRefusedBeforeSigningOnAnOwnerEdit(variant: \"nonce changed under the carried id\", reason: \"DATA_KEY_IDENTIFIER_REUSED\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditCarryingTheV2RowsPassesPrepareAndIsNotCommitted",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV2ItemCannotBeDowngradedToAV1EnvelopeByAShareEditor",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV2ItemCannotBeDowngradedToAV1EnvelopeByTheOwner(kind: \"document\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AV2ItemCannotBeDowngradedToAV1EnvelopeByTheOwner(kind: \"field\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCarryingATwoItemV2BatchAndAV2DocumentPassesPrepareAndIsNotCommitted",
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.TheV1AgainstCurrentRuleIgnoresV2RowsAndKeepsItsV1Behaviour"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-15",
+      "mutation": "census: v2 rows judged by the v1 census rule",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.EnvelopeV2RulesTests.TheCensusJudgesV1RowsAsBeforeAndV2RowsByTheV2Rules"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-16",
+      "mutation": "CARV reverted to version 1",
+      "mode": "unit",
+      "failed": 32,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.Floor2IsAcceptedByTheCommandAndFailsClosedWhenTheDatabaseIsUnreachable",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.ReadinessReportsARecordedHigherFloorWhoseConstraintIsMissing",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.ReleaseBRequiresARecognizedFloorUpToThisBuild(floor: \"02\", valid: True, described: \"phase=ReleaseB requiredFloor=2\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.ReleaseBRequiresARecognizedFloorUpToThisBuild(floor: \"2\", valid: True, described: \"phase=ReleaseB requiredFloor=2\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheRecognizedFloorsAreOneAndTwoAndMatchTheFloorMigrations",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 1 put back after floor 2 was recorded, floor\"\ufffd\ufffd\ufffd, required: 2, expected: \"FloorLowered\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 1, floor 2 required\", required: 2, expected: \"FloorLowered\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 2 covering Prepared only\", required: 1, expected: \"FloorDefinitionMismatch\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 2 dropped, nothing put back\", required: 2, expected: \"FloorRecordedButMissing\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 2 present, floor 1 history row missing\", required: 1, expected: \"FloorNotRecorded\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 2 present, its history row missing\", required: 1, expected: \"FloorNotRecorded\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 2 replaced by the floor-1 text\", required: 1, expected: \"FloorDefinitionMismatch\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 2 validated\", required: 2, expected: null)",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 2 without the IS NOT NULL term\", required: 1, expected: \"FloorDefinitionMismatch\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 2, floor 1 required (a minimum)\", required: 1, expected: null)",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 2, floor 2 required\", required: 2, expected: null)",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floors 1 and 2 both present\", required: 1, expected: \"FloorDefinitionMismatch\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.AMissingOrLoweredFloorIsNotReady(scenario: \"release A: no floor, none required\", ready: True, detail: \"content acceptance rules v2 (floor none)\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.AMissingOrLoweredFloorIsNotReady(scenario: \"release B: floor installed and recorded, required\", ready: True, detail: \"content acceptance rules v2 (floor 1)\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.AMissingOrLoweredFloorIsNotReady(scenario: \"required floor above this build\", ready: False, detail: \"ContentAcceptanceRuleRequiredFloorAboveBuild(requi\"\ufffd\ufffd\ufffd)",
+        "AuthorizationAuthority.Tests.ContentAcceptancePolicyTests.ReleaseBReadinessRequiresTheFloorAndTheWriteFence",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.ARunningInstanceBecomesNotReadyWhenANewerFloorAppearsOrTheFenceCannotBeRead",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.StoreConnectionsCarryTheBuildRuleVersion(configured: \"Host=db;Database=authority;Username=authority_runt\"\ufffd\ufffd\ufffd, applicationName: \"authority carv-v2\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.StoreConnectionsCarryTheBuildRuleVersion(configured: \"Host=db;Database=authority;Username=authority_runt\"\ufffd\ufffd\ufffd, applicationName: \"authority-api carv-v2\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.TheGuardIsReadyOnlyForACompleteFenceAtOrBelowThisBuild(scenario: \"complete, no floor\", ready: True, detail: \"content acceptance rules v2 (floor none)\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.TheGuardIsReadyOnlyForACompleteFenceAtOrBelowThisBuild(scenario: \"floor 1 below the build\", ready: True, detail: \"content acceptance rules v2 (floor 1)\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.TheGuardIsReadyOnlyForACompleteFenceAtOrBelowThisBuild(scenario: \"floor above the build\", ready: False, detail: \"ContentAcceptanceRuleFloorAboveBuild(floor=3, buil\"\ufffd\ufffd\ufffd)",
+        "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.TheGuardIsReadyOnlyForACompleteFenceAtOrBelowThisBuild(scenario: \"floor equal to the build\", ready: True, detail: \"content acceptance rules v2 (floor 2)\")",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.PrepareStampsTheBuildRuleVersionAndCommitStampsItWithTheCommittedTransition",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.SchemaTwoIsRegisteredForBothEnvelopeKindsWithPinnedShapesAndTheV1AllowListIsUnchanged"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-17",
+      "mutation": "CARV Commit rule accepts any stamped version (no exact equality with the build)",
+      "mode": "unit",
+      "failed": 4,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitOfAnOperationPreparedUnderOtherRulesIsAbortedBeforeAnyVerificationAndNothingIsAccepted(prepareVersion: 1)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitOfAnOperationPreparedUnderOtherRulesIsAbortedBeforeAnyVerificationAndNothingIsAccepted(prepareVersion: 3)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.APrepareReplayOfAnOutdatedPreparedOperationIsRefusedAndWritesNothing(storedVersion: 1)",
+        "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.APrepareReplayOfAnOutdatedPreparedOperationIsRefusedAndWritesNothing(storedVersion: 3)"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-18",
+      "mutation": "fence minimum semantics removed (a lower installed floor accepted)",
+      "mode": "unit",
+      "failed": 2,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 1 put back after floor 2 was recorded, floor\"\ufffd\ufffd\ufffd, required: 2, expected: \"FloorLowered\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 1, floor 2 required\", required: 2, expected: \"FloorLowered\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-19",
+      "mutation": "fence: a recorded higher floor no longer required to be installed (lowering accepted)",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 1 put back after floor 2 was recorded, floor\"\ufffd\ufffd\ufffd, required: 1, expected: \"FloorRecordedButMissing\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-20",
+      "mutation": "fence: the installed floor's exact definition no longer compared",
+      "mode": "unit",
+      "failed": 5,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 2 covering Prepared only\", required: 1, expected: \"FloorDefinitionMismatch\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 2 replaced by the floor-1 text\", required: 1, expected: \"FloorDefinitionMismatch\")",
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floor 2 without the IS NOT NULL term\", required: 1, expected: \"FloorDefinitionMismatch\")",
+        "AuthorizationAuthority.Tests.ContentAcceptancePolicyTests.TheWriteFenceAcceptsOnlyTheExactlyInstalledFloorAndFence(scenario: \"floor replaced by a Prepared-only floor\", expected: \"FloorDefinitionMismatch\")",
+        "AuthorizationAuthority.Tests.ContentAcceptancePolicyTests.TheWriteFenceAcceptsOnlyTheExactlyInstalledFloorAndFence(scenario: \"floor replaced without the IS NOT NULL term\", expected: \"FloorDefinitionMismatch\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-21",
+      "mutation": "fence: more than one floor constraint accepted",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheWriteFenceEnforcesTheRequiredFloorAsAMinimumOverExactlyRecognizedDefinitions(scenario: \"floors 1 and 2 both present\", required: 1, expected: \"FloorDefinitionMismatch\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-22",
+      "mutation": "policy accepts an unrecognized floor above the build",
+      "mode": "unit",
+      "failed": 2,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.ReleaseBRequiresARecognizedFloorUpToThisBuild(floor: \"3\", valid: False, described: \"phase=Unresolved failure=RequiredFloorUnsupported\")",
+        "AuthorizationAuthority.Tests.ContentAcceptancePolicyTests.AnInvalidConfigurationIsNeverReleaseAAndGuardsEveryContentWrite(phase: \"ReleaseB\", floor: \"3\", reason: \"RequiredFloorUnsupported\")"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-23",
+      "mutation": "command migrates every pending floor (no explicit target)",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "EnterpriseForms.ArchitectureTests.EnvelopeV2RuleBoundaryTests.TheFloorCommandMigratesTheFloorContextToExactlyOneRequestedFloor"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-24",
+      "mutation": "floor-2 SQL: an older-marker session no longer blocks the raise",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheFloor2SqlLocksChecksPreconditionsAddsFloor2ThenDropsFloor1"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-25",
+      "mutation": "floor-2 SQL: floor 1 not dropped by the raise",
+      "mode": "unit",
+      "failed": 1,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContentAcceptanceFloor2Tests.TheFloor2SqlLocksChecksPreconditionsAddsFloor2ThenDropsFloor1"
+      ],
+      "timed_out": false,
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-26",
+      "mutation": "command: applying a lower floor after a higher one no longer refused",
+      "mode": "unit",
+      "failed": 0,
+      "failed_tests": [],
+      "timed_out": false,
+      "detected": false,
+      "restored": true
+    },
+    {
+      "id": "MD-27",
+      "mutation": "command: skipping floor 1 no longer refused",
+      "mode": "unit",
+      "failed": 0,
+      "failed_tests": [],
+      "timed_out": false,
+      "detected": false,
+      "restored": true
+    }
+  ]
+}

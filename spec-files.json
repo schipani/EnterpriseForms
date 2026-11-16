@@ -614,23 +614,28 @@
     },
     {
       "path": "docs/security/E3_M2B1_CARV_OPERATIONS.md",
-      "sha256": "8422f5139bc734ff60760e6c1c26e6e6e4ee6eed1aad57cb5282c40344b6a3ff",
-      "bytes": 21586
+      "sha256": "74c1b8d652a9d6dc7b0afefad964bd8df038ff3409538644efd0d873bc40baa7",
+      "bytes": 24766
     },
     {
       "path": "docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md",
-      "sha256": "0b0dcd2c9fca755ecd3c259d2c4df4e18cd51804a9060ff2f616a11d6f37561b",
-      "bytes": 224335
+      "sha256": "73d9684e9c658ac64286bd9882fa3286bebbae33701382be6df36d1972a45835",
+      "bytes": 226568
     },
     {
       "path": "docs/security/E3_M2C_IMPLEMENTATION_RECORD.md",
-      "sha256": "767eb32f327da74f428d83cd8cc8acc03680d63e6b34ebba8f719b56a7531444",
-      "bytes": 43742
+      "sha256": "3b92d83833fcedd4871fab9091e6dee8ff7228a4e93727ec84359d3b019e54b9",
+      "bytes": 44313
+    },
+    {
+      "path": "docs/security/E3_M2D_IMPLEMENTATION_RECORD.md",
+      "sha256": "760b29e0a281abaacf6a1cca5501699081b383c964d2e68ef0132bd69f5269eb",
+      "bytes": 45353
     },
     {
       "path": "docs/security/E3_M2_AUTHORITY_DATABASE_CONTRACT.md",
-      "sha256": "dc029d23ac153b59be08e74d3ae685fc7d313dc30522c59dfb14f3f004a3fcbf",
-      "bytes": 85922
+      "sha256": "567b3187587f122e3b5a7d56b2f357635b60bd21a9905af658866a7115f19dc8",
+      "bytes": 86298
     },
     {
       "path": "docs/security/E4_CONTROLLED_KEY_ACTIVATION.md",
@@ -913,6 +918,11 @@
       "bytes": 3806
     },
     {
+      "path": "scripts/dev/e3-m2d-carv2-pg-gate.ps1",
+      "sha256": "c4508af5b54b2c6c009fa6af2c2e4f45fb8afc6f8285f6b1fd96d3af9099e4be",
+      "bytes": 8492
+    },
+    {
       "path": "scripts/dev/e5-vault-hmac-integration.ps1",
       "sha256": "bca0403deea56f23f22a2b449c00916357a66eb22c7615978e9744bcd0586762",
       "bytes": 6703
@@ -1104,8 +1114,8 @@
     },
     {
       "path": "trust_authority/DISASTER_RECOVERY_OPERATOR_RUNBOOK.md",
-      "sha256": "339210a4ea726d711cc80b41a66bca1fdde7974d6aa13702e9a3d67fdffa4989",
-      "bytes": 7368
+      "sha256": "70456602c6132b638009d41f44b0fb1323f98e4a5ca4794b2ddb9038e0171678",
+      "bytes": 7475
     },
     {
       "path": "trust_authority/DISASTER_RECOVERY_TEST_PLAN.md",
@@ -1224,8 +1234,8 @@
     },
     {
       "path": "trust_authority/trust-authority.openapi.yaml",
-      "sha256": "f8f9e39388577dac7126cdf583a601aba1427bef01e7e95198336efde5a89fd6",
-      "bytes": 20946
+      "sha256": "e0445453cd67eb4eb701144ed2402af68ca95e451947c46307d1ea39f7da0363",
+      "bytes": 21959
     }
   ]
 }

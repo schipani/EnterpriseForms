@@ -158,6 +158,11 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         // share editor, protection migration; creation has an empty current revision). Commit binds the same head by its
         // revision compare-and-set, so a candidate checked against an older head can never be accepted on a newer one.
         EnvelopeRules.EnforceAgainstCurrent(parsed.Select(p => (p.ItemId, p.Document)), current.Select(c => (c.ItemId, c.Document)));
+
+        // E3-M2d (CARV 2; Prepare-only, needs the verified current revision): every v2 row is Carried (a byte-identical schema-2 row
+        // of the current accepted head) or New; DK-3; every New v2 row is refused (no v2 acceptance in E3-M2d); no v2 item may be
+        // downgraded to a v1 envelope; no v1 row may reuse a current v2 wrapped key. Before classification, authorization or signing.
+        EnvelopeV2Rules.EnforceAgainstCurrent(parsed.Select(p => (p.ItemId, p.Document)).ToList(), current.Select(c => (c.ItemId, c.Document)).ToList());
         await ContentItemIdentityRules.EnforceAtPrepareAsync(scope, state.OrganizationId, request.FormRecordId,
             current.Select(i => (i.Kind, i.ItemId, i.Document)).ToList(), parsed.Select(p => (p.Kind, p.ItemId, p.Document)).ToList(), cancellationToken).ConfigureAwait(false);
         Dictionary<string, string> mutations;
@@ -447,6 +452,16 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             operation.OperationQuarantineReasonCode = "ENVELOPE_INVALID_AT_COMMIT";
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             throw;
+        }
+
+        // E3-M2d (dark): no v2 row is committed by this build, carried or new. Commit cannot re-derive the Prepare-only carried/new
+        // decision (it holds only digests of the current revision), so it refuses every v2 row; the v2 rules above ran first.
+        if (EnvelopeV2Rules.CommitViolation(stagedDocuments.Select(d => d.Item3)) is { } v2Violation)
+        {
+            operation.OperationStateName = ContentOperationStates.Aborted;
+            operation.OperationQuarantineReasonCode = EnvelopeV2Rules.NotEnabledAtCommitReason;
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            throw EnvelopeRules.Refused(v2Violation);
         }
 
         var newIdentities = await ContentItemIdentityRules.BindAtCommitAsync(scope, state.OrganizationId, request.FormRecordId, operationId, stagedDocuments, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false);
@@ -848,7 +863,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         // The bytes are now exactly the accepted, signed rows of this revision: count from them alone.
         int occurrences = 0, oldForm = 0, envelopeIssues = 0;
         string? status = null;
-        var nonces = new HashSet<string>(StringComparer.Ordinal);
+        var nonces = new EnvelopeV2Rules.CensusState(); // E3-M2d: v1 rows exactly as before; v2 rows by the v2 rules (per revision)
         foreach (var item in observedItems)
         {
             var document = RowCanonicalDecoder.Decode(Convert.FromBase64String(item.CanonicalBytesBase64));
@@ -975,9 +990,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     /// (<see cref="EnvelopeRules"/>, E3-M2a), and no wrapped data key seen before in this revision. Rows accepted before
     /// E3-M2a may still fail them, which is what the census reports. The tag itself can only be checked by the key holder.
     /// </summary>
-    private static bool EnvelopeLooksApproved(RowCanonicalDocument document, HashSet<string> nonces) =>
+    private static bool EnvelopeLooksApproved(RowCanonicalDocument document, EnvelopeV2Rules.CensusState census) =>
         EnvelopeSchemaTie.Violation(document) is null // E3-M2b-2 S-4: the schema/envelope tie, as on every write
-        && EnvelopeRules.Validate(document) is null && nonces.Add(EnvelopeRules.WrappedKeyOf(document)); // E3-M2a: the same rules as every write (one value per v1 data key)
+        && census.Accepts(document); // E3-M2a rules for v1 rows (one value per v1 data key); E3-M2d v2 rules for v2 rows
 
     /// <summary>
     /// One record's verification (shared by the single and the batch operation). Throws the single operation's typed

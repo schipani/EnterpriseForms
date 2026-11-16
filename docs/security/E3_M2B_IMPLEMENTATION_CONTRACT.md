@@ -11,7 +11,7 @@
 | E3-M2b-1F (floor) | **Implemented and owner-accepted for Development/Testing (2026-11-15), signed local commit; Release B not activated; mandatory gate RB-CARV-1 open: §21** |
 | RB-CARV-1 (Release B write fence) | **Implemented and conditionally owner-accepted for Development/Testing (2026-11-15), signed local commit; not production-closed: deployment protection, Azure compatibility, privileged schema mutation and performance remain open release gates: §22** |
 | E3-M2b-2 (signed schema 2 groundwork) | **Implemented for Development/Testing (2026-11-15), uncommitted, owner review pending; Envelope v2 not activated, no AuthorityDb change, CARV unchanged: §23** |
-| E3-M2c and later | **Not authorized** |
+| E3-M2c and later | **Not authorized** (status at the time of this contract; E3-M2c: `E3_M2C_IMPLEMENTATION_RECORD.md`; E3-M2d, owner-accepted for Development/Testing (2026-11-15), signed local commit: `E3_M2D_IMPLEMENTATION_RECORD.md`, whose §12 records the owner-approved contract readings OA-M2d-1..8, applied below as dated inline notes; E3-M2e and later not authorized) |
 | Independent cryptographic review (V2-IND-01) | Required before production; not started |
 | Production use of Envelope v2 | Not approved |
 | **E3-M2b-1 CARV final design gate** | **§19** (2026-11-14). The owner conditionally approved the CARV direction. The real-PostgreSQL gate ran against two real pre-CARV Authority binaries (47/47 checks each; evidence in `docs/evidence/e3-m2b1-carv/`). It found and corrected design defects D-1 to D-5. **§19 supersedes §3, §9.1, §9.2, §16 and §17.1.** |
@@ -245,6 +245,8 @@ The reuse rules split as follows (F-14):
 | Against the current revision | `EnforceAgainstCurrent` as accepted | Classify per **item key** (package §4.3): Carried = the same item, current row schema 2, every Identity- and Content-class column byte-identical. Otherwise New, and DK-3 applies (no New id equals a current or carried id). The v1 map is built only from v1 rows. |
 | Census (`EnvelopeLooksApproved`) | Shape + per-revision unique wrapped key | Shape + per-revision batch consistency; no wrapped key shared between v1 and v2, or between two ids |
 
+> **E3-M2d owner-approved readings (2026-11-15; `E3_M2D_IMPLEMENTATION_RECORD.md` §12).** OA-M2d-4: within a candidate, batch consistency is grouped over **every** v2 row, carried rows included (not only New rows), at Prepare and at Commit. OA-M2d-5: against the current revision, DK-3 (`DATA_KEY_IDENTIFIER_REUSED`) is evaluated **before** the E3-M2d blanket refusal of every remaining New v2 row (`ENVELOPE_VERSION_NOT_ENABLED`).
+
 ### 5.2 Where each check runs
 
 | Check | Prepare | Commit | Census |
@@ -301,6 +303,8 @@ These are the package §3.5 rules, restated, with OD-M2-06 analysed:
 | Share edit (`SharedFieldWriteBuilder`) | Copies rows, keeps the schema, re-seals the edited item | Unedited v2 items Carried; an edited v2 item is refused (framing) until M4 |
 | Upload / document commit, lifecycle, protection-migration unchanged rows (`CloneValue` / `CloneAttachment`) | Byte-identical carry | Carried, provided S-3 copies the three columns |
 | Restore (`RecordRestoreHandler`) | Re-seals restored values; carries documents from the current head | Restored values are New (v1 → downgrade rule applies); documents Carried |
+
+> **Correction (2026-11-15, E3-M2d, OA-M2d-3; `E3_M2D_IMPLEMENTATION_RECORD.md` §12).** The share-edit row above says an edited v2 item is refused "(framing)". The actual E3-M2d refusal is decided by the v2 rules at Prepare, before the share classifier: a share edit that introduces a v2 row (a v2 → v2 re-seal, or v1 → v2) is refused `ENVELOPE_VERSION_NOT_ENABLED`; one that replaces a v2 item with a v1 envelope is refused `ENVELOPE_DOWNGRADE`, as applicable. Relaxing `SHARE_ITEM_FRAMING_CHANGED` for v1 → v2 remains E3-M4 work.
 | Record creation | New v1 | n/a (no current revision) |
 | Reprotection Encrypt (B-28) | New v1 encrypted rows | Unchanged until M4/M5 |
 
@@ -330,7 +334,7 @@ As in the package §4.2, with exact constraints in §9.4. Changes: an added UUID
 **Prepare** (`PrepareCoreAsync`; organization lock and head `FOR UPDATE` already held), inserted after `EnforceAgainstCurrent` and the identity rules, before mutation classification and signing:
 
 1. Classify every schema-2 candidate row: Carried or New (package §4.3).
-2. DK-2: batch consistency over New rows (§5.1).
+2. DK-2: batch consistency over New rows (§5.1). (E3-M2d, OA-M2d-4: batch consistency is applied over every v2 row of the candidate, carried rows included, so Commit can re-derive it; see the note in §5.1.)
 3. DK-3: no New id equals any id in the verified current snapshot or among Carried rows.
 4. DK-4: `SELECT 1 FROM content_data_key_bindings WHERE data_key_identifier = ANY(:new_ids)` → any hit is `422 DATA_KEY_IDENTIFIER_REUSED`. Nothing is written or signed.
 5. Sign (existing code).
@@ -711,7 +715,7 @@ These extend the package's M2-ENV, M2-DK, M2-CON, M2-IDM and M2-REP groups:
 | ID | Test |
 |---|---|
 | M2-ENV-15 | A two-item v2 batch is accepted within a candidate, and is not reported by the census (F-14) |
-| M2-ENV-16 | A carried two-item v2 batch is accepted against the current revision |
+| M2-ENV-16 | A carried two-item v2 batch is accepted against the current revision. **E3-M2d reading (OA-M2d-2, 2026-11-15):** met at Prepare level only (the batch passes the against-current Prepare rules); in E3-M2d Commit refuses every v2 row (OA-M2d-1), so the batch cannot complete Commit until a later authorized milestone (E3-M2e), where M2-ENV-16 must be re-run end to end through Commit |
 | M2-ENV-17 | A v2 wrapped key equal to a v1 wrapped key is refused |
 | M2-ENV-18 | A switch turned off between Prepare and Commit refuses at Commit |
 | M2-DK-11 | A reused id is refused at Prepare and **no business staging occurs** (stager stops before staging) |
@@ -1072,7 +1076,7 @@ The owner approved E3-M2b-1 for Development/Testing on the baseline `66f0aa7b257
 - Migration `20261115014221_AuthorityContentAcceptanceRuleVersion` (§20.3).
 - `ContentAcceptanceRuleRefusals` + `AuthorityStore`: every scope write (`FlushAsync` and `CommitAsync`) goes through one `SaveAsync`; a `DbUpdateException` whose `PostgresException` is SQLSTATE 23514 on a fence object becomes `409 OPERATION_RULES_OUTDATED` and raises the operational security alert `CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE` (Critical; organization and operation from the failed entry when available). Any other database error is unchanged.
 - `ContentAcceptanceRuleSchemaReader`: one read-only catalog query with the runtime role (migration history row, both columns, the validated commit CHECK, an enabled state guard, the highest installed floor).
-- `ContentAcceptanceRuleConnection`: the Authority store connection's `application_name` carries `carv-v1` (§19.9 step 3).
+- `ContentAcceptanceRuleConnection`: the Authority store connection's `application_name` carries `carv-v1` (§19.9 step 3). (E3-M2d, OA-M2d-7, 2026-11-15: the marker reports the **current build's** CARV version, `carv-v2` from E3-M2d; a configured stale `carv-vN` token is replaced by it, not kept beside it.)
 
 **Authority — Api:** `ContentAcceptanceRuleGuard` (latest decision; never evaluated, unreadable or older than 90 s ⇒ not ready) and `ContentAcceptanceRuleMonitor` (hosted; skipped during OpenAPI generation). `AuthorityReadiness` consults the guard after the store-reachability check.
 
@@ -1249,7 +1253,7 @@ The Authority's `retryable` flag describes the operation level only; it does not
 |---|---|
 | Floor migration | `20261115032228_AuthorityContentAcceptanceRuleFloor1` in `Persistence/FloorMigrations/`, belonging to the new model-less `ContentAcceptanceFloorContext` (§21.2). Up = `ContentAcceptanceFloorSql.UpSql`; Down always raises `floors are never lowered`. No existing migration was modified. |
 | Floor SQL (`ContentAcceptanceFloorSql`) | One transaction: `SET LOCAL lock_timeout = '5s'`; `LOCK TABLE authority.content_change_operations IN ACCESS EXCLUSIVE MODE`; preconditions under the lock (§21.3); then exactly the §19.5 floor `ck_content_operation_rule_floor_v1 CHECK (operation_state_name NOT IN ('Prepared', 'Committed') OR (prepare_acceptance_rule_version IS NOT NULL AND prepare_acceptance_rule_version >= 1)) NOT VALID`. |
-| Operator command | `AuthorizationAuthority.Api.dll --apply-content-acceptance-floor 1 [--reinstate-recorded-floor]` (`ContentAcceptanceFloorCommand`): migration identity only, the floor number stated explicitly, refused together with `--migrate`. It migrates only the floor context, then verifies that the constraint exists (exit 4 if the history records it but it is missing; §21.6). |
+| Operator command | `AuthorizationAuthority.Api.dll --apply-content-acceptance-floor 1 [--reinstate-recorded-floor]` (`ContentAcceptanceFloorCommand`): migration identity only, the floor number stated explicitly, refused together with `--migrate`. It migrates only the floor context, then verifies that the constraint exists (exit 4 if the history records it but it is missing; §21.6). (E3-M2d, OA-M2d-6, 2026-11-15: the command accepts floor 1 or 2 and applies **only the explicitly requested next floor**, migrating the floor context to exactly that floor's migration; it refuses lowering, skipping and `--migrate`. Floor-1 behaviour is unchanged.) |
 | Detection (readiness, additive to E3-M2b-1) | `SchemaFacts.FloorRecorded` (history row of the floor migration); `ContentAcceptanceRules.Evaluate(..., requiredFloor)`; option `ContentAcceptance:RequiredFloor` (`ContentAcceptanceRuleOptions`; invalid values fail at startup). New not-ready reasons: `ContentAcceptanceRuleFloorMissing`, `ContentAcceptanceRuleFloorBelowRequired`, `ContentAcceptanceRuleRequiredFloorAboveBuild`. Every E3-M2b-1 decision and detail string is unchanged. |
 | Unchanged | The E3-M2b-1 migration, its CHECKs and state guard, the Prepare/Commit rules, the store mapping (floor refusals already map to `409 OPERATION_RULES_OUTDATED`), the business mapping, the ordinary `--migrate`. |
 | Gate | Harness F (`tools/experiments/e3-m2b1-carv-gate/HarnessF`) added to `scripts/dev/e3-m2b1-carv-pg-gate.ps1`; the legacy agent gained an optional clock offset (default 0, so harness B is unaffected); the gate passes `--context AuthorityDbContext` to `dotnet ef` (two contexts now exist in the assembly). |

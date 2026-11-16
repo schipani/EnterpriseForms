@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    E3-M2d CARV 2 real-PostgreSQL gate (version-1 agent: one Prepare or Commit of the version-1 build 8915f77 per process; V1Binaries =
+    that build's Authority Release binaries). Development/Testing only; not part of EnterpriseForms.All.slnx and never built in place:
+    scripts/dev/e3-m2d-carv2-pg-gate.ps1 copies this folder to a temporary work directory (outside the repository, so no repository
+    build settings apply) and builds it there. It references no repository project.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>V1Agent</AssemblyName>
+    <!-- Without a deps file the host loads every assembly in the output folder: the copies of V1Binaries. -->
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS1591;CA2007;CA1303</NoWarn>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="$(V1Binaries)\*.dll" Private="true" />
+  </ItemGroup>
+  <Target Name="RequireV1Binaries" BeforeTargets="ResolveAssemblyReferences" Condition="'$(V1Binaries)' == '' Or !Exists('$(V1Binaries)\AuthorizationAuthority.Api.dll')">
+    <Error Text="Build through scripts/dev/e3-m2d-carv2-pg-gate.ps1 (V1Binaries must name a folder of Authority Release binaries)." />
+  </Target>
+</Project>

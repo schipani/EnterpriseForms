@@ -30,27 +30,35 @@ public sealed partial class ContributorWriteProtocolTests
             new RowSignedColumn("key_wrap_algorithm_code", RowColumnType.Int32, false),
         ]).OrderBy(c => c.ColumnName, StringComparer.Ordinal).ToList());
 
-    /// <summary>A well-formed schema-2 fixture of an envelope row (the only way schema 2 exists before E3-M4 writers).</summary>
-    private static Row AsSchema2(Row row, int envelopeVersion = 2)
+    /// <summary>
+    /// A well-formed schema-2 fixture of an envelope row (the only way schema 2 exists before E3-M4 writers). E3-M2d: well-formed under
+    /// the v2 rules too (canonical v2 key reference of the organization and the row's purpose, wrap code 1, a UUIDv7 data-key id, a
+    /// 32-byte commitment, the v2 document ciphertext size), so a refusal of it is the M2d acceptance decision, not a shape error.
+    /// </summary>
+    private static Row AsSchema2(Row row, Guid org, int envelopeVersion = 2, Guid? dataKeyIdentifier = null, byte commitment = 0xdd)
     {
-        var schema = row.Schema.EntityKind == EncryptedValues.EntityKind ? EncryptedValuesV2 : AttachmentsV2;
-        return (row with { Schema = schema })
+        var field = row.Schema.EntityKind == EncryptedValues.EntityKind;
+        var schema = field ? EncryptedValuesV2 : AttachmentsV2;
+        var v2 = (row with { Schema = schema })
             .With("encryption_envelope_version", RowValue.Int32(envelopeVersion))
-            .With("data_key_commitment_bytes", RowValue.Bytes(Fill(32, 0xdd)))
-            .With("data_key_identifier", RowValue.Uuid(Guid.CreateVersion7()))
+            .With("encryption_key_reference", RowValue.Text($"localdev:{org:D}:{(field ? "field-value" : "document")}:1"))
+            .With("data_key_commitment_bytes", RowValue.Bytes(Fill(32, commitment)))
+            .With("data_key_identifier", RowValue.Uuid(dataKeyIdentifier ?? Guid.CreateVersion7()))
             .With("key_wrap_algorithm_code", RowValue.Int32(1));
+        return field ? v2 : v2.With("ciphertext_size_bytes", RowValue.Int64(1020)); // 1,000 plaintext bytes + one 20-byte segment overhead
     }
 
     private static List<Row> WithSchema2(Harness h, string kind, int envelopeVersion) =>
-        Change(h.Rows(), kind == "field" ? h.SealedItem : h.Document, r => AsSchema2(kind == "field" ? Sealed(h.Org, h.Record, h.SealedField, h.SealedItem, 70) : r, envelopeVersion));
+        Change(h.Rows(), kind == "field" ? h.SealedItem : h.Document, r => AsSchema2(kind == "field" ? Sealed(h.Org, h.Record, h.SealedField, h.SealedItem, 70) : r, h.Org, envelopeVersion));
 
     public static TheoryData<string, int> Schema2Variants => new() { { "field", 2 }, { "field", 1 }, { "document", 2 }, { "document", 1 } };
 
     /// <summary>
-    /// R-M2b2-11: a schema-2 row with envelope 1 is refused by the S-4 tie (before the envelope rules); a tied schema-2 /
-    /// envelope-2 row passes the tie and is refused by the unchanged E3-M2a schema refusal (D-9).
+    /// R-M2b2-11: a schema-2 row with envelope 1 is refused by the S-4 tie (before the envelope rules). E3-M2d: a well-formed tied
+    /// schema-2 / envelope-2 row passes the tie and the v2 shape rules and, being a new v2 row (not a carry of the current head), is
+    /// refused at Prepare before anything is signed (ENVELOPE_VERSION_NOT_ENABLED; before E3-M2d it was ENVELOPE_SCHEMA_UNSUPPORTED, D-9).
     /// </summary>
-    private static string Schema2Reason(int envelopeVersion) => envelopeVersion == 2 ? EnvelopeRules.Reasons.SchemaUnsupported : EnvelopeSchemaTie.MismatchReason;
+    private static string Schema2Reason(int envelopeVersion) => envelopeVersion == 2 ? EnvelopeV2Rules.Reasons.VersionNotEnabled : EnvelopeSchemaTie.MismatchReason;
 
     [Theory]
     [MemberData(nameof(Schema2Variants))]
@@ -112,8 +120,8 @@ public sealed partial class ContributorWriteProtocolTests
             "document scanner name NULL" => document.With("scanner_name", null),
             "field logical type NULL" => field.With("encrypted_logical_type", null),
             "field group as text" => field.With("form_record_group_id", RowValue.Text("not-a-uuid")),
-            "schema 2 wrap code NULL" => AsSchema2(Sealed(h.Org, h.Record, h.SealedField, h.SealedItem, 80)).With("key_wrap_algorithm_code", null),
-            "schema 2 data-key id as text" => AsSchema2(document).With("data_key_identifier", RowValue.Text("0199a2b3-c4d5-7e6f-8123-456789abce0a")),
+            "schema 2 wrap code NULL" => AsSchema2(Sealed(h.Org, h.Record, h.SealedField, h.SealedItem, 80), h.Org).With("key_wrap_algorithm_code", null),
+            "schema 2 data-key id as text" => AsSchema2(document, h.Org).With("data_key_identifier", RowValue.Text("0199a2b3-c4d5-7e6f-8123-456789abce0a")),
             _ => throw new ArgumentOutOfRangeException(nameof(variant)),
         };
     }
@@ -195,7 +203,7 @@ public sealed partial class ContributorWriteProtocolTests
     }
 
     [Fact]
-    public void SchemaTwoIsRegisteredForBothEnvelopeKindsWithPinnedShapesAndTheRuleVersionIsUnchanged()
+    public void SchemaTwoIsRegisteredForBothEnvelopeKindsWithPinnedShapesAndTheV1AllowListIsUnchanged()
     {
         foreach (var (schema1, schema2) in new[] { (EncryptedValues, EncryptedValuesV2), (Attachments, AttachmentsV2) })
         {
@@ -225,8 +233,8 @@ public sealed partial class ContributorWriteProtocolTests
             Assert.Null(ContentDeltaRules.FindRule(schema1.EntityKind, 3));
         }
 
-        // D-2: S-9 is re-derived at Commit, so it is not a Prepare-only rule and does not bump the content acceptance rule version.
-        Assert.Equal(1, ContentAcceptanceRules.CurrentVersion);
+        // D-2 (E3-M2b-2): S-9 is re-derived at Commit and did not bump the rule version; E3-M2d's Prepare-only v2 rules did (its D-2).
+        Assert.Equal(2, ContentAcceptanceRules.CurrentVersion);
         Assert.Equal(new HashSet<int> { 1 }, EnvelopeRules.AllowedEnvelopeVersions);
         Assert.Null(ContentDeltaRules.FindRule("form_records", 2)!.PinnedShapes); // OD-M2-22: only the envelope kinds are pinned
     }

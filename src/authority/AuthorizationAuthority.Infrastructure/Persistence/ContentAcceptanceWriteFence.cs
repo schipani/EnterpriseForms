@@ -18,7 +18,19 @@ public sealed record WriteFenceFacts(
     int RuleCount,
     int StampDefaultCount,
     string? RelationKind,
-    int ChildCount);
+    int ChildCount,
+    int? FloorConstraintCount = null,
+    IReadOnlySet<int>? RecordedFloors = null)
+{
+    /// <summary>
+    /// E3-M2d: how many constraints named <c>ck_content_operation_rule_floor_v*</c> exist. Null (facts built before E3-M2d, tests)
+    /// means "one if <see cref="FloorDefinition"/> is known, otherwise none".
+    /// </summary>
+    public int EffectiveFloorConstraintCount => FloorConstraintCount ?? (FloorDefinition is null ? 0 : 1);
+
+    /// <summary>E3-M2d: the recognized floors whose migration the history records. Null means floor 1 only, per <see cref="FloorRecorded"/>.</summary>
+    public IReadOnlySet<int> EffectiveRecordedFloors => RecordedFloors ?? (FloorRecorded ? new HashSet<int> { ContentAcceptanceRules.MinimumFloor } : new HashSet<int>());
+}
 
 /// <summary>
 /// RB-CARV-1 (contract §22): verifies, inside a content write transaction, that the database really enforces the required CARV
@@ -66,7 +78,8 @@ public static class ContentAcceptanceWriteFence
           EXISTS (SELECT 1 FROM authority.ef_migrations_history h WHERE h."MigrationId" = @fence) AS fence_recorded,
           EXISTS (SELECT 1 FROM authority.ef_migrations_history h WHERE h."MigrationId" = @floor) AS floor_recorded,
           (SELECT pg_catalog.pg_get_constraintdef(c.oid) FROM pg_catalog.pg_constraint c
-            WHERE c.conrelid = t.oid AND c.contype = 'c' AND c.conname = @floor_name) AS floor_definition,
+            WHERE c.conrelid = t.oid AND c.contype = 'c' AND c.conname ~ '^ck_content_operation_rule_floor_v[0-9]+$'
+            ORDER BY substring(c.conname FROM '([0-9]+)$')::integer DESC LIMIT 1) AS floor_definition,
           (SELECT max(substring(c.conname FROM '^ck_content_operation_rule_floor_v([0-9]+)$')::integer) FROM pg_catalog.pg_constraint c
             WHERE c.conrelid = t.oid) AS highest_floor,
           (SELECT pg_catalog.pg_get_constraintdef(c.oid) FROM pg_catalog.pg_constraint c
@@ -90,12 +103,21 @@ public static class ContentAcceptanceWriteFence
               AND a.attname IN ('prepare_acceptance_rule_version', 'commit_acceptance_rule_version')
               AND (a.atthasdef OR a.attgenerated <> '')) AS stamp_default_count,
           t.relkind::text AS relation_kind,
-          (SELECT count(*)::integer FROM pg_catalog.pg_inherits i WHERE i.inhparent = t.oid) AS child_count
+          (SELECT count(*)::integer FROM pg_catalog.pg_inherits i WHERE i.inhparent = t.oid) AS child_count,
+          (SELECT count(*)::integer FROM pg_catalog.pg_constraint c
+            WHERE c.conrelid = t.oid AND c.conname LIKE 'ck\_content\_operation\_rule\_floor\_v%') AS floor_constraint_count,
+          (SELECT coalesce(array_agg(h."MigrationId" ORDER BY h."MigrationId"), ARRAY[]::text[]) FROM authority.ef_migrations_history h
+            WHERE h."MigrationId" = ANY(@floor_migrations)) AS recorded_floor_migrations
         FROM pg_catalog.pg_class t
         WHERE t.oid = 'authority.content_change_operations'::regclass
         """;
 
-    /// <summary>Reads the facts with one statement on <paramref name="connection"/> (in <paramref name="transaction"/> when given).</summary>
+    /// <summary>
+    /// Reads the facts with one statement on <paramref name="connection"/> (in <paramref name="transaction"/> when given). E3-M2d: the
+    /// facts describe the installed floor (the single highest-numbered floor constraint), the number of floor constraints and the
+    /// recorded recognized floor migrations, independently of <paramref name="requiredFloor"/>; <see cref="Evaluate"/> compares
+    /// them with the required minimum.
+    /// </summary>
     public static async Task<WriteFenceFacts> ReadAsync(DbConnection connection, DbTransaction? transaction, int requiredFloor, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -104,7 +126,7 @@ public static class ContentAcceptanceWriteFence
         command.CommandText = FactsSql;
         Add(command, "fence", ContentAcceptanceRuleSql.MigrationId);
         Add(command, "floor", ContentAcceptanceFloorSql.MigrationId);
-        Add(command, "floor_name", ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix + requiredFloor.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Add(command, "floor_migrations", ContentAcceptanceFloors.Recognized.Select(f => f.MigrationId).ToArray());
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -114,7 +136,8 @@ public static class ContentAcceptanceWriteFence
         string? Text(int i) => reader.IsDBNull(i) ? null : reader.GetString(i);
         return new WriteFenceFacts(
             reader.GetBoolean(0), reader.GetBoolean(1), Text(2), reader.IsDBNull(3) ? null : reader.GetInt32(3), Text(4), Text(5), Text(6), Text(7), Text(8),
-            reader.GetInt32(9), reader.GetInt32(10), reader.GetInt32(11), Text(12), reader.GetInt32(13));
+            reader.GetInt32(9), reader.GetInt32(10), reader.GetInt32(11), Text(12), reader.GetInt32(13),
+            reader.GetInt32(14), ContentAcceptanceFloors.RecordedFloors(reader.GetFieldValue<string[]>(15)));
     }
 
     /// <summary>
@@ -123,9 +146,10 @@ public static class ContentAcceptanceWriteFence
     /// </summary>
     public static string? Evaluate(WriteFenceFacts? facts, int requiredFloor, int buildVersion = ContentAcceptanceRules.CurrentVersion)
     {
-        if (facts is null || requiredFloor != ContentAcceptancePolicy.ReleaseBFloor)
+        // E3-M2d (D-4): the required floor is a minimum and must be a floor this build recognizes (and can compare exactly).
+        if (facts is null || ContentAcceptanceFloors.Find(requiredFloor) is null || requiredFloor > buildVersion)
         {
-            return ContentAcceptanceFloorFailures.FloorUnverifiable; // this build defines (and can compare) floor 1 only
+            return ContentAcceptanceFloorFailures.FloorUnverifiable;
         }
 
         if (!facts.FenceRecorded)
@@ -166,24 +190,46 @@ public static class ContentAcceptanceWriteFence
             return ContentAcceptanceFloorFailures.FloorAboveBuild;
         }
 
-        if (facts.FloorDefinition is null)
+        var recorded = facts.EffectiveRecordedFloors;
+        var count = facts.EffectiveFloorConstraintCount;
+        if (count == 0)
         {
             if (facts.HighestFloor is { } lower && lower < requiredFloor)
             {
                 return ContentAcceptanceFloorFailures.FloorLowered;
             }
 
-            return facts.FloorRecorded ? ContentAcceptanceFloorFailures.FloorRecordedButMissing : ContentAcceptanceFloorFailures.FloorNotInstalled;
+            return recorded.Count > 0 ? ContentAcceptanceFloorFailures.FloorRecordedButMissing : ContentAcceptanceFloorFailures.FloorNotInstalled;
+        }
+
+        // E3-M2d: exactly one floor constraint, a recognized floor, at least the required minimum, with exactly its definition.
+        if (count != 1 || facts.FloorDefinition is null || facts.HighestFloor is not { } installed || ContentAcceptanceFloors.Find(installed) is not { } floor)
+        {
+            return facts.HighestFloor is { } lowerFloor && lowerFloor < requiredFloor && count == 1
+                ? ContentAcceptanceFloorFailures.FloorLowered
+                : ContentAcceptanceFloorFailures.FloorDefinitionMismatch;
+        }
+
+        if (installed < requiredFloor)
+        {
+            return ContentAcceptanceFloorFailures.FloorLowered;
         }
 
         // The floor is permanently NOT VALID (D-4); a validated floor (impossible while unstamped historical rows exist) is not weaker.
-        if (!string.Equals(facts.FloorDefinition, ExpectedFloorDefinition, StringComparison.Ordinal)
-            && !string.Equals(facts.FloorDefinition + " NOT VALID", ExpectedFloorDefinition, StringComparison.Ordinal))
+        if (!string.Equals(facts.FloorDefinition, floor.ExpectedDefinition, StringComparison.Ordinal)
+            && !string.Equals(facts.FloorDefinition + " NOT VALID", floor.ExpectedDefinition, StringComparison.Ordinal))
         {
             return ContentAcceptanceFloorFailures.FloorDefinitionMismatch;
         }
 
-        return facts.FloorRecorded ? null : ContentAcceptanceFloorFailures.FloorNotRecorded;
+        // A recorded floor above the installed one means a higher floor's constraint is missing: a lowering (monotonic progression).
+        if (recorded.Count > 0 && recorded.Max() > installed)
+        {
+            return ContentAcceptanceFloorFailures.FloorRecordedButMissing;
+        }
+
+        // Every floor up to the installed one must be recorded (floors are applied one step at a time by the floor command).
+        return ContentAcceptanceFloors.Recognized.Where(f => f.Version <= installed).All(f => recorded.Contains(f.Version)) ? null : ContentAcceptanceFloorFailures.FloorNotRecorded;
     }
 
     private static void Add(DbCommand command, string name, object value)

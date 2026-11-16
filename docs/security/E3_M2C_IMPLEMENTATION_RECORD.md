@@ -277,7 +277,9 @@ Confirmed unchanged: no Authority file, no database migration, CARV `CurrentVers
 | R-M2c-11 | New creation-retry item-id defect: **tracked separately; no correction within E3-M2c** (§12.2) |
 | `DecryptVerifiedAsync` | **Name kept**, with the documentation that it validates the envelope and the S-8 format, not Authority provenance (§11.2) |
 
-No production release gate is closed or weakened by this acceptance: V2-IND-01, PB-11/PB-12 release governance, Azure staging evidence (Managed HSM, Confidential Ledger, real Entra), RB-CARV-1 production configuration controls (R-CARV-22), Envelope v2 activation prerequisites (M2d ledger/acceptance, M3 catalog, M4 writers, E-9) and the Level 2 adversarial gates remain open.
+No production release gate is closed or weakened by this acceptance: V2-IND-01, PB-11/PB-12 release governance, Azure staging evidence (Managed HSM, Confidential Ledger, real Entra), RB-CARV-1 production configuration controls (R-CARV-22), Envelope v2 activation prerequisites (M2d Authority v2 rules and CARV 2, M2e data-key ledger and acceptance switch, M3 catalog, M4 writers, E-9) and the Level 2 adversarial gates remain open.
+
+> **Correction (2026-11-15, E3-M2d, documentation only).** The sentence above originally read "M2d ledger/acceptance". Both governing contracts place the data-key ledger and the acceptance switch in **E3-M2e** (`E3_M2_AUTHORITY_DATABASE_CONTRACT.md` §10; `E3_M2B_IMPLEMENTATION_CONTRACT.md` §15); E3-M2d is the dark Authority v2 rule set, version dispatch, the downgrade guard and CARV 2 (`E3_M2D_IMPLEMENTATION_RECORD.md`). The accepted E3-M2c implementation, its evidence and its owner decisions are unchanged.
 
 ### 12.2 Defect record R-M2c-11 — creation retry answers uncommitted item ids
 

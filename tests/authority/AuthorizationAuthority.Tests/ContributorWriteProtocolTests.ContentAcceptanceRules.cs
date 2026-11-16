@@ -99,7 +99,7 @@ public sealed partial class ContributorWriteProtocolTests
             Assert.Equal((ContentOperationStates.Committed, (int?)ContentAcceptanceRules.CurrentVersion, (int?)ContentAcceptanceRules.CurrentVersion), (stored.OperationStateName, stored.PrepareAcceptanceRuleVersion, stored.CommitAcceptanceRuleVersion));
         }
 
-        Assert.Equal(1, ContentAcceptanceRules.CurrentVersion); // M2b-1 = the E3-M2a rule set (a bump is a reviewed change)
+        Assert.Equal(2, ContentAcceptanceRules.CurrentVersion); // E3-M2d (D-2) = version 1 plus the Prepare-only Envelope v2 rules (a bump is a reviewed change)
         Assert.All(h.Store.Operations, o => Assert.Equal(o.PrepareAcceptanceRuleVersion, o.CommitAcceptanceRuleVersion));
     }
 
@@ -119,7 +119,7 @@ public sealed partial class ContributorWriteProtocolTests
 
     // ---- M2-CARV-02 -------------------------------------------------------------------------------------------------------
 
-    public static TheoryData<int?> OtherRuleVersions => new() { (int?)null, ContentAcceptanceRules.CurrentVersion + 1 };
+    public static TheoryData<int?> OtherRuleVersions => new() { (int?)null, ContentAcceptanceRules.CurrentVersion - 1, ContentAcceptanceRules.CurrentVersion + 1 }; // E3-M2d: CurrentVersion - 1 is a version-1 build's stamp
 
     [Theory]
     [MemberData(nameof(OtherRuleVersions))]

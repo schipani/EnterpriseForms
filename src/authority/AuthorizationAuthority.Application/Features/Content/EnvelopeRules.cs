@@ -101,9 +101,17 @@ public static class EnvelopeRules
     public static void Enforce(IEnumerable<RowCanonicalDocument> documents)
     {
         ArgumentNullException.ThrowIfNull(documents);
+        var all = documents.ToList();
         var nonceByWrappedKey = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var document in documents)
+        foreach (var document in all)
         {
+            // E3-M2d version dispatch: a schema-2 row (the S-4 tie admits only envelope 2 there) is judged by the v2 rules below,
+            // never by the v1 rules, and takes no part in the v1 one-value-per-data-key rule. v1 rows are judged exactly as before.
+            if (EnvelopeV2Rules.IsV2(document))
+            {
+                continue;
+            }
+
             if (Validate(document) is { } reason)
             {
                 throw Refused(reason);
@@ -123,6 +131,9 @@ public static class EnvelopeRules
 
             nonceByWrappedKey[wrapped] = nonce;
         }
+
+        // E3-M2d: the v2 shape, batch consistency and v1/v2 wrapped-key separation (re-derivable from these bytes alone).
+        EnvelopeV2Rules.Enforce(all);
     }
 
     /// <summary>
@@ -140,9 +151,11 @@ public static class EnvelopeRules
         ArgumentNullException.ThrowIfNull(candidate);
         ArgumentNullException.ThrowIfNull(current);
         var currentByWrappedKey = new Dictionary<string, (Guid ItemId, RowCanonicalDocument Document)>(StringComparer.Ordinal);
+        // E3-M2d: this v1 rule sees v1 rows only (a v2 batch legitimately shares one wrapped key across items); v2 rows and the
+        // v1/v2 separation against the current revision are EnvelopeV2Rules.EnforceAgainstCurrent.
         foreach (var row in current)
         {
-            if (row.Document.Header.EntityKind == FieldEntityKind)
+            if (row.Document.Header.EntityKind == FieldEntityKind && !EnvelopeV2Rules.IsV2(row.Document))
             {
                 currentByWrappedKey.TryAdd(WrappedKeyOf(row.Document), row);
             }
@@ -150,7 +163,7 @@ public static class EnvelopeRules
 
         foreach (var row in candidate)
         {
-            if (row.Document.Header.EntityKind != FieldEntityKind || !currentByWrappedKey.TryGetValue(WrappedKeyOf(row.Document), out var existing))
+            if (row.Document.Header.EntityKind != FieldEntityKind || EnvelopeV2Rules.IsV2(row.Document) || !currentByWrappedKey.TryGetValue(WrappedKeyOf(row.Document), out var existing))
             {
                 continue; // a fresh data key (or no envelope)
             }
@@ -175,7 +188,7 @@ public static class EnvelopeRules
         Convert.ToHexStringLower((document.Column("encryption_nonce_bytes")?.AsBytes() ?? ReadOnlyMemory<byte>.Empty).Span);
 
     /// <summary>Same entity kind, schema and column list, and every column byte-identical except the operation binding.</summary>
-    private static bool IsByteIdenticalCarry(RowCanonicalDocument current, RowCanonicalDocument candidate)
+    internal static bool IsByteIdenticalCarry(RowCanonicalDocument current, RowCanonicalDocument candidate)
     {
         if (current.Header.EntityKind != candidate.Header.EntityKind || current.Header.SchemaVersion != candidate.Header.SchemaVersion || current.Columns.Count != candidate.Columns.Count)
         {

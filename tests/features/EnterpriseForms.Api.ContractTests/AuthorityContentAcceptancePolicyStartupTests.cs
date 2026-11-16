@@ -68,7 +68,7 @@ public sealed class AuthorityContentAcceptancePolicyStartupTests
         { "ReleaseB", null, ContentAcceptancePolicy.FloorMissing },
         { "ReleaseB", "one", ContentAcceptancePolicy.FloorMalformed },
         { "ReleaseB", "0", ContentAcceptancePolicy.FloorBelowMinimum },
-        { "ReleaseB", "2", ContentAcceptancePolicy.FloorUnsupported },
+        { "ReleaseB", "3", ContentAcceptancePolicy.FloorUnsupported }, // E3-M2d: floor 2 is recognized; 3 is above this build
         { "ReleaseA", "1", ContentAcceptancePolicy.FloorNotPermittedInReleaseA },
     };
 
@@ -105,5 +105,11 @@ public sealed class AuthorityContentAcceptancePolicyStartupTests
         using var releaseBClient = releaseB.CreateClient();
         var policy = releaseB.Services.GetRequiredService<ContentAcceptancePolicy>();
         Assert.Equal(("phase=ReleaseB requiredFloor=1", true), (policy.Describe(), policy.GuardsContentWrites));
+
+        // E3-M2d (D-4): a version-2 build also starts with the recognized floor 2 as its required minimum.
+        using var floor2 = Authority("Development", new Dictionary<string, string?> { ["ContentAcceptance:EnforcementPhase"] = "ReleaseB", ["ContentAcceptance:RequiredFloor"] = "2" });
+        using var floor2Client = floor2.CreateClient();
+        var floor2Policy = floor2.Services.GetRequiredService<ContentAcceptancePolicy>();
+        Assert.Equal(("phase=ReleaseB requiredFloor=2", true), (floor2Policy.Describe(), floor2Policy.GuardsContentWrites));
     }
 }

@@ -148,3 +148,19 @@ The business recovers from `409 OPERATION_RULES_OUTDATED` with a fresh operation
 - record creation: step 1 treats it like `OPERATION_EXPIRED`, step 2 like `IDEMPOTENCY_CONFLICT`, so step 3's fresh retry key follows;
 - field protection migration: the item stays Pending; the next attempt number is a fresh operation;
 - every other write path returns it to the caller as a `409` problem (`retryable: false`, meaning the refused operation itself can never be retried); the caller re-submits as a new request with a new idempotency key, which prepares a fresh operation. Re-sending the same idempotency key is refused (`IDEMPOTENCY_CONFLICT` or `OPERATION_STATE_INVALID`), never accepted.
+
+## 8. E3-M2d: CARV 2 and floor 2 (Development/Testing only)
+
+Record: `docs/security/E3_M2D_IMPLEMENTATION_RECORD.md`. **Owner decision D-3: floor 2 is exercised only in disposable PostgreSQL. It is not installed in, and no Release B configuration is changed for, any persistent environment by E3-M2d.** The sequence below is the designed procedure, recorded so that a later, separately approved release can follow it.
+
+| Step | What | Check |
+|---|---|---|
+| 1 | Deploy the version-2 build (CARV 2) to every instance. Floor 1 stays installed; a Release B configuration with `RequiredFloor = 1` keeps working (minimum semantics). Operations prepared by version-1 instances during the rollout are refused at a version-2 Commit (`409 OPERATION_RULES_OUTDATED`, R-CARV-7) and the reverse is refused by the version-1 rule and by the database (C = P) | readiness `content acceptance rules v2 (floor 1)` on every instance |
+| 2 | Confirm no version-1 instance remains (deployment inventory; no session marked `carv-v1`) and no unexpired operation prepared below version 2 is in flight | the floor-2 command refuses otherwise (step 3) |
+| 3 | `ConnectionStrings__AuthorityDbMigration=<migration identity> dotnet AuthorizationAuthority.Api.dll --apply-content-acceptance-floor 2` | exit 0; one constraint `ck_content_operation_rule_floor_v2` (floor 1 dropped in the same transaction); both floor migrations in the history |
+| 4 | Only after step 3, raise the protected Release B configuration to `ContentAcceptance__RequiredFloor=2` (PB-11) | readiness `... (floor 2); phase=ReleaseB requiredFloor=2` |
+
+- **Refusals (exit 2, nothing applied):** `--migrate` in the same invocation; a floor this build does not recognize (3); floor 2 before floor 1 (floors are raised one step at a time); floor 1 after floor 2 (never lowered). **Refusals (exit 3, nothing applied):** a connected session able to write operations without a `carv-v2` (or later) marker; an unexpired operation prepared below version 2; the 5 s lock timeout; any other database error. Re-running floor 2 after success is a no-op.
+- **Exactly one floor at a time:** the command migrates the floor context to exactly the requested floor migration, so `--apply-content-acceptance-floor 1` never applies floor 2.
+- **Release B fence with floor 2:** the required floor is a minimum. Refusal reasons extend as follows: an installed floor below the required one is `FloorLowered`; a recorded higher floor whose constraint is missing (for example floor 2 dropped, or floor 1 put back in its place) is `FloorRecordedButMissing` even when only floor 1 is required; two floor constraints, or a floor constraint whose definition is not exactly the recognized one, is `FloorDefinitionMismatch`; an installed floor whose migration (or a lower floor's migration) is not recorded is `FloorNotRecorded`.
+- **Recovery:** after a restore to before floor 2, re-apply the floors in order (`1`, then `2`); after a privileged drop or substitution of floor 2 with its history row kept, `--apply-content-acceptance-floor 2 --reinstate-recorded-floor` (adds floor 2, drops a remaining floor 1; same lock and preconditions; never touches the history).

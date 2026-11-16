@@ -22,8 +22,9 @@ public enum ContentAcceptancePhase
 /// AuthorityDb cannot turn a Release B instance back into Release A.
 /// <para>
 /// There is no default: an absent, blank, <c>Unconfigured</c> or unknown phase is a configuration failure, never Release A.
-/// Release B requires exactly the floor this build defines (<see cref="ReleaseBFloor"/>); a lower value (a downgrade), a higher
-/// one (this build cannot satisfy it), a malformed one or a missing one is a configuration failure. Release A refuses a
+/// Release B requires a floor this build recognizes, at least <see cref="ReleaseBFloor"/> and at most this build's content acceptance
+/// rule version (E3-M2d, D-4: 1 or 2, a minimum); a lower value (a downgrade), a higher or unrecognized one (this build cannot
+/// satisfy or verify it), a malformed one or a missing one is a configuration failure. Release A refuses a
 /// <c>RequiredFloor</c> (an ambiguous half-configuration). An invalid policy refuses every content write and the host start.
 /// </para>
 /// <para>
@@ -40,8 +41,12 @@ public sealed class ContentAcceptancePolicy
     public const string ReleaseBName = "ReleaseB";
     public const string UnconfiguredName = "Unconfigured";
 
-    /// <summary>The only floor this build defines and can enforce (floor migration AuthorityContentAcceptanceRuleFloor1).</summary>
-    public const int ReleaseBFloor = 1;
+    /// <summary>
+    /// The lowest floor a Release B deployment may require (floor migration AuthorityContentAcceptanceRuleFloor1). E3-M2d (D-4):
+    /// <see cref="RequiredFloor"/> may be any floor of <see cref="ContentAcceptanceRules.RecognizedFloors"/> up to this build's
+    /// version; it is a minimum, so a higher recognized floor installed in the database also satisfies it.
+    /// </summary>
+    public const int ReleaseBFloor = ContentAcceptanceRules.MinimumFloor;
 
     // Configuration failure reasons (diagnostic codes; contain no configuration values).
     public const string PhaseUnconfigured = "EnforcementPhaseUnconfigured";
@@ -117,7 +122,9 @@ public sealed class ContentAcceptancePolicy
             return Invalid(FloorBelowMinimum);
         }
 
-        return floor > ReleaseBFloor ? Invalid(FloorUnsupported) : new ContentAcceptancePolicy(ContentAcceptancePhase.ReleaseB, floor, null);
+        return !ContentAcceptanceRules.RecognizedFloors.Contains(floor) || floor > ContentAcceptanceRules.CurrentVersion
+            ? Invalid(FloorUnsupported)
+            : new ContentAcceptancePolicy(ContentAcceptancePhase.ReleaseB, floor, null);
     }
 
     private static ContentAcceptancePolicy Invalid(string reason) => new(ContentAcceptancePhase.Unresolved, null, reason);

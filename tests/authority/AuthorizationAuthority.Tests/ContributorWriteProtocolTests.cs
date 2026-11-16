@@ -2,8 +2,10 @@ using System.Reflection;
 using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Application.Features.Content;
+using AuthorizationAuthority.Application.Features.Journal;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.Content;
+using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
@@ -148,6 +150,67 @@ public sealed partial class ContributorWriteProtocolTests
         {
             await WriteAsync(Owner, Rows(), withCurrent: true);
             return this;
+        }
+
+        /// <summary>
+        /// Test-only (E3-M2d, as ProtectionReconciliationTests.AcceptLegacyAsync): records <paramref name="rows"/> as the accepted head
+        /// without running Prepare or Commit, signed with the organization's key, with an anchored content checkpoint. It models
+        /// accepted history this build would not itself accept (an Envelope v2 head, which no build accepts before E3-M2e).
+        /// </summary>
+        public async Task AcceptDirectlyAsync(List<Row> rows)
+        {
+            var operation = Guid.CreateVersion7();
+            var revision = Head.CommittedContentRevision + 1;
+            var key = new IntegrityKeyReference(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", 1);
+            var accepted = new List<(Staged Row, byte[] Signature)>(rows.Count);
+            var inputs = new List<MerkleLeafInput>(rows.Count);
+            foreach (var row in rows)
+            {
+                var encoded = Encode(row, Org, operation, revision);
+                var signature = (await Mac.SignAsync(key, encoded.Bytes, CancellationToken.None)).Mac;
+                accepted.Add((encoded, signature));
+                inputs.Add(new MerkleLeafInput((MerkleItemKind)(byte)encoded.Kind, encoded.ItemId, signature, encoded.Digest, (ulong)revision, operation));
+            }
+
+            var manifest = MerkleManifestV1.Build(inputs);
+            var commit = new RecordManifestCommit
+            {
+                RecordManifestCommitId = Guid.CreateVersion7(),
+                OrganizationId = Org,
+                FormRecordId = Record,
+                CommittedOperationId = operation,
+                CommittedContentRevision = revision,
+                ManifestSchemaVersion = 1,
+                ManifestAlgorithmVersion = 1,
+                RowSignatureKeyVersion = 1,
+                ManifestLeafCount = (long)manifest.LeafCount,
+                ManifestRootDigest = manifest.MerkleRoot,
+                ManifestLeafIndexDigest = manifest.LeafIndexDigest,
+                ManifestCommittedOn = DateTimeOffset.UtcNow,
+            };
+            Store.Commits.Add(commit);
+            Store.ManifestLeaves.AddRange(manifest.SortedLeaves.Select((leaf, position) => new RecordManifestLeaf
+            {
+                RecordManifestLeafId = Guid.CreateVersion7(),
+                RecordManifestCommitId = commit.RecordManifestCommitId,
+                ManifestLeafPosition = position,
+                ManifestItemKey = leaf.ItemKey,
+                ManifestItemKindCode = (byte)leaf.Kind,
+                ManifestItemId = leaf.ItemId,
+                CanonicalPayloadDigest = leaf.CanonicalPayloadDigest.ToArray(),
+                RowSignature = leaf.RowSignature.ToArray(),
+                ManifestLeafDigest = manifest.LeafHashes[position],
+            }));
+            Head.CommittedContentRevision = revision;
+            Head.CommittedOperationId = operation;
+            Head.CurrentRecordManifestCommitId = commit.RecordManifestCommitId;
+            Head.CommittedManifestRoot = manifest.MerkleRoot;
+            Head.SignatureKeyVersion = 1;
+            State.AdvanceContentIntegrityRevision(ContentRevisionProjectionAction.AdvanceWithDerivation);
+            var checkpoint = JournalChain.Append(State, JournalStreamNames.Content, State.ContentIntegrityRevision, "ContentHeadCommitted", new { form_record_id = Record, committed_content_revision = revision }, null, operation, TimeProvider.System);
+            checkpoint.ArchiveDeliveryState = ArchiveDeliveryStates.Anchored;
+            Store.Journal.Add(checkpoint);
+            Accepted = accepted;
         }
     }
 

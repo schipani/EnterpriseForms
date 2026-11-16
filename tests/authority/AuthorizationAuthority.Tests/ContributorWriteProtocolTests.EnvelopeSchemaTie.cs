@@ -81,16 +81,17 @@ public sealed partial class ContributorWriteProtocolTests
     [Theory]
     [InlineData("field")]
     [InlineData("document")]
-    public async Task SchemaTwoWithEnvelopeTwoPassesTheTieAndStaysUnsupported(string kind)
+    public async Task SchemaTwoWithEnvelopeTwoPassesTheTieAndIsNotEnabled(string kind)
     {
+        // E3-M2d: the tied pair passes S-4 and the v2 shape rules; as a new v2 row it is refused at Prepare (not enabled), before signing.
         var created = new Harness();
         var operation = Guid.CreateVersion7();
         var ex = await Assert.ThrowsAsync<AuthorityException>(() => created.PrepareAsync(created.Owner, operation, created.Stage(WithPair(created, kind, "schema 2 / envelope 2"), operation), withCurrent: true));
-        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeRules.Reasons.SchemaUnsupported, ex.Message);
+        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeV2Rules.Reasons.VersionNotEnabled, ex.Message);
         Assert.Empty(created.Store.Operations);
 
         var edited = await new Harness().CreatedAsync();
-        await RefusedBeforeSigningAsync(edited, edited.Owner, WithPair(edited, kind, "schema 2 / envelope 2"), EnvelopeRules.Reasons.SchemaUnsupported);
+        await RefusedBeforeSigningAsync(edited, edited.Owner, WithPair(edited, kind, "schema 2 / envelope 2"), EnvelopeV2Rules.Reasons.VersionNotEnabled);
     }
 
     [Fact]
@@ -152,11 +153,14 @@ public sealed partial class ContributorWriteProtocolTests
         }
     }
 
-    /// <summary>At Commit a tied schema-2 / envelope-2 row passes S-4 and is still refused by the unchanged E3-M2a envelope rule.</summary>
+    /// <summary>
+    /// At Commit a tied, well-formed schema-2 / envelope-2 row passes S-4 and the v2 shape rules and is still refused: E3-M2d commits
+    /// no v2 row (EnvelopeV2Rules.CommitViolation), even for an operation recorded outside this build's Prepare with a current stamp.
+    /// </summary>
     [Theory]
     [InlineData("field")]
     [InlineData("document")]
-    public async Task AtCommitATiedSchemaTwoRowIsStillRefusedByTheEnvelopeRules(string kind)
+    public async Task AtCommitATiedSchemaTwoRowIsStillRefused(string kind)
     {
         var h = await new Harness().CreatedAsync();
         var head = h.Head.CommittedContentRevision;
@@ -164,8 +168,8 @@ public sealed partial class ContributorWriteProtocolTests
         var staged = await SeedPreparedWithoutPrepareRulesAsync(h, operation, h.Stage(WithPair(h, kind, "schema 2 / envelope 2"), operation));
 
         var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.Service.CommitAsync(Harness.Actor(h.Owner), operation, new CommitContentChangeRequest(h.Org, h.Record, staged), Guid.CreateVersion7(), CancellationToken.None));
-        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeRules.Reasons.SchemaUnsupported, ex.Message);
-        Assert.Equal("ENVELOPE_INVALID_AT_COMMIT", h.Store.Operations.Single(o => o.ContentChangeOperationId == operation).OperationQuarantineReasonCode);
+        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeV2Rules.Reasons.VersionNotEnabled, ex.Message);
+        Assert.Equal(EnvelopeV2Rules.NotEnabledAtCommitReason, h.Store.Operations.Single(o => o.ContentChangeOperationId == operation).OperationQuarantineReasonCode);
         Assert.Equal(head, h.Head.CommittedContentRevision);
     }
 

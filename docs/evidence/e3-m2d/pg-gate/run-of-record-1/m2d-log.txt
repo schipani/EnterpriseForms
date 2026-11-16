@@ -1,0 +1,80 @@
+02:10:24.466 --migrate (m2d-migrate) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+02:10:24.733 PASS D-00: exit 0; floors none; floor history none
+02:10:26.025 --apply-content-acceptance-floor 1 (m2d-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+02:10:26.085 PASS D-00b: exit 0; floors 1; history 20261115032228_AuthorityContentAcceptanceRuleFloor1
+02:10:28.489 PASS D-A1: True content acceptance rules v2 (floor 1); phase=ReleaseB requiredFloor=1 | required 1: none | required 2: FloorLowered
+02:10:28.521 PASS D-A2: false false false
+02:10:30.427 PASS D-A3: OK; committed 2/2: 10
+02:10:30.638 PASS D-A4: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e21e-b8a5-7d99-aa50-4f56b9de4091, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorLowered category=LoweredFloor recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=2 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 10->10; unchanged | unchanged
+02:10:30.653 PASS D-A5: False ContentAcceptanceRuleFloorBelowRequired(installed=1, required=2)
+02:10:34.862 v1 prepare exit 0: ok=True error= mapped= build=1 
+02:10:34.895 PASS D-X1a: OK; 1/NULL Prepared
+02:10:35.016 PASS D-X1b: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; 1/NULL Aborted OPERATION_RULES_OUTDATED; unchanged
+02:10:37.473 v1 commit exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False mapped=409 {"errorCode":"OPERATION_RULES_OUTDATED","correlationId":"01a1e21e-e2f4-7e77-83b1-62f9319cb063","retryable":false,"detail":"the operation was prepared under other content acceptance rules; start a fresh operation"} build=1 
+02:10:37.534 PASS D-X2: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; 2/NULL Aborted; unchanged
+02:10:37.583 seed Valid P=2 op=01a1e21e-e361-706d-94a6-dc3b91d498b0: OK
+02:10:37.630 PASS D-X2b: OK; 23514 ck_content_operation_commit_rule_version: new row for relation "content_change_operations" violates check constraint "ck_content_operation_commit_rule_version"; 2/NULL Prepared
+02:10:40.872 v1 prepare exit 0: ok=True error= mapped= build=1 
+02:10:44.602 v1 commit exit 0: ok=True error= mapped= build=1 
+02:10:44.632 PASS D-X3: OK OK; 1/1 Committed
+02:10:47.482 v1 prepare exit 0: ok=True error= mapped= build=1 
+02:10:47.574 PASS D-X4: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; operations 15->15; 1/NULL Prepared
+02:10:47.712 PASS D-X5: OK; unchanged
+02:10:47.839 PASS D-V1: AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; signatures 0; ops 15->15; leaves 60->60
+02:10:47.955 PASS D-V2: AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; signatures 0; ops 15->15; leaves 60->60
+02:10:47.990 seed NewV2Field P=2 op=01a1e21f-0c14-7ac4-a706-fcb6fe2eaff6: OK
+02:10:48.188 PASS D-V3: OK; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; 2/NULL Aborted ENVELOPE_VERSION_NOT_ENABLED_AT_COMMIT; verified 4; unchanged | unchanged
+02:10:48.225 seed FieldSchema2Envelope1 P=2 op=01a1e21f-0cfc-7a16-826e-f9dcd4ebf7a5: OK
+02:10:48.437 PASS D-V4: OK; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; 2/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT; verified 4; unchanged | unchanged
+02:10:48.478 seed Valid P=2 op=01a1e21f-0df5-7dbb-bd77-5e299f79e27c: OK
+02:10:48.601 PASS D-V5: OK; OK; 2/2 Committed; head 0->1
+02:10:54.237 --migrate (m2d-fresh-migrate) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+02:10:55.043 --apply-content-acceptance-floor 2 (m2d-fresh-floor2) exit 2: content acceptance rule floor 2 requires every lower floor to be applied first (floors are raised one step at a time)
+02:10:55.106 PASS D-F0: migrate exit 0; floor 2 exit 2; floors none; floor history none
+02:10:55.216 --apply-content-acceptance-floor 2 --migrate (m2d-floor2-migrate) exit 2: --apply-content-acceptance-floor cannot be combined with --migrate: the floor is a separate release (Release B), applied only after every Authority instance runs a CARV build
+02:10:55.343 --apply-content-acceptance-floor 3 (m2d-floor3) exit 2: usage: --apply-content-acceptance-floor 1|2 [--reinstate-recorded-floor]  (the floor number must be stated explicitly; this build installs only the floors it recognizes)
+02:10:55.371 PASS D-F1: exit 2 | exit 2; floors 1
+02:10:56.571 --apply-content-acceptance-floor 2 (m2d-floor2-stale) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor 2 refused: 1 session(s) able to write content operations are connected without a CARV build marker of version 2 or later (an older Authority instance may still run)
+02:10:56.626 PASS D-F2: exit 3; marker message True; floors 1; history 20261115032228_AuthorityContentAcceptanceRuleFloor1
+02:10:59.123 v1 prepare exit 0: ok=True error= mapped= build=1 
+02:11:00.256 --apply-content-acceptance-floor 2 (m2d-floor2-inflight) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor 2 refused: 1 unexpired operation(s) prepared below content acceptance rule version 2 are in flight; let them expire or abort them first
+02:11:00.281 PASS D-F3: prepare OK; exit 3; in-flight message True; floors 1
+02:11:00.318 D-F3 reconciliation: the version-2 Commit aborts the in-flight version-1 operation: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; 1/NULL Aborted
+02:11:06.486 --apply-content-acceptance-floor 2 (m2d-floor2-locked) exit 3: content acceptance rule floor NOT applied: 55P03: canceling statement due to lock timeout
+02:11:06.559 PASS D-F4: exit 3; 55P03 True; floors 1; history 20261115032228_AuthorityContentAcceptanceRuleFloor1
+02:11:09.417 v1 prepare exit 0: ok=True error= mapped= build=1 
+02:11:09.468 PASS D-F5: OK; 1/NULL Prepared; expired True
+02:11:10.912 --apply-content-acceptance-floor 2 (m2d-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+02:11:10.961 PASS D-F6: exit 0; 12 x OK; floors 2; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2
+02:11:11.044 PASS D-F7: definition equal True; required 1: none; required 2: none
+02:11:11.071 PASS D-F8: True content acceptance rules v2 (floor 2); phase=ReleaseB requiredFloor=1 | True content acceptance rules v2 (floor 2); phase=ReleaseB requiredFloor=2
+02:11:11.274 PASS D-F9: OK | OK
+02:11:12.646 --apply-content-acceptance-floor 2 (m2d-floor2-again) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+02:11:13.486 --apply-content-acceptance-floor 1 (m2d-floor1-again) exit 2: content acceptance rule floor 2 is already recorded; floors are never lowered, so floor 1 is not applied
+02:11:13.537 PASS D-F10: exit 0 | exit 2 True; floors 2; floor-2 rows 1
+02:11:16.282 v1 prepare exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False mapped=409 {"errorCode":"OPERATION_RULES_OUTDATED","correlationId":"01a1e21f-7a8e-7512-88df-433fb4baae3a","retryable":false,"detail":"the operation crosses content acceptance rule versions and was refused; start a fresh operation"} build=1 
+02:11:16.309 PASS D-F11: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v2) refused a content operation write; this build applies rule version 1 (mixed-version fleet or a newer floor); operations 34->34
+02:11:18.788 v1 commit exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False mapped=409 {"errorCode":"OPERATION_RULES_OUTDATED","correlationId":"01a1e21f-845b-7fcb-ac0b-388511ac90ad","retryable":false,"detail":"the operation crosses content acceptance rule versions and was refused; start a fresh operation"} build=1 
+02:11:18.875 PASS D-F12: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v2) refused a content operation write; this build applies rule version 1 (mixed-version fleet or a newer floor); 1/NULL Prepared; unchanged | unchanged
+02:11:18.973 PASS D-F13: OK; 1/1 Committed; unchanged
+02:11:19.007 seed Valid P=1 op=01a1e21f-853d-7d73-a8fc-fad2e795d8b0: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v2
+02:11:19.035 seed Valid P=2 op=01a1e21f-855f-7b21-9322-bb6b1fd85f9f: OK
+02:11:19.035 PASS D-F14: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v2 | OK
+02:11:19.187 PASS D-M1a: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e21e-b8a5-7d99-aa50-4f56b9de4091, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorRecordedButMissing category=MissingFloor recovery=RecoveryRequired:ReinstateRecordedFloor phase=ReleaseB requiredFloor=2 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 35->35; unchanged | unchanged
+02:11:19.348 PASS D-M1b: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e21e-b8a5-7d99-aa50-4f56b9de4091, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorRecordedButMissing category=MissingFloor recovery=RecoveryRequired:ReinstateRecordedFloor phase=ReleaseB requiredFloor=1 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 35->35; unchanged | unchanged
+02:11:19.373 PASS D-M1c: False ContentAcceptanceRuleFloorMissing(recorded in the migration history, constraint absent) | False ContentAcceptanceRuleFloorMissing(recorded in the migration history, constraint absent)
+02:11:19.483 PASS D-M1d: OK
+02:11:20.636 --apply-content-acceptance-floor 2 (m2d-floor2-reinstate-noflag) exit 4: content acceptance rule floor 2 is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with --reinstate-recorded-floor
+02:11:21.814 --apply-content-acceptance-floor 2 --reinstate-recorded-floor (m2d-floor2-reinstate) exit 0: content acceptance rule floor 2 re-installed (recorded floor reinstated)  content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+02:11:21.930 PASS D-M2: exit 4 | exit 0; floors 2; write OK
+02:11:22.091 PASS D-M3: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e21e-b8a5-7d99-aa50-4f56b9de4091, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorDefinitionMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=2 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 37->37; unchanged | unchanged
+02:11:23.283 --apply-content-acceptance-floor 2 --reinstate-recorded-floor (m2d-floor2-restore-1) exit 0: content acceptance rule floor 2 re-installed (recorded floor reinstated)  content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+02:11:23.296 D-M3 restore: exit 0; floors 2
+02:11:23.452 PASS D-M4a: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e21e-b8a5-7d99-aa50-4f56b9de4091, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorRecordedButMissing category=MissingFloor recovery=RecoveryRequired:ReinstateRecordedFloor phase=ReleaseB requiredFloor=1 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 37->37; unchanged | unchanged
+02:11:23.599 PASS D-M4b: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e21e-b8a5-7d99-aa50-4f56b9de4091, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorLowered category=LoweredFloor recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=2 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 37->37; unchanged | unchanged
+02:11:25.002 --apply-content-acceptance-floor 2 --reinstate-recorded-floor (m2d-floor2-restore-2) exit 0: content acceptance rule floor 2 re-installed (recorded floor reinstated)  content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+02:11:25.119 PASS D-M4c: exit 0; floors 2; OK
+02:11:25.294 PASS D-M5: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e21e-b8a5-7d99-aa50-4f56b9de4091, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorDefinitionMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 38->38; unchanged | unchanged
+02:11:25.465 PASS D-M6: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e21e-b8a5-7d99-aa50-4f56b9de4091, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=2 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 38->38; unchanged | unchanged
+02:11:25.636 PASS D-M7: OK; True content acceptance rules v2 (floor 2); phase=ReleaseB requiredFloor=2; none
+02:11:25.664 PASS D-99: Aborted P1/CNULL OPERATION_RULES_OUTDATED=3, Aborted P2/CNULL ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT=1, Aborted P2/CNULL ENVELOPE_VERSION_NOT_ENABLED_AT_COMMIT=1, Aborted P2/CNULL OPERATION_RULES_OUTDATED=1, Committed P1/C1=1, Committed P2/C2=29, Prepared P1/CNULL=1, Prepared P2/CNULL=2

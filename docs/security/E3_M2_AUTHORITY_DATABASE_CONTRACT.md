@@ -187,6 +187,8 @@ Over all **new** v2 rows of a candidate (§4.3 defines "new"), grouped by `data_
 
 Carried rows are not re-grouped; they were checked when first accepted.
 
+> **Superseded for E3-M2d (owner decision OA-M2d-4, 2026-11-15; `E3_M2D_IMPLEMENTATION_RECORD.md` §12).** Batch consistency is validated over **all** v2 rows of a candidate, carried rows included, at Prepare and at Commit, so that Commit can re-derive it from the staged bytes. Carried rows of one accepted batch are byte-consistent, so no legitimate candidate is affected.
+
 ### 2.5 Compatibility with v1
 
 - v1 rows stay schema 1 forever. They are never re-signed and never rewritten.

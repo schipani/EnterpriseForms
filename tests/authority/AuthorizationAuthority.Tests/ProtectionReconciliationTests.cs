@@ -600,12 +600,13 @@ public sealed class ProtectionReconciliationTests
         ]).OrderBy(c => c.ColumnName, StringComparer.Ordinal).ToList());
         var sealedV2 = (Sealed(h.Org, record, h.Field, h.ItemFor(record), 40) with { Schema = schema2 })
             .With("encryption_envelope_version", RowValue.Int32(envelopeVersion))
+            .With("encryption_key_reference", RowValue.Text($"localdev:{h.Org:D}:field-value:1")) // E3-M2d: well-formed under the v2 rules
             .With("data_key_commitment_bytes", RowValue.Bytes(Fill(32, 0xdd)))
             .With("data_key_identifier", RowValue.Uuid(Guid.CreateVersion7()))
             .With("key_wrap_algorithm_code", RowValue.Int32(1));
 
         var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.ReprotectAsync(record, command, [Header(h.Org, record), sealedV2, Integer(h.Org, record, h.OtherField, other, 3)]));
-        Assert.Equal("ENVELOPE_INVALID: " + (envelopeVersion == 2 ? EnvelopeRules.Reasons.SchemaUnsupported : EnvelopeSchemaTie.MismatchReason), ex.Message); // S-4 refuses the mismatched pair first
+        Assert.Equal("ENVELOPE_INVALID: " + (envelopeVersion == 2 ? EnvelopeV2Rules.Reasons.VersionNotEnabled : EnvelopeSchemaTie.MismatchReason), ex.Message); // S-4 refuses the mismatched pair first; E3-M2d refuses a new v2 row
         Assert.Equal(operations, h.Store.Operations.Count);
         Assert.Equal(head, (h.Head(record).CommittedContentRevision, h.Head(record).CommittedOperationId));
     }

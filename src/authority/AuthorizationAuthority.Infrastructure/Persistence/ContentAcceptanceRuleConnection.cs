@@ -8,7 +8,7 @@ namespace AuthorizationAuthority.Infrastructure.Persistence;
 /// <c>application_name</c> (for example <c>authority carv-v1</c>), so <c>pg_stat_activity</c> shows whether any pre-CARV instance
 /// (no marker) is still connected before the floor migration. Informational for the operator; never an enforcement input.
 /// </summary>
-public static class ContentAcceptanceRuleConnection
+public static partial class ContentAcceptanceRuleConnection
 {
     public static string Marker => "carv-v" + ContentAcceptanceRules.CurrentVersion.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
@@ -22,7 +22,14 @@ public static class ContentAcceptanceRuleConnection
 
         var builder = new NpgsqlConnectionStringBuilder(connectionString);
         var current = builder.ApplicationName;
-        builder.ApplicationName = string.IsNullOrWhiteSpace(current) ? "authority " + Marker : current.Contains(Marker, StringComparison.Ordinal) ? current : current + " " + Marker;
+
+        // E3-M2d: a configured name may carry another build's marker (for example a stale "carv-v1" under a version-2 build). It is
+        // replaced, never kept beside this build's marker, so the floor-activation precondition reads the marker of the running build.
+        builder.ApplicationName = string.IsNullOrWhiteSpace(current) ? "authority " + Marker
+            : MarkerPattern().IsMatch(current) ? MarkerPattern().Replace(current, Marker) : current + " " + Marker;
         return builder.ConnectionString;
     }
+
+    [System.Text.RegularExpressions.GeneratedRegex("carv-v[0-9]+")]
+    private static partial System.Text.RegularExpressions.Regex MarkerPattern();
 }

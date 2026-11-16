@@ -141,7 +141,7 @@ public sealed partial class ContentAcceptancePolicyStartupGuard(ContentAcceptanc
             LogInvalid(logger, policy.ConfigurationFailure!);
             throw new InvalidOperationException(
                 $"Content acceptance policy is invalid ({policy.ConfigurationFailure}). Set {ContentAcceptancePolicy.PhaseKey} to {ContentAcceptancePolicy.ReleaseAName} "
-                + $"or {ContentAcceptancePolicy.ReleaseBName}; Release B requires {ContentAcceptancePolicy.RequiredFloorKey} = {ContentAcceptancePolicy.ReleaseBFloor}, Release A refuses it. "
+                + $"or {ContentAcceptancePolicy.ReleaseBName}; Release B requires {ContentAcceptancePolicy.RequiredFloorKey} = one of {string.Join(", ", ContentAcceptanceRules.RecognizedFloors)} (a minimum, at most {ContentAcceptanceRules.CurrentVersion}), Release A refuses it. "
                 + "The Authorization Authority refuses to start; a missing value is never treated as Release A.");
         }
 

@@ -1,9 +1,14 @@
+using AuthorizationAuthority.Application.Features.Content;
 using AuthorizationAuthority.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace AuthorizationAuthority.Api.Composition;
 
 /// <summary>
+/// E3-M2d (D-3): <c>--apply-content-acceptance-floor 2</c> raises floor 1 to floor 2 the same way (migration identity, floor context
+/// migrated to exactly the floor-2 migration, only after floor 1, never lowering a recorded floor). Floor 2 is exercised only in
+/// disposable PostgreSQL in E3-M2d.
 /// E3-M2b-1F (Release B, contract §21): <c>dotnet AuthorizationAuthority.Api.dll --apply-content-acceptance-floor 1</c>. The ONLY
 /// path that applies the content acceptance rule floor. It migrates <see cref="ContentAcceptanceFloorContext"/>, whose migrations
 /// the ordinary <c>--migrate</c> (<see cref="AuthorityDbContext"/>) can never see, with the migration identity
@@ -42,10 +47,14 @@ public static class ContentAcceptanceFloorCommand
             return true;
         }
 
+        // E3-M2d (D-3): the floor number is stated explicitly and must be a floor this build recognizes, at most its own rule version.
         var requested = index + 1 < args.Length ? args[index + 1] : null;
-        if (!string.Equals(requested, ContentAcceptanceFloorSql.FloorVersion.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal))
+        var target = ContentAcceptanceFloors.Recognized.FirstOrDefault(f => f.Version <= ContentAcceptanceRules.CurrentVersion
+            && string.Equals(requested, f.Version.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal));
+        if (target is null)
         {
-            Console.Error.WriteLine($"usage: {Flag} {ContentAcceptanceFloorSql.FloorVersion} [{ReinstateFlag}]  (this build installs floor {ContentAcceptanceFloorSql.FloorVersion} only; the floor number must be stated explicitly)");
+            var known = string.Join("|", ContentAcceptanceFloors.Recognized.Where(f => f.Version <= ContentAcceptanceRules.CurrentVersion).Select(f => f.Version));
+            Console.Error.WriteLine($"usage: {Flag} {known} [{ReinstateFlag}]  (the floor number must be stated explicitly; this build installs only the floors it recognizes)");
             exitCode = 2;
             return true;
         }
@@ -62,20 +71,39 @@ public static class ContentAcceptanceFloorCommand
         try
         {
             using var context = new ContentAcceptanceFloorContext(ContentAcceptanceFloorContext.OptionsFor(connectionString));
-            context.Database.Migrate(); // floor migrations only
+
+            // E3-M2d: monotonic, one step at a time. A floor above the requested one already recorded is never undone by applying a
+            // lower one; a floor is applied only after the floor below it (no skipping). Both are refusals, nothing is changed.
+            var recorded = RecordedFloors(context);
+            if (recorded.Count > 0 && recorded.Max() > target.Version)
+            {
+                Console.Error.WriteLine($"content acceptance rule floor {recorded.Max()} is already recorded; floors are never lowered, so floor {target.Version} is not applied");
+                exitCode = 2;
+                return true;
+            }
+
+            if (ContentAcceptanceFloors.Recognized.Any(f => f.Version < target.Version && !recorded.Contains(f.Version)))
+            {
+                Console.Error.WriteLine($"content acceptance rule floor {target.Version} requires every lower floor to be applied first (floors are raised one step at a time)");
+                exitCode = 2;
+                return true;
+            }
+
+            // Exactly up to the requested floor's migration: a later floor migration of this build is never applied implicitly.
+            context.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>().Migrate(target.MigrationId);
             var installed = InstalledFloor(context);
-            if (installed < ContentAcceptanceFloorSql.FloorVersion)
+            if (installed < target.Version)
             {
                 if (Array.IndexOf(args, ReinstateFlag) < 0)
                 {
-                    Console.Error.WriteLine($"content acceptance rule floor {ContentAcceptanceFloorSql.FloorVersion} is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with {ReinstateFlag}");
+                    Console.Error.WriteLine($"content acceptance rule floor {target.Version} is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with {ReinstateFlag}");
                     exitCode = 4;
                     return true;
                 }
 
                 using (var transaction = context.Database.BeginTransaction())
                 {
-                    context.Database.ExecuteSqlRaw(ContentAcceptanceFloorSql.ReinstateSql);
+                    context.Database.ExecuteSqlRaw(target.ReinstateSql);
                     transaction.Commit();
                 }
 
@@ -83,7 +111,7 @@ public static class ContentAcceptanceFloorCommand
                 Console.WriteLine($"content acceptance rule floor {installed} re-installed (recorded floor reinstated)");
             }
 
-            Console.WriteLine($"content acceptance rule floor {installed} installed ({ContentAcceptanceFloorSql.ConstraintName}, NOT VALID); ordinary --migrate never applies or removes it");
+            Console.WriteLine($"content acceptance rule floor {installed} installed ({target.ConstraintName}, NOT VALID); ordinary --migrate never applies or removes it");
         }
         catch (Exception ex) when (DatabaseFailure(ex) is { } failure)
         {
@@ -113,4 +141,13 @@ public static class ContentAcceptanceFloorCommand
 
     private static int InstalledFloor(ContentAcceptanceFloorContext context) =>
         context.Database.SqlQueryRaw<int>(InstalledFloorSql).AsEnumerable().Single();
+
+    /// <summary>The recognized floors whose migration the history records (an absent history table means none).</summary>
+    private static IReadOnlySet<int> RecordedFloors(ContentAcceptanceFloorContext context)
+    {
+        var historyExists = context.Database.SqlQueryRaw<bool>("SELECT to_regclass('authority.ef_migrations_history') IS NOT NULL AS \"Value\"").AsEnumerable().Single();
+        return historyExists
+            ? ContentAcceptanceFloors.RecordedFloors(context.Database.SqlQueryRaw<string>("SELECT \"MigrationId\" AS \"Value\" FROM authority.ef_migrations_history").AsEnumerable().ToList())
+            : new HashSet<int>();
+    }
 }

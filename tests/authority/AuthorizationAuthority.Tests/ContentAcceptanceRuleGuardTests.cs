@@ -27,9 +27,10 @@ public sealed class ContentAcceptanceRuleGuardTests
     public static TheoryData<string, bool, string> Decisions => new()
     {
         { "unknown", false, "ContentAcceptanceRulesUnverified" },
-        { "complete, no floor", true, "content acceptance rules v1 (floor none)" },
-        { "floor equal to the build", true, "content acceptance rules v1 (floor 1)" },
-        { "floor above the build", false, "ContentAcceptanceRuleFloorAboveBuild(floor=2, build=1)" },
+        { "complete, no floor", true, "content acceptance rules v2 (floor none)" },
+        { "floor 1 below the build", true, "content acceptance rules v2 (floor 1)" }, // E3-M2d: a version-2 build accepts floor 1 (a minimum)
+        { "floor equal to the build", true, "content acceptance rules v2 (floor 2)" },
+        { "floor above the build", false, "ContentAcceptanceRuleFloorAboveBuild(floor=3, build=2)" },
         { "migration missing", false, "ContentAcceptanceRuleMigrationMissing" },
         { "columns missing", false, "ContentAcceptanceRuleSchemaIncomplete" },
         { "commit check missing", false, "ContentAcceptanceRuleSchemaIncomplete" },
@@ -40,8 +41,9 @@ public sealed class ContentAcceptanceRuleGuardTests
     {
         "unknown" => null,
         "complete, no floor" => Complete,
-        "floor equal to the build" => Complete with { InstalledFloor = 1 },
-        "floor above the build" => Complete with { InstalledFloor = 2 },
+        "floor 1 below the build" => Complete with { InstalledFloor = 1 },
+        "floor equal to the build" => Complete with { InstalledFloor = 2 },
+        "floor above the build" => Complete with { InstalledFloor = 3 },
         "migration missing" => Complete with { MigrationApplied = false },
         "columns missing" => Complete with { ColumnsPresent = false },
         "commit check missing" => Complete with { CommitCheckPresent = false },
@@ -88,10 +90,10 @@ public sealed class ContentAcceptanceRuleGuardTests
         Assert.True((await guard.RefreshAsync(CancellationToken.None)).Ready);
         Assert.True(guard.Current.Ready);
 
-        reader.Next = () => Complete with { InstalledFloor = 2 }; // a newer floor installed while this instance runs
+        reader.Next = () => Complete with { InstalledFloor = 3 }; // a newer floor installed while this instance runs
         clock.Now += ContentAcceptanceRules.ReadinessRecheckInterval;
         await guard.RefreshAsync(CancellationToken.None);
-        Assert.Equal((false, "ContentAcceptanceRuleFloorAboveBuild(floor=2, build=1)"), guard.Current);
+        Assert.Equal((false, "ContentAcceptanceRuleFloorAboveBuild(floor=3, build=2)"), guard.Current);
 
         reader.Next = () => throw new NpgsqlException("unreachable");
         clock.Now += ContentAcceptanceRules.ReadinessRecheckInterval;
@@ -182,9 +184,10 @@ public sealed class ContentAcceptanceRuleGuardTests
     // ---- versioned application name (§19.9 step 3) ------------------------------------------------------------------------
 
     [Theory]
-    [InlineData("Host=db;Database=authority;Username=authority_runtime", "authority carv-v1")]
-    [InlineData("Host=db;Database=authority;Username=authority_runtime;Application Name=authority-api", "authority-api carv-v1")]
-    [InlineData("Host=db;Database=authority;Username=authority_runtime;Application Name=authority-api carv-v1", "authority-api carv-v1")]
+    [InlineData("Host=db;Database=authority;Username=authority_runtime", "authority carv-v2")]
+    [InlineData("Host=db;Database=authority;Username=authority_runtime;Application Name=authority-api", "authority-api carv-v2")]
+    [InlineData("Host=db;Database=authority;Username=authority_runtime;Application Name=authority-api carv-v2", "authority-api carv-v2")]
+    [InlineData("Host=db;Database=authority;Username=authority_runtime;Application Name=authority-api carv-v1", "authority-api carv-v2")] // E3-M2d: a stale marker is replaced, never kept beside the build's
     public void StoreConnectionsCarryTheBuildRuleVersion(string configured, string applicationName) =>
         Assert.Equal(applicationName, new NpgsqlConnectionStringBuilder(ContentAcceptanceRuleConnection.WithVersionedApplicationName(configured)).ApplicationName);
 

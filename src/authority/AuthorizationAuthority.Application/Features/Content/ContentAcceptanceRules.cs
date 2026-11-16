@@ -10,13 +10,25 @@ namespace AuthorizationAuthority.Application.Features.Content;
 /// </para>
 /// <para>
 /// <see cref="CurrentVersion"/> is incremented by a reviewed code change whenever Prepare starts enforcing a rule that Commit does
-/// not fully re-derive. Version 1 = the E3-M2a rule set, including the cross-revision envelope rule.
+/// not fully re-derive. Version 1 = the E3-M2a rule set, including the cross-revision envelope rule. Version 2 (E3-M2d, owner
+/// decision D-2) = version 1 plus the Prepare-only Envelope v2 rules: carried/new classification against the current accepted
+/// head, DK-3, the refusal of every new v2 row and the v2-to-v1 downgrade guard (EnvelopeV2Rules.EnforceAgainstCurrent).
 /// </para>
 /// </summary>
 public static class ContentAcceptanceRules
 {
     /// <summary>V: the rule version this build applies at Prepare and requires at Commit.</summary>
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
+
+    /// <summary>
+    /// E3-M2d (D-3/D-4): the floors this build recognizes, each with an exact database definition (floor migrations
+    /// AuthorityContentAcceptanceRuleFloor1 and -Floor2). A Release B deployment requires one of them as a minimum; an installed
+    /// floor outside this set, or above <see cref="CurrentVersion"/>, fails closed.
+    /// </summary>
+    public static readonly IReadOnlyList<int> RecognizedFloors = [1, 2];
+
+    /// <summary>The lowest recognized floor (floor 1, E3-M2b-1F).</summary>
+    public const int MinimumFloor = 1;
 
     /// <summary>OD-M2-30: how often a running instance re-reads the database fence for its readiness decision.</summary>
     public static readonly TimeSpan ReadinessRecheckInterval = TimeSpan.FromSeconds(30);
@@ -51,7 +63,9 @@ public static class ContentAcceptanceRules
     /// What the readiness guard reads from the database (one query; see the Infrastructure reader). E3-M2b-1F adds
     /// <paramref name="FloorRecorded"/>: the migration history records that a floor migration was applied.
     /// </summary>
-    public sealed record SchemaFacts(bool MigrationApplied, bool ColumnsPresent, bool CommitCheckPresent, bool StateGuardEnabled, int? InstalledFloor, bool FloorRecorded = false, string? WriteFenceFailure = null);
+    /// E3-M2d adds <paramref name="HighestRecordedFloor"/>: the highest recognized floor whose migration the history records (null
+    /// when the reader cannot tell; then <paramref name="FloorRecorded"/> alone means floor 1, as in E3-M2b-1F).
+    public sealed record SchemaFacts(bool MigrationApplied, bool ColumnsPresent, bool CommitCheckPresent, bool StateGuardEnabled, int? InstalledFloor, bool FloorRecorded = false, string? WriteFenceFailure = null, int? HighestRecordedFloor = null);
 
     /// <summary>
     /// RB-CARV-1 (contract §22): the readiness decision for this instance's policy. Release A (or no policy, as in the E3-M2b-1
@@ -125,7 +139,9 @@ public static class ContentAcceptanceRules
             return (false, $"ContentAcceptanceRuleRequiredFloorAboveBuild(required={required}, build={compiledVersion})");
         }
 
-        if (facts.FloorRecorded && facts.InstalledFloor is null)
+        // E3-M2d: a recorded floor higher than the installed one is a missing (lowered) floor, for every recognized floor.
+        var recorded = facts.HighestRecordedFloor ?? (facts.FloorRecorded ? MinimumFloor : null);
+        if (recorded is { } highestRecorded && highestRecorded > (facts.InstalledFloor ?? 0))
         {
             return (false, "ContentAcceptanceRuleFloorMissing(recorded in the migration history, constraint absent)");
         }

@@ -1,0 +1,37 @@
+8915f77c10299c08b27e36d40b7a2388d1e38d0f plus the uncommitted working tree (git status --short below)
+ M docs/security/E3_M2B1_CARV_OPERATIONS.md
+ M docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md
+ M docs/security/E3_M2C_IMPLEMENTATION_RECORD.md
+ M src/authority/AuthorizationAuthority.Api/Composition/ContentAcceptanceFloorCommand.cs
+ M src/authority/AuthorizationAuthority.Api/Composition/ContentAcceptanceRuleGuard.cs
+ M src/authority/AuthorizationAuthority.Application/Features/Content/ContentAcceptancePolicy.cs
+ M src/authority/AuthorizationAuthority.Application/Features/Content/ContentAcceptanceRules.cs
+ M src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs
+ M src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeRules.cs
+ M src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceRuleConnection.cs
+ M src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceRuleSchemaReader.cs
+ M src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceWriteFence.cs
+ M tests/authority/AuthorizationAuthority.Tests/ContentAcceptanceFloorTests.cs
+ M tests/authority/AuthorizationAuthority.Tests/ContentAcceptancePolicyTests.cs
+ M tests/authority/AuthorizationAuthority.Tests/ContentAcceptanceRuleGuardTests.cs
+ M tests/authority/AuthorizationAuthority.Tests/ContributorWriteProtocolTests.ContentAcceptanceRules.cs
+ M tests/authority/AuthorizationAuthority.Tests/ContributorWriteProtocolTests.EnvelopeSchema2.cs
+ M tests/authority/AuthorizationAuthority.Tests/ContributorWriteProtocolTests.EnvelopeSchemaTie.cs
+ M tests/authority/AuthorizationAuthority.Tests/ContributorWriteProtocolTests.cs
+ M tests/authority/AuthorizationAuthority.Tests/ProtectionReconciliationTests.cs
+ M tests/features/EnterpriseForms.Api.ContractTests/AuthorityContentAcceptancePolicyStartupTests.cs
+ M trust_authority/DISASTER_RECOVERY_OPERATOR_RUNBOOK.md
+ M trust_authority/trust-authority.openapi.yaml
+?? docs/evidence/e3-m2d/
+?? docs/security/E3_M2D_IMPLEMENTATION_RECORD.md
+?? scripts/dev/e3-m2d-carv2-pg-gate.ps1
+?? src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeV2Rules.cs
+?? src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceFloor2Sql.cs
+?? src/authority/AuthorizationAuthority.Infrastructure/Persistence/FloorMigrations/20261115200000_AuthorityContentAcceptanceRuleFloor2.Designer.cs
+?? src/authority/AuthorizationAuthority.Infrastructure/Persistence/FloorMigrations/20261115200000_AuthorityContentAcceptanceRuleFloor2.cs
+?? tests/architecture/EnterpriseForms.ArchitectureTests/EnvelopeV2RuleBoundaryTests.cs
+?? tests/authority/AuthorizationAuthority.Tests/ContentAcceptanceFloor2Tests.cs
+?? tests/authority/AuthorizationAuthority.Tests/ContributorWriteProtocolTests.EnvelopeV2.cs
+?? tests/authority/AuthorizationAuthority.Tests/EnvelopeV2RulesTests.cs
+?? tests/features/EnterpriseForms.Api.ContractTests/EnvelopeV2AuthorityCompatibilityTests.cs
+?? tools/experiments/e3-m2d-carv2-gate/
