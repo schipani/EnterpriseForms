@@ -287,7 +287,10 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
 
         var fieldsById = fields.ToDictionary(f => f.FieldDefinitionId);
         var optionsById = options.ToDictionary(o => o.FieldOptionId);
-        var decrypted = await Values.DecryptedFieldValues.DecryptAsync(encryption, candidateValues, cancellationToken).ConfigureAwait(false); // E-1: the values this caller just submitted
+        // E3-M2c OD-M2c-02a path C: candidateValues are always this request's own fresh seals (ApplyValuesDetailedAsync with no current
+        // rows, then ProtectAsync), on the first attempt and on every retry or replay; committed or staged rows of an earlier attempt are
+        // never formatted here (a head past revision 1 returns the verified read above). Self-sealed mode enforces that at run time.
+        var decrypted = await Values.DecryptedFieldValues.DecryptSelfSealedAsync(encryption, candidateValues, cancellationToken).ConfigureAwait(false);
         return new FormRecordResponse(formRecordId, context.OrganizationId, formDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true,
             candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, optionsById, decrypted), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue, FormRecordGroupId: v.FormRecordGroupId)).ToList(),
             "Committed(" + accepted.ArchiveState + ")",

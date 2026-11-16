@@ -5,16 +5,32 @@ using Xunit;
 namespace EnterpriseForms.ArchitectureTests;
 
 /// <summary>
-/// E3-M1: the Envelope v2 cryptographic core is isolated and disconnected from production execution until E3-M2 is separately
-/// authorized. (1) No type outside its namespace, in any product assembly (Business and Authority), references a v2 type — in a
-/// signature, field, base type, interface or method body. (2) Every v2 type is non-public, so only the contract tests reach it
-/// (InternalsVisibleTo). (3) v2 code references no logging, console, debug or trace API, so plaintext, seeds and derived keys
-/// cannot reach a log through it. DecryptionCallSiteTests separately pins its decrypt call sites and treats its two entry points
-/// as decrypting operations.
+/// E3-M1: the Envelope v2 cryptographic core is isolated. E3-M2c (dark readers) opens exactly one door: (1) outside the namespace,
+/// in any product assembly (Business and Authority), only the verified decryption paths of <c>AesGcmFieldEncryptionService</c> and
+/// <c>AesGcmFileEncryptionService</c> reference v2 code, and only <c>EnvelopeV2ProductReader</c> (and its nested types) — in a
+/// signature, field, base type, interface or method body; no product code references the opener, the document cipher, the seal
+/// batch or the key schedule directly. (2) The product reader itself references no writer entry point (seal batch, document
+/// encryption) and no key schedule, so v2 writers stay unreachable from product code. (3) Every v2 type is non-public, so only
+/// the contract tests reach the rest (InternalsVisibleTo). (4) v2 code references no logging, console, debug or trace API, so
+/// plaintext, seeds and derived keys cannot reach a log through it. DecryptionCallSiteTests separately pins its decrypt call sites.
 /// </summary>
 public sealed class EnvelopeV2IsolationTests
 {
     private const string EnvelopeV2Namespace = "EnterpriseForms.Infrastructure.Features.Documents.EnvelopeV2";
+    private const string ProductReader = EnvelopeV2Namespace + ".EnvelopeV2ProductReader";
+
+    /// <summary>E3-M2c: the only product types (with their compiler-generated nested types) allowed to reference the v2 product reader.</summary>
+    private static readonly HashSet<string> ApprovedGatewayUsers = new(StringComparer.Ordinal)
+    {
+        "EnterpriseForms.Infrastructure.Features.FormRecords.AesGcmFieldEncryptionService",
+        "EnterpriseForms.Infrastructure.Features.Documents.AesGcmFileEncryptionService",
+    };
+
+    /// <summary>Writer entry points and key material of the core that the product reader must never reach.</summary>
+    private static readonly string[] WriterOrKeyTypes =
+    [
+        EnvelopeV2Namespace + ".FieldSealBatchV2", EnvelopeV2Namespace + ".EnvelopeV2KeySchedule", EnvelopeV2Namespace + ".DocumentEncryptionV2Outcome",
+    ];
 
     private static readonly string[] ForbiddenPrefixes =
     [
@@ -32,7 +48,7 @@ public sealed class EnvelopeV2IsolationTests
             })
             .Order(StringComparer.Ordinal);
 
-    private static bool InEnvelopeV2(TypeReference type)
+    private static TypeReference Outermost(TypeReference type)
     {
         var outer = type;
         while (outer.DeclaringType is { } declaring)
@@ -40,8 +56,17 @@ public sealed class EnvelopeV2IsolationTests
             outer = declaring;
         }
 
-        return outer.Namespace == EnvelopeV2Namespace;
+        return outer;
     }
+
+    private static bool InEnvelopeV2(TypeReference type) => Outermost(type).Namespace == EnvelopeV2Namespace;
+
+    private static bool IsProductReader(TypeReference type) => Outermost(type).FullName == ProductReader;
+
+    /// <summary>Members of the core a method body calls or loads (the writer check is member-level: <c>DocumentEnvelopeV2Cipher</c> holds both directions).</summary>
+    private static IEnumerable<string> ReferencedMembers(TypeDefinition type) =>
+        type.Methods.Where(m => m.HasBody).SelectMany(m => m.Body.Instructions).Select(i => i.Operand).OfType<MethodReference>()
+            .Select(m => m.DeclaringType.GetElementType().FullName + "::" + m.Name);
 
     private static IEnumerable<TypeReference> Flatten(TypeReference? type)
     {
@@ -85,9 +110,10 @@ public sealed class EnvelopeV2IsolationTests
     }
 
     [Fact]
-    public void NoProductCodeOutsideTheCoreReferencesEnvelopeV2()
+    public void OnlyTheApprovedDecryptionServicesReachEnvelopeV2AndOnlyThroughTheProductReader()
     {
         var violations = new SortedSet<string>(StringComparer.Ordinal);
+        var gatewayUses = new SortedSet<string>(StringComparer.Ordinal);
         var coreTypes = 0;
         foreach (var path in ProductAssemblies())
         {
@@ -102,6 +128,12 @@ public sealed class EnvelopeV2IsolationTests
 
                 foreach (var referenced in Referenced(type).Where(InEnvelopeV2))
                 {
+                    if (IsProductReader(referenced) && ApprovedGatewayUsers.Contains(Outermost(type).FullName))
+                    {
+                        gatewayUses.Add(Outermost(type).FullName);
+                        continue;
+                    }
+
                     violations.Add(type.FullName + " -> " + referenced.FullName);
                 }
             }
@@ -109,6 +141,27 @@ public sealed class EnvelopeV2IsolationTests
 
         Assert.True(coreTypes >= 10, "the Envelope v2 core was not found in the scanned assemblies");
         Assert.Empty(violations);
+        Assert.Equal(ApprovedGatewayUsers.Order(StringComparer.Ordinal), gatewayUses); // both verified readers are wired (E3-M2c)
+    }
+
+    [Fact]
+    public void TheProductReaderReachesNoWriterEntryPointOrKeySchedule()
+    {
+        var found = OverInfrastructureTypes(types =>
+        {
+            var reader = types.Where(t => InEnvelopeV2(t) && IsProductReader(t)).ToList();
+            var referencedTypes = reader.SelectMany(Referenced).Select(r => r.FullName).ToHashSet(StringComparer.Ordinal);
+            var members = reader.SelectMany(ReferencedMembers).ToHashSet(StringComparer.Ordinal);
+            return (Count: reader.Count, Types: referencedTypes, Members: members);
+        });
+
+        Assert.True(found.Count >= 3, "the product reader and its nested types were not found");
+        // Positive control: the scan sees what the reader is supposed to call.
+        Assert.Contains(EnvelopeV2Namespace + ".FieldEnvelopeV2Opener::OpenAsync", found.Members);
+        Assert.Contains(EnvelopeV2Namespace + ".DocumentEnvelopeV2Cipher::DecryptAsync", found.Members);
+        Assert.All(WriterOrKeyTypes, writer => Assert.DoesNotContain(writer, found.Types));
+        Assert.DoesNotContain(EnvelopeV2Namespace + ".DocumentEnvelopeV2Cipher::EncryptAsync", found.Members);
+        Assert.DoesNotContain(found.Members, m => m.StartsWith(EnvelopeV2Namespace + ".FieldSealBatchV2::", StringComparison.Ordinal));
     }
 
     [Fact]

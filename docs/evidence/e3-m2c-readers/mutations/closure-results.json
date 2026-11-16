@@ -1,0 +1,232 @@
+[
+  {
+    "id": "MU-11",
+    "title": "path C switched to verified mode",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/CreateFormRecord/CreateFormRecordHandler.cs",
+    "built": true,
+    "contract": {
+      "total": 233,
+      "failed": 3,
+      "succeeded": 230
+    },
+    "architecture": {
+      "total": 144,
+      "failed": 2,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.HandlerDecryptionModeTests.CreationRetryAfterACrashBetweenStageAndCommitCommitsTheStagedRowsButAnswersWithItsOwnFreshSeals",
+      "EnterpriseForms.Api.ContractTests.HandlerDecryptionModeTests.CreationReplayAnswersWithFreshSealsAndNeverDecryptsTheCommittedRows",
+      "EnterpriseForms.Api.ContractTests.HandlerDecryptionModeTests.CreationFirstAttemptAnswersWithItsOwnSealsInSelfSealedModeOnly"
+    ],
+    "architecture_failures": [
+      "EnterpriseForms.ArchitectureTests.DecryptionCallSiteTests.EveryDecryptionCallSiteIsReviewedAndAllowListed",
+      "EnterpriseForms.ArchitectureTests.DecryptionCallSiteTests.SelfSealedCallersArePinnedToTheReviewedInventory"
+    ],
+    "contract_rc": 2,
+    "architecture_rc": 2,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 55
+  },
+  {
+    "id": "MU-12",
+    "title": "path E sends every released row to self-sealed mode",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/UpdateFormRecord/UpdateFormRecordHandler.cs",
+    "built": true,
+    "contract": {
+      "total": 233,
+      "failed": 4,
+      "succeeded": 229
+    },
+    "architecture": {
+      "total": 144,
+      "failed": 0,
+      "succeeded": 144
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.PhaseC5SharedEditTests.PathETheSharedEditResponseDecryptsEditedRowsSelfSealedAndCopiedRowsVerified",
+      "EnterpriseForms.Api.ContractTests.PhaseC5SharedEditTests.PathEAnIdempotentReplayKeepsTheSameSplitAndCannotPassStoredContentAsSelfSealed",
+      "EnterpriseForms.Api.ContractTests.HandlerDecryptionModeTests.SharedEditAnswersEditedRowsSelfSealedCopiedRowsVerifiedAndNothingUnshared",
+      "EnterpriseForms.Api.ContractTests.HandlerDecryptionModeTests.SharedEditReplayAnswersNoChangeWithoutSelfSealingAndAStaleRevisionIsRefused"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 68
+  },
+  {
+    "id": "MU-13",
+    "title": "path E sends every released row to verified mode",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/UpdateFormRecord/UpdateFormRecordHandler.cs",
+    "built": true,
+    "contract": {
+      "total": 233,
+      "failed": 3,
+      "succeeded": 230
+    },
+    "architecture": {
+      "total": 144,
+      "failed": 0,
+      "succeeded": 144
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.PhaseC5SharedEditTests.PathETheSharedEditResponseDecryptsEditedRowsSelfSealedAndCopiedRowsVerified",
+      "EnterpriseForms.Api.ContractTests.PhaseC5SharedEditTests.PathEAnIdempotentReplayKeepsTheSameSplitAndCannotPassStoredContentAsSelfSealed",
+      "EnterpriseForms.Api.ContractTests.HandlerDecryptionModeTests.SharedEditAnswersEditedRowsSelfSealedCopiedRowsVerifiedAndNothingUnshared"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 47
+  },
+  {
+    "id": "MX-1",
+    "title": "closure: registry ignores the recorded binding (identity only)",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/Values/DecryptedFieldValues.cs",
+    "built": true,
+    "contract": {
+      "total": 233,
+      "failed": 1,
+      "succeeded": 232
+    },
+    "architecture": {
+      "total": 144,
+      "failed": 0,
+      "succeeded": 144
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.DecryptionClosureRuntimeTests.MutatingARegisteredSealVoidsItsProvenanceButStagingMetadataDoesNot"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 61
+  },
+  {
+    "id": "MX-2",
+    "title": "closure: fingerprint JSON parsed leniently (unknown members ignored)",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/CreateFormRecord/CreationRequestFingerprint.cs",
+    "built": true,
+    "contract": {
+      "total": 233,
+      "failed": 4,
+      "succeeded": 229
+    },
+    "architecture": {
+      "total": 144,
+      "failed": 0,
+      "succeeded": 144
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.DecryptionClosureRuntimeTests.StoredFingerprintJsonCarryingAnyEnvelopeV2OrSchemaMemberIsRefused(member: \"\\\"KeyWrapAlgorithmCode\\\":2\")",
+      "EnterpriseForms.Api.ContractTests.DecryptionClosureRuntimeTests.StoredFingerprintJsonCarryingAnyEnvelopeV2OrSchemaMemberIsRefused(member: \"\\\"RowSignatureSchemaVersion\\\":2\")",
+      "EnterpriseForms.Api.ContractTests.DecryptionClosureRuntimeTests.StoredFingerprintJsonCarryingAnyEnvelopeV2OrSchemaMemberIsRefused(member: \"\\\"DataKeyIdentifier\\\":\\\"019a5b2c-1000-7000-8000-00000\"\ufffd\ufffd\ufffd)",
+      "EnterpriseForms.Api.ContractTests.DecryptionClosureRuntimeTests.StoredFingerprintJsonCarryingAnyEnvelopeV2OrSchemaMemberIsRefused(member: \"\\\"DataKeyCommitmentBytes\\\":\\\"AAAA\\\"\")"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 45
+  },
+  {
+    "id": "MX-3",
+    "title": "closure: fingerprint operation skips its envelope-version check (second layer: v1 core)",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/FormRecords/AesGcmFieldEncryptionService.cs",
+    "built": true,
+    "contract": {
+      "total": 233,
+      "failed": 0,
+      "succeeded": 233
+    },
+    "architecture": {
+      "total": 144,
+      "failed": 0,
+      "succeeded": 144
+    },
+    "contract_failures": [],
+    "architecture_failures": [],
+    "contract_rc": 0,
+    "architecture_rc": 0,
+    "detected": false,
+    "restored_hash_matches": true,
+    "seconds": 55
+  },
+  {
+    "id": "MX-4a",
+    "title": "closure: fingerprint operation accepts a key of any length - INEFFECTIVE: `if (false)` fails to compile (unreachable code is an error); superseded by MX-4",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/FormRecords/AesGcmFieldEncryptionService.cs",
+    "built": false,
+    "detected": true,
+    "by": "build",
+    "log": "tudio Code\\EnterpriseForms\\src\\backend\\EnterpriseForms.Infrastructure\\Features\\FormRecords\\AesGcmFieldEncryptionService.cs(243,13): error CS0162: Unreachable code detected [<repo>\\src\\backend\\EnterpriseForms.Infrastructure\\EnterpriseForms.Infrastructure.csproj]\n\nBuild FAILED.\n\n<repo>\\src\\backend\\EnterpriseForms.Infrastructure\\Features\\FormRecords\\AesGcmFieldEncryptionService.cs(243,13): error CS0162: Unreachable code detected [<repo>\\src\\backend\\EnterpriseForms.Infrastructure\\EnterpriseForms.Infrastructure.csproj]\n    0 Warning(s)\n    1 Error(s)\n\nTime Elapsed 00:00:10.09\n<repo>\\src\\backend\\EnterpriseForms.Infrastructure\\Features\\FormRecords\\AesGcmFieldEncryptionService.cs(243,13): error CS0162: Unreachable code detected [<repo>\\src\\backend\\EnterpriseForms.Infrastructure\\EnterpriseForms.Infrastructure.csproj]\n\nBuild FAILED.\n\n<repo>\\src\\backend\\EnterpriseForms.Infrastructure\\Features\\FormRecords\\AesGcmFieldEncryptionService.cs(243,13): error CS0162: Unreachable code detected [<repo>\\src\\backend\\EnterpriseForms.Infrastructure\\EnterpriseForms.Infrastructure.csproj]\n    0 Warning(s)\n    1 Error(s)\n\nTime Elapsed 00:00:10.10\n",
+    "restored_hash_matches": true,
+    "seconds": 21
+  },
+  {
+    "id": "MX-4",
+    "title": "closure: fingerprint operation accepts a key of any length",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/FormRecords/AesGcmFieldEncryptionService.cs",
+    "built": true,
+    "contract": {
+      "total": 233,
+      "failed": 1,
+      "succeeded": 232
+    },
+    "architecture": {
+      "total": 144,
+      "failed": 0,
+      "succeeded": 144
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.DecryptionClosureRuntimeTests.AStoredFieldValueEnvelopeCannotBeOpenedThroughTheFingerprintException"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 51
+  },
+  {
+    "id": "MX-5",
+    "title": "closure: fingerprint check back on the raw self-sealed API",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/CreateFormRecord/CreationRequestFingerprint.cs",
+    "built": true,
+    "contract": {
+      "total": 233,
+      "failed": 3,
+      "succeeded": 230
+    },
+    "architecture": {
+      "total": 144,
+      "failed": 5,
+      "succeeded": 139
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.HandlerDecryptionModeTests.CreationRetryAfterACrashBetweenStageAndCommitCommitsTheStagedRowsButAnswersWithItsOwnFreshSeals",
+      "EnterpriseForms.Api.ContractTests.HandlerDecryptionModeTests.CreationReplayAnswersWithFreshSealsAndNeverDecryptsTheCommittedRows",
+      "EnterpriseForms.Api.ContractTests.HandlerDecryptionModeTests.ACreationReplayAfterTheRecordWasEditedAnswersThroughTheVerifiedReader"
+    ],
+    "architecture_failures": [
+      "EnterpriseForms.ArchitectureTests.EnvelopeRowFidelityTests.EveryConstructionSiteOfAnEnvelopeRowIsReviewed",
+      "EnterpriseForms.ArchitectureTests.DecryptionCallSiteTests.EveryDecryptionCallSiteIsReviewedAndAllowListed",
+      "EnterpriseForms.ArchitectureTests.DecryptionCallSiteTests.TheRawSingleValueApiIsReachedOnlyThroughTheFieldValueWrappers",
+      "EnterpriseForms.ArchitectureTests.DecryptionCallSiteTests.SelfSealedCallersArePinnedToTheReviewedInventory",
+      "EnterpriseForms.ArchitectureTests.DecryptionCallSiteTests.OnlyTheCreationFingerprintCheckOpensStoredFingerprintKeys"
+    ],
+    "contract_rc": 2,
+    "architecture_rc": 2,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 59
+  }
+]

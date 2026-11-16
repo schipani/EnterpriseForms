@@ -66,7 +66,8 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             target = await VerifiedHistoricVersionAsync(context, formRecordId, fileAttachmentId, requested, cancellationToken).ConfigureAwait(false);
         }
 
-        var envelope = new FileEncryptionEnvelope(target.EncryptionAlgorithmName, target.EncryptionEnvelopeVersion, target.EncryptionKeyReference, target.WrappedDataKey, target.EncryptionNoncePrefix, target.EncryptionSegmentSizeBytes);
+        // E3-M2c: the stored envelope with its signed schema and Envelope v2 columns; the verified reader dispatches on them (S-8).
+        var envelope = VerifiedDocumentEnvelope.Of(target);
         var aad = new FileEncryptionContext(target.TenantId, target.FormRecordId, target.FileAttachmentId, target.VersionNumber);
         await AuditRecorder.RecordAsync(store, context, clock, AuditCategories.Document, AuditActions.DocumentDownloaded, "authorized document download released", formRecordId, "Success", new { fileAttachmentId, versionNumber = target.VersionNumber }, cancellationToken).ConfigureAwait(false);
         var captured = target;
@@ -75,7 +76,7 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             await using var ciphertext = await storage.OpenReadAsync(StorageArea.Documents, captured.StorageObjectKey, ct).ConfigureAwait(false);
             try
             {
-                await encryption.DecryptAsync(ciphertext, output, envelope, aad, ct).ConfigureAwait(false);
+                await encryption.DecryptVerifiedAsync(ciphertext, output, envelope, aad, ct).ConfigureAwait(false);
             }
             catch (Exception ex) when (FormRecords.Encryption.DecryptionFailure.Find(ex) is not null)
             {

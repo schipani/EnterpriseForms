@@ -189,6 +189,50 @@ public sealed class AesGcmFileEncryptionService(IEncryptionKeyProvider keys) : I
         }
     }
 
+    /// <summary>
+    /// E3-M2c: strict S-8 dispatch of an Authority-verified document version. (schema 1, envelope 1, no v2 column) uses the
+    /// unchanged v1 decryptor above; (schema 2, envelope 2, every v2 column) uses the Envelope v2 reader, which validates the whole
+    /// envelope and the version identity before the seed is unwrapped and checks the key commitment before any segment. Anything else
+    /// (schema 0 included) is refused before the key provider is asked; there is no fallback between formats.
+    /// </summary>
+    public async Task DecryptVerifiedAsync(Stream ciphertext, Stream plaintextSink, VerifiedDocumentEnvelope envelope, FileEncryptionContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(ciphertext);
+        ArgumentNullException.ThrowIfNull(plaintextSink);
+        ArgumentNullException.ThrowIfNull(envelope);
+        ArgumentNullException.ThrowIfNull(context);
+        var anyV2Column = envelope.DataKeyIdentifier is not null || envelope.DataKeyCommitmentBytes is not null || envelope.KeyWrapAlgorithmCode is not null;
+        var everyV2Column = envelope.DataKeyIdentifier is not null && envelope.DataKeyCommitmentBytes is not null && envelope.KeyWrapAlgorithmCode is not null;
+        switch ((envelope.SignedSchemaVersion, envelope.EnvelopeVersion))
+        {
+            case (1, EnvelopeVersion) when !anyV2Column:
+                await DecryptAsync(ciphertext, plaintextSink, new FileEncryptionEnvelope(envelope.AlgorithmName, envelope.EnvelopeVersion, envelope.KeyReference, envelope.WrappedDataKey, envelope.NoncePrefix, envelope.SegmentSizeBytes), context, cancellationToken).ConfigureAwait(false);
+                return;
+            case (2, 2) when everyV2Column:
+                break;
+            default:
+                var refusal = new CryptographicException("unsupported signed schema and envelope version combination for a verified document read");
+                DecryptionFailure.ForDocument(DecryptionFailureReasons.UnsupportedEnvelope, context.TenantId, context.FormRecordId, context.FileAttachmentId, context.VersionNumber).AttachTo(refusal);
+                throw refusal;
+        }
+
+        try
+        {
+            var prepared = EnvelopeV2.EnvelopeV2ProductReader.PrepareDocument(envelope, context);
+            if (!keys.IsConfigured)
+            {
+                throw new EncryptionUnavailableException("no encryption key provider is configured");
+            }
+
+            await prepared.DecryptAsync(ciphertext, plaintextSink, keys, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (EnvelopeV2.EnvelopeV2ProductReader.ReasonFor(ex) is { } reason)
+        {
+            DecryptionFailure.ForDocument(reason, context.TenantId, context.FormRecordId, context.FileAttachmentId, context.VersionNumber).AttachTo(ex);
+            throw;
+        }
+    }
+
     /// <summary>The exact v1 segment AAD (internal for the known-answer vectors).</summary>
     internal static byte[] Aad(FileEncryptionContext c, uint segment, bool isFinal)
     {

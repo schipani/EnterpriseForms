@@ -1,0 +1,20 @@
+﻿powershell : WARNING! The following warnings were returned from Vault:
+At line:1 char:416
++ ... cratchpad"; powershell -NoProfile -ExecutionPolicy Bypass -File scrip ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (WARNING! The fo...ned from Vault::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+  * Supplying a custom ID for the token uses the weaker SHA1 hashing instead
+  of the more secure SHA2-256 HMAC for token obfuscation. SHA1 hashed tokens
+  on the wire leads to less secure lookups.
+
+Vault ready: two organizations provisioned; second organization field-value key at versions 1 and 2
+
+Test run summary: Passed! - <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+  total: 3
+  failed: 0
+  succeeded: 3
+  skipped: 0
+  duration: 859ms

@@ -623,6 +623,11 @@
       "bytes": 224335
     },
     {
+      "path": "docs/security/E3_M2C_IMPLEMENTATION_RECORD.md",
+      "sha256": "767eb32f327da74f428d83cd8cc8acc03680d63e6b34ebba8f719b56a7531444",
+      "bytes": 43742
+    },
+    {
       "path": "docs/security/E3_M2_AUTHORITY_DATABASE_CONTRACT.md",
       "sha256": "dc029d23ac153b59be08e74d3ae685fc7d313dc30522c59dfb14f3f004a3fcbf",
       "bytes": 85922
@@ -901,6 +906,11 @@
       "path": "scripts/dev/e3-m2b2-s4-pg-gate.ps1",
       "sha256": "1fe3705162ba34714e7c0809380adbfe40a54835ef74adf0908004d2b48ecba8",
       "bytes": 6263
+    },
+    {
+      "path": "scripts/dev/e3-m2c-vault-reader.ps1",
+      "sha256": "a56fdbb76d4a7032c631a0b1716ece7f0bbdcda1f5b7a298021618f8d6bdb436",
+      "bytes": 3806
     },
     {
       "path": "scripts/dev/e5-vault-hmac-integration.ps1",

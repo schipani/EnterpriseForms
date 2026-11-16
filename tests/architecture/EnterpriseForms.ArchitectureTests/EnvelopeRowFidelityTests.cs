@@ -35,8 +35,8 @@ public sealed partial class EnvelopeRowFidelityTests
             "Clone helper for every byte-identical carry of a field row (upload commit, document handlers, lifecycle, protection migration, shared edits).",
         ["EnterpriseForms.Application.Features.FormRecords.Staging.CandidateBuilder.CloneAttachment -> FileAttachmentVersion"] =
             "Clone helper for every per-operation copy of a document version row.",
-        ["EnterpriseForms.Application.Features.FormRecords.CreateFormRecord.CreationRequestFingerprint+Envelope.ToValue -> FieldEncryptedValue"] =
-            "Transient decrypt input for the creation-idempotency sealed key (unsigned JSON, F-03): never staged, signed or cloned; its v2 shape is an E3-M4 writer concern.",
+        ["EnterpriseForms.Infrastructure.Features.FormRecords.AesGcmFieldEncryptionService.OpenCreationFingerprintKeyAsync -> FieldEncryptedValue"] =
+            "Transient decrypt input for the creation-idempotency sealed key (unsigned JSON, F-03), built inside the narrow fingerprint operation (E3-M2c R-M2c-1) with the fixed seal identity, envelope 1, schema 0 and no v2 column: never staged, signed or cloned; its v2 shape is an E3-M4 writer concern.",
         ["EnterpriseForms.Application.Features.Documents.Processing.DocumentProcessingService.ProcessAsync -> FileAttachmentVersion"] =
             "The processed (pre-commit) document version; its signed schema follows the envelope the encryption service produced (S-1).",
     };

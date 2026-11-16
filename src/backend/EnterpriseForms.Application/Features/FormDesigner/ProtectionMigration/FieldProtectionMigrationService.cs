@@ -216,8 +216,9 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             }
             else
             {
+                // E3-M2c OD-M2c-02a path A: the self-check decrypts only the envelope ProtectAsync just sealed from this record's plaintext (self-sealed mode).
                 converted = await FieldValueCodec.ProtectAsync(value, field, optionsById, encryption, cancellationToken).ConfigureAwait(false);
-                if (converted is not FieldEncryptedValue || await FieldValueCodec.FormatAsync(converted, optionsById, encryption, cancellationToken).ConfigureAwait(false) != FieldValueCodec.Format(value, optionsById))
+                if (converted is not FieldEncryptedValue || await FieldValueCodec.FormatSelfSealedAsync(converted, optionsById, encryption, cancellationToken).ConfigureAwait(false) != FieldValueCodec.Format(value, optionsById))
                 {
                     return Failure(item, "REPROTECT_SELF_CHECK_FAILED");
                 }

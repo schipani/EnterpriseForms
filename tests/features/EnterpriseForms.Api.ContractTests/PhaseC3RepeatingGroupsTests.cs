@@ -67,7 +67,7 @@ public sealed class PhaseC3RepeatingGroupsTests
     private sealed record State(List<FieldValueRowBase> Values, List<FormRecordGroupRevision> Occurrences);
 
     private static CandidateBuilder.ApplyResult Apply(FormLayout layout, IReadOnlyList<FieldDefinition> fields, IReadOnlyList<FieldOption> options, IReadOnlyList<GroupDefinition> groups, State? current, Dictionary<string, string>? values, IReadOnlyList<CandidateBuilder.GroupWrite>? writes, bool creating = false, IReadOnlySet<Guid>? editable = null, RecordWriteOrigin origin = RecordWriteOrigin.User) =>
-        InProcessCompletion.Completed(CandidateBuilder.ApplyValuesDetailedAsync(current?.Values ?? [], values ?? [], layout, fields, options, editable, Tenant, Record, Now, Actor, options.ToDictionary(o => o.FieldOptionId), Encryption, CancellationToken.None, origin, creating,
+        InProcessCompletion.Completed(CandidateBuilder.ApplyValuesDetailedAsync(VerifiedFixtureRows.AsCommitted(current?.Values ?? []), values ?? [], layout, fields, options, editable, Tenant, Record, Now, Actor, options.ToDictionary(o => o.FieldOptionId), Encryption, CancellationToken.None, origin, creating,
             new CandidateBuilder.GroupInput(groups, current?.Occurrences ?? [], writes)));
 
     private static State StateOf(CandidateBuilder.ApplyResult result) => new(result.Rows, result.Occurrences);
@@ -80,7 +80,7 @@ public sealed class PhaseC3RepeatingGroupsTests
     }
 
     private static string WireIn(State state, FieldDefinition field, Guid? occurrence, IReadOnlyList<FieldOption> options) =>
-        FieldValueCodec.FormatField(field, state.Values.Where(r => r.FieldDefinitionId == field.FieldDefinitionId && r.FormRecordGroupId == occurrence), options.ToDictionary(o => o.FieldOptionId), InProcessCompletion.Completed(DecryptedFieldValues.DecryptAsync(Encryption, state.Values, CancellationToken.None)));
+        FieldValueCodec.FormatField(field, state.Values.Where(r => r.FieldDefinitionId == field.FieldDefinitionId && r.FormRecordGroupId == occurrence), options.ToDictionary(o => o.FieldOptionId), InProcessCompletion.Completed(DecryptedFieldValues.DecryptSelfSealedAsync(Encryption, state.Values, CancellationToken.None)));
 
     // ---- people section fixture --------------------------------------------------------------------------------------
 
