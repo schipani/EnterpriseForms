@@ -1,0 +1,52 @@
+{
+  "id": "MZ-09b",
+  "kind": "MZ",
+  "what": "record on admit: every exception of an admitted request is recorded (catch no longer limited to the floor refusal)",
+  "files": [
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs": "3898d8967194ab22cb844f0875603a06aefeb98df66c4d838f5808b83d33fc97"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "H",
+      "exit": 0,
+      "seconds": 37.4
+    },
+    {
+      "build": "X",
+      "exit": 0,
+      "seconds": 36.0
+    },
+    {
+      "letter": "H",
+      "classes": [
+        "CapabilityRefusalEvidenceHostTests"
+      ],
+      "exit": 2,
+      "seconds": 8.3,
+      "total": 4,
+      "succeeded": 3,
+      "failed": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.AdmittedRequestsAndOtherErrorsAreNeverRecorded"
+      ]
+    },
+    {
+      "letter": "X",
+      "classes": [
+        "CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "exit": 2,
+      "seconds": 2.9,
+      "total": 20,
+      "succeeded": 19,
+      "failed": [
+        "EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceRecorderBoundaryTests.TheRecorderIsReachedOnlyThroughTheFilterAndItsRetryService"
+      ]
+    }
+  ],
+  "seconds": 84.7
+}

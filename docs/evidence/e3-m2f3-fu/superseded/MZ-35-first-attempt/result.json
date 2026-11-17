@@ -1,0 +1,78 @@
+{
+  "id": "MZ-35",
+  "kind": "MZ",
+  "what": "an INVALID index (indisvalid = false) is classified as present (ValidMatching) by the shared classification of the command and T2-8",
+  "files": [
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/CapabilityRefusalEvidenceIndex.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/CapabilityRefusalEvidenceIndex.cs": "85661647f058848625428acf73f85273eaf87f25b6cdb0fced066a7b4ab9dac1"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "R",
+      "exit": 0,
+      "seconds": 22.9
+    },
+    {
+      "build": "A",
+      "exit": 0,
+      "seconds": 29.1
+    },
+    {
+      "build": "X",
+      "exit": 0,
+      "seconds": 39.4
+    },
+    {
+      "letter": "A",
+      "classes": [
+        "CapabilityRefusalEvidenceIndexTests"
+      ],
+      "exit": 2,
+      "seconds": 2.9,
+      "total": 40,
+      "succeeded": 39,
+      "failed": [
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceIndexTests.AnApprovedButUnusableIndexWithoutAVisibleBuildIsInvalid(valid:"
+      ]
+    },
+    {
+      "letter": "X",
+      "classes": [
+        "CapabilityRefusalEvidenceIndexBoundaryTests"
+      ],
+      "exit": 0,
+      "seconds": 2.3,
+      "total": 21,
+      "succeeded": 21,
+      "failed": []
+    },
+    {
+      "kind": "PG3I",
+      "groups": "",
+      "exit": 1,
+      "seconds": 57.7,
+      "report": true,
+      "checks": 40,
+      "failed": [
+        "I-11",
+        "I-15",
+        "I-16",
+        "I-17",
+        "I-21"
+      ]
+    },
+    {
+      "kind": "PG3G",
+      "groups": "L",
+      "exit": 1,
+      "seconds": 0.7,
+      "report": false,
+      "failed": null
+    }
+  ],
+  "seconds": 155.0
+}

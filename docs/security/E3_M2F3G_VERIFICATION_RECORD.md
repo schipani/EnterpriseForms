@@ -11,6 +11,9 @@
 | Result | **Three runs of record on fresh disposable PostgreSQL 18.0 + Vault: run-1 68/68; run-2 67/68 (M-03: one of 420 burst requests failed inside a host with a Windows socket-buffer exhaustion before reaching the capability check; harness correction HC-10; safety unaffected); run-3 68/68. **Two passing runs of record: run-1 and run-3**.** Mutations: **7 of 7 PostgreSQL mutations DETECTED; MZ-22 SURVIVED as an equivalent mutant (re-reviewed); all restored; restored baseline green**. Regressions: Authority 1204/1208 (4 skipped), architecture 214/214, contract 940/952 in four of five full runs (one unidentified failure in the first; TS-M2f-01 open) |
 | Review | Owner-led. Not an independent security review and not a certification. Disposable-container planner and timing results do not establish Azure PostgreSQL behaviour or performance |
 | Final closure 2026-11-17 | Owner, 2026-11-17: E3-M2f-3a, -3i, -3b and -3G **accepted for Development/Testing within their verified scope**; final closure documentation, validation and one controlled local SSH-signed commit authorized. Not authorized: push, merge, deployment, Azure, persistent database change, Stage B. Reconciled verification matrix: §12. Committed locally with the E3-M2f-3 closure; not pushed or merged |
+| Update 2026-11-17 (FU-M2f3-01/02) | Test-only follow-up executed, uncommitted, owner review pending (`E3_M2F3_FU_VERIFICATION_RECORD.md`): M2F3-22 and M2F3-25 passed as dedicated tests; M2F3-43 **failed as written**; MZ-02, -13, -24, -34, -35, -36 detected, **MZ-09 survived** (non-equivalent), MZ-03 not executable as written; M2F3-21 reclassified to reduced scope. The counts of §12.1/§12.2 are superseded by that record's §5. The gate script received harness correction HC-12 (its preflight no longer matches committed evidence). PD-15 remains **not met** |
+| Final closure 2026-11-17 (Option A) | Implementation workstream closed for Development/Testing; PD-15 remains **OPEN**; M2F3-43 FAILED, tracked as SEC-BL-01; current matrix and remaining gaps in `E3_M2F3_CONTRACT_CLOSURE.md` §14.1 |
+| Update 2026-11-17 (follow-up) | FU-M2f3-03 executed (M2F3-21 Passed; MZ-09 DETECTED); M2F3-43 design investigation (documentation only); MZ-22 and MZ-03 owner dispositions; HC-12 retained and applied to the E3-M2e-2 gate. Current matrix: `E3_M2F3_FU_VERIFICATION_RECORD.md` §10.5. PD-15 remains **not met** |
 
 ---
 
@@ -336,6 +339,8 @@ PD-15 asks that §10.1, §10.2 and §10.5 be green, that §10.3 and §10.4 be gr
 - M2F3-44 is inconclusive.
 - M2F3-28 ran in reduced form and M2F3-33 did not run.
 - Eight MZ identifiers were not executed, and MZ-22 survived as an equivalent mutant.
+
+*(Note 2026-11-17, FU-M2f3-01/02: executed; updated accounting in `E3_M2F3_FU_VERIFICATION_RECORD.md` §5: closure tests 73 passed, 6 reduced, 1 failed (M2F3-43), 1 inconclusive, 1 not executed, 0 missing dedicated coverage; mutations 33 of 36 identifiers detected, MZ-09 and MZ-22 survived, MZ-03 not executable as written. PD-15 still not met.)*
 
 The owner's acceptance is of the increments **within their verified scope**. The items above are outside that scope and stay open as **FU-M2f3-01** (dedicated tests for M2F3-22, -25 and -43), **FU-M2f3-02** (mutations MZ-02, -03, -09, -13, -24, -34, -35, -36, or a recorded decision that they are not expressible), together with the bound-organization scenarios, TS-M2f-01 and the unidentified contract failure. No product or security-contract change was made to close them.
 

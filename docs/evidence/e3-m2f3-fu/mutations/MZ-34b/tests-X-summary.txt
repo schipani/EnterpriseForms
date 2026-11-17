@@ -1,0 +1,12 @@
+failed EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceIndexBoundaryTests.TheCommandNeverReachesTheOrdinaryMigrationPathOrRepairsAnything(forbidden: "BeginTransaction") (2ms)
+  Assert.DoesNotContain() Failure: Sub-string found
+                                        (pos 9286)
+failed EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceIndexBoundaryTests.TheCommandBoundsLockWaitsAndTakesItsLockBeforeInspectingAndBuildsInItsOwnStatement (1ms)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.ArgumentOutOfRangeException : Index was out of range. Must be non-negative and less than or equal to the size of the collection. (Parameter 'startIndex')
+    at System.Globalization.Ordinal.IndexOf(String source, String value, Int32 startIndex, Int32 count, Boolean ignoreCase)
+Test run summary: Failed! - <clone>\tests\architecture\EnterpriseForms.ArchitectureTests\bin\Debug\net10.0\EnterpriseForms.ArchitectureTests.dll (net10.0|x64)
+  total: 21
+  failed: 2
+  succeeded: 19
+  skipped: 0
+  duration: 825ms

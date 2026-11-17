@@ -1,0 +1,26 @@
+{
+  "id": "BASE-PG3I",
+  "kind": "BASE",
+  "what": "unmutated: E3-M2f-3i PostgreSQL gate",
+  "files": [],
+  "original_sha256": {},
+  "restored": true,
+  "verdict": "SURVIVED",
+  "results": [
+    {
+      "build": "R",
+      "exit": 0,
+      "seconds": 23.3
+    },
+    {
+      "kind": "PG3I",
+      "groups": "",
+      "exit": 0,
+      "seconds": 57.3,
+      "report": true,
+      "checks": 40,
+      "failed": []
+    }
+  ],
+  "seconds": 80.6
+}

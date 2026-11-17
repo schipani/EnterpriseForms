@@ -1,0 +1,9 @@
+failed EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidencePreFloorHostTests.RequestsRejectedBeforeTheFloorProduceNoEvidenceOnAnyOfTheSevenRoutes (4s 835ms)
+  prepare / unregistered organization: an evidence transaction began
+    at EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidencePreFloorHostTests.RequestsRejectedBeforeTheFloorProduceNoEvidenceOnAnyOfTheSevenRoutes() in <clone>\tests\features\EnterpriseForms.Api.ContractTests\CapabilityRefusalEvidencePreFloorHostTests.cs:316
+Test run summary: Failed! - <clone>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+  total: 5
+  failed: 1
+  succeeded: 4
+  skipped: 0
+  duration: 8s 825ms

@@ -1,0 +1,35 @@
+{
+  "id": "V22-1",
+  "kind": "V",
+  "what": "any AuthorityException is treated as a capability refusal (context synthesized when absent): pre-floor rejections inside the endpoint reach the recorder",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidence.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidence.cs": "98d2e8be46996196a55aedaa47197f03c960fbd3907e75b9a42326983e7f96fa"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "H",
+      "exit": 0,
+      "seconds": 39.5
+    },
+    {
+      "letter": "H",
+      "classes": [
+        "CapabilityRefusalEvidencePreFloorHostTests",
+        "CapabilityRefusalEvidenceHostTests"
+      ],
+      "exit": 2,
+      "seconds": 9.5,
+      "total": 5,
+      "succeeded": 4,
+      "failed": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidencePreFloorHostTests.RequestsRejectedBeforeTheFloorProduceNoEvidenceOnAnyOfTheSevenRoutes"
+      ]
+    }
+  ],
+  "seconds": 49.1
+}

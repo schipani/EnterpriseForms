@@ -1,0 +1,74 @@
+{
+  "id": "MZ-02a",
+  "kind": "MZ",
+  "what": "record inside T1: the floor stages the evidence entry in the refused transaction (not committed; T1 rolls back)",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeCapabilityFloor.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeCapabilityFloor.cs": "2c800bc40328734cf002764eaf087a81cf0a431b0228d3e48d80127deb6706ed"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "A",
+      "exit": 0,
+      "seconds": 28.8
+    },
+    {
+      "build": "H",
+      "exit": 0,
+      "seconds": 37.9
+    },
+    {
+      "build": "X",
+      "exit": 0,
+      "seconds": 36.5
+    },
+    {
+      "letter": "A",
+      "classes": [
+        "CapabilityRefusalEvidenceRecorderTests",
+        "EnvelopeCapabilityFloorTests"
+      ],
+      "exit": 2,
+      "seconds": 3.0,
+      "total": 88,
+      "succeeded": 86,
+      "failed": [
+        "AuthorizationAuthority.Tests.EnvelopeCapabilityFloorTests.M2F07AndM2F22TheEffectiveFloorIsTheMaximumAndOnlyLevelOneAtFloorOneReadsTheLedger(clientLevel:"
+      ]
+    },
+    {
+      "letter": "H",
+      "classes": [
+        "CapabilityRefusalEvidenceHostTests",
+        "EnvelopeCapabilityEnforcementHostTests"
+      ],
+      "exit": 2,
+      "seconds": 8.7,
+      "total": 17,
+      "succeeded": 14,
+      "failed": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.EveryCapabilityRouteRecordsOneEntryOnlyAfterTheRefusedTransactionWasDisposed",
+        "EnterpriseForms.Api.ContractTests.EnvelopeCapabilityEnforcementHostTests.EveryContentEndpointRefusesAnUndeclaredOrUnknownCapabilityInABoundOrganizationBeforeAnyOtherStep",
+        "EnterpriseForms.Api.ContractTests.EnvelopeCapabilityEnforcementHostTests.M2F28TheBusinessSeesANonRetryableRefusalAndAnswersUsersWithAServiceUnavailableCondition"
+      ]
+    },
+    {
+      "letter": "X",
+      "classes": [
+        "CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "exit": 2,
+      "seconds": 3.4,
+      "total": 20,
+      "succeeded": 19,
+      "failed": [
+        "EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceRecorderBoundaryTests.OnlyTheRecorderAppendsTheEvidenceKind"
+      ]
+    }
+  ],
+  "seconds": 118.4
+}

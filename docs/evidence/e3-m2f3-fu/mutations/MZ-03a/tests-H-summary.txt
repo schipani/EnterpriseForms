@@ -1,0 +1,9 @@
+failed EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.EveryCapabilityRouteRecordsOneEntryOnlyAfterTheRefusedTransactionWasDisposed (3s 596ms)
+  verify: T2 began only after T1 was disposed
+    at EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.EveryCapabilityRouteRecordsOneEntryOnlyAfterTheRefusedTransactionWasDisposed() in <clone>\tests\features\EnterpriseForms.Api.ContractTests\CapabilityRefusalEvidenceHostTests.cs:250
+Test run summary: Failed! - <clone>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+  total: 4
+  failed: 1
+  succeeded: 3
+  skipped: 0
+  duration: 7s 461ms

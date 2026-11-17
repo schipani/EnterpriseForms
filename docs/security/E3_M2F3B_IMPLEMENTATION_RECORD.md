@@ -132,6 +132,8 @@ Detected: MZ-01, -04, -05, -06, -07, -08, -10, -11, -12, -14, -15, -16, -17, -18
 
 **Not executed:** MZ-02 and MZ-03 (recording inside T1 or before the handler returns: not expressible as a local edit without restructuring the entry points; guarded by the host ordering test and the architecture tests), MZ-09 (recording on admission: structurally impossible, the context exists only on the refusal exception; the filter's catch-only shape is pinned), MZ-13 (covered by MZ-12, the same mechanism), MZ-24 (lookup before the lock: guarded by the architecture order test), MZ-34..MZ-36 (E3-M2f-3i command; outside this increment).
 
+*(Note 2026-11-17, FU-M2f3-02, `E3_M2F3_FU_VERIFICATION_RECORD.md` §3: these were executed in a scratch clone. MZ-02 (staging or committing the entry in T1), MZ-13, MZ-24 and MZ-34..36 are DETECTED. The statement above that MZ-09 is structurally impossible does not hold: a context synthesized from the request arguments expresses it, and its success-path form (MZ-09a) **SURVIVED** every declared and full suite. MZ-03 is not executable as written; its closest expressible variant (T1 disposed only after the refusal left the entry point) was DETECTED by the M2F3-17 host test and is not counted.)*
+
 ## 10. Failures, skips and inconclusive checks
 
 | Item | Classification |

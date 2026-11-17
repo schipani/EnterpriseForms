@@ -664,23 +664,33 @@
     },
     {
       "path": "docs/security/E3_M2F3B_IMPLEMENTATION_RECORD.md",
-      "sha256": "78dc285cfaa4ad18afc4e2b5582e1908f18e54e8d3bd2a98a944714d8879c5ca",
-      "bytes": 22560
+      "sha256": "90314f0862f60c2bbde542d3fedb8da8dcd28bc51111adbc621dc47e91cb46dd",
+      "bytes": 23162
     },
     {
       "path": "docs/security/E3_M2F3G_VERIFICATION_RECORD.md",
-      "sha256": "557b7ae0f7f7144b5cbb7f347a691f203b6bcefed2c35ed0285ceca22c3037f3",
-      "bytes": 43305
+      "sha256": "ae17e6b7da45b5cd33cd927194d7c8c8ada77af122c156c07481c607e7610351",
+      "bytes": 44768
     },
     {
       "path": "docs/security/E3_M2F3I_IMPLEMENTATION_RECORD.md",
-      "sha256": "dd3ee70e6f19bc2c237cc3059950df6fa1fb5ae019390cde3929c29d4d71b3c2",
-      "bytes": 17315
+      "sha256": "4438ec177cb29d460f13df6a3a5507494e16284052bd721559c2b227d6c1f4cb",
+      "bytes": 17602
     },
     {
       "path": "docs/security/E3_M2F3_CONTRACT_CLOSURE.md",
-      "sha256": "f9fbd4a1b44af21af10a928e98972b3e3908d80adef41f7dc7d0969902e365b1",
-      "bytes": 90520
+      "sha256": "da228e8f57c3739d391dd9ed995dd706438870cfe851aab9910f1ad78ec6dabb",
+      "bytes": 96124
+    },
+    {
+      "path": "docs/security/E3_M2F3_DELIVERED_ENTRY_VERIFICATION_DESIGN.md",
+      "sha256": "f832f476d5eb31ca9606b8231e36db677c1f564b2743e42ca17240043d19cbb5",
+      "bytes": 21734
+    },
+    {
+      "path": "docs/security/E3_M2F3_FU_VERIFICATION_RECORD.md",
+      "sha256": "2888b65e06e1966eeba29c7bf2690783500fdb3064d58751b5f56fd684836741",
+      "bytes": 36584
     },
     {
       "path": "docs/security/E3_M2F_CONTRACT_CLOSURE.md",
@@ -751,6 +761,11 @@
       "path": "docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md",
       "sha256": "888feee620960f2165344ba8a7e6f4b54aa290680443a2279c32c0375c98fadb",
       "bytes": 25148
+    },
+    {
+      "path": "docs/security/SECURITY_BACKLOG.md",
+      "sha256": "b772fa9efa5633eff477c746bc70841678644a7c96b5d316b8970adb8c83269d",
+      "bytes": 3154
     },
     {
       "path": "docs/security/stage-a-vault-transit-vectors.json",
@@ -989,8 +1004,8 @@
     },
     {
       "path": "scripts/dev/e3-m2e2-acceptance-pg-gate.ps1",
-      "sha256": "c2526b600a0ae2847d3c757d4b592305ec4d5504981578276c9875f8da0c56ad",
-      "bytes": 27823
+      "sha256": "fb3d88e50761b5bb5b0f7ddb3a98f0fa7d785e1edc334891582b3a082a830b2d",
+      "bytes": 28160
     },
     {
       "path": "scripts/dev/e3-m2e2-mutations.ps1",
@@ -1003,9 +1018,19 @@
       "bytes": 28259
     },
     {
+      "path": "scripts/dev/e3-m2f3-fu-mutations.py",
+      "sha256": "4b8cdcde5679791d6dc9893d385be01fa1f62095a74d863a010510a9bca99e20",
+      "bytes": 27198
+    },
+    {
+      "path": "scripts/dev/e3-m2f3-hc12-preflight-check.ps1",
+      "sha256": "8b765b68a7146d05ec7fd44a16444376a4d16935e09104a67e952de6cd501f34",
+      "bytes": 4275
+    },
+    {
       "path": "scripts/dev/e3-m2f3g-evidence-pg-gate.ps1",
-      "sha256": "88abce0e15551106b03d7742b45eba67d1f3a0f0387a2d2fde76e27edadfeb69",
-      "bytes": 20412
+      "sha256": "52c56227eecb382e06094cb827b46b0c1e6f7d57b9050d4eddd8a07112c13d81",
+      "bytes": 20687
     },
     {
       "path": "scripts/dev/e3-m2f3g-mutations.ps1",

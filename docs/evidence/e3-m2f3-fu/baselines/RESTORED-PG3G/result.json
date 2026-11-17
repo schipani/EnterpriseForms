@@ -1,0 +1,26 @@
+{
+  "id": "RESTORED-PG3G",
+  "kind": "BASE",
+  "what": "restored tree after all mutations: E3-M2f-3G PostgreSQL gate, groups T and L",
+  "files": [],
+  "original_sha256": {},
+  "restored": true,
+  "verdict": "SURVIVED",
+  "results": [
+    {
+      "build": "R",
+      "exit": 0,
+      "seconds": 22.7
+    },
+    {
+      "kind": "PG3G",
+      "groups": "T,L",
+      "exit": 0,
+      "seconds": 102.7,
+      "report": true,
+      "checks": 31,
+      "failed": []
+    }
+  ],
+  "seconds": 125.4
+}

@@ -1,0 +1,40 @@
+[
+  {
+    "id": "BASE-FU03",
+    "kind": "BASE",
+    "verdict": "SURVIVED",
+    "restored": true,
+    "files": [],
+    "failed": {
+      "H": []
+    }
+  },
+  {
+    "id": "MZ-09a-fu03",
+    "kind": "MZ",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs"
+    ],
+    "failed": {
+      "H": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceAdmittedSuccessHostTests.SuccessfullyCompletedAdmittedRequestsProduceNoEvidenceTelemetryOrRetry"
+      ]
+    }
+  },
+  {
+    "id": "MZ-09b-fu03",
+    "kind": "MZ",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs"
+    ],
+    "failed": {
+      "H": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.AdmittedRequestsAndOtherErrorsAreNeverRecorded"
+      ]
+    }
+  }
+]

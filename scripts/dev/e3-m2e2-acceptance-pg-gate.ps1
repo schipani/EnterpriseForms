@@ -160,7 +160,10 @@ function Get-FrozenBusinessBuild([string]$commit) {
 }
 
 function Get-ConfigEnablers {
-    $hits = git -C $repo grep -n -i 'EnvelopeV2AcceptanceEnabled' -- '*.json' '*.yaml' '*.yml' '*.env' '*.bicep' '*.bicepparam' 2>$null
+    # HC-12 (FU-M2f3, 2026-11-17; same correction as scripts/dev/e3-m2f3g-evidence-pg-gate.ps1): committed gate evidence (docs/evidence)
+    # quotes the setting name in check descriptions; it is test output, not configuration, and is excluded so the preflight keeps
+    # checking every configuration file.
+    $hits = git -C $repo grep -n -i 'EnvelopeV2AcceptanceEnabled' -- '*.json' '*.yaml' '*.yml' '*.env' '*.bicep' '*.bicepparam' ':(exclude)docs/evidence/**' 2>$null
     return @($hits | Where-Object { $_ })
 }
 

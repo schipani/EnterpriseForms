@@ -1,0 +1,9 @@
+failed EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceAdmittedSuccessHostTests.SuccessfullyCompletedAdmittedRequestsProduceNoEvidenceTelemetryOrRetry (4s 264ms)
+  Assert.Single() Failure: The collection contained 2 items
+  Collection: [[2] = ["Begin", "LockOrganizationAsync", "CountPendingArchiveAsync", "get_SearchIndex", "index.FindProjectionStateAsync", ���], [3] = ["Begin", "SetCapabilityEvidenceLockTimeoutAsync", "LockOrganizationAsync", "StartCapabilityEvidenceLookupAsync", "IsCapabilityRefusalEvidenceIndexUsableAsync", ���]]
+Test run summary: Failed! - <clone>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+  total: 5
+  failed: 1
+  succeeded: 4
+  skipped: 0
+  duration: 8s 251ms

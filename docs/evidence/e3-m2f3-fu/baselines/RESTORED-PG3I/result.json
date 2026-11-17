@@ -1,0 +1,26 @@
+{
+  "id": "RESTORED-PG3I",
+  "kind": "BASE",
+  "what": "restored tree after all mutations: E3-M2f-3i PostgreSQL gate",
+  "files": [],
+  "original_sha256": {},
+  "restored": true,
+  "verdict": "SURVIVED",
+  "results": [
+    {
+      "build": "R",
+      "exit": 0,
+      "seconds": 22.1
+    },
+    {
+      "kind": "PG3I",
+      "groups": "",
+      "exit": 0,
+      "seconds": 59.0,
+      "report": true,
+      "checks": 40,
+      "failed": []
+    }
+  ],
+  "seconds": 81.1
+}

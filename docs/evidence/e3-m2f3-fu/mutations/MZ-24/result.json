@@ -1,0 +1,73 @@
+{
+  "id": "MZ-24",
+  "kind": "MZ",
+  "what": "look up before taking the organization lock (clock, index check and lookup moved before LockOrganizationAsync)",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs": "334aada9cfc27cbe6ec7852bfe28b20ba728f37c64da04c010e8e60e36ad26b1"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "R",
+      "exit": 0,
+      "seconds": 24.5
+    },
+    {
+      "build": "A",
+      "exit": 0,
+      "seconds": 29.5
+    },
+    {
+      "build": "X",
+      "exit": 0,
+      "seconds": 36.0
+    },
+    {
+      "letter": "A",
+      "classes": [
+        "CapabilityRefusalEvidenceRecorderTests"
+      ],
+      "exit": 2,
+      "seconds": 3.1,
+      "total": 28,
+      "succeeded": 26,
+      "failed": [
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AFirstRefusalCommitsOneEntryWithTheExactFootprint",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ConcurrentInstancesNeverExceedOnePerKeyOrSevenPerBucket"
+      ]
+    },
+    {
+      "letter": "X",
+      "classes": [
+        "CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "exit": 2,
+      "seconds": 3.4,
+      "total": 20,
+      "succeeded": 19,
+      "failed": [
+        "EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceRecorderBoundaryTests.TheEvidenceTransactionFollowsTheSpecifiedOrder"
+      ]
+    },
+    {
+      "kind": "PG3G",
+      "groups": "T",
+      "exit": 1,
+      "seconds": 76.9,
+      "report": true,
+      "checks": 19,
+      "failed": [
+        "T-01",
+        "T-05",
+        "T-06",
+        "T-08",
+        "T-09"
+      ]
+    }
+  ],
+  "seconds": 173.5
+}
