@@ -1,0 +1,8 @@
+added EnterpriseForms.Application.dll
+added EnterpriseForms.Contracts.dll
+added EnterpriseForms.Domain.dll
+added EnterpriseForms.Infrastructure.dll
+took the business Microsoft.IdentityModel.Abstractions.dll 8.23.0.0 (Authority has 8.19.2.0)
+took the business Microsoft.IdentityModel.JsonWebTokens.dll 8.23.0.0 (Authority has 8.19.2.0)
+took the business Microsoft.IdentityModel.Logging.dll 8.23.0.0 (Authority has 8.19.2.0)
+took the business Microsoft.IdentityModel.Tokens.dll 8.23.0.0 (Authority has 8.19.2.0)

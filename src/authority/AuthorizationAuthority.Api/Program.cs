@@ -29,6 +29,21 @@ public sealed class Program
             return probeExitCode;
         }
 
+        // E3-M2f-3i: the capability-refusal evidence index, a separate privileged step (migration identity, CREATE INDEX
+        // CONCURRENTLY, no EF migration, no grant re-application). It refuses --migrate and the floor command alongside it, so it
+        // is dispatched first.
+        if (CapabilityRefusalEvidenceIndexCommand.TryRun(args, out var evidenceIndexExitCode))
+        {
+            return evidenceIndexExitCode;
+        }
+
+        // E3-M2b-1F: Release B only, an explicit operator action; ordinary --migrate never applies the floor, and the two are
+        // never combined in one invocation (the command refuses --migrate alongside it).
+        if (ContentAcceptanceFloorCommand.TryRun(args, out var floorExitCode))
+        {
+            return floorExitCode;
+        }
+
         if (MigrateCommand.TryRun(args, out var migrateExitCode))
         {
             return migrateExitCode;
@@ -68,6 +83,16 @@ public sealed class Program
             builder.Configuration[AuthorizationAuthority.Application.Features.Content.ShareContributorWriteSwitch.ConfigurationKey],
             builder.Environment.IsProduction(),
             builder.Environment.IsEnvironment("Testing")));
+        // E3-M2e (OD-M2e-07): Envelope v2 acceptance; off unless the deployment sets exactly "true"; refused outside Development/Testing,
+        // without Release B RequiredFloor 3, or without the data-key ledger migration. E3-M2e-1 is dark: never enabled.
+        builder.Services.AddEnvelopeV2Acceptance();
+        // E3-M2f-2 (§9): the business envelope capability floor; deployment floor from Content:MinimumBusinessEnvelopeCapability (absent => 1,
+        // exactly "1" or "2" otherwise; anything else refuses the start). The check itself runs at the seven content entry points.
+        builder.Services.AddEnvelopeCapabilityFloor();
+
+        // E3-M2f-3b: bounded capability-refusal evidence on the organization audit stream (recorder, endpoint filter on the seven
+        // capability routes, in-memory retry). Never changes a refusal; adds no endpoint, permission or configuration key.
+        builder.Services.AddCapabilityRefusalEvidence();
         AuthorizationAuthority.Api.Features.Health.TestStackIdentityEndpoints.RefuseOutsideTesting(builder.Configuration, builder.Environment);
         builder.Services.AddInternalAuthentication(builder.Configuration);
         // Phase C8 AC-9: read-only outcome lookup for the business reconciler (own credential, rate limit; bad limits fail at startup).

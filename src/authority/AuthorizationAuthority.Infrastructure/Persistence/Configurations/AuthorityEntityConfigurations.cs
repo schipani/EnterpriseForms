@@ -264,7 +264,16 @@ public sealed class ContentChangeOperationConfiguration : IEntityTypeConfigurati
         builder.HasIndex(e => new { e.OrganizationId, e.FormRecordId, e.OperationStateName, e.OperationCreatedOn }).HasDatabaseName("ix_content_ops_org_record_state");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_content_op_org");
         builder.HasOne<IdentityBinding>().WithMany().HasForeignKey(e => e.ActorIdentityBindingId).HasConstraintName("fk_content_op_actor");
-        builder.ToTable(t => t.HasCheckConstraint("ck_content_operation_state", "operation_state_name IN ('Prepared','Committed','Aborted','Quarantined')"));
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_content_operation_state", "operation_state_name IN ('Prepared','Committed','Aborted','Quarantined')");
+
+            // E3-M2b-1 CARV (contract §19.5): the model mirrors migration AuthorityContentAcceptanceRuleVersion, which creates these
+            // with hand-written SQL together with the state-guard trigger. Every comparison is preceded by IS NOT NULL: PostgreSQL
+            // accepts a CHECK that evaluates to NULL (design-gate defect D-1).
+            t.HasCheckConstraint(ContentAcceptanceRuleSql.PositiveCheckName, ContentAcceptanceRuleSql.PositiveCheckSql);
+            t.HasCheckConstraint(ContentAcceptanceRuleSql.CommitCheckName, ContentAcceptanceRuleSql.CommitCheckSql);
+        });
     }
 }
 
@@ -318,6 +327,33 @@ public sealed class ContentItemIdentityConfiguration : IEntityTypeConfiguration<
             t.HasCheckConstraint("ck_content_item_identity_anchor",
                 "(manifest_item_kind_code IN (3, 4, 5)) = (bound_field_definition_id IS NOT NULL) AND (manifest_item_kind_code = 2) = (bound_group_definition_id IS NOT NULL) "
                 + "AND (manifest_item_kind_code = 1) = (bound_form_definition_id IS NOT NULL) AND (bound_form_record_group_id IS NULL OR manifest_item_kind_code IN (3, 4))");
+        });
+    }
+}
+
+/// <summary>
+/// E3-M2e (docs/security/E3_M2E_CONTRACT_CLOSURE.md §3.1): the data-key ledger. The relationship to the operation is modelled so EF
+/// inserts the operation before its bindings in the Prepare transaction (L-5). The P-1 binding guard and P-2 immutability triggers
+/// are created by the migration's SQL (<see cref="Persistence.ContentDataKeyLedgerSql"/>).
+/// </summary>
+public sealed class ContentDataKeyBindingConfiguration : IEntityTypeConfiguration<ContentDataKeyBinding>
+{
+    public void Configure(EntityTypeBuilder<ContentDataKeyBinding> builder)
+    {
+        builder.MapSnakeCase("content_data_key_bindings");
+        builder.HasKey(e => e.ContentDataKeyBindingId);
+        builder.HasIndex(e => e.DataKeyIdentifier).IsUnique().HasDatabaseName(Persistence.ContentDataKeyLedgerSql.UniqueIdentifierIndex);
+        builder.HasIndex(e => new { e.OrganizationId, e.FormRecordId }).HasDatabaseName("ix_content_data_key_bindings_record");
+        builder.HasIndex(e => e.BindingContentChangeOperationId).HasDatabaseName("ix_content_data_key_bindings_operation");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_content_data_key_binding_org").OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ContentChangeOperation>().WithMany().HasForeignKey(e => e.BindingContentChangeOperationId).HasConstraintName("fk_content_data_key_binding_operation").OnDelete(DeleteBehavior.Restrict);
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_content_data_key_binding_kind", "envelope_payload_kind_code IN (1, 2)");
+            t.HasCheckConstraint("ck_content_data_key_binding_commitment", "octet_length(data_key_commitment_bytes) = 32");
+            t.HasCheckConstraint("ck_content_data_key_binding_count", "binding_item_count >= 1 AND (envelope_payload_kind_code = 1 OR binding_item_count = 1)");
+            t.HasCheckConstraint("ck_content_data_key_binding_identifier_v7",
+                "substring(data_key_identifier::text FROM 15 FOR 1) = '7' AND substring(data_key_identifier::text FROM 20 FOR 1) IN ('8', '9', 'a', 'b')");
         });
     }
 }

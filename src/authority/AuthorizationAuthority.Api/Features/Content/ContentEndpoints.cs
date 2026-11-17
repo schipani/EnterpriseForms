@@ -16,9 +16,11 @@ public static partial class ContentEndpoints
             {
                 var actor = InternalAuthentication.TryActor(context, validator);
                 var key = SecurityCommandEndpoints.RequireIdempotencyKey(context);
-                return TypedResults.Accepted((string?)null, await service.PrepareAsync(actor, request, key, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+                return TypedResults.Accepted((string?)null, await service.PrepareAsync(actor, request, key, InternalAuthentication.Correlation(context), cancellationToken, InternalAuthentication.EnvelopeCapability(context)).ConfigureAwait(false));
             })
             .WithName("PrepareContentChange")
+            .WithEnvelopeCapabilityContract()
+            .WithCapabilityRefusalEvidence(AuthorizationAuthority.Application.Features.Content.CapabilityRefusalEvidence.EntryPoints.Prepare)
             .WithSummary("Validates the exact candidate snapshot against the accepted head and the actor's edit scope (or, without a user, the reprotection rules of an effective PublishFormSecurityRevision command), then signs it. Not a generic signing endpoint.");
 
         group.MapPost("/content-changes/{operationId:guid}/commit", static async Task<Ok<ContentRevision>> (Guid operationId, CommitContentChangeRequest request, HttpContext context, ContentService service, DelegatedUserAssertionValidator validator, IHostEnvironment environment, ILoggerFactory loggers, CancellationToken cancellationToken) =>
@@ -30,7 +32,7 @@ public static partial class ContentEndpoints
                 ContentRevision revision;
                 try
                 {
-                    revision = await service.CommitAsync(actor, operationId, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false);
+                    revision = await service.CommitAsync(actor, operationId, request, InternalAuthentication.Correlation(context), cancellationToken, InternalAuthentication.EnvelopeCapability(context)).ConfigureAwait(false);
                 }
                 finally
                 {
@@ -52,6 +54,8 @@ public static partial class ContentEndpoints
                 return TypedResults.Ok(revision);
             })
             .WithName("CommitContentChange")
+            .WithEnvelopeCapabilityContract()
+            .WithCapabilityRefusalEvidence(AuthorizationAuthority.Application.Features.Content.CapabilityRefusalEvidence.EntryPoints.Commit)
             .WithSummary("Proves the staged bytes equal the approved candidate and CAS-advances the trusted content head.");
 
         group.MapGet("/content-revisions/{organizationId:guid}/{formRecordId:guid}", static async Task<Ok<ContentRevision>> (Guid organizationId, Guid formRecordId, Guid? reprotectionCommandId, HttpContext context, ContentService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
@@ -72,17 +76,21 @@ public static partial class ContentEndpoints
         group.MapPost("/integrity/verify-record-projection", static async Task<Ok<VerifyRecordProjectionResult>> (VerifyRecordProjectionRequest request, HttpContext context, ContentService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
             {
                 var actor = InternalAuthentication.RequireActor(context, validator);
-                return TypedResults.Ok(await service.VerifyProjectionAsync(actor, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+                return TypedResults.Ok(await service.VerifyProjectionAsync(actor, request, InternalAuthentication.Correlation(context), cancellationToken, InternalAuthentication.EnvelopeCapability(context)).ConfigureAwait(false));
             })
             .WithName("VerifyRecordProjection")
+            .WithEnvelopeCapabilityContract()
+            .WithCapabilityRefusalEvidence(AuthorizationAuthority.Application.Features.Content.CapabilityRefusalEvidence.EntryPoints.Verify)
             .WithSummary("Compares the observed staged items with the complete accepted leaf index, verifies every signature and the root, and returns the authorized subset.");
 
         group.MapPost("/integrity/verify-record-projections", static async Task<Ok<VerifyRecordProjectionsResponse>> (VerifyRecordProjectionsRequest request, HttpContext context, ContentService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
             {
                 var actor = InternalAuthentication.RequireActor(context, validator);
-                return TypedResults.Ok(await service.VerifyProjectionsAsync(actor, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+                return TypedResults.Ok(await service.VerifyProjectionsAsync(actor, request, InternalAuthentication.Correlation(context), cancellationToken, InternalAuthentication.EnvelopeCapability(context)).ConfigureAwait(false));
             })
             .WithName("VerifyRecordProjections")
+            .WithEnvelopeCapabilityContract()
+            .WithCapabilityRefusalEvidence(AuthorizationAuthority.Application.Features.Content.CapabilityRefusalEvidence.EntryPoints.VerifyBatch)
             .WithSummary("Phase C7 OD-6: batch of 1..50 records, each verified exactly like VerifyRecordProjection (registry, discover/read, quarantine, archive receipt, complete leaf set, every signature, root, readable field scope) against the head the caller expects. Per-record typed results; mismatches quarantine the record; read action only. Not a signature oracle: every record needs the caller's own read or discover permission.");
 
         return endpoints;

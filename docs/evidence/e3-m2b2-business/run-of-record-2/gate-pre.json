@@ -1,0 +1,50 @@
+{
+  "gate": "E3-M2b-2 business PostgreSQL gate",
+  "phase": "pre",
+  "checksTotal": 7,
+  "checksFailed": 0,
+  "checks": [
+    {
+      "checkId": "PRE-01",
+      "description": "baseline: history at the previous migration, without the E3-M2b-2 migration or its columns",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "checkId": "PRE-02",
+      "description": "the business schema guard reports MigrationMissing for an unmigrated database (runtime role, real reader)",
+      "passed": true,
+      "detail": "MigrationMissing / BusinessSchemaMigrationMissing"
+    },
+    {
+      "checkId": "PRE-03",
+      "description": "the real Worker startup guard refuses to start on the unmigrated database and requests a host stop",
+      "passed": true,
+      "detail": "Refusing to start: the business database schema is not verified (BusinessSchemaMigrationMissing)."
+    },
+    {
+      "checkId": "PRE-04",
+      "description": "the real API monitor stops the host on the unmigrated database",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "checkId": "PRE-05",
+      "description": "the new EF model cannot read the envelope table of an unmigrated database (42703: fail closed even without the guard)",
+      "passed": true,
+      "detail": "42703"
+    },
+    {
+      "checkId": "PRE-06",
+      "description": "a pre-existing schema/envelope mismatch makes the migration fail (23514) and apply nothing (no columns, no CHECKs, old CHECK kept, no history row)",
+      "passed": true,
+      "detail": "23514 ck_field_encrypted_values_schema_envelope_tie"
+    },
+    {
+      "checkId": "PRE-07",
+      "description": "a concurrent open transaction makes the migration fail with lock_timeout (55P03) within the bound and roll back completely",
+      "passed": true,
+      "detail": "55P03 after 5.1 s"
+    }
+  ]
+}

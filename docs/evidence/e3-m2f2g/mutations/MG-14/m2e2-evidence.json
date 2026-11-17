@@ -1,0 +1,388 @@
+{
+  "harness": "E3-M2e-2 controlled Envelope v2 acceptance verification (real Authority build in-process; real E3-M1 core; business signed-column registry; disposable PostgreSQL 18.0 and Vault 1.20.4)",
+  "build": "ContentAcceptanceRules.CurrentVersion = 3; RecognizedFloors = 1,2,3; EnvelopeRules.AllowedEnvelopeVersions = 1",
+  "groups": "GC",
+  "isolation": {
+    "databases": [
+      "m2e2_floor2",
+      "m2e2gate",
+      "postgres"
+    ],
+    "scrubbedEnvironmentVariables": [],
+    "stopped": false
+  },
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "checksTotal": 27,
+  "checksFailed": 2,
+  "byKind": {
+    "Database": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    "Negative": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "Security": {
+      "total": 6,
+      "passed": 4,
+      "failed": 2
+    },
+    "Setup": {
+      "total": 15,
+      "passed": 15,
+      "failed": 0
+    }
+  },
+  "byGroup": {
+    "GC": {
+      "total": 7,
+      "passed": 5,
+      "failed": 2
+    },
+    "L": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    "S": {
+      "total": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    "setup": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    "teardown": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "m2e2Regression": {
+    "total": 20,
+    "failed": 0
+  },
+  "m2f2g": {
+    "total": 7,
+    "failed": 2,
+    "byKind": {
+      "Security": {
+        "total": 6,
+        "passed": 4,
+        "failed": 2
+      },
+      "Setup": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    "gapDemonstrations": {}
+  },
+  "expectedGapDemonstrations": 0,
+  "checks": [
+    {
+      "Id": "S-00",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "target identity: the primary and maintenance databases carry this run\u0027s nonce, the cluster\u0027s system identifier and port 5432 behind the run\u0027s loopback port",
+      "Expected": "admitted m2e2gate, postgres",
+      "Observed": "m2e2gate,postgres",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-01",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "inherited connection strings, content settings, Azure settings and environment overrides are removed from the harness process (and so from every child)",
+      "Expected": "none remaining",
+      "Observed": "removed []; remaining []",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-02",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "the ordinary --migrate runs before any runtime connection: it applies the ledger migration and never a floor",
+      "Expected": "runtime sessions 0; exit 0; floors none; ledger 20261116031706_AuthorityContentDataKeyBindings",
+      "Observed": "runtime sessions 0; exit 0; floors none; ledger 20261116031706_AuthorityContentDataKeyBindings",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-03",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "runtime role on the ledger: SELECT and INSERT only (L-8); the role is ordinary",
+      "Expected": "select=true insert=true update=false delete=false truncate=false; false false",
+      "Observed": "select=true insert=true update=false delete=false truncate=false; false false",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-04",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "floors 1 -\u003E 2 -\u003E 3 applied in order (focused run without group F)",
+      "Expected": "0 0 0; floors 3",
+      "Observed": "0 0 0; floors 3",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-10",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "target identity re-verified for every admitted database immediately before acceptance is enabled",
+      "Expected": "all admitted",
+      "Observed": "m2e2_floor2,m2e2gate,postgres",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-11",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "Release B with RequiredFloor = 3: the readiness guard is ready on floor 3 with the ledger migration",
+      "Expected": "True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3",
+      "Observed": "True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-12",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "the switch refuses to be configured on outside Development/Testing (Staging, Production) and without Release B RequiredFloor 3 (floor 2, Release A)",
+      "Expected": "refused: environment x2; refused: policy x2",
+      "Observed": "refused: environment; refused: environment; refused: policy; refused: policy",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-13",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "the Testing switch is configured on with its static prerequisites; acceptance is NOT effective before the exact policy is recorded",
+      "Expected": "configured True; prerequisites True; enabled False",
+      "Observed": "configured True; prerequisites True; enabled False",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-14",
+      "Kind": "Negative",
+      "Group": "S",
+      "Description": "missing policy observation: with the switch configured on but the policy unrecorded, a New v2 group is refused at Prepare (nothing signed, no operation, no binding)",
+      "Expected": "ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; unchanged",
+      "Observed": "ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; signatures 0-\u003E0; bindings 0-\u003E0; ops 0-\u003E0",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-15",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "the effective policy is recorded on the disposable platform journal (in-memory archive); acceptance becomes effective only then",
+      "Expected": "Recorded; body records the exact digest and acceptance requested; enabled True",
+      "Observed": "Recorded; body has the digest, requested on; enabled True",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-after-activation",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "F-E2 sentinel (after-activation): the runtime role\u0027s table grants equal the setup baseline",
+      "Expected": "unchanged",
+      "Observed": "unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-01",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "raw SQL positive control: the runtime role inserts a binding for a Prepared operation stamped 3 of the same organization and record (P-1 admits it)",
+      "Expected": "setup write OK; seed OK; insert OK",
+      "Observed": "setup OK; seed OK; insert OK",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-02",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "P-1 (database): a binding for a Committed operation is refused by the binding guard trigger",
+      "Expected": "23514 trg_content_data_key_binding_guard",
+      "Observed": "23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-03",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "global uniqueness (database): a second binding of an identifier is refused by the unique index",
+      "Expected": "23505 uq_content_data_key_binding_identifier",
+      "Observed": "23505 uq_content_data_key_binding_identifier: duplicate key value violates unique constraint \u0022uq_content_data_key_binding_identifier\u0022",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-04",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "L-8 (database): the runtime role has no UPDATE, DELETE or TRUNCATE privilege on the ledger",
+      "Expected": "42501 x3 (labelled expected)",
+      "Observed": "42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-05",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "P-2 (database): even the superuser is refused UPDATE, DELETE and TRUNCATE by the immutability triggers; the binding is intact",
+      "Expected": "23514 trg_content_data_key_binding_permanent x3; 1/1",
+      "Observed": "23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated; 1/1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GC-01",
+      "Kind": "Security",
+      "Group": "GC",
+      "Description": "M2F-34 FB-1 on real PostgreSQL (binding committed): while the first-binding Prepare holds the organization lock with its binding inserted but uncommitted, a level-1 Verify of another record WAITS on the organization lock (pg_stat_activity Lock wait, blocked by that Prepare) and cannot decide; after the Prepare commits, the Verify sees the binding and is refused",
+      "Expected": "paused at the binding insert; Prepare holds the org row and the ledger; Verify waits (blocked by the paused transaction); binding invisible to others while uncommitted; Prepare OK; Verify AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False",
+      "Observed": "paused True; Prepare holds [authority.\u0022AK_organization_authorization_states_organization_id\u0022:RowShareLock, authority.authority_relationship_edges:AccessShareLock, authority.authority_resources:AccessShareLock, authority.content_candidate_leaves:RowExclusiveLock, authority.content_change_operations:AccessShareLock, authority.content_change_operations:RowExclusiveLock, authority.content_change_operations:RowShareLock, authority.content_data_key_bindings:AccessShareLock, authority.content_data_key_bindings:RowExclusiveLock, authority.content_item_identities:AccessShareLock, authority.ef_migrations_history:AccessShareLock, authority.identity_bindings:AccessShareLock, authority.identity_bindings:RowShareLock, authority.integrity_key_registrations:AccessShareLock, authority.ix_authority_edges_subject:AccessShareLock, authority.\u0022IX_authority_relationship_edges_created_by_security_command_id\u0022:AccessShareLock, authority.\u0022IX_authority_relationship_edges_removed_by_security_command_id\u0022:AccessShareLock, authority.ix_authority_resources_form_scope:AccessShareLock, authority.\u0022IX_content_change_operations_actor_identity_binding_id\u0022:AccessShareLock, authority.\u0022IX_content_change_operations_actor_identity_binding_id\u0022:RowShareLock, authority.ix_content_data_key_bindings_operation:AccessShareLock, authority.ix_content_data_key_bindings_record:AccessShareLock, authority.ix_content_item_identities_record:AccessShareLock, authority.ix_content_ops_org_record_state:AccessShareLock, authority.ix_content_ops_org_record_state:RowShareLock, authority.\u0022IX_identity_bindings_organization_onboarding_request_id\u0022:AccessShareLock, authority.\u0022IX_identity_bindings_organization_onboarding_request_id\u0022:RowShareLock, authority.\u0022IX_identity_bindings_organization_owner_recovery_case_id\u0022:AccessShareLock, authority.\u0022IX_identity_bindings_organization_owner_recovery_case_id\u0022:RowShareLock, authority.ix_manifest_leaf_item:AccessShareLock, authority.\u0022IX_organization_authorization_states_organization_id\u0022:RowShareLock, authority.\u0022IX_record_content_heads_committed_operation_id\u0022:RowShareLock, authority.\u0022IX_record_content_heads_current_record_manifest_commit_id\u0022:RowShareLock, authority.\u0022IX_record_manifest_commits_committed_operation_id\u0022:AccessShareLock, authority.organization_authorization_states:RowShareLock, authority.\u0022PK_authority_relationship_edges\u0022:AccessShareLock, authority.\u0022PK_authority_resources\u0022:AccessShareLock, authority.\u0022PK_content_change_operations\u0022:AccessShareLock, authority.\u0022PK_content_change_operations\u0022:RowShareLock, authority.\u0022PK_content_data_key_bindings\u0022:AccessShareLock, authority.\u0022PK_content_item_identities\u0022:AccessShareLock, authority.\u0022PK_ef_migrations_history\u0022:AccessShareLock, authority.\u0022PK_identity_bindings\u0022:AccessShareLock, authority.\u0022PK_identity_bindings\u0022:RowShareLock, authority.\u0022PK_integrity_key_registrations\u0022:AccessShareLock, authority.\u0022PK_organization_authorization_states\u0022:RowShareLock, authority.\u0022PK_record_content_heads\u0022:RowShareLock, authority.\u0022PK_record_manifest_commits\u0022:AccessShareLock, authority.\u0022PK_record_manifest_leaves\u0022:AccessShareLock, authority.record_content_heads:RowShareLock, authority.record_manifest_commits:AccessShareLock, authority.record_manifest_leaves:AccessShareLock, authority.uq_authority_relationship_active:AccessShareLock, authority.uq_authority_resource:AccessShareLock, authority.uq_authority_user_per_org:AccessShareLock, authority.uq_authority_user_per_org:RowShareLock, authority.uq_content_data_key_binding_identifier:AccessShareLock, authority.uq_content_item_identity_item:AccessShareLock, authority.uq_content_op_idempotency:AccessShareLock, authority.uq_content_op_idempotency:RowShareLock, authority.uq_identity_subject:AccessShareLock, authority.uq_identity_subject:RowShareLock, authority.uq_integrity_key_org_purpose:AccessShareLock, authority.uq_manifest_committed_operation:AccessShareLock, authority.uq_manifest_leaf_key:AccessShareLock, authority.uq_manifest_leaf_position:AccessShareLock, authority.uq_manifest_record_revision:AccessShareLock, authority.uq_organization_onboarding_request:RowShareLock, authority.uq_record_content_head:RowShareLock, transactionid:ExclusiveLock]; waits Lock/transactionid on [SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_re] blocked by [m2e2-runtime-GC01P carv-v3] (the paused transaction); verify open True; visible bindings while paused 0; Prepare OK; Verify OK: verified True ; bindings now 1",
+      "Pass": false,
+      "Gap": null,
+      "Result": "FAIL"
+    },
+    {
+      "Id": "GC-02",
+      "Kind": "Security",
+      "Group": "GC",
+      "Description": "M2F-34 FB-1 (binding rolled back): the first-binding Prepare fails after inserting its binding and rolls back; the Verify that waited on the organization lock then sees no binding and is admitted (pre-binding), and no binding or operation survives",
+      "Expected": "paused; Verify waits (blocked by the paused transaction); Prepare fails; Verify OK: verified True; bindings 0; operations of the organization unchanged",
+      "Observed": "paused True; waits Lock/transactionid on [SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_re] blocked by [m2e2-runtime-GC02P carv-v3] (the paused transaction); Prepare InvalidOperationException; Verify OK: verified True ; bindings 0; operations 0",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GC-03",
+      "Kind": "Security",
+      "Group": "GC",
+      "Description": "M2F-34 FB-1 (reverse order) and no stale negative: a level-1 Verify paused right after its existence query holds the organization row lock and only an ACCESS SHARE lock on the ledger; the first-binding Prepare waits for it; the Verify is admitted (pre-binding); after the Prepare binds and commits, the SAME node and a second node are both refused",
+      "Expected": "Verify holds organization_authorization_states and content_data_key_bindings:AccessShareLock only; Prepare waits (blocked by the paused Verify); Verify OK: verified True; Prepare/Commit OK; same node AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; other node AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False",
+      "Observed": "paused True; Verify holds [authority.\u0022AK_organization_authorization_states_organization_id\u0022:AccessShareLock, authority.content_data_key_bindings:AccessShareLock, authority.ix_content_data_key_bindings_operation:AccessShareLock, authority.ix_content_data_key_bindings_record:AccessShareLock, authority.\u0022IX_organization_authorization_states_organization_id\u0022:AccessShareLock, authority.organization_authorization_states:AccessShareLock, authority.\u0022PK_content_data_key_bindings\u0022:AccessShareLock, authority.\u0022PK_organization_authorization_states\u0022:AccessShareLock, authority.uq_content_data_key_binding_identifier:AccessShareLock, authority.uq_organization_onboarding_request:AccessShareLock]; NO WAIT; Verify OK: verified True ; Prepare OK; Commit OK; same node AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; other node AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False",
+      "Pass": false,
+      "Gap": null,
+      "Result": "FAIL"
+    },
+    {
+      "Id": "GC-04",
+      "Kind": "Security",
+      "Group": "GC",
+      "Description": "closure \u00A74.2 point 4 on real PostgreSQL: a level-1 Prepare admitted in an unbound organization; its level-1 Commit waits on the organization lock of the concurrent first-binding Prepare and, once that commits, is refused: the operation stays Prepared (not aborted) and the head does not move. A current build then commits the same operation normally",
+      "Expected": "legacy Prepare OK (P = 3); Commit waits (blocked by the paused transaction); first-binding Prepare OK; legacy Commit AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; still 3/NULL Prepared; head unchanged; current Commit OK",
+      "Observed": "legacy Prepare OK; paused True; waits Lock/transactionid on [SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_re] blocked by [m2e2-runtime-GC04P carv-v3] (the paused transaction); first-binding OK; legacy Commit AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; state 3/NULL Prepared -; head unchanged; current Commit OK",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GC-05",
+      "Kind": "Security",
+      "Group": "GC",
+      "Description": "CAP-F7 / M2F-09 isolation on real PostgreSQL: while another organization\u0027s first-binding Prepare is paused holding its lock, a level-1 Verify in an unbound organization is admitted and one in a bound organization is refused, both without waiting",
+      "Expected": "both completed while the other organization\u0027s Prepare was still paused; unbound OK: verified True; bound AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False",
+      "Observed": "paused True; both finished True; Prepare still paused then True; unbound OK: verified True ; bound AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; Prepare OK",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GC-06",
+      "Kind": "Security",
+      "Group": "GC",
+      "Description": "mixed concurrent stress on real PostgreSQL (4 rounds x 6 concurrent requests, two organizations): level-2 v2 writes create bindings, level-1 Verifies and writes in the bound organization are refused, everything else proceeds; no deadlock (pg_stat_database.deadlocks unchanged since the group started)",
+      "Expected": "first write OK; 24 outcomes all in their expected sets; deadlocks 0",
+      "Observed": "first OK; outcomes 24; unexpected 0 []; deadlocks 0; bindings A 5 B 0",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-after-capability-concurrency",
+      "Kind": "Setup",
+      "Group": "GC",
+      "Description": "F-E2 sentinel (after-capability-concurrency): the runtime role\u0027s table grants equal the setup baseline",
+      "Expected": "unchanged",
+      "Observed": "unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "T-01",
+      "Kind": "Setup",
+      "Group": "teardown",
+      "Description": "teardown: the Testing override disables acceptance on the in-process switch (instances are discarded with the process)",
+      "Expected": "enabled False",
+      "Observed": "enabled False",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-end",
+      "Kind": "Setup",
+      "Group": "teardown",
+      "Description": "F-E2 sentinel (end): the runtime role\u0027s table grants equal the setup baseline",
+      "Expected": "unchanged",
+      "Observed": "unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "T-02",
+      "Kind": "Setup",
+      "Group": "teardown",
+      "Description": "end: every admitted database still carries this run\u0027s nonce and system identifier; the runtime role is ordinary",
+      "Expected": "verified; false false",
+      "Observed": "verified 3; false false",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    }
+  ],
+  "gapDemonstrations": []
+}

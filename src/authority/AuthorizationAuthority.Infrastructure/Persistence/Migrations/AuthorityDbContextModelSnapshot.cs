@@ -492,6 +492,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("bytea")
                         .HasColumnName("candidate_manifest_root");
 
+                    b.Property<int?>("CommitAcceptanceRuleVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("commit_acceptance_rule_version");
+
                     b.Property<Guid>("CorrelationIdentifier")
                         .HasColumnType("uuid")
                         .HasColumnName("correlation_identifier");
@@ -546,6 +550,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
 
+                    b.Property<int?>("PrepareAcceptanceRuleVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("prepare_acceptance_rule_version");
+
                     b.Property<Guid?>("ReprotectionCommandId")
                         .HasColumnType("uuid")
                         .HasColumnName("reprotection_command_id");
@@ -563,7 +571,75 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.ToTable("content_change_operations", "authority", t =>
                         {
+                            t.HasCheckConstraint("ck_content_operation_commit_rule_version", "(operation_state_name = 'Committed'\n                AND ((prepare_acceptance_rule_version IS NULL AND commit_acceptance_rule_version IS NULL)\n                  OR (prepare_acceptance_rule_version IS NOT NULL AND commit_acceptance_rule_version IS NOT NULL\n                      AND commit_acceptance_rule_version = prepare_acceptance_rule_version)))\n            OR (operation_state_name <> 'Committed' AND commit_acceptance_rule_version IS NULL)");
+
+                            t.HasCheckConstraint("ck_content_operation_rule_versions_positive", "(prepare_acceptance_rule_version IS NULL OR prepare_acceptance_rule_version >= 1)\n           AND (commit_acceptance_rule_version IS NULL OR commit_acceptance_rule_version >= 1)");
+
                             t.HasCheckConstraint("ck_content_operation_state", "operation_state_name IN ('Prepared','Committed','Aborted','Quarantined')");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Content.ContentDataKeyBinding", b =>
+                {
+                    b.Property<Guid>("ContentDataKeyBindingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("content_data_key_binding_id");
+
+                    b.Property<Guid>("BindingContentChangeOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("binding_content_change_operation_id");
+
+                    b.Property<int>("BindingItemCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("binding_item_count");
+
+                    b.Property<DateTimeOffset>("DataKeyBoundOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("data_key_bound_on");
+
+                    b.Property<byte[]>("DataKeyCommitmentBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("data_key_commitment_bytes");
+
+                    b.Property<Guid>("DataKeyIdentifier")
+                        .HasColumnType("uuid")
+                        .HasColumnName("data_key_identifier");
+
+                    b.Property<short>("EnvelopePayloadKindCode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("envelope_payload_kind_code");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.HasKey("ContentDataKeyBindingId");
+
+                    b.HasIndex("BindingContentChangeOperationId")
+                        .HasDatabaseName("ix_content_data_key_bindings_operation");
+
+                    b.HasIndex("DataKeyIdentifier")
+                        .IsUnique()
+                        .HasDatabaseName("uq_content_data_key_binding_identifier");
+
+                    b.HasIndex("OrganizationId", "FormRecordId")
+                        .HasDatabaseName("ix_content_data_key_bindings_record");
+
+                    b.ToTable("content_data_key_bindings", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_content_data_key_binding_commitment", "octet_length(data_key_commitment_bytes) = 32");
+
+                            t.HasCheckConstraint("ck_content_data_key_binding_count", "binding_item_count >= 1 AND (envelope_payload_kind_code = 1 OR binding_item_count = 1)");
+
+                            t.HasCheckConstraint("ck_content_data_key_binding_identifier_v7", "substring(data_key_identifier::text FROM 15 FOR 1) = '7' AND substring(data_key_identifier::text FROM 20 FOR 1) IN ('8', '9', 'a', 'b')");
+
+                            t.HasCheckConstraint("ck_content_data_key_binding_kind", "envelope_payload_kind_code IN (1, 2)");
                         });
                 });
 
@@ -4958,6 +5034,24 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_content_op_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Content.ContentDataKeyBinding", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Content.ContentChangeOperation", null)
+                        .WithMany()
+                        .HasForeignKey("BindingContentChangeOperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_content_data_key_binding_operation");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_content_data_key_binding_org");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Content.ContentIntegrityCheckpoint", b =>

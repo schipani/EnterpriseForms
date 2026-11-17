@@ -354,7 +354,15 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
             FieldBooleanValue b => new FieldBooleanValue { FieldBooleanValueId = Guid.CreateVersion7(), BooleanValue = b.BooleanValue },
             FieldOptionValue o => new FieldOptionValue { FieldOptionValueId = Guid.CreateVersion7(), FieldOptionId = o.FieldOptionId },
             // Ciphertext is carried unchanged: the AAD binds tenant/record/field/item, none of which change in a copy.
-            FieldEncryptedValue e => new FieldEncryptedValue { FieldEncryptedValueId = Guid.CreateVersion7(), EncryptedValueBytes = e.EncryptedValueBytes, EncryptionNonceBytes = e.EncryptionNonceBytes, EncryptionAuthTagBytes = e.EncryptionAuthTagBytes, WrappedDataKeyBytes = e.WrappedDataKeyBytes, EncryptionAlgorithmName = e.EncryptionAlgorithmName, EncryptionKeyReference = e.EncryptionKeyReference, EncryptionEnvelopeVersion = e.EncryptionEnvelopeVersion, EncryptedLogicalType = e.EncryptedLogicalType },
+            // E3-M2b-2 (S-3): the whole envelope is carried, including the Envelope v2 metadata and the signed schema version,
+            // so a copy can never be re-encoded under another schema or silently lose v2 metadata.
+            FieldEncryptedValue e => new FieldEncryptedValue
+            {
+                FieldEncryptedValueId = Guid.CreateVersion7(), EncryptedValueBytes = e.EncryptedValueBytes, EncryptionNonceBytes = e.EncryptionNonceBytes, EncryptionAuthTagBytes = e.EncryptionAuthTagBytes,
+                WrappedDataKeyBytes = e.WrappedDataKeyBytes, EncryptionAlgorithmName = e.EncryptionAlgorithmName, EncryptionKeyReference = e.EncryptionKeyReference, EncryptionEnvelopeVersion = e.EncryptionEnvelopeVersion,
+                EncryptedLogicalType = e.EncryptedLogicalType, DataKeyIdentifier = e.DataKeyIdentifier, DataKeyCommitmentBytes = e.DataKeyCommitmentBytes, KeyWrapAlgorithmCode = e.KeyWrapAlgorithmCode,
+                RowSignatureSchemaVersion = e.RowSignatureSchemaVersion,
+            },
             _ => throw new InvalidOperationException("unsupported value row " + v.GetType().Name),
         };
         clone.TenantId = v.TenantId;

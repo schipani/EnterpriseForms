@@ -2,6 +2,7 @@ using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Domain.Features.Content;
 using AuthorizationAuthority.Domain.Features.FieldSearch;
+using AuthorizationAuthority.Application.Features.Content;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Contracts.V1;
@@ -30,7 +31,28 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<RecordManifestLeaf> ManifestLeaves { get; } = [];
 
     public List<ContentItemIdentity> ItemIdentities { get; } = [];
+
+    /// <summary>E3-M2e: the data-key ledger. Emulates the global unique identifier and the P-1 binding guard (the real behaviour is PostgreSQL-only, gate E3-M2e-1).</summary>
+    public List<ContentDataKeyBinding> DataKeyBindings { get; } = [];
+
+    /// <summary>E3-M2e L-13: when set, every <see cref="IAuthorityScope.RequireDataKeyLedgerAsync"/> refuses as a store whose ledger is not enforced.</summary>
+    public bool DataKeyLedgerRefused { get; set; }
+
+    /// <summary>E3-M2e L-13: number of ledger verifications requested by the services under test.</summary>
+    public int DataKeyLedgerChecks { get; private set; }
+
+    /// <summary>E3-M2f-2 AM-F1: number of organization binding-existence queries (proves the CAP-F3 short-circuit).</summary>
+    public int DataKeyBindingExistenceQueries { get; private set; }
+
+    /// <summary>E3-M2f-2 CAP-F5: when set, every binding-existence query throws this (a store failure).</summary>
+    public Exception? DataKeyBindingExistenceFailure { get; set; }
     public List<SecurityJournalEntry> Journal { get; } = [];
+
+    /// <summary>E3-M2f-3b: whether the evidence index is reported usable (T2-8).</summary>
+    public bool EvidenceIndexUsable { get; set; } = true;
+
+    /// <summary>E3-M2f-3b: the emulated AuthorityDb clock_timestamp().</summary>
+    public Func<DateTimeOffset> EvidenceDatabaseClock { get; set; } = () => DateTimeOffset.UtcNow;
     public List<ContentIntegrityCheckpoint> Checkpoints { get; } = [];
     public List<IntegrityKeyRegistration> Keys { get; } = [];
     public List<SearchCatalogueSnapshot> Snapshots { get; } = [];
@@ -77,6 +99,15 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     /// <summary>C-149: number of read-write scopes opened.</summary>
     public int ScopeCount { get; private set; }
 
+    /// <summary>
+    /// RB-CARV-1: when set, every <see cref="IAuthorityScope.RequireContentAcceptanceFloorAsync"/> refuses as a Release B instance
+    /// whose floor is not enforced (the real verification is PostgreSQL-only and is covered by harness R). Null = Release A.
+    /// </summary>
+    public string? ContentAcceptanceFenceRefusal { get; set; }
+
+    /// <summary>RB-CARV-1: number of content write fence checks requested by the services under test.</summary>
+    public int ContentAcceptanceFenceChecks { get; private set; }
+
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken)
     {
         ScopeCount++;
@@ -111,6 +142,12 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public ISearchAccessStore SearchAccess => s.SearchAccess;
 
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(s.Organizations.FirstOrDefault(o => o.OrganizationId == organizationId));
+
+        public Task RequireContentAcceptanceFloorAsync(CancellationToken cancellationToken)
+        {
+            s.ContentAcceptanceFenceChecks++;
+            return s.ContentAcceptanceFenceRefusal is null ? Task.CompletedTask : throw AuthorizationAuthority.Application.Features.Content.ContentAcceptanceFloorFailures.Refusal();
+        }
 
         public Task<OrganizationAuthorizationState?> ReadOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(s.Organizations.FirstOrDefault(o => o.OrganizationId == organizationId));
 
@@ -212,9 +249,18 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public Task<ContentChangeOperation?> FindOperationAsync(Guid contentChangeOperationId, CancellationToken cancellationToken) =>
             Task.FromResult(s.Operations.FirstOrDefault(o => o.ContentChangeOperationId == contentChangeOperationId));
 
-        public void AddOperation(ContentChangeOperation operation) => s.Operations.Add(operation);
+        public void AddOperation(ContentChangeOperation operation)
+        {
+            s.Operations.Add(operation);
+            addedOperations.Add(operation);
+        }
 
-        public void AddCandidateLeaves(IEnumerable<ContentCandidateLeaf> leaves) => s.CandidateLeaves.AddRange(leaves);
+        public void AddCandidateLeaves(IEnumerable<ContentCandidateLeaf> leaves)
+        {
+            var list = leaves.ToList();
+            s.CandidateLeaves.AddRange(list);
+            addedLeaves.AddRange(list);
+        }
 
         public Task<List<ContentCandidateLeaf>> GetCandidateLeavesAsync(Guid contentChangeOperationId, CancellationToken cancellationToken) =>
             Task.FromResult(s.CandidateLeaves.Where(l => l.ContentChangeOperationId == contentChangeOperationId).ToList());
@@ -236,6 +282,77 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
                 }
 
                 s.ItemIdentities.Add(identity);
+            }
+        }
+
+        public Task<List<ContentDataKeyBinding>> FindDataKeyBindingsAsync(IReadOnlyCollection<Guid> dataKeyIdentifiers, CancellationToken cancellationToken) =>
+            Task.FromResult(s.DataKeyBindings.Where(b => dataKeyIdentifiers.Contains(b.DataKeyIdentifier)).ToList());
+
+        public Task<List<ContentDataKeyBinding>> GetDataKeyBindingsForOperationAsync(Guid contentChangeOperationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.DataKeyBindings.Where(b => b.BindingContentChangeOperationId == contentChangeOperationId).ToList());
+
+        /// <summary>Unique identifier and P-1 emulation; a refusal also removes the operation and leaves this scope added (the transaction rollback).</summary>
+        public void AddDataKeyBindings(IEnumerable<ContentDataKeyBinding> bindings)
+        {
+            var list = bindings.ToList();
+            foreach (var binding in list)
+            {
+                var operation = s.Operations.FirstOrDefault(o => o.ContentChangeOperationId == binding.BindingContentChangeOperationId);
+                if (operation is null || operation.OperationStateName != ContentOperationStates.Prepared || operation.OrganizationId != binding.OrganizationId
+                    || operation.FormRecordId != binding.FormRecordId || operation.PrepareAcceptanceRuleVersion is not >= 3)
+                {
+                    RollBackScopeAdds();
+                    throw AuthorizationAuthority.Application.Features.Content.DataKeyLedgerFailures.InvariantViolated();
+                }
+
+                if (s.DataKeyBindings.Any(b => b.DataKeyIdentifier == binding.DataKeyIdentifier) || list.Count(b => b.DataKeyIdentifier == binding.DataKeyIdentifier) > 1)
+                {
+                    RollBackScopeAdds();
+                    throw AuthorizationAuthority.Application.Features.Content.EnvelopeRules.Refused(AuthorizationAuthority.Application.Features.Content.EnvelopeV2Rules.Reasons.DataKeyIdentifierReused);
+                }
+            }
+
+            s.DataKeyBindings.AddRange(list);
+        }
+
+        public Task<bool> OrganizationHasDataKeyBindingsAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            s.DataKeyBindingExistenceQueries++;
+            return s.DataKeyBindingExistenceFailure is { } failure ? throw failure : Task.FromResult(s.DataKeyBindings.Any(b => b.OrganizationId == organizationId));
+        }
+
+        // E3-M2f-3b: the evidence port over the in-memory journal (no rollback: use CapabilityRefusalEvidenceWorld for T2 semantics).
+        public Task SetCapabilityEvidenceLockTimeoutAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<DateTimeOffset> StartCapabilityEvidenceLookupAsync(CancellationToken cancellationToken) => Task.FromResult(s.EvidenceDatabaseClock());
+
+        public Task<bool> IsCapabilityRefusalEvidenceIndexUsableAsync(CancellationToken cancellationToken) => Task.FromResult(s.EvidenceIndexUsable);
+
+        public Task<IReadOnlyList<CapabilityRefusalEvidenceRow>> GetNewestCapabilityRefusalEvidenceAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<CapabilityRefusalEvidenceRow>>(s.Journal
+                .Where(e => e.OrganizationId == organizationId && e.JournalStreamName == CapabilityRefusalEvidence.StreamName && e.JournalEventKind == CapabilityRefusalEvidence.EventKind)
+                .OrderByDescending(e => e.JournalStreamRevision).Take(CapabilityRefusalEvidence.LookupLimit)
+                .Select(e => new CapabilityRefusalEvidenceRow(e.SecurityJournalEntryId, e.JournalStreamRevision, e.JournalEventBodyJson, e.JournalEventDigest)).ToList());
+
+        public Task RequireDataKeyLedgerAsync(CancellationToken cancellationToken)
+        {
+            s.DataKeyLedgerChecks++;
+            return s.DataKeyLedgerRefused ? throw AuthorizationAuthority.Application.Features.Content.DataKeyLedgerFailures.NotEnforced() : Task.CompletedTask;
+        }
+
+        private readonly List<ContentChangeOperation> addedOperations = [];
+        private readonly List<ContentCandidateLeaf> addedLeaves = [];
+
+        private void RollBackScopeAdds()
+        {
+            foreach (var operation in addedOperations)
+            {
+                s.Operations.Remove(operation);
+            }
+
+            foreach (var leaf in addedLeaves)
+            {
+                s.CandidateLeaves.Remove(leaf);
             }
         }
 
@@ -340,6 +457,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public void AddPlatformJournalHead(PlatformJournalHead head) => s.PlatformHead = head;
 
         public void AddPlatformJournalEntry(PlatformJournalEntry entry) => s.PlatformJournal.Add(entry);
+
+        public Task<List<PlatformJournalEntry>> GetLatestPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PlatformJournal.OrderByDescending(e => e.PlatformJournalRevision).Take(limit).ToList());
 
         public Task<List<PlatformJournalEntry>> GetPendingPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken) =>
             Task.FromResult(s.PlatformJournal.Where(e => e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending).OrderBy(e => e.PlatformJournalRevision).Take(limit).ToList());

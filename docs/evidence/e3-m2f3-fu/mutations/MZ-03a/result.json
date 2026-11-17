@@ -1,0 +1,50 @@
+{
+  "id": "MZ-03a",
+  "kind": "MZ",
+  "what": "closest expressible form of \"record before next returns\": the Verify entry point lets the refusal leave before T1 is disposed (disposal deferred 2 s), so the filter records while T1 is still open",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs": "e92b5cda9db1858a8c9782255624ffc09000dfad43df587e587dec72ce7738d4"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "H",
+      "exit": 0,
+      "seconds": 38.0
+    },
+    {
+      "build": "X",
+      "exit": 0,
+      "seconds": 35.5
+    },
+    {
+      "letter": "H",
+      "classes": [
+        "CapabilityRefusalEvidenceHostTests"
+      ],
+      "exit": 2,
+      "seconds": 9.3,
+      "total": 4,
+      "succeeded": 3,
+      "failed": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.EveryCapabilityRouteRecordsOneEntryOnlyAfterTheRefusedTransactionWasDisposed"
+      ]
+    },
+    {
+      "letter": "X",
+      "classes": [
+        "CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "exit": 0,
+      "seconds": 2.9,
+      "total": 20,
+      "succeeded": 20,
+      "failed": []
+    }
+  ],
+  "seconds": 85.8
+}

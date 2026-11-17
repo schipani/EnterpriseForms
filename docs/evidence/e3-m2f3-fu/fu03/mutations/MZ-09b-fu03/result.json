@@ -1,0 +1,35 @@
+{
+  "id": "MZ-09b-fu03",
+  "kind": "MZ",
+  "what": "MZ-09b (record every exception of an admitted request) against the FU-M2f3-03 success-path test",
+  "files": [
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs": "3898d8967194ab22cb844f0875603a06aefeb98df66c4d838f5808b83d33fc97"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "H",
+      "exit": 0,
+      "seconds": 37.8
+    },
+    {
+      "letter": "H",
+      "classes": [
+        "CapabilityRefusalEvidenceAdmittedSuccessHostTests",
+        "CapabilityRefusalEvidenceHostTests"
+      ],
+      "exit": 2,
+      "seconds": 9.4,
+      "total": 5,
+      "succeeded": 4,
+      "failed": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.AdmittedRequestsAndOtherErrorsAreNeverRecorded"
+      ]
+    }
+  ],
+  "seconds": 47.2
+}

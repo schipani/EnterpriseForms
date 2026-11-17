@@ -72,6 +72,25 @@ public static class BusinessSignedSchemas
         new RowSignedColumn("encryption_nonce_bytes", RowColumnType.Bytes, Nullable: false),
         new RowSignedColumn("wrapped_data_key_bytes", RowColumnType.Bytes, Nullable: false));
 
+    /// <summary>
+    /// field_encrypted_values v2 (E3-M2b-2; contract §4.2): schema 1 plus the three Envelope v2 metadata columns, all
+    /// non-nullable in the signed registry (the database columns are nullable because envelope-1 rows store NULL; the
+    /// envelope-metadata CHECK requires them for envelope 2). Selected only for envelope-2 rows (S-1). No product writer
+    /// produces envelope 2 before E3-M4, and the Authority still refuses every schema-2 candidate.
+    /// </summary>
+    public static readonly RowSchemaDefinition FieldEncryptedValuesV2 = ValueSchema("field_encrypted_values", 2,
+        new RowSignedColumn("data_key_commitment_bytes", RowColumnType.Bytes, Nullable: false),
+        new RowSignedColumn("data_key_identifier", RowColumnType.Uuid, Nullable: false),
+        new RowSignedColumn("encrypted_logical_type", RowColumnType.Text, Nullable: false),
+        new RowSignedColumn("encrypted_value_bytes", RowColumnType.Bytes, Nullable: false),
+        new RowSignedColumn("encryption_algorithm_name", RowColumnType.Text, Nullable: false),
+        new RowSignedColumn("encryption_auth_tag_bytes", RowColumnType.Bytes, Nullable: false),
+        new RowSignedColumn("encryption_envelope_version", RowColumnType.Int32, Nullable: false),
+        new RowSignedColumn("encryption_key_reference", RowColumnType.Text, Nullable: false),
+        new RowSignedColumn("encryption_nonce_bytes", RowColumnType.Bytes, Nullable: false),
+        new RowSignedColumn("key_wrap_algorithm_code", RowColumnType.Int32, Nullable: false),
+        new RowSignedColumn("wrapped_data_key_bytes", RowColumnType.Bytes, Nullable: false));
+
     public static readonly RowSchemaDefinition FieldOptionValuesV1 = ValueSchema("field_option_values", new RowSignedColumn("field_option_id", RowColumnType.Uuid, Nullable: false));
 
     /// <summary>file_attachment_versions v1: binds ciphertext object, both digests, detected type, scanner verdict and the AES-GCM envelope (MERKLE §4.2). Primary key = version row id; item id = attachment id.</summary>
@@ -105,6 +124,18 @@ public static class BusinessSignedSchemas
         new RowSignedColumn("wrapped_data_key", RowColumnType.Bytes, Nullable: false),
     ]);
 
+    /// <summary>file_attachment_versions v2 (E3-M2b-2; contract §4.3): the 26 schema-1 columns plus the three Envelope v2 metadata columns (non-nullable), in ordinal order. Selected only for envelope-2 rows (S-1).</summary>
+    public static readonly RowSchemaDefinition FileAttachmentVersionsV2 = new("file_attachment_versions", 2,
+        FileAttachmentVersionsV1.Columns
+            .Concat(
+            [
+                new RowSignedColumn("data_key_commitment_bytes", RowColumnType.Bytes, Nullable: false),
+                new RowSignedColumn("data_key_identifier", RowColumnType.Uuid, Nullable: false),
+                new RowSignedColumn("key_wrap_algorithm_code", RowColumnType.Int32, Nullable: false),
+            ])
+            .OrderBy(c => c.ColumnName, StringComparer.Ordinal)
+            .ToArray());
+
     /// <summary>form_record_groups v1 (Phase C3): one occurrence of a repeating group; canonical pk = the stable occurrence id.</summary>
     public static readonly RowSchemaDefinition FormRecordGroupsV1 = new("form_record_groups", 1,
     [
@@ -116,10 +147,10 @@ public static class BusinessSignedSchemas
         new RowSignedColumn("tenant_id", RowColumnType.Uuid, Nullable: false),
     ]);
 
-    /// <summary>Current schema per entity kind (used for new candidates).</summary>
+    /// <summary>Every registered (entity kind, schema version), current and historical (the Authority's rule table must equal this set exactly).</summary>
     public static IReadOnlyList<RowSchemaDefinition> All { get; } =
     [
-        FormRecordsV2, FormRecordsV3, FieldStringValuesV1, FieldIntegerValuesV1, FieldDecimalValuesV1, FieldDateValuesV1, FieldDateTimeValuesV1, FieldGuidValuesV1, FieldBooleanValuesV1, FieldOptionValuesV1, FieldEncryptedValuesV1, FileAttachmentVersionsV1, FormRecordGroupsV1,
+        FormRecordsV2, FormRecordsV3, FieldStringValuesV1, FieldIntegerValuesV1, FieldDecimalValuesV1, FieldDateValuesV1, FieldDateTimeValuesV1, FieldGuidValuesV1, FieldBooleanValuesV1, FieldOptionValuesV1, FieldEncryptedValuesV1, FieldEncryptedValuesV2, FileAttachmentVersionsV1, FileAttachmentVersionsV2, FormRecordGroupsV1,
     ];
 
     public static int CurrentSchemaVersion(ISignedContentRow row)
@@ -135,9 +166,9 @@ public static class BusinessSignedSchemas
             FieldDateTimeValue => FieldDateTimeValuesV1.SchemaVersion,
             FieldGuidValue => FieldGuidValuesV1.SchemaVersion,
             FieldBooleanValue => FieldBooleanValuesV1.SchemaVersion,
-            FieldEncryptedValue => FieldEncryptedValuesV1.SchemaVersion,
+            FieldEncryptedValue e => SchemaForEnvelope(e.EncryptionEnvelopeVersion),
             FieldOptionValue => FieldOptionValuesV1.SchemaVersion,
-            FileAttachmentVersion => FileAttachmentVersionsV1.SchemaVersion,
+            FileAttachmentVersion a => SchemaForEnvelope(a.EncryptionEnvelopeVersion),
             FormRecordGroupRevision => FormRecordGroupsV1.SchemaVersion,
             _ => throw new ArgumentOutOfRangeException(nameof(row), row.GetType().Name, "unregistered signed row type"),
         };
@@ -158,9 +189,9 @@ public static class BusinessSignedSchemas
             FieldDateTimeValue v => RowCanonicalizerV1.Encode(FieldDateTimeValuesV1, context, ValueColumns(v, "date_time_value", RowValue.Timestamp(v.DateTimeValue))),
             FieldGuidValue v => RowCanonicalizerV1.Encode(FieldGuidValuesV1, context, ValueColumns(v, "guid_value", RowValue.Uuid(v.GuidValue))),
             FieldBooleanValue v => RowCanonicalizerV1.Encode(FieldBooleanValuesV1, context, ValueColumns(v, "boolean_value", RowValue.Boolean(v.BooleanValue))),
-            FieldEncryptedValue v => RowCanonicalizerV1.Encode(FieldEncryptedValuesV1, context, EncryptedColumns(v)),
+            FieldEncryptedValue v => RowCanonicalizerV1.Encode(EnvelopeSchema(FieldEncryptedValuesV1, FieldEncryptedValuesV2, v.RowSignatureSchemaVersion, v.EncryptionEnvelopeVersion), context, EncryptedColumns(v)),
             FieldOptionValue v => RowCanonicalizerV1.Encode(FieldOptionValuesV1, context, ValueColumns(v, "field_option_id", RowValue.Uuid(v.FieldOptionId))),
-            FileAttachmentVersion v => RowCanonicalizerV1.Encode(FileAttachmentVersionsV1, context, AttachmentColumns(v)),
+            FileAttachmentVersion v => RowCanonicalizerV1.Encode(EnvelopeSchema(FileAttachmentVersionsV1, FileAttachmentVersionsV2, v.RowSignatureSchemaVersion, v.EncryptionEnvelopeVersion), context, AttachmentColumns(v)),
             FormRecordGroupRevision g => RowCanonicalizerV1.Encode(FormRecordGroupsV1, context, new Dictionary<string, RowValue?>(StringComparer.Ordinal)
             {
                 ["content_change_operation_id"] = RowValue.Uuid(g.ContentChangeOperationId),
@@ -172,6 +203,38 @@ public static class BusinessSignedSchemas
             }),
             _ => throw new ArgumentOutOfRangeException(nameof(row), row.GetType().Name, "unregistered signed row type"),
         };
+    }
+
+    /// <summary>
+    /// S-1 (E3-M2b-2): the signed schema of an envelope row is chosen from its own envelope version, never from its type:
+    /// envelope 1 gives schema 1, envelope 2 gives schema 2. Any other envelope version has no schema and throws (no fallback).
+    /// </summary>
+    public static int SchemaForEnvelope(int encryptionEnvelopeVersion) => encryptionEnvelopeVersion switch
+    {
+        1 => 1,
+        2 => 2,
+        _ => throw new ArgumentOutOfRangeException(nameof(encryptionEnvelopeVersion), encryptionEnvelopeVersion, "no signed schema for this envelope version"),
+    };
+
+    /// <summary>
+    /// S-2 and S-10 (E3-M2b-2): an envelope row is encoded under its stored schema version only. An unknown version throws (no
+    /// fallback to any schema), and a stored schema that disagrees with the row's envelope version throws before anything is
+    /// sent to the Authority (which refuses the pair independently).
+    /// </summary>
+    private static RowSchemaDefinition EnvelopeSchema(RowSchemaDefinition schema1, RowSchemaDefinition schema2, int storedSchemaVersion, int encryptionEnvelopeVersion)
+    {
+        var schema = storedSchemaVersion switch
+        {
+            1 => schema1,
+            2 => schema2,
+            _ => throw new ArgumentOutOfRangeException(nameof(storedSchemaVersion), storedSchemaVersion, schema1.EntityKind + ": unregistered signed schema version"),
+        };
+        if (storedSchemaVersion != encryptionEnvelopeVersion)
+        {
+            throw new InvalidOperationException(schema1.EntityKind + ": signed schema version and envelope version disagree");
+        }
+
+        return schema;
     }
 
     private static byte[] EncodeHeader(FormRecordRevision header, RowSigningContext context)
@@ -207,6 +270,11 @@ public static class BusinessSignedSchemas
         columns["encryption_key_reference"] = RowValue.Text(v.EncryptionKeyReference);
         columns["encryption_nonce_bytes"] = RowValue.Bytes(v.EncryptionNonceBytes);
         columns["wrapped_data_key_bytes"] = RowValue.Bytes(v.WrappedDataKeyBytes);
+        if (v.RowSignatureSchemaVersion == FieldEncryptedValuesV2.SchemaVersion)
+        {
+            AddEnvelopeV2Columns(columns, v.DataKeyIdentifier, v.DataKeyCommitmentBytes, v.KeyWrapAlgorithmCode);
+        }
+
         return columns;
     }
 
@@ -221,7 +289,26 @@ public static class BusinessSignedSchemas
         [valueColumn] = value,
     };
 
-    private static Dictionary<string, RowValue?> AttachmentColumns(FileAttachmentVersion v) => new(StringComparer.Ordinal)
+    private static Dictionary<string, RowValue?> AttachmentColumns(FileAttachmentVersion v)
+    {
+        var columns = AttachmentV1Columns(v);
+        if (v.RowSignatureSchemaVersion == FileAttachmentVersionsV2.SchemaVersion)
+        {
+            AddEnvelopeV2Columns(columns, v.DataKeyIdentifier, v.DataKeyCommitmentBytes, v.KeyWrapAlgorithmCode);
+        }
+
+        return columns;
+    }
+
+    /// <summary>The three Envelope v2 columns. A NULL is passed through so the canonicalizer refuses it (NullNotPermitted) instead of signing a row without metadata.</summary>
+    private static void AddEnvelopeV2Columns(Dictionary<string, RowValue?> columns, Guid? dataKeyIdentifier, byte[]? dataKeyCommitmentBytes, int? keyWrapAlgorithmCode)
+    {
+        columns["data_key_commitment_bytes"] = dataKeyCommitmentBytes is { } commitment ? RowValue.Bytes(commitment) : null;
+        columns["data_key_identifier"] = dataKeyIdentifier is { } identifier ? RowValue.Uuid(identifier) : null;
+        columns["key_wrap_algorithm_code"] = keyWrapAlgorithmCode is { } code ? RowValue.Int32(code) : null;
+    }
+
+    private static Dictionary<string, RowValue?> AttachmentV1Columns(FileAttachmentVersion v) => new(StringComparer.Ordinal)
     {
         ["ciphertext_sha256"] = RowValue.Bytes(v.CiphertextSha256),
         ["ciphertext_size_bytes"] = RowValue.Int64(v.CiphertextSizeBytes),
@@ -251,9 +338,11 @@ public static class BusinessSignedSchemas
         ["wrapped_data_key"] = RowValue.Bytes(v.WrappedDataKey),
     };
 
-    private static RowSchemaDefinition ValueSchema(string entityKind, params RowSignedColumn[] valueColumns)
+    private static RowSchemaDefinition ValueSchema(string entityKind, params RowSignedColumn[] valueColumns) => ValueSchema(entityKind, 1, valueColumns);
+
+    private static RowSchemaDefinition ValueSchema(string entityKind, int schemaVersion, params RowSignedColumn[] valueColumns)
     {
         var columns = ValueEnvelope.Concat(valueColumns).Append(new RowSignedColumn("tenant_id", RowColumnType.Uuid, Nullable: false)).OrderBy(c => c.ColumnName, StringComparer.Ordinal).ToArray();
-        return new RowSchemaDefinition(entityKind, 1, columns);
+        return new RowSchemaDefinition(entityKind, schemaVersion, columns);
     }
 }

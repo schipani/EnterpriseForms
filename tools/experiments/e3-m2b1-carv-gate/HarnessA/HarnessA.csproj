@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    E3-M2b-1 CARV real-PostgreSQL gate (harness A: legacy build + real migration + CARV-build emulation; CarvBinaries = the legacy build). Development/Testing only; not part of EnterpriseForms.All.slnx and never built in
+    place: scripts/dev/e3-m2b1-carv-pg-gate.ps1 copies this folder to a temporary work directory (outside the repository, so no
+    repository build settings apply) and builds it against a set of Authority Release binaries passed as CarvBinaries. It
+    references no repository project. Warnings are not errors: the code compiles against frozen external binaries.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>CarvHarness</AssemblyName>
+    <!-- Without a deps file the host loads every assembly in the output folder: the byte-identical copies of CarvBinaries. -->
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS1591;CA2007;CA1303</NoWarn>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="$(CarvBinaries)\*.dll" Private="true" />
+  </ItemGroup>
+  <Target Name="RequireCarvBinaries" BeforeTargets="ResolveAssemblyReferences" Condition="'$(CarvBinaries)' == '' Or !Exists('$(CarvBinaries)\AuthorizationAuthority.Api.dll')">
+    <Error Text="Build through scripts/dev/e3-m2b1-carv-pg-gate.ps1 (CarvBinaries must name a folder of Authority Release binaries)." />
+  </Target>
+</Project>

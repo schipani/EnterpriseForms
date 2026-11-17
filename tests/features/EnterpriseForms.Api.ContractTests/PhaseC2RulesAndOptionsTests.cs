@@ -59,13 +59,13 @@ public sealed class PhaseC2RulesAndOptionsTests
     private static RuleComparison Eq(FieldDefinition field, string value) => new(RuleOperators.Equal, field.FieldDefinitionId, value, null);
 
     private static CandidateBuilder.ApplyResult Apply(FormLayout layout, IReadOnlyList<FieldDefinition> fields, IReadOnlyList<FieldOption> options, IReadOnlyList<FieldValueRowBase> current, Dictionary<string, string> values, IReadOnlySet<Guid>? editable = null, RecordWriteOrigin origin = RecordWriteOrigin.User, bool creating = false) =>
-        InProcessCompletion.Completed(CandidateBuilder.ApplyValuesDetailedAsync(current, values, layout, fields, options, editable, Tenant, Record, Now, Actor, options.ToDictionary(o => o.FieldOptionId), Encryption, CancellationToken.None, origin, creating));
+        InProcessCompletion.Completed(CandidateBuilder.ApplyValuesDetailedAsync(VerifiedFixtureRows.AsCommitted(current), values, layout, fields, options, editable, Tenant, Record, Now, Actor, options.ToDictionary(o => o.FieldOptionId), Encryption, CancellationToken.None, origin, creating));
 
     private static List<FieldValueRowBase> Stored(IReadOnlyList<FieldDefinition> fields, IReadOnlyList<FieldOption> options, Dictionary<string, string> values) =>
         InProcessCompletion.Completed(CandidateBuilder.ApplyValuesAsync([], values, Layout(fields.Select(f => Element(f, f.FieldDataType == "Option" ? (f.OptionSelectionMode == "Multiple" ? "multiselect" : "select") : "text")).ToArray()), fields, options, null, Tenant, Record, Now, Actor, options.ToDictionary(o => o.FieldOptionId), Encryption, CancellationToken.None, creating: true));
 
     private static string WireOf(IEnumerable<FieldValueRowBase> rows, FieldDefinition field, IReadOnlyList<FieldOption> options) =>
-        FieldValueCodec.FormatField(field, rows.Where(r => r.FieldDefinitionId == field.FieldDefinitionId), options.ToDictionary(o => o.FieldOptionId), InProcessCompletion.Completed(DecryptedFieldValues.DecryptAsync(Encryption, rows, CancellationToken.None)));
+        FieldValueCodec.FormatField(field, rows.Where(r => r.FieldDefinitionId == field.FieldDefinitionId), options.ToDictionary(o => o.FieldOptionId), InProcessCompletion.Completed(DecryptedFieldValues.DecryptSelfSealedAsync(Encryption, rows, CancellationToken.None)));
 
     // ---- shared vectors -------------------------------------------------------------------------------------------
 

@@ -216,8 +216,9 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             }
             else
             {
+                // E3-M2c OD-M2c-02a path A: the self-check decrypts only the envelope ProtectAsync just sealed from this record's plaintext (self-sealed mode).
                 converted = await FieldValueCodec.ProtectAsync(value, field, optionsById, encryption, cancellationToken).ConfigureAwait(false);
-                if (converted is not FieldEncryptedValue || await FieldValueCodec.FormatAsync(converted, optionsById, encryption, cancellationToken).ConfigureAwait(false) != FieldValueCodec.Format(value, optionsById))
+                if (converted is not FieldEncryptedValue || await FieldValueCodec.FormatSelfSealedAsync(converted, optionsById, encryption, cancellationToken).ConfigureAwait(false) != FieldValueCodec.Format(value, optionsById))
                 {
                     return Failure(item, "REPROTECT_SELF_CHECK_FAILED");
                 }
@@ -257,9 +258,11 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
                 ? Completed(accepted.CommittedOperationId, accepted.CommittedContentRevision, completionKind, 0)
                 : Failure(item, "OLD_FORM_STILL_PRESENT_AFTER_COMMIT");
         }
-        catch (AuthorityClientException ex) when (ex.ErrorCode is "CONTENT_REVISION_CONFLICT" or "STALE_AUTHORIZATION_REVISION" or "OPERATION_STATE_INVALID" or "OPERATION_EXPIRED")
+        catch (AuthorityClientException ex) when (IsRetryableConflict(ex.ErrorCode))
         {
             // A user committed concurrently (their write re-protected the field) or the authorization revision moved: re-read next pass.
+            // E3-M2b-1 CARV: an operation that crosses content acceptance rule versions is aborted by the Authority; the next attempt
+            // number prepares a fresh operation.
             return new ItemOutcome(FieldProtectionMigrationItemStates.Pending, ex.ErrorCode, null, null, null, null, Retry: true);
         }
         catch (AuthorityClientException ex) when (ex.ErrorCode is "IDEMPOTENCY_CONFLICT")
@@ -270,6 +273,12 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             // attempt moves the item to the next attempt number and therefore a fresh operation; the abandoned operation
             // expires unused. Not a record failure: nothing about the record's content is wrong.
             return new ItemOutcome(FieldProtectionMigrationItemStates.Pending, ex.ErrorCode, null, null, null, null, Retry: true);
+        }
+        catch (AuthorityClientException ex) when (EnvelopeCapabilityRefusal.Is(ex))
+        {
+            // E3-M2f-2 (CAP-E3): this build's declared envelope capability is below the organization's or the deployment's floor. Terminal:
+            // no further attempt and so no fresh operation (each would be refused the same way, before any verification); a current build is needed.
+            return new ItemOutcome(FieldProtectionMigrationItemStates.Failed, ex.ErrorCode, null, null, null, null, Retry: false);
         }
         catch (AuthorityClientException ex) when (!ex.Retryable)
         {
@@ -284,6 +293,13 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
         var text = string.IsNullOrWhiteSpace(ex.Message) || ex.Message == ex.ErrorCode ? ex.ErrorCode : ex.ErrorCode + ": " + ex.Message;
         return text.Length <= 200 ? text : text[..200];
     }
+
+    /// <summary>
+    /// Authority conflicts after which the item stays Pending and the next attempt number (a fresh operation) re-reads the record.
+    /// E3-M2b-1 adds OPERATION_RULES_OUTDATED: an operation that crosses content acceptance rule versions is aborted by the Authority.
+    /// </summary>
+    public static bool IsRetryableConflict(string errorCode) =>
+        errorCode is "CONTENT_REVISION_CONFLICT" or "STALE_AUTHORIZATION_REVISION" or "OPERATION_STATE_INVALID" or "OPERATION_EXPIRED" or "OPERATION_RULES_OUTDATED";
 
     /// <summary>
     /// Idempotency key (and so the derived operation id) of one reprotection attempt for one record. Bound to the

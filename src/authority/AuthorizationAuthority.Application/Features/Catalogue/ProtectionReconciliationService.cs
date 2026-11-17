@@ -36,7 +36,8 @@ public sealed class ProtectionReconciliationService(IAuthorityStore store, Conte
     /// <summary>Census outcomes that are stored: a verified revision, or the integrity failure that quarantined it.</summary>
     private static bool IsStoredOutcome(ContentService.ProtectionCensusVerification result) => result.Verified || result.Quarantined;
 
-    public async Task<ProtectionCensusResponse> CensusAsync(string workloadName, Guid snapshotId, ProtectionCensusRequest request, Guid correlationId, CancellationToken cancellationToken)
+    /// <param name="envelopeCapability">E3-M2f-2: the capability the request declared (null ⇒ level 1, CAP-S5).</param>
+    public async Task<ProtectionCensusResponse> CensusAsync(string workloadName, Guid snapshotId, ProtectionCensusRequest request, Guid correlationId, CancellationToken cancellationToken, ClientEnvelopeCapability? envelopeCapability = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workloadName);
         ArgumentNullException.ThrowIfNull(request);
@@ -59,6 +60,8 @@ public sealed class ProtectionReconciliationService(IAuthorityStore store, Conte
 
         var state = await scope.LockOrganizationAsync(snapshot.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        // E3-M2f-2 (CAP-O2/O3): right after the lock, before the gate and every census verification (G-2: no false quarantine).
+        await content.CapabilityFloor.RequireAsync(scope, state, envelopeCapability, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
         var decision = await ResolveDecisionAsync(scope, snapshot, cancellationToken).ConfigureAwait(false);
 

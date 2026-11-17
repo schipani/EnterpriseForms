@@ -74,6 +74,11 @@ public sealed class PhaseC6RestoreTests
 
         public Task<string> DecryptAsync(FieldEncryptedValue value, EnterpriseForms.Application.Features.Documents.Ports.EncryptionKeyPurpose purpose, CancellationToken cancellationToken) =>
             Task.FromResult(Decrypt(value));
+
+        public Task<IReadOnlyList<string>> DecryptVerifiedAsync(Guid organizationId, IReadOnlyList<FieldEncryptedValue> values, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<string>>(values.Select(Decrypt).ToList());
+
+        public Task<byte[]> OpenCreationFingerprintKeyAsync(CreationFingerprintKeyEnvelope envelope, CancellationToken cancellationToken) => throw new NotSupportedException("not used by restore planning");
     }
 
     private static readonly FakeEncryption Crypto = new();

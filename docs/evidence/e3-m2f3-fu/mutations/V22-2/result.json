@@ -1,0 +1,35 @@
+{
+  "id": "V22-2",
+  "kind": "V",
+  "what": "the filter records every rejected level-1 request (organization taken from the request arguments), not only the floor refusal",
+  "files": [
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs": "3898d8967194ab22cb844f0875603a06aefeb98df66c4d838f5808b83d33fc97"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "H",
+      "exit": 0,
+      "seconds": 38.5
+    },
+    {
+      "letter": "H",
+      "classes": [
+        "CapabilityRefusalEvidencePreFloorHostTests",
+        "CapabilityRefusalEvidenceHostTests"
+      ],
+      "exit": 2,
+      "seconds": 10.4,
+      "total": 5,
+      "succeeded": 4,
+      "failed": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidencePreFloorHostTests.RequestsRejectedBeforeTheFloorProduceNoEvidenceOnAnyOfTheSevenRoutes"
+      ]
+    }
+  ],
+  "seconds": 48.9
+}

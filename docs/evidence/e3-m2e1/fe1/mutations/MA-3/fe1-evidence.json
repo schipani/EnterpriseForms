@@ -1,0 +1,450 @@
+{
+  "harness": "E3-M2e-1 dark data-key ledger focused real-PostgreSQL gate (real Authority build in-process, acceptance off; CARV-1 build 8915f77 and CARV-2 build a1127a1 through LegacyAgent)",
+  "build": "Release build of the working tree (new-sha256.txt); ContentAcceptanceRules.CurrentVersion = 3; RecognizedFloors = 1,2,3; EnvelopeRules.AllowedEnvelopeVersions = 1",
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "checksTotal": 63,
+  "checksFailed": 3,
+  "checks": [
+    {
+      "Id": "FE-00",
+      "Description": "setup: the gate database is migrated by this build\u0027s ordinary --migrate, without any floor (it is the template of every scenario database)",
+      "Expected": "exit 0; floors none",
+      "Observed": "exit 0; floors none",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_da/DA-setup1",
+      "Description": "setup: floor 1 raised with no concurrent writer",
+      "Expected": "exit 0; floors 1",
+      "Observed": "exit 0; floors 1",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_da/DA-setup2",
+      "Description": "setup: floor 2 raised with no concurrent writer",
+      "Expected": "exit 0; floors 2",
+      "Observed": "exit 0; floors 2",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_da/DA-1",
+      "Description": "A-1: the writer\u0027s fence locks the migration history first, then the operations table (the statements the build issued)",
+      "Expected": "LOCK TABLE authority.ef_migrations_history IN ACCESS SHARE MODE | LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE",
+      "Observed": "LOCK TABLE authority.ef_migrations_history IN ACCESS SHARE MODE | LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_da/DA-2",
+      "Description": "with the writer inside its fence, the floor command waits at EF\u0027s migration lock on the history (ACCESS EXCLUSIVE), not holding it while it waits for the operations table",
+      "Expected": "authority.ef_migrations_history AccessExclusiveLock",
+      "Observed": "authority.ef_migrations_history AccessExclusiveLock",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_da/DA-3",
+      "Description": "after the writer is released no lock cycle exists between the floor command and the writer (pg_blocking_pids)",
+      "Expected": "no mutual blocking",
+      "Observed": "no mutual blocking; writer holds AccessShareLock on authority.content_change_operations; writer holds RowExclusiveLock on authority.content_change_operations; writer holds AccessShareLock on authority.ef_migrations_history",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_da/DA-4",
+      "Description": "the paused Release B (floor 2) write completes; no fence refusal",
+      "Expected": "OK; refusal reasons none",
+      "Observed": "OK; refusal reasons none",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_da/DA-5",
+      "Description": "the floor command raises floor 3 exactly (exit 0, exact live definition, every floor recorded) and every committed operation has P = C",
+      "Expected": "exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; P\u003C\u003EC 0",
+      "Observed": "exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; P\u003C\u003EC 0",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_da/DL",
+      "Description": "PostgreSQL detected no deadlock in this database during the scenario (pg_stat_database.deadlocks)",
+      "Expected": "0",
+      "Observed": "0",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_db/DB-setup1",
+      "Description": "setup: floor 1 raised with no concurrent writer",
+      "Expected": "exit 0; floors 1",
+      "Observed": "exit 0; floors 1",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_db/DB-setup2",
+      "Description": "setup: floor 2 raised with no concurrent writer",
+      "Expected": "exit 0; floors 2",
+      "Observed": "exit 0; floors 2",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_db/DB-1",
+      "Description": "A-1: the writer\u0027s fence locks the migration history first, then the operations table (the statements the build issued)",
+      "Expected": "LOCK TABLE authority.ef_migrations_history IN ACCESS SHARE MODE | LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE",
+      "Observed": "LOCK TABLE authority.ef_migrations_history IN ACCESS SHARE MODE | LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_db/DB-2",
+      "Description": "with the writer inside its fence, the floor command waits at EF\u0027s migration lock on the history (ACCESS EXCLUSIVE), not holding it while it waits for the operations table",
+      "Expected": "authority.ef_migrations_history AccessExclusiveLock",
+      "Observed": "authority.ef_migrations_history AccessExclusiveLock",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_db/DB-3",
+      "Description": "after the writer is released no lock cycle exists between the floor command and the writer (pg_blocking_pids)",
+      "Expected": "no mutual blocking",
+      "Observed": "no mutual blocking; none",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_db/DB-4",
+      "Description": "the paused Release B (floor 2) write completes; no fence refusal",
+      "Expected": "OK; refusal reasons none",
+      "Observed": "OK; refusal reasons none",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_db/DB-5",
+      "Description": "the floor command raises floor 3 exactly (exit 0, exact live definition, every floor recorded) and every committed operation has P = C",
+      "Expected": "exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; P\u003C\u003EC 0",
+      "Observed": "exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; P\u003C\u003EC 0",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_db/DL",
+      "Description": "PostgreSQL detected no deadlock in this database during the scenario (pg_stat_database.deadlocks)",
+      "Expected": "0",
+      "Observed": "0",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_d2/D2-setup1",
+      "Description": "setup: floor 1 raised with no concurrent writer",
+      "Expected": "exit 0; floors 1",
+      "Observed": "exit 0; floors 1",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_d2/D2-1",
+      "Description": "A-1: the writer\u0027s fence locks the migration history first, then the operations table (the statements the build issued)",
+      "Expected": "LOCK TABLE authority.ef_migrations_history IN ACCESS SHARE MODE | LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE",
+      "Observed": "LOCK TABLE authority.ef_migrations_history IN ACCESS SHARE MODE | LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_d2/D2-2",
+      "Description": "with the writer inside its fence, the floor command waits at EF\u0027s migration lock on the history (ACCESS EXCLUSIVE), not holding it while it waits for the operations table",
+      "Expected": "authority.ef_migrations_history AccessExclusiveLock",
+      "Observed": "authority.ef_migrations_history AccessExclusiveLock",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_d2/D2-3",
+      "Description": "after the writer is released no lock cycle exists between the floor command and the writer (pg_blocking_pids)",
+      "Expected": "no mutual blocking",
+      "Observed": "no mutual blocking; none",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_d2/D2-4",
+      "Description": "the paused Release B (floor 1) write completes; no fence refusal",
+      "Expected": "OK; refusal reasons none",
+      "Observed": "OK; refusal reasons none",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_d2/D2-5",
+      "Description": "the floor command raises floor 2 exactly (exit 0, exact live definition, every floor recorded) and every committed operation has P = C",
+      "Expected": "exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; P\u003C\u003EC 0",
+      "Observed": "exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; P\u003C\u003EC 0",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_d2/DL",
+      "Description": "PostgreSQL detected no deadlock in this database during the scenario (pg_stat_database.deadlocks)",
+      "Expected": "0",
+      "Observed": "0",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_lt/LT-setup1",
+      "Description": "setup: floor 1 raised with no concurrent writer",
+      "Expected": "exit 0; floors 1",
+      "Observed": "exit 0; floors 1",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_lt/LT-setup2",
+      "Description": "setup: floor 2 raised with no concurrent writer",
+      "Expected": "exit 0; floors 2",
+      "Observed": "exit 0; floors 2",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_lt/LT-1",
+      "Description": "the raise waits for the writer at the history lock and gives up after the 5 s lock timeout (bounded; dotnet start-up included)",
+      "Expected": "waits on authority.ef_migrations_history AccessExclusiveLock; exit 3 (55P03 lock timeout) within 4.5-10 s",
+      "Observed": "waits on authority.ef_migrations_history AccessExclusiveLock; exit 0 (content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it) after 21.3 s",
+      "Pass": false
+    },
+    {
+      "Id": "fe1_lt/LT-2",
+      "Description": "the timed-out raise applied nothing (no partial commit)",
+      "Expected": "floors 2; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; no floor-3 constraint",
+      "Observed": "floors 3; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; floor-3 constraint CHECK ((((operation_state_name)::text \u003C\u003E ALL ((ARRAY[\u0027Prepared\u0027::character varying, \u0027Committed\u0027::character varying])::text[])) OR ((prepare_acceptance_rule_version IS NOT NULL) AND (prepare_acceptance_rule_version \u003E= 3)))) NOT VALID",
+      "Pass": false
+    },
+    {
+      "Id": "fe1_lt/LT-3",
+      "Description": "a writer that arrived while the raise waited, and the writer held inside its fence, both commit; no fence refusal",
+      "Expected": "OK; OK; refusal reasons none",
+      "Observed": "OK; OK; refusal reasons none",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_lt/LT-4",
+      "Description": "re-running the raise once no writer holds the fence succeeds",
+      "Expected": "exit 0; floors 3; history of floor 3",
+      "Observed": "exit 0; floors 3; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_lt/DL",
+      "Description": "PostgreSQL detected no deadlock in this database during the scenario (pg_stat_database.deadlocks)",
+      "Expected": "0",
+      "Observed": "0",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-setup1",
+      "Description": "setup: floor 1 raised with no concurrent writer",
+      "Expected": "exit 0; floors 1",
+      "Observed": "exit 0; floors 1",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-setup2",
+      "Description": "setup: floor 2 raised with no concurrent writer",
+      "Expected": "exit 0; floors 2",
+      "Observed": "exit 0; floors 2",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-0",
+      "Description": "setup: floor 3 raised after the floor-2 copy was taken",
+      "Expected": "exit 0; floors 3",
+      "Observed": "exit 0; floors 3",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-ok",
+      "Description": "control: Release B writers requiring floors 2 and 3 commit on floor 3",
+      "Expected": "OK; OK",
+      "Observed": "OK; OK",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-1a",
+      "Description": "floor-3 constraint present but its history row missing: a Release B (floor 3) write is refused",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorNotRecorded; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32c-3e15-743d-9405-36e28a6947d6, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 2-\u003E2; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-1b",
+      "Description": "the same for a Release B (floor 2) write (every installed floor must be recorded)",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorNotRecorded; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32c-3e15-743d-9405-36e28a6947d6, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=2 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 2-\u003E2; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-1c",
+      "Description": "the floor command then refuses (its preconditions require floor 2 as the only floor) and changes nothing",
+      "Expected": "exit 3; floors 3; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2",
+      "Observed": "exit 3; floors 3; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-1d",
+      "Description": "with the history row restored the floor-3 writer commits again",
+      "Expected": "OK",
+      "Observed": "OK",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-2",
+      "Description": "corrupted migration history (the floor-2 row altered): a Release B (floor 3) write is refused",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorNotRecorded; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32c-3e15-743d-9405-36e28a6947d6, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 3-\u003E3; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-3",
+      "Description": "the E3-M2b-1 fence migration missing from the history: refused",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FenceMigrationNotRecorded; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32c-3e15-743d-9405-36e28a6947d6, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FenceMigrationNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 3-\u003E3; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-4",
+      "Description": "the migration history table missing: refused fail closed",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorUnverifiable; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32c-3e15-743d-9405-36e28a6947d6, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorUnverifiable category=UnverifiableFloor recovery=CheckAuthorityDbReachabilityAndPrivileges phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 3-\u003E3; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-4b",
+      "Description": "with the history table back the floor-3 writer commits",
+      "Expected": "OK",
+      "Observed": "OK",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-5a",
+      "Description": "floor 3 recorded but its constraint missing: refused",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorRecordedButMissing; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32c-3e15-743d-9405-36e28a6947d6, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorRecordedButMissing category=MissingFloor recovery=RecoveryRequired:ReinstateRecordedFloor phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 4-\u003E4; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-5b",
+      "Description": "the floor command reports it (exit 4) and reinstates it only with the flag",
+      "Expected": "exit 4; exit 0; floors 3; history of floor 3",
+      "Observed": "exit 4; exit 0; floors 3; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/restored/H-6a",
+      "Description": "database restored to the earlier floor-2 state: a Release B instance requiring floor 3 refuses (the restore lowered the floor)",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorLowered; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32c-3e15-743d-9405-36e28a6947d6, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorLowered category=LoweredFloor recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 0-\u003E0; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/restored/H-6b",
+      "Description": "on the restored database the floor is raised again by the command; the floor-3 writer then commits",
+      "Expected": "exit 0; floors 3; OK",
+      "Observed": "exit 0; floors 3; OK",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-6c",
+      "Description": "no deadlock in the restored database",
+      "Expected": "0",
+      "Observed": "0",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-7",
+      "Description": "the CARV-2 build (a1127a1) is refused by the floor-3 CHECK; nothing persisted",
+      "Expected": "refused (ck_content_operation_rule_floor_v3); no operation",
+      "Observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v3) ; ops 4-\u003E4",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/H-8",
+      "Description": "end state: P = C for every committed operation; floor 3 exact",
+      "Expected": "P\u003C\u003EC 0; definition exact",
+      "Observed": "P\u003C\u003EC 0; definition exact",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_h/DL",
+      "Description": "PostgreSQL detected no deadlock in this database during the scenario (pg_stat_database.deadlocks)",
+      "Expected": "0",
+      "Observed": "0",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_s01/F1",
+      "Description": "floor 1 raised while Release A writers and Release B (floor 1) writers run: exit 0, floor 1 exact; every write commits or (before floor 1 exists) is refused FloorNotInstalled, never FloorUnverifiable",
+      "Expected": "exit 0; floors 1; definition exact; outcomes within OK / FloorNotEnforced; reasons within FloorNotInstalled; some OK after the raise",
+      "Observed": "exit 0; floors 1; definition exact; RA OK x103, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x76, RB1e OK x6; reasons FloorNotInstalled; before 25, during 138, after 22",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_s01/F2",
+      "Description": "floor 1 -\u003E 2 raised while eight Release B (floor 1) writers run before, during and after: exit 0, floor 2 exact and recorded; every write commits",
+      "Expected": "exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; all OK; writes before, during and after",
+      "Observed": "exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x99; reasons none; before 4, during 68, after 27",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_s01/F3",
+      "Description": "floor 2 -\u003E 3 raised while eight Release B (floor 2) writers run before, during and after (E-33 / E-33b): exit 0, floor 2 dropped, floor 3 exact and recorded; every write commits",
+      "Expected": "exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; all OK; writes before, during and after",
+      "Observed": "exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x105; reasons none; before 8, during 72, after 25",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_s01/FM",
+      "Description": "an ordinary --migrate (nothing pending; it still takes EF\u0027s migration lock) while Release B (floor 3) writers run: exit 0, floor 3 kept; every write commits or is refused fail closed in the grant re-application window (F-E2)",
+      "Expected": "exit 0; floors 3; outcomes within OK / 42501 / FloorNotEnforced (FloorUnverifiable only); some OK",
+      "Observed": "exit 0; floors 3; RB3- OK x114, RB3- PostgresException 42501  x52, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x55, RB3- AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False x40; reasons FloorUnverifiable",
+      "Pass": false
+    },
+    {
+      "Id": "fe1_s01/PC",
+      "Description": "every committed operation has P = C (CARV Prepare/Commit equality)",
+      "Expected": "0",
+      "Observed": "0",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_s01/DL",
+      "Description": "PostgreSQL detected no deadlock in this database during the scenario (pg_stat_database.deadlocks)",
+      "Expected": "0",
+      "Observed": "0",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_s02/F1",
+      "Description": "floor 1 raised while Release A writers and Release B (floor 1) writers run: exit 0, floor 1 exact; every write commits or (before floor 1 exists) is refused FloorNotInstalled, never FloorUnverifiable",
+      "Expected": "exit 0; floors 1; definition exact; outcomes within OK / FloorNotEnforced; reasons within FloorNotInstalled; some OK after the raise",
+      "Observed": "exit 0; floors 1; definition exact; RA OK x109, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x78, RB1e OK x8; reasons FloorNotInstalled; before 21, during 146, after 28",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_s02/F2",
+      "Description": "floor 1 -\u003E 2 raised while eight Release B (floor 1) writers run before, during and after: exit 0, floor 2 exact and recorded; every write commits",
+      "Expected": "exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; all OK; writes before, during and after",
+      "Observed": "exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x105; reasons none; before 8, during 72, after 25",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_s02/F3",
+      "Description": "floor 2 -\u003E 3 raised while eight Release B (floor 2) writers run before, during and after (E-33 / E-33b): exit 0, floor 2 dropped, floor 3 exact and recorded; every write commits",
+      "Expected": "exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; all OK; writes before, during and after",
+      "Observed": "exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; RB2- OK x105; reasons none; before 8, during 68, after 29",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_s02/FM",
+      "Description": "an ordinary --migrate (nothing pending; it still takes EF\u0027s migration lock) while Release B (floor 3) writers run: exit 0, floor 3 kept; every write commits or is refused fail closed in the grant re-application window (F-E2)",
+      "Expected": "exit 0; floors 3; outcomes within OK / 42501 / FloorNotEnforced (FloorUnverifiable only); some OK",
+      "Observed": "exit 0; floors 3; RB3- OK x130, RB3- PostgresException 42501  x51, RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x54, RB3- DbUpdateException \u003C- PostgresException 42501  x1; reasons FloorUnverifiable",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_s02/PC",
+      "Description": "every committed operation has P = C (CARV Prepare/Commit equality)",
+      "Expected": "0",
+      "Observed": "0",
+      "Pass": true
+    },
+    {
+      "Id": "fe1_s02/DL",
+      "Description": "PostgreSQL detected no deadlock in this database during the scenario (pg_stat_database.deadlocks)",
+      "Expected": "0",
+      "Observed": "0",
+      "Pass": true
+    }
+  ]
+}

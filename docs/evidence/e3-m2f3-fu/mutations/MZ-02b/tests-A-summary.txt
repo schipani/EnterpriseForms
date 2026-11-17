@@ -1,0 +1,12 @@
+failed AuthorizationAuthority.Tests.EnvelopeCapabilityFloorTests.M2F07AndM2F22TheEffectiveFloorIsTheMaximumAndOnlyLevelOneAtFloorOneReadsTheLedger(clientLevel: 1, deploymentFloor: 1, bound: True, refused: True, queries: 1) (2ms)
+  Assert.Equal() Failure: Strings differ
+              (pos 0)
+failed AuthorizationAuthority.Tests.EnvelopeCapabilityFloorTests.M2F07AndM2F22TheEffectiveFloorIsTheMaximumAndOnlyLevelOneAtFloorOneReadsTheLedger(clientLevel: null, deploymentFloor: 1, bound: True, refused: True, queries: 1) (0ms)
+  Assert.Equal() Failure: Strings differ
+              (pos 0)
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 88
+  failed: 2
+  succeeded: 86
+  skipped: 0
+  duration: 1s 709ms

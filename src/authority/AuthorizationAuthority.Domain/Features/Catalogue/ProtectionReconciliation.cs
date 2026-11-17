@@ -35,7 +35,7 @@ public sealed class ProtectionCensusResult
     /// <summary>Rows of the field still in the form the decision removes (plaintext for Encrypt, ciphertext for Decrypt).</summary>
     public int OldFormOccurrenceCount { get; set; }
 
-    /// <summary>Encrypted rows of the field whose envelope shape is not the approved one, or that reuse another row's nonce under the same wrapped key.</summary>
+    /// <summary>Encrypted rows of the field whose envelope shape is not the approved one, or that reuse another row's wrapped data key (E3-M2a: with the same or a different nonce).</summary>
     public int EnvelopeIssueCount { get; set; }
 
     /// <summary>Signed header status of the verified revision (e.g. Draft, Archived); archived records stay in scope.</summary>

@@ -1,0 +1,15 @@
+{
+    "Id":  "MG-17b",
+    "What":  "level-2 short-circuit removed (level 2 reads the ledger), groups P and GC",
+    "Groups":  "P,GC",
+    "GateExit":  1,
+    "Detected":  false,
+    "DetectedBy":  "",
+    "ExpectedDetectors":  "P-01,GC-03,GC-06",
+    "AllFailedChecks":  "P-02,P-03,P-06,P-07,P-09,HARNESS",
+    "ContainersRemoved":  true,
+    "Restored":  true,
+    "Note":  "scratch restored sha256 equal; repository file sha256 unchanged",
+    "AssembliesDifferingFromCleanBuild":  "AuthorizationAuthority.Api.dll,AuthorizationAuthority.Application.dll",
+    "BuildFailed":  false
+}

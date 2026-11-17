@@ -1,0 +1,11 @@
+{
+  "id": "MF-4 (re-run after strengthening the test)",
+  "buildOk": true,
+  "testsRun": 20,
+  "testsFailed": 2,
+  "failingTests": [
+    "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.TheFloorCommandRefusesAnUnstatedFloorOrACombinationWithMigrate(commandLine: \"--apply-content-acceptance-floor 1 --migrate\")",
+    "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.TheFloorCommandRefusesAnUnstatedFloorOrACombinationWithMigrate(commandLine: \"--migrate --apply-content-acceptance-floor 1\")"
+  ],
+  "restoredSha256Matches": true
+}

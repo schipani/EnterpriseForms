@@ -1,0 +1,1 @@
+{"Ok":false,"Status":409,"Error":"AuthorityClientException","ErrorCode":"CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT","HttpStatusCode":409,"Retryable":false,"Sent":[{"Path":"/internal/v1/content-changes/01a1e9dd-1947-77d7-a71d-ffcfdd57a757/commit","CapabilityHeaderValues":[],"Status":409}]}

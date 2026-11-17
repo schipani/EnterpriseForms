@@ -1,0 +1,12 @@
+failed AuthorizationAuthority.Tests.ArchiveProcessorTests.ArchivedBytesThatDifferFromTheJournalAreAConflictNotAnOverwrite (3ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.AConsistentlyRedigestedDeliveredRowThatIsSentAgainCollidesWithTheArchiveAndQuarantines (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 12
+  failed: 2
+  succeeded: 10
+  skipped: 0
+  duration: 1s 168ms

@@ -365,6 +365,28 @@ public sealed class CommandPlannerTests
     /// <summary>In-memory scope: only the lookups the planner needs. Cross-organization lookups return nothing (tenant binding).</summary>
     private sealed class FakeScope(Guid organizationId) : IAuthorityScope
     {
+        // E3-M2e ports (not used by these tests).
+        public Task<List<ContentDataKeyBinding>> FindDataKeyBindingsAsync(IReadOnlyCollection<Guid> dataKeyIdentifiers, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<bool> OrganizationHasDataKeyBindingsAsync(Guid organizationId, CancellationToken cancellationToken) => throw new NotSupportedException(); // E3-M2f-2 (not used here)
+
+        // E3-M2f-3b capability-refusal evidence port: not used by these tests.
+        public Task SetCapabilityEvidenceLockTimeoutAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<DateTimeOffset> StartCapabilityEvidenceLookupAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<bool> IsCapabilityRefusalEvidenceIndexUsableAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<CapabilityRefusalEvidenceRow>> GetNewestCapabilityRefusalEvidenceAsync(Guid organizationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<ContentDataKeyBinding>> GetDataKeyBindingsForOperationAsync(Guid contentChangeOperationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddDataKeyBindings(IEnumerable<ContentDataKeyBinding> bindings) => throw new NotSupportedException();
+
+        public Task RequireDataKeyLedgerAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<PlatformJournalEntry>> GetLatestPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public ISearchIndexStore SearchIndex => throw new NotSupportedException();
 
         public ISearchAccessStore SearchAccess => throw new NotSupportedException();
@@ -398,6 +420,8 @@ public sealed class CommandPlannerTests
         public Task<SecurityCommand?> FindCommandAsync(Guid id, CancellationToken ct) => Task.FromResult(Commands.TryGetValue(id, out var command) ? command : null);
 
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task RequireContentAcceptanceFloorAsync(CancellationToken ct) => throw new NotSupportedException();
 
         public Task<OrganizationAuthorizationState?> ReadOrganizationAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
 

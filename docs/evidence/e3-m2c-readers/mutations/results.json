@@ -1,0 +1,549 @@
+[
+  {
+    "id": "MU-01",
+    "title": "verified reader accepts schema 0",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/FormRecords/AesGcmFieldEncryptionService.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 3,
+      "succeeded": 190
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 1,
+      "succeeded": 141
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.DecryptionModeProvenanceTests.TheCandidateBuilderReadsTheCurrentRowsOnlyThroughTheVerifiedReader",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.EveryOtherSchemaAndEnvelopeCombinationIsRefusedBeforeTheProvider(schema: 0, envelope: 1)",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.VerifiedSchema1Envelope1OpensWithTheV1ReaderAndSchema0IsRefusedBeforeTheProvider"
+    ],
+    "architecture_failures": [
+      "EnterpriseForms.ArchitectureTests.WorkerFieldReaderCompositionTests.TheComposedFieldReaderIsTheS8DispatcherAndRefusesUnstagedContent"
+    ],
+    "contract_rc": 2,
+    "architecture_rc": 2,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 95
+  },
+  {
+    "id": "MU-02",
+    "title": "verified reader ignores v2 columns on schema 1",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/FormRecords/AesGcmFieldEncryptionService.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 3,
+      "succeeded": 190
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.ASchema1RowCarryingAnyV2ColumnIsRefused(column: \"wrap-code\")",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.ASchema1RowCarryingAnyV2ColumnIsRefused(column: \"commitment\")",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.ASchema1RowCarryingAnyV2ColumnIsRefused(column: \"identifier\")"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 100
+  },
+  {
+    "id": "MU-03",
+    "title": "verified reader skips the v2 completeness check (second layer: product reader)",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/FormRecords/AesGcmFieldEncryptionService.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 0,
+      "succeeded": 193
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [],
+    "architecture_failures": [],
+    "contract_rc": 0,
+    "architecture_rc": 0,
+    "detected": false,
+    "restored_hash_matches": true,
+    "seconds": 86
+  },
+  {
+    "id": "MU-04",
+    "title": "verified reader skips the organization check",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/FormRecords/AesGcmFieldEncryptionService.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 1,
+      "succeeded": 192
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.OrganizationAndPurposeIsolationHoldsBeforeAnyKeyOperation"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 72
+  },
+  {
+    "id": "MU-05",
+    "title": "verified reader unwraps v1 rows before every row is validated",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/FormRecords/AesGcmFieldEncryptionService.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 25,
+      "succeeded": 168
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.DecryptionModeProvenanceTests.PathDTheOwnerUpdateResponseRowsAreFreshSealsAlsoForCarriedValuesAndOnAnIdempotentReplay",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.EveryOtherSchemaAndEnvelopeCombinationIsRefusedBeforeTheProvider(schema: 1, envelope: 0)",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.EveryOtherSchemaAndEnvelopeCombinationIsRefusedBeforeTheProvider(schema: 0, envelope: 2)",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.EveryOtherSchemaAndEnvelopeCombinationIsRefusedBeforeTheProvider(schema: 2, envelope: 3)",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.EveryOtherSchemaAndEnvelopeCombinationIsRefusedBeforeTheProvider(schema: 1, envelope: 2)",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.EveryOtherSchemaAndEnvelopeCombinationIsRefusedBeforeTheProvider(schema: 3, envelope: 3)",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.EveryOtherSchemaAndEnvelopeCombinationIsRefusedBeforeTheProvider(schema: 0, envelope: 1)",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.EveryOtherSchemaAndEnvelopeCombinationIsRefusedBeforeTheProvider(schema: 2, envelope: 1)"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 86
+  },
+  {
+    "id": "MU-06",
+    "title": "v2 failure falls back to the v1 reader",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/FormRecords/AesGcmFieldEncryptionService.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 3,
+      "succeeded": 190
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.TamperedV2RowsAreRefusedByTheCommitmentAndTheAead",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.TheExactKeyVersionNamedByTheReferenceIsUsedWithoutFallback",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.ProviderFailuresOfAV2RowFailClosedWithoutFallback"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 103
+  },
+  {
+    "id": "MU-07",
+    "title": "self-sealed API accepts schema 2",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/FormRecords/AesGcmFieldEncryptionService.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 1,
+      "succeeded": 192
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.SelfSealedRefusesSchema2AndEnvelope2BeforeTheProvider(schema: 2, envelope: 1)"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 72
+  },
+  {
+    "id": "MU-08",
+    "title": "self-sealed API ignores v2 metadata",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/FormRecords/AesGcmFieldEncryptionService.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 3,
+      "succeeded": 190
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.SelfSealedRefusesAnEnvelope1RowCarryingV2Metadata(column: \"commitment\")",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.SelfSealedRefusesAnEnvelope1RowCarryingV2Metadata(column: \"wrap-code\")",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.SelfSealedRefusesAnEnvelope1RowCarryingV2Metadata(column: \"identifier\")"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 62
+  },
+  {
+    "id": "MU-09",
+    "title": "self-sealed registry check disabled",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/Values/DecryptedFieldValues.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 5,
+      "succeeded": 188
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.DecryptionModeProvenanceTests.PathCTheCreationResponseRowsAreThisRequestsOwnSealsOnTheFirstAttemptAndOnEveryRetry",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.TheNamedSelfSealedEntryPointsAcceptOnlyRowsThisProcessFreshlySealed",
+      "EnterpriseForms.Api.ContractTests.DecryptionModeProvenanceTests.PathDTheOwnerUpdateResponseRowsAreFreshSealsAlsoForCarriedValuesAndOnAnIdempotentReplay",
+      "EnterpriseForms.Api.ContractTests.DecryptionModeProvenanceTests.AProtectionSelfCheckDecryptsOnlyItsOwnSeal",
+      "EnterpriseForms.Api.ContractTests.PhaseC5SharedEditTests.PathEAnIdempotentReplayKeepsTheSameSplitAndCannotPassStoredContentAsSelfSealed"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 83
+  },
+  {
+    "id": "MU-10",
+    "title": "ProtectAsync registers an already-encrypted row passed in",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/Values/FieldValueCodec.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 1,
+      "succeeded": 192
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.TheNamedSelfSealedEntryPointsAcceptOnlyRowsThisProcessFreshlySealed"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 77
+  },
+  {
+    "id": "MU-11",
+    "title": "path C switched to verified mode",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/CreateFormRecord/CreateFormRecordHandler.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 0,
+      "succeeded": 193
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 2,
+      "succeeded": 140
+    },
+    "contract_failures": [],
+    "architecture_failures": [
+      "EnterpriseForms.ArchitectureTests.DecryptionCallSiteTests.SelfSealedCallersArePinnedToTheReviewedInventory",
+      "EnterpriseForms.ArchitectureTests.DecryptionCallSiteTests.EveryDecryptionCallSiteIsReviewedAndAllowListed"
+    ],
+    "contract_rc": 0,
+    "architecture_rc": 2,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 58
+  },
+  {
+    "id": "MU-12",
+    "title": "path E sends every released row to self-sealed mode",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/UpdateFormRecord/UpdateFormRecordHandler.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 2,
+      "succeeded": 191
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.PhaseC5SharedEditTests.PathEAnIdempotentReplayKeepsTheSameSplitAndCannotPassStoredContentAsSelfSealed",
+      "EnterpriseForms.Api.ContractTests.PhaseC5SharedEditTests.PathETheSharedEditResponseDecryptsEditedRowsSelfSealedAndCopiedRowsVerified"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 63
+  },
+  {
+    "id": "MU-13",
+    "title": "path E sends every released row to verified mode",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/UpdateFormRecord/UpdateFormRecordHandler.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 2,
+      "succeeded": 191
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.PhaseC5SharedEditTests.PathEAnIdempotentReplayKeepsTheSameSplitAndCannotPassStoredContentAsSelfSealed",
+      "EnterpriseForms.Api.ContractTests.PhaseC5SharedEditTests.PathETheSharedEditResponseDecryptsEditedRowsSelfSealedAndCopiedRowsVerified"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 56
+  },
+  {
+    "id": "MU-14",
+    "title": "document reader accepts schema 0",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/Documents/AesGcmFileEncryptionService.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 1,
+      "succeeded": 192
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.TheVerifiedDocumentReaderRefusesEveryOtherCombinationBeforeTheProvider(schema: 0, envelopeVersion: 1, withV2Columns: False)"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 58
+  },
+  {
+    "id": "MU-15",
+    "title": "document reader skips the v2 completeness check (second layer: product reader)",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/Documents/AesGcmFileEncryptionService.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 0,
+      "succeeded": 193
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [],
+    "architecture_failures": [],
+    "contract_rc": 0,
+    "architecture_rc": 0,
+    "detected": false,
+    "restored_hash_matches": true,
+    "seconds": 50
+  },
+  {
+    "id": "MU-16",
+    "title": "product reader derives the wrap from the reference, not the stored code",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/Documents/EnvelopeV2/EnvelopeV2ProductReader.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 2,
+      "succeeded": 191
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.TheWorkerEntryPointReadsV2RowsSealedUnderTheRealLocalKeyring",
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.IncompleteOrUnexpectedV2MetadataIsRefusedBeforeTheProvider(defect: \"wrap-code-family-mismatch\")"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 53
+  },
+  {
+    "id": "MU-17",
+    "title": "product reader references a v2 writer",
+    "file": "src/backend/EnterpriseForms.Infrastructure/Features/Documents/EnvelopeV2/EnvelopeV2ProductReader.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 0,
+      "succeeded": 193
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 1,
+      "succeeded": 141
+    },
+    "contract_failures": [],
+    "architecture_failures": [
+      "EnterpriseForms.ArchitectureTests.EnvelopeV2IsolationTests.TheProductReaderReachesNoWriterEntryPointOrKeySchedule"
+    ],
+    "contract_rc": 0,
+    "architecture_rc": 2,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 55
+  },
+  {
+    "id": "MU-18a",
+    "title": "another product type references the v2 core directly \u2014 INEFFECTIVE: the discarded `_ = typeof(...)` is elided by the compiler, so no reference reached the IL",
+    "file": "src/backend/EnterpriseForms.Infrastructure/BusinessInfrastructureRegistration.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 0,
+      "succeeded": 193
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [],
+    "architecture_failures": [],
+    "contract_rc": 0,
+    "architecture_rc": 0,
+    "detected": false,
+    "restored_hash_matches": true,
+    "seconds": 53,
+    "detected_note": "mutation ineffective, not a test gap; superseded by MU-18"
+  },
+  {
+    "id": "MU-18",
+    "title": "another product type references the v2 core directly",
+    "file": "src/backend/EnterpriseForms.Infrastructure/BusinessInfrastructureRegistration.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 0,
+      "succeeded": 193
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 1,
+      "succeeded": 141
+    },
+    "contract_failures": [],
+    "architecture_failures": [
+      "EnterpriseForms.ArchitectureTests.EnvelopeV2IsolationTests.OnlyTheApprovedDecryptionServicesReachEnvelopeV2AndOnlyThroughTheProductReader"
+    ],
+    "contract_rc": 0,
+    "architecture_rc": 2,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 83
+  },
+  {
+    "id": "MU-19",
+    "title": "a verified storage reader switched to self-sealed mode",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/Projection/VerifiedRecordReader.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 0,
+      "succeeded": 193
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 3,
+      "succeeded": 139
+    },
+    "contract_failures": [],
+    "architecture_failures": [
+      "EnterpriseForms.ArchitectureTests.DecryptionCallSiteTests.SelfSealedCallersArePinnedToTheReviewedInventory",
+      "EnterpriseForms.ArchitectureTests.DecryptionCallSiteTests.EveryDecryptionCallSiteIsReviewedAndAllowListed",
+      "EnterpriseForms.ArchitectureTests.DecryptionCallSiteTests.TheVerifiedStorageReadersUseTheVerifiedReaderOnly"
+    ],
+    "contract_rc": 0,
+    "architecture_rc": 2,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 48
+  },
+  {
+    "id": "MU-20",
+    "title": "application batch step skips the one-organization check (second layer: service)",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/Values/DecryptedFieldValues.cs",
+    "built": true,
+    "contract": {
+      "total": 193,
+      "failed": 1,
+      "succeeded": 192
+    },
+    "architecture": {
+      "total": 142,
+      "failed": 0,
+      "succeeded": 142
+    },
+    "contract_failures": [
+      "EnterpriseForms.Api.ContractTests.EnvelopeV2ProductReaderTests.OrganizationAndPurposeIsolationHoldsBeforeAnyKeyOperation"
+    ],
+    "architecture_failures": [],
+    "contract_rc": 2,
+    "architecture_rc": 0,
+    "detected": true,
+    "restored_hash_matches": true,
+    "seconds": 57
+  }
+]

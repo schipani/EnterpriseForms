@@ -1,0 +1,196 @@
+12:12:07.761 PASS S-00: m2e2gate,postgres
+12:12:07.764 PASS S-01: removed []; remaining []
+12:12:14.040 --migrate (m2e2-migrate) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+12:12:14.098 PASS S-02: runtime sessions 0; exit 0; floors none; ledger 20261116031706_AuthorityContentDataKeyBindings
+12:12:14.121 runtime grants baseline: authority.authenticated_sessions:INSERT,authority.authenticated_sessions:SELECT,authority.authenticated_sessions:UPDATE,authority.authority_relationship_edges:INSERT,authority.authority_relationship_edges:SELECT,authority.authority_relationship_edges:UPDATE,authority.authority_resources:INSERT,authority.authority_resources:SELECT,authority.authority_resources:UPDATE,authority.content_candidate_leaves:INSERT,authority.content_candidate_leaves:SELECT,authority.content_candidate_leaves:UPDATE,authority.content_change_operations:INSERT,authority.content_change_operations:SELECT,authority.content_change_operations:UPDATE,authority.content_data_key_bindings:INSERT,authority.content_data_key_bindings:SELECT,authority.content_integrity_checkpoints:INSERT,authority.content_integrity_checkpoints:SELECT,authority.content_integrity_checkpoints:UPDATE,authority.content_item_identities:INSERT,authority.content_item_identities:SELECT,authority.ef_migrations_history:SELECT,authority.field_search_approvals:INSERT,authority.field_search_approvals:SELECT,authority.field_search_approvals:UPDATE,authority.identity_bindings:INSERT,authority.identity_bindings:SELECT,authority.identity_bindings:UPDATE,authority.integrity_key_registrations:INSERT,authority.integrity_key_registrations:SELECT,authority.integrity_key_registrations:UPDATE,authority.organization_authorization_states:INSERT,authority.organization_authorization_states:SELECT,authority.organization_authorization_states:UPDATE,authority.organization_membership_requests:INSERT,authority.organization_membership_requests:SELECT,authority.organization_membership_requests:UPDATE,authority.organization_onboarding_approvals:INSERT,authority.organization_onboarding_approvals:SELECT,authority.organization_onboarding_approvals:UPDATE,authority.organization_onboarding_owners:INSERT,authority.organization_onboarding_owners:SELECT,authority.organization_onboarding_owners:UPDATE,authority.organization_onboarding_requests:INSERT,authority.organization_onboarding_requests:SELECT,authority.organization_onboarding_requests:UPDATE,authority.organization_owner_recovery_approvals:INSERT,authority.organization_owner_recovery_approvals:SELECT,authority.organization_owner_recovery_approvals:UPDATE,authority.organization_owner_recovery_cases:INSERT,authority.organization_owner_recovery_cases:SELECT,authority.organization_owner_recovery_cases:UPDATE,authority.organization_owner_recovery_subjects:INSERT,authority.organization_owner_recovery_subjects:SELECT,authority.organization_owner_recovery_subjects:UPDATE,authority.organization_protection_policies:INSERT,authority.organization_protection_policies:SELECT,authority.organization_protection_policies:UPDATE,authority.organization_recovered_owner_probations:INSERT,authority.organization_recovered_owner_probations:SELECT,authority.organization_recovered_owner_probations:UPDATE,authority.organization_role_change_proposals:INSERT,authority.organization_role_change_proposals:SELECT,authority.organization_role_change_proposals:UPDATE,authority.platform_journal_entries:INSERT,authority.platform_journal_entries:SELECT,authority.platform_journal_entries:UPDATE,authority.platform_journal_heads:INSERT,authority.platform_journal_heads:SELECT,authority.platform_journal_heads:UPDATE,authority.platform_operator_approvals:INSERT,authority.platform_operator_approvals:SELECT,authority.platform_operator_approvals:UPDATE,authority.platform_operator_change_proposals:INSERT,authority.platform_operator_change_proposals:SELECT,authority.platform_operator_change_proposals:UPDATE,authority.platform_operator_evidence_uses:INSERT,authority.platform_operator_evidence_uses:SELECT,authority.platform_operator_evidence_uses:UPDATE,authority.platform_operators:INSERT,authority.platform_operators:SELECT,authority.platform_operators:UPDATE,authority.projection_outbox_events:INSERT,authority.projection_outbox_events:SELECT,authority.projection_outbox_events:UPDATE,authority.protection_census_results:INSERT,authority.protection_census_results:SELECT,authority.protection_census_results:UPDATE,authority.protection_reconciliation_attestations:INSERT,authority.protection_reconciliation_attestations:SELECT,authority.protection_reconciliation_attestations:UPDATE,authority.published_form_versions:INSERT,authority.published_form_versions:SELECT,authority.published_form_versions:UPDATE,authority.record_content_heads:INSERT,authority.record_content_heads:SELECT,authority.record_content_heads:UPDATE,authority.record_manifest_commits:INSERT,authority.record_manifest_commits:SELECT,authority.record_manifest_commits:UPDATE,authority.record_manifest_leaves:INSERT,authority.record_manifest_leaves:SELECT,authority.record_manifest_leaves:UPDATE,authority.search_catalogue_snapshot_entries:INSERT,authority.search_catalogue_snapshot_entries:SELECT,authority.search_catalogue_snapshot_entries:UPDATE,authority.search_catalogue_snapshots:INSERT,authority.search_catalogue_snapshots:SELECT,authority.search_catalogue_snapshots:UPDATE,authority.security_commands:INSERT,authority.security_commands:SELECT,authority.security_commands:UPDATE,authority.security_journal_entries:INSERT,authority.security_journal_entries:SELECT,authority.security_journal_entries:UPDATE,authority_search.search_boolean_postings:DELETE,authority_search.search_boolean_postings:INSERT,authority_search.search_boolean_postings:SELECT,authority_search.search_date_postings:DELETE,authority_search.search_date_postings:INSERT,authority_search.search_date_postings:SELECT,authority_search.search_date_time_postings:DELETE,authority_search.search_date_time_postings:INSERT,authority_search.search_date_time_postings:SELECT,authority_search.search_decimal_postings:DELETE,authority_search.search_decimal_postings:INSERT,authority_search.search_decimal_postings:SELECT,authority_search.search_field_coverages:INSERT,authority_search.search_field_coverages:SELECT,authority_search.search_field_coverages:UPDATE,authority_search.search_form_states:INSERT,authority_search.search_form_states:SELECT,authority_search.search_form_states:UPDATE,authority_search.search_integer_postings:DELETE,authority_search.search_integer_postings:INSERT,authority_search.search_integer_postings:SELECT,authority_search.search_option_postings:DELETE,authority_search.search_option_postings:INSERT,authority_search.search_option_postings:SELECT,authority_search.search_projection_states:INSERT,authority_search.search_projection_states:SELECT,authority_search.search_projection_states:UPDATE,authority_search.search_record_entries:DELETE,authority_search.search_record_entries:INSERT,authority_search.search_record_entries:SELECT,authority_search.search_record_field_anomalies:DELETE,authority_search.search_record_field_anomalies:INSERT,authority_search.search_record_field_anomalies:SELECT,authority_search.search_result_snapshot_entries:DELETE,authority_search.search_result_snapshot_entries:INSERT,authority_search.search_result_snapshot_entries:SELECT,authority_search.search_result_snapshots:DELETE,authority_search.search_result_snapshots:INSERT,authority_search.search_result_snapshots:SELECT,authority_search.search_string_postings:DELETE,authority_search.search_string_postings:INSERT,authority_search.search_string_postings:SELECT,authority_search_access.search_access_checkpoints:INSERT,authority_search_access.search_access_checkpoints:SELECT,authority_search_access.search_access_checkpoints:UPDATE,authority_search_access.search_access_edges:DELETE,authority_search_access.search_access_edges:INSERT,authority_search_access.search_access_edges:SELECT,authority_search_access.search_access_field_item_grants:DELETE,authority_search_access.search_access_field_item_grants:INSERT,authority_search_access.search_access_field_item_grants:SELECT,authority_search_access.search_access_record_grants:DELETE,authority_search_access.search_access_record_grants:INSERT,authority_search_access.search_access_record_grants:SELECT,authority_search_access.search_access_shadow_samples:DELETE,authority_search_access.search_access_shadow_samples:INSERT,authority_search_access.search_access_shadow_samples:SELECT,authority_search_access.search_access_value_postings:DELETE,authority_search_access.search_access_value_postings:INSERT,authority_search_access.search_access_value_postings:SELECT,authority_search_access.search_access_verification_states:DELETE,authority_search_access.search_access_verification_states:INSERT,authority_search_access.search_access_verification_states:SELECT,authority_search_access.search_access_verification_states:UPDATE
+12:12:14.164 PASS S-03: select=true insert=true update=false delete=false truncate=false; false false
+12:12:17.829 --apply-content-acceptance-floor 3 (m2e2-floor3-early) exit 2: content acceptance rule floor 3 requires every lower floor to be applied first (floors are raised one step at a time)
+12:12:17.862 PASS F-01: exit 2; floors none
+12:12:19.292 --apply-content-acceptance-floor 1 (m2e2-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+12:12:19.328 PASS F-02: exit 0; floors 1
+12:12:20.118 PASS F-03: OK OK
+12:12:24.810 legacy net10.0 prepare exit 0: ok=True error= build=1 
+12:12:27.973 legacy net10.0 commit exit 0: ok=True error= build=1 
+12:12:28.006 PASS F-04: Prepare OK; Commit OK; head revision 2
+12:12:28.318 PASS F-05: ENVELOPE_INVALID: ENVELOPE_DOWNGRADE; unchanged
+12:12:29.789 --apply-content-acceptance-floor 2 (m2e2-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+12:12:29.817 PASS F-06: exit 0; floors 2
+12:12:32.687 legacy net10.0 prepare exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False build=1 
+12:12:32.744 PASS F-07: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False :: the operation crosses content acceptance rule versions and was refused; start a fresh operation ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v2) refused a content operation write; this build applies rule version 1 (mixed-version fleet or a newer floor); ops 3->3; unchanged
+12:12:32.935 database copy m2e2_floor2 of m2e2gate created and admitted
+12:12:36.239 --migrate (m2e2-migrate-2) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+12:12:36.267 PASS F-08: exit 0; floors 2
+12:12:37.579 --apply-content-acceptance-floor 3 (m2e2-floor3-session) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor 3 refused: 1 session(s) able to write content operations are connected without a CARV build marker of version 3 or later (an older Authority instance may still run)
+12:12:37.612 PASS F-09: exit 3; floors 2
+12:12:37.726 seed P=2 op=01a1e446-0970-7df8-94f4-02238c09fda6: OK
+12:12:39.661 --apply-content-acceptance-floor 3 (m2e2-floor3-inflight) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor 3 refused: 1 unexpired operation(s) prepared below content acceptance rule version 3 are in flight; let them expire or abort them first
+12:12:39.704 PASS F-10: seed OK; exit 3; floors 2
+12:12:41.202 --apply-content-acceptance-floor 3 (m2e2-floor3-ledger) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor 3 refused: the data-key ledger index or its binding-guard and immutability triggers are not present exactly as created
+12:12:41.246 PASS F-11: exit 3; floors 2
+12:12:43.419 --apply-content-acceptance-floor 3 (m2e2-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+12:12:43.740 PASS F-12: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; outcomes OK x18; P<>C 0
+12:12:45.244 --apply-content-acceptance-floor 3 (m2e2-floor3-again) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+12:12:46.409 --apply-content-acceptance-floor 2 (m2e2-floor2-after-3) exit 2: content acceptance rule floor 3 is already recorded; floors are never lowered, so floor 2 is not applied
+12:12:46.454 PASS F-13: exit 0, floors 3; exit 2, floors 3
+12:12:50.932 legacy net10.0 prepare exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False build=2 
+12:12:50.988 PASS F-14: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False :: the operation crosses content acceptance rule versions and was refused; start a fresh operation ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v3) refused a content operation write; this build applies rule version 2 (mixed-version fleet or a newer floor); ops 22->22; unchanged
+12:12:51.009 PASS G-after-floors: unchanged
+12:12:51.265 PASS S-10: m2e2_floor2,m2e2gate,postgres
+12:12:51.308 PASS S-11: True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3
+12:12:51.308 PASS S-12: refused: environment; refused: environment; refused: policy; refused: policy
+12:12:51.308 PASS S-13: configured True; prerequisites True; enabled False
+12:12:51.462 PASS S-14: ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; signatures 63->63; bindings 0->0; ops 22->22
+12:12:51.606 PASS S-15: Recorded; body has the digest, requested on; enabled True
+12:12:51.625 PASS G-after-activation: unchanged
+12:12:51.807 seed P=3 op=01a1e446-40c0-73b5-bc31-d38d89befc59: OK
+12:12:51.835 PASS L-01: setup OK; seed OK; insert OK
+12:12:51.853 PASS L-02: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later
+12:12:51.868 PASS L-03: 23505 uq_content_data_key_binding_identifier: duplicate key value violates unique constraint "uq_content_data_key_binding_identifier"
+12:12:51.915 PASS L-04: 42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings
+12:12:51.975 PASS L-05: 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated; 1/1
+12:12:52.194 PASS P-01: OK ; ledger [01a1e44641c97294892a12667ae511cf/k1/n3/13311ca6]; matches True; signed 5; 3/NULL Prepared -; wrap 1
+12:12:52.360 PASS P-02: OK ; 3/3 Committed -; head 0 -> 1; ledger unchanged True; DK-8 [01a1e44641c97294892a12667ae511cf/k1/n3/13311ca6]
+12:12:52.479 PASS P-03: OK ; ledger [01a1e446430c7853bbd2aec2998549c4/k2/n1/77b27185]; matches True; signed 3; 3/NULL Prepared -; wrap 1
+12:12:52.630 PASS P-04: OK ; 3/3 Committed -; head 0 -> 1; ledger unchanged True; DK-8 [01a1e446430c7853bbd2aec2998549c4/k2/n1/77b27185]
+12:12:52.783 PASS P-05: OK ; ledger [01a1e44644497f668721c7cc9669d9ba/k1/n2/9efd1ba3]; matches True; signed 4; 3/NULL Prepared -; wrap 2
+12:12:52.931 PASS P-06: OK ; 3/3 Committed -; head 0 -> 1; ledger unchanged True; DK-8 [01a1e44644497f668721c7cc9669d9ba/k1/n2/9efd1ba3]
+12:12:53.054 PASS P-07: OK ; ledger [01a1e446454c72fcab38c8a09bcce0b7/k2/n1/beefcc23]; matches True; signed 3; 3/NULL Prepared -; wrap 2
+12:12:53.205 PASS P-08: OK ; 3/3 Committed -; head 0 -> 1; ledger unchanged True; DK-8 [01a1e446454c72fcab38c8a09bcce0b7/k2/n1/beefcc23]
+12:12:53.364 PASS P-09: OK ; ledger [01a1e44646557b1c861fa0c2cb9191fc/k1/n2/df6310c0; 01a1e44646557be98b9b1c12fa25fe4f/k1/n1/dcf47067; 01a1e446465971ff94665fca7975f344/k2/n1/18d7e645; 01a1e4464657714ba7a18fa8c94a1e92/k2/n1/44bd6249]; tuples [01a1e44646557b1c861fa0c2cb9191fc/k1/n2/df6310c0; 01a1e44646557be98b9b1c12fa25fe4f/k1/n1/dcf47067; 01a1e4464657714ba7a18fa8c94a1e92/k2/n1/44bd6249; 01a1e446465971ff94665fca7975f344/k2/n1/18d7e645]; byte order True
+12:12:53.669 PASS P-10: first OK; carry Prepare OK; Commit OK ; new bindings 0; DK-8 []; ledger rows for the id 1
+12:12:54.076 PASS P-11: OK,OK,OK; head revision 5; bindings for the id 1
+12:12:54.211 PASS P-12: OK; binding count 2
+12:12:54.346 PASS P-13: OK; v2 items 0; binding 1
+12:12:54.630 PASS P-14: OK OK; new 1; old 2
+12:12:54.890 PASS P-15: first OK; enabled False; carry OK; New ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; enabled True
+12:12:55.071 PASS P-16: carry OK; New ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED
+12:12:55.309 PASS P-17: OK OK; DK-8 []; bindings 0
+12:12:55.563 PASS P-18: OK OK
+12:12:55.739 PASS P-19: OK; replay OK; same True; bindings 1 -> 1; ops 46 -> 46
+12:12:55.902 PASS P-20: OK; replay OK revision 1 (head 1); journal 20 -> 20; bindings 1
+12:12:56.001 PASS P-21: 20 content entries; archived all; chain verified; ledger 12 rows; archived tuples 12; equal True
+12:12:56.045 PASS P-22: 2 content entries; archived all; chain verified; ledger 2 rows; archived tuples 2; equal True
+12:12:56.062 PASS G-after-positive: unchanged
+12:12:56.369 PASS N-00: OK OK
+12:12:56.544 PASS N-01: AuthorityException ITEM_IDENTITY_REUSED 422 retryable=False :: ITEM_IDENTITY_REUSED: a new item may not reuse an id that is already bound; signatures 159->159; ops 48->48; bindings 16->16; unchanged
+12:12:56.725 PASS N-01b: AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED; signatures 159->159; ops 48->48; bindings 16->16; unchanged
+12:12:56.906 PASS N-02: AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED; signatures 159->159; ops 48->48; bindings 16->16; unchanged
+12:12:57.085 PASS N-03: AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED; signatures 159->159; ops 48->48; bindings 16->16; unchanged
+12:12:57.200 PASS N-04: OK; bindings 1; 3/NULL Prepared -
+12:12:57.380 PASS N-05: AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED; signatures 162->162; ops 49->49; bindings 17->17; unchanged
+12:12:57.646 PASS N-06: Prepare OK; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; 3/NULL Aborted ENVELOPE_VERSION_NOT_ENABLED_AT_COMMIT; incidents 0->0; binding 1; unchanged
+12:12:57.954 PASS N-07: Prepare OK; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; 3/NULL Aborted ENVELOPE_VERSION_NOT_ENABLED_AT_COMMIT; incidents 0->0; binding 1; unchanged
+12:12:58.150 PASS N-08: AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED; signatures 168->168; ops 51->51; bindings 19->19; unchanged
+12:12:58.150 PASS N-09: enabled True
+12:12:58.304 PASS N-10: Prepare OK; AuthorityException OPERATION_EXPIRED 409 retryable=False; 3/NULL Aborted -
+12:12:58.487 PASS N-11: AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED; signatures 171->171; ops 52->52; bindings 20->20; unchanged
+12:12:58.609 PASS N-12: OK
+12:12:58.778 PASS N-13: AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED; signatures 175->175; ops 53->53; bindings 21->21; unchanged
+12:12:58.948 PASS N-14: AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: ENVELOPE_BATCH_INCONSISTENT; signatures 175->175; ops 53->53; bindings 21->21; unchanged
+12:12:59.124 PASS N-15: AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED; signatures 175->175; ops 53->53; bindings 21->21; unchanged
+12:12:59.158 seed P=3 op=01a1e446-5d74-7a77-82c6-b2ec59294705: OK
+12:12:59.427 PASS N-20: AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; 3/NULL Aborted DATA_KEY_BINDING_MISMATCH; incidents 0->1; integrity 3->4; unchanged
+12:12:59.483 seed P=3 op=01a1e446-5ea5-7792-be50-7810976a931f: OK
+12:12:59.503 N-21 binding insert: OK
+12:12:59.722 PASS N-21: AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; 3/NULL Aborted DATA_KEY_BINDING_MISMATCH; incidents 1->2; integrity 4->5; unchanged
+12:12:59.758 seed P=3 op=01a1e446-5fcb-784b-9242-9cccdc11f097: OK
+12:12:59.776 N-22 binding insert: OK
+12:13:00.019 PASS N-22: AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; 3/NULL Aborted DATA_KEY_BINDING_MISMATCH; incidents 2->3; integrity 5->6; unchanged
+12:13:00.064 seed P=3 op=01a1e446-60f6-7374-817a-f8b109e0320f: OK
+12:13:00.090 N-23 binding insert: OK
+12:13:00.385 PASS N-23: AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; 3/NULL Aborted DATA_KEY_BINDING_MISMATCH; incidents 3->4; integrity 6->7; unchanged
+12:13:00.428 seed P=3 op=01a1e446-6262-710c-9698-4463e7d1d829: OK
+12:13:00.447 N-24 binding insert: OK
+12:13:00.680 PASS N-24: AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; 3/NULL Aborted DATA_KEY_BINDING_MISMATCH; incidents 4->5; integrity 7->8; unchanged
+12:13:00.839 seed P=3 op=01a1e446-6405-79b7-ac9a-9b95d94d0d42: OK
+12:13:01.072 PASS N-25: AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; 3/NULL Aborted DATA_KEY_BINDING_MISMATCH; incidents 5->6; integrity 9->10; unchanged
+12:13:01.173 seed P=3 op=01a1e446-6551-7341-af17-dc0102cb119d: OK
+12:13:01.397 PASS N-26: AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; 3/NULL Aborted DATA_KEY_BINDING_MISMATCH; incidents 6->7; integrity 10->11; unchanged
+12:13:01.569 seed P=3 op=01a1e446-66dd-70dc-b78c-472f9592c8f7: OK
+12:13:01.781 PASS N-27: AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; 3/NULL Aborted DATA_KEY_BINDING_MISMATCH; incidents 7->8; integrity 12->13; unchanged
+12:13:01.925 seed P=3 op=01a1e446-6843-7058-b3b1-c34fe8a55195: OK
+12:13:02.150 PASS N-28: AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; 3/NULL Aborted DATA_KEY_BINDING_MISMATCH; incidents 8->9; integrity 14->15; unchanged
+12:13:02.329 PASS N-29: AuthorityException CANDIDATE_MISMATCH 409 retryable=False; 3/NULL Prepared -; unchanged
+12:13:02.439 PASS N-30: 42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings || 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated; binding count 1
+12:13:02.497 PASS N-31: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later | 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later | 23505 uq_content_data_key_binding_identifier: duplicate key value violates unique constraint "uq_content_data_key_binding_identifier"
+12:13:02.660 PASS N-32: intervening OK; AuthorityException CONTENT_REVISION_CONFLICT 409 retryable=False; signatures 223->223; bindings 30->30
+12:13:02.720 PASS N-33: enabled False; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; Recorded; enabled True; cleared enabled False; Recorded; enabled True
+12:13:02.874 PASS N-34: AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures 223->223; ops 68->68; bindings 30->30; unchanged
+12:13:03.035 PASS N-35: AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; signatures 223->223; ops 68->68; bindings 30->30; unchanged
+12:13:03.208 PASS N-36: AuthorityException INVALID_COMMAND 422 retryable=False :: UNSUPPORTED_SIGNED_SCHEMA: entity kind or schema version has no column-class assignment; signatures 223->223; ops 68->68; bindings 30->30; unchanged
+12:13:03.392 PASS N-37: AuthorityException INVALID_COMMAND 422 retryable=False :: UNSUPPORTED_SIGNED_SCHEMA: column type or nullability differs from the registered assignment; signatures 223->223; ops 68->68; bindings 30->30; unchanged
+12:13:03.427 seed P=3 op=01a1e446-6e20-7dac-9687-0d969ad06547: OK
+12:13:03.530 PASS N-38: AuthorityException INVALID_COMMAND 422 retryable=False; 3/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT; unchanged
+12:13:03.564 seed P=3 op=01a1e446-6eaa-7137-bbc0-e427cf2711af: OK
+12:13:03.659 PASS N-39: AuthorityException INVALID_COMMAND 422 retryable=False; 3/NULL Aborted SIGNED_SCHEMA_INVALID_AT_COMMIT; unchanged
+12:13:03.932 PASS N-40: AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: ENVELOPE_DOWNGRADE; signatures 232->232; ops 71->71; bindings 31->31; unchanged
+12:13:04.247 PASS N-41: OK
+12:13:04.446 PASS N-42: AuthorityException FORBIDDEN 403 retryable=False :: SHARE_MUTATION_OUT_OF_SCOPE: SHARE_ITEM_FRAMING_CHANGED; signatures 240->240; ops 73->73; bindings 32->32; unchanged
+12:13:04.659 PASS N-43: AuthorityException FORBIDDEN 403 retryable=False :: SHARE_MUTATION_OUT_OF_SCOPE: SHARE_ENVELOPE_NOT_ALLOWED; signatures 240->240; ops 73->73; bindings 32->32; unchanged
+12:13:04.680 PASS G-after-negative: unchanged
+12:13:04.922 PASS C-01: OK 1; reused 1; signed 3; bindings 1; outcomes OK / ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED
+12:13:05.935 PASS C-02: A first True; B at insert True; A OK; B AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED; signed 6; bindings 1 (org A); B ops 0->0
+12:13:06.358 PASS C-03: prepared OK/OK; first OK; second AuthorityException CONTENT_REVISION_CONFLICT 409 retryable=False; 3/NULL Aborted -; loser binding 1; same ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED; fresh OK
+12:13:06.594 PASS C-04: SimulatedCrashException; 3/NULL Prepared -; bindings 1; replay OK same True; bindings 1; commit OK
+12:13:06.838 PASS C-05: SimulatedCrashException; same ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED; fresh OK
+12:13:08.110 PASS C-06: outcomes OK x32; bindings per org 4,4,4,4; P<>C 0
+12:13:08.129 PASS G-after-concurrency: unchanged
+12:13:11.253 legacy net10.0 prepare exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False build=2 
+12:13:11.318 PASS X-01: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False :: the operation crosses content acceptance rule versions and was refused; start a fresh operation ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v3) refused a content operation write; this build applies rule version 2 (mixed-version fleet or a newer floor); ops 113->113; unchanged
+12:13:14.580 legacy net10.0 prepare exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False build=1 
+12:13:14.645 PASS X-02: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False :: the operation crosses content acceptance rule versions and was refused; start a fresh operation ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v3) refused a content operation write; this build applies rule version 1 (mixed-version fleet or a newer floor); ops 113->113; unchanged
+12:13:17.523 legacy net10.0 commit exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False build=2 
+12:13:17.610 PASS X-03: Prepare OK; legacy AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False :: the operation was prepared under other content acceptance rules; start a fresh operation; 3/NULL Aborted OPERATION_RULES_OUTDATED; unchanged; binding 1
+12:13:20.487 legacy net10.0 commit exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False build=2 
+12:13:20.546 PASS X-04: setup OK; Prepare OK; legacy AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False :: the operation was prepared under other content acceptance rules; start a fresh operation; 3/NULL Aborted OPERATION_RULES_OUTDATED; unchanged
+12:13:23.137 legacy net10.0 commit exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False build=1 
+12:13:23.201 PASS X-05: Prepare OK; legacy AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False :: the operation was prepared under other content acceptance rules; start a fresh operation; 3/NULL Aborted OPERATION_RULES_OUTDATED; unchanged
+12:13:23.221 PASS G-after-cross-build: unchanged
+12:13:23.557 PASS D-01: weaken OK; AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; ops +0; bindings +0; signed 0; restore OK; digest = baseline; healthy OK
+12:13:23.812 PASS D-02: weaken OK; AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; ops +0; bindings +0; signed 0; restore OK; digest = baseline; healthy OK
+12:13:24.066 PASS D-03: weaken OK; AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; ops +0; bindings +0; signed 0; restore OK; digest = baseline; healthy OK
+12:13:24.326 PASS D-04: weaken OK; AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; ops +0; bindings +0; signed 0; restore OK; digest = baseline; healthy OK
+12:13:24.575 PASS D-05: weaken OK; AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; ops +0; bindings +0; signed 0; restore OK; digest = baseline; healthy OK
+12:13:24.822 PASS D-06: weaken OK; AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; ops +0; bindings +0; signed 0; restore OK; digest = baseline; healthy OK
+12:13:25.004 PASS D-07: Prepare OK; AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; 3/NULL Prepared -; retry OK
+12:13:26.475 --apply-content-acceptance-floor 3 --reinstate-recorded-floor (m2e2-reinstate-D-08) exit 0: content acceptance rule floor 3 re-installed (recorded floor reinstated)  content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+12:13:26.604 PASS D-08: weaken OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert has reason True; ops +0; bindings +0; reinstate exit 0; digest = baseline; healthy OK
+12:13:27.919 --apply-content-acceptance-floor 3 --reinstate-recorded-floor (m2e2-reinstate-D-09) exit 0: content acceptance rule floor 3 re-installed (recorded floor reinstated)  content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+12:13:28.046 PASS D-09: weaken OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert has reason True; ops +0; bindings +0; reinstate exit 0; digest = baseline; healthy OK
+12:13:29.525 --apply-content-acceptance-floor 3 --reinstate-recorded-floor (m2e2-reinstate-D-10) exit 0: content acceptance rule floor 3 re-installed (recorded floor reinstated)  content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+12:13:29.660 PASS D-10: weaken OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert has reason True; ops +0; bindings +0; reinstate exit 0; digest = baseline; healthy OK
+12:13:29.900 PASS D-11: weaken OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert has reason True; ops +0; bindings +0; OK; digest = baseline; healthy OK
+12:13:30.159 PASS D-12: weaken OK; AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert has reason True; ops +0; bindings +0; OK; digest = baseline; healthy OK
+12:13:30.357 PASS D-13: policy Recorded enabled True; v2 AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; v1 AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reasons [FloorLowered]; ops 3->3
+12:13:30.393 PASS D-14: = baseline
+12:13:30.411 PASS G-after-database: unchanged
+12:13:30.941 database copy m2e2_t0 of m2e2gate created and admitted
+12:13:31.641 PASS R-00: pre OK,OK,OK; post OK,OK,OK; prepared OK; aborted ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; expired AuthorityException OPERATION_EXPIRED 409 retryable=False
+12:13:31.723 PASS R-01: 6 content entries; archived all; chain verified; reconstructed 8; committed ledger 8; equal True
+12:13:31.723 EXPECTED_LIMIT R-02 (as expected: True): uncommitted 3 [Prepared, Aborted, Aborted]; in reconstruction 0
+12:13:31.769 EXPECTED_LIMIT R-03 (as expected: True): missing bindings 3; missing operations 3 (for 3 tuples); guard requires Prepared True; nothing inserted
+12:13:31.775 EXPECTED_LIMIT R-04 (as expected: True): reconstruction 7 of 8; chain INCOMPLETE (revision gap before r5)
+12:13:31.790 EXPECTED_LIMIT R-05 (as expected: True): altered equals ledger False; verified rows 2; from bytes db5fe0c1 = ledger True
+12:13:31.967 PASS R-06: AuthorityException INVALID_COMMAND 422 retryable=False :: ENVELOPE_INVALID: DATA_KEY_IDENTIFIER_REUSED; signatures 476->476; ops 138->138; bindings 81->81; unchanged
+12:13:32.187 EXPECTED_GAP_BD1 R-07 (as expected: True): policy AlreadyRecorded; readiness True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3; Prepare OK; Commit OK; K1 bindings in the restored ledger 1 (operation 01a1e446)
+12:13:32.204 PASS G-after-recovery: unchanged
+12:13:38.629 --migrate (m2e2-host-migrate) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+12:13:40.735 --apply-content-acceptance-floor 1 (m2e2-host-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+12:13:42.209 --apply-content-acceptance-floor 2 (m2e2-host-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+12:13:43.654 --apply-content-acceptance-floor 3 (m2e2-host-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+12:13:43.686 PASS H-00: migrate 0; floors 0,0,0; installed 3
+12:13:46.903 host Development: exited False code -1 condition True
+12:13:46.920 PASS H-01: exited False; record appeared True; log configured=True True; body Release B floor 3 True
+12:14:11.987 host Testing: exited False code -1 condition False
+12:14:12.019 PASS H-02: exited False; configured=True True; acceptance records 1 -> 1
+12:14:15.059 host Staging: exited True code -532462766 condition False
+12:14:15.059 PASS H-03: exited True code -532462766; message present
+12:14:18.106 host Production: exited True code -532462766 condition False
+12:14:18.106 PASS H-04: exited True code -532462766; message present
+12:14:21.141 host Development: exited True code -532462766 condition False
+12:14:21.141 PASS H-05: exited True code -532462766; message present
+12:14:28.678 host Development: exited True code -532462766 condition False
+12:14:28.678 PASS H-06: ledger none; exited True code -532462766; message present
+12:14:28.679 PASS T-01: enabled False
+12:14:28.698 PASS G-end: unchanged
+12:14:28.824 PASS T-02: verified 6; false false

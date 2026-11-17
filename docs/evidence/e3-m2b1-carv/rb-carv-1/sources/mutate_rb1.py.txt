@@ -1,0 +1,153 @@
+"""RB-CARV-1 enforcement-removal checks. Each mutation removes one part of the Release B write fence, applied alone to the
+working tree, then either (unit) rebuilds and runs the focused Authority test classes, or (pg) builds a mutated Release Authority
+and runs harness R against the frozen legacy build 66f0aa7 on a disposable PostgreSQL container. Every file is backed up in the
+scratchpad, restored and SHA-256 verified. Usage: python -I mutate_rb1.py <repo> <scratch-carv-dir> [ids...]"""
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+repo, S = sys.argv[1], sys.argv[2]
+only = set(sys.argv[3:])
+R1 = os.path.join(S, "rb1")
+APP = "src/authority/AuthorizationAuthority.Application/Features/Content/"
+SERVICE = APP + "ContentService.cs"
+POLICY = APP + "ContentAcceptancePolicy.cs"
+COMMANDS = "src/authority/AuthorizationAuthority.Application/Features/SecurityCommands/SecurityCommandService.cs"
+FENCE = "src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceWriteFence.cs"
+STORE = "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityStore.cs"
+AUTH_TESTS = "tests/authority/AuthorizationAuthority.Tests"
+AUTH_EXE = os.path.join(repo, AUTH_TESTS, "bin/Debug/net10.0/AuthorizationAuthority.Tests.exe")
+CLASSES = ["ContentAcceptancePolicyTests", "ContentAcceptanceRegistrationTests", "ContributorWriteProtocolTests", "ContentAcceptanceFloorTests", "ContentAcceptanceRuleGuardTests"]
+API = "src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj"
+API_OUT = os.path.join(repo, "src/authority/AuthorizationAuthority.Api/bin/Release/net10.0")
+
+PREPARE_ENTRY = ("        await scope.RequireContentAcceptanceFloorAsync(cancellationToken).ConfigureAwait(false);\n        var (bound, reprotection)", "        var (bound, reprotection)")
+COMMIT_ENTRY = ("        await scope.RequireContentAcceptanceFloorAsync(cancellationToken).ConfigureAwait(false);\n        OrganizationGate.RequireOpen", "        OrganizationGate.RequireOpen")
+REGISTRATION_ENTRY = ("                await scope.RequireContentAcceptanceFloorAsync(cancellationToken).ConfigureAwait(false);\n", "")
+FALLBACK = ("            return Invalid(PhaseUnconfigured);\n        }\n\n        var floorGiven", "            return new ContentAcceptancePolicy(ContentAcceptancePhase.ReleaseA, null, null);\n        }\n\n        var floorGiven")
+DOWNGRADE = ("        if (floor < ReleaseBFloor)\n", "        if (floor < 0)\n")
+DEFINITION = ("        if (!string.Equals(facts.FloorDefinition, ExpectedFloorDefinition, StringComparison.Ordinal)\n", "        if (facts.ChildCount < 0 && !string.Equals(facts.FloorDefinition, ExpectedFloorDefinition, StringComparison.Ordinal)\n")
+DEFAULT = ("        if (facts.StampDefaultCount != 0)\n", "        if (facts.StampDefaultCount < 0)\n")
+NOOP = ("            if (!policy.GuardsContentWrites || contentFenceVerified)\n", "            if (!policy.GuardsContentWrites || contentFenceVerified || lockedOrganizationId != Guid.NewGuid())\n")
+CATCH_ALL = ("            if (policy.GuardsContentWrites && !contentFenceVerified && HasContentAcceptanceWrites())\n", "            if (policy.GuardsContentWrites && !contentFenceVerified && HasContentAcceptanceWrites() && lockedOrganizationId == Guid.NewGuid())\n")
+LOCK = ("                    await context.Database.ExecuteSqlRawAsync(ContentAcceptanceWriteFence.LockSql, cancellationToken).ConfigureAwait(false);\n", "")
+
+MUTATIONS = [
+    ("MU-1", "the Prepare entry call of the write fence removed (ContentService)", "unit", [(SERVICE, *PREPARE_ENTRY)]),
+    ("MU-2", "the Commit entry call of the write fence removed (ContentService)", "unit", [(SERVICE, *COMMIT_ENTRY)]),
+    ("MU-3", "the record-registration entry call removed (SecurityCommandService, a secondary content path)", "unit", [(COMMANDS, *REGISTRATION_ENTRY)]),
+    ("MU-4", "required-floor configuration validation removed: a missing phase falls back to Release A", "unit", [(POLICY, *FALLBACK)]),
+    ("MU-5", "required-floor configuration validation removed: a lower required floor (downgrade) is accepted", "unit", [(POLICY, *DOWNGRADE)]),
+    ("MU-6", "floor-integrity verification removed: a replaced floor definition is accepted", "unit", [(FENCE, *DEFINITION)]),
+    ("MU-7", "fence verification removed: a default on the Prepare stamp is accepted", "unit", [(FENCE, *DEFAULT)]),
+    ("MP-1", "the write-path guard removed: the store fence is a no-op", "pg", [(STORE, *NOOP)]),
+    ("MP-2", "secondary-path coverage removed: the store catch-all never runs", "pg", [(STORE, *CATCH_ALL)]),
+    ("MP-3", "transactional protection against concurrent removal removed: no table lock before the verification", "pg", [(STORE, *LOCK)]),
+    ("MP-4", "floor-integrity verification removed: a replaced floor definition is accepted", "pg", [(FENCE, *DEFINITION)]),
+    ("MP-5", "the Prepare entry call removed (the catch-all alone remains)", "pg", [(SERVICE, *PREPARE_ENTRY)]),
+    ("MP-6", "required-floor configuration validation removed: a missing phase falls back to Release A", "pg", [(POLICY, *FALLBACK)]),
+]
+
+
+def sha(path):
+    return hashlib.sha256(open(path, "rb").read()).hexdigest()
+
+
+def run(args, cwd=None):
+    return subprocess.run(args, cwd=cwd or repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+
+def unit_tests():
+    r = run(["dotnet", "build", AUTH_TESTS, "-c", "Debug", "-nologo", "-v", "q"])
+    if r.returncode != 0:
+        return {"build": "FAILED: " + (r.stdout + r.stderr)[-1500:]}
+    args = [AUTH_EXE]
+    for c in CLASSES:
+        args += ["--filter-class", "AuthorizationAuthority.Tests." + c]
+    t = run(args)
+    text = t.stdout + t.stderr
+    total, failed = re.search(r"total: (\d+)", text), re.search(r"failed: (\d+)", text)
+    return {"testsRun": int(total.group(1)) if total else None, "testsFailed": int(failed.group(1)) if failed else None,
+            "failingTests": sorted(set(re.findall(r"failed ([A-Za-z0-9_.]+(?:\([^)]*\))?)", text)))[:12]}
+
+
+def dlls(directory):
+    return [n for n in os.listdir(directory) if n.endswith(".dll") and (n.startswith("AuthorizationAuthority.") or n == "EnterpriseForms.Integrity.dll")]
+
+
+def pg_build(mid):
+    r = run(["dotnet", "build", API, "-c", "Release", "-nologo", "-v", "q"])
+    if r.returncode != 0:
+        return {"build": "FAILED: " + (r.stdout + r.stderr)[-1500:]}
+    newbin = os.path.join(R1, f"newbin-{mid}")
+    shutil.rmtree(newbin, ignore_errors=True)
+    shutil.copytree(API_OUT, newbin)
+    return {"newbin": newbin}
+
+
+def pg_harness(mid, newbin):
+    harness_bin = os.path.join(R1, f"harnessR-bin-{mid}")
+    shutil.rmtree(harness_bin, ignore_errors=True)
+    shutil.copytree(os.path.join(R1, "build-HarnessR", "bin", "Release", "net10.0"), harness_bin)
+    for name in dlls(newbin):
+        shutil.copyfile(os.path.join(newbin, name), os.path.join(harness_bin, name))
+    hashfile = os.path.join(R1, f"hashes-{mid}.txt")
+    open(hashfile, "w", encoding="ascii", newline="\r\n").write("\n".join(f"{sha(os.path.join(newbin, n))} *{n}" for n in sorted(dlls(newbin))) + "\n")
+    evidence = os.path.join(R1, "mutation-evidence", mid)
+    shutil.rmtree(evidence, ignore_errors=True)
+    os.makedirs(evidence)
+    args = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(S, "run-R.ps1"), "-Legacy", "66f0aa7", "-Evidence", evidence,
+            "-NewBin", newbin, "-HarnessBin", harness_bin, "-NewBinHashFile", hashfile, "-AgentBin", os.path.join(S, "agentF-66f0aa7", "bin", "Release", "net10.0")]
+    r = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    report = os.path.join(evidence, "carv-evidence.json")
+    if not os.path.exists(report):
+        return {"harnessError": (r.stdout + r.stderr)[-2000:]}
+    data = json.load(open(report, encoding="utf-8"))
+    failed = [c for c in data["checks"] if not c["Pass"]]
+    return {"checksTotal": data["checksTotal"], "checksFailed": data["checksFailed"], "failedChecks": [{"id": c["Id"], "observed": c["Observed"][:300]} for c in failed]}
+
+
+def apply(path, old, new):
+    text = open(path, encoding="utf-8", newline="").read()
+    crlf = "\r\n" in text
+    o, n = (old.replace("\n", "\r\n"), new.replace("\n", "\r\n")) if crlf else (old, new)
+    assert text.count(o) == 1, (path, text.count(o))
+    open(path, "w", encoding="utf-8", newline="").write(text.replace(o, n))
+
+
+results = []
+for mid, removal, kind, edits in MUTATIONS:
+    if only and mid not in only:
+        continue
+    entry = {"id": mid, "removal": removal, "kind": kind}
+    print("running", mid, flush=True)
+    backups = []
+    outcome = {}
+    try:
+        for rel, old, new in edits:
+            path = os.path.join(repo, rel)
+            backup = os.path.join(R1, "mutation-backups", f"{mid}-{os.path.basename(path)}")
+            os.makedirs(os.path.dirname(backup), exist_ok=True)
+            shutil.copyfile(path, backup)
+            backups.append((path, backup, sha(path)))
+            apply(path, old, new)
+        outcome = unit_tests() if kind == "unit" else pg_build(mid)
+    finally:
+        for path, backup, original in backups:
+            shutil.copyfile(backup, path)
+        entry["restoredSha256Matches"] = all(sha(p) == o for p, _, o in backups)
+    if kind == "pg" and "newbin" in outcome:
+        outcome = pg_harness(mid, outcome["newbin"])  # the source is already restored; the harness runs the mutated build
+    entry.update(outcome)
+    entry["detected"] = bool(entry.get("testsFailed") or entry.get("checksFailed"))
+    results.append(entry)
+    print(json.dumps({k: v for k, v in entry.items() if k not in ("failedChecks", "failingTests")}), flush=True)
+
+r = run(["dotnet", "build", AUTH_TESTS, "-c", "Debug", "-nologo", "-v", "q"])
+results.append({"id": "REBUILD", "authorityTestsBuildOk": r.returncode == 0})
+json.dump(results, open(os.path.join(R1, "mutation-rb1-results.json"), "w", encoding="utf-8"), indent=2)
+print("done", flush=True)

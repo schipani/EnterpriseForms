@@ -509,8 +509,8 @@
     },
     {
       "path": "docs/dynamic-forms/row-integrity-format.md",
-      "sha256": "c75162ac988be343644d988c1f69ffdd14a09cb4185a940e1d67b08783f7bf05",
-      "bytes": 14113
+      "sha256": "bfac466c0ba2442a5e92752ff14632ee75d40156968554bf72216671543b5044",
+      "bytes": 18477
     },
     {
       "path": "docs/dynamic-forms/search-entry-seal-format.md",
@@ -554,8 +554,8 @@
     },
     {
       "path": "docs/infrastructure/STAGING_PREPARATION_INDEXED_SEARCH.md",
-      "sha256": "52827fcf1724f085158d83777eb1756fe36e05c67e8ed70d58e59bdd9b5e801b",
-      "bytes": 25195
+      "sha256": "5af226049739dbc7c29304d79e5b2a2829e760372c9870469562661a1a50cf1e",
+      "bytes": 26013
     },
     {
       "path": "docs/performance/PB09_BENCHMARK_ACCEPTANCE_MATRIX.csv",
@@ -608,6 +608,101 @@
       "bytes": 14290
     },
     {
+      "path": "docs/security/E3_ENVELOPE_V2_KEY_HIERARCHY_DESIGN.md",
+      "sha256": "afa3240c2bf370755f9bc0ea1ff8bf495179d4b1885800d65f495a47820bb4ea",
+      "bytes": 101444
+    },
+    {
+      "path": "docs/security/E3_M2B1_CARV_OPERATIONS.md",
+      "sha256": "d09bdf363e2b965b3c3fd8cd3f54f74bd4606162abc349825f4b2e143fe59084",
+      "bytes": 50405
+    },
+    {
+      "path": "docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md",
+      "sha256": "58d2982581985d64a2ccc450d67ae3fe4d55ebec3ec01bb85743ff4537f073a4",
+      "bytes": 249914
+    },
+    {
+      "path": "docs/security/E3_M2C_IMPLEMENTATION_RECORD.md",
+      "sha256": "3b92d83833fcedd4871fab9091e6dee8ff7228a4e93727ec84359d3b019e54b9",
+      "bytes": 44313
+    },
+    {
+      "path": "docs/security/E3_M2D_IMPLEMENTATION_RECORD.md",
+      "sha256": "760b29e0a281abaacf6a1cca5501699081b383c964d2e68ef0132bd69f5269eb",
+      "bytes": 45353
+    },
+    {
+      "path": "docs/security/E3_M2E1_IMPLEMENTATION_RECORD.md",
+      "sha256": "8c83b5c349fef4b2bc7cc87d017b3b150f3c4ab6897c11069dae439533d45406",
+      "bytes": 37056
+    },
+    {
+      "path": "docs/security/E3_M2E2_VERIFICATION_RECORD.md",
+      "sha256": "37c272a62472b713c29c59c96ffbe2221996f3d26ba4f1dfecb188b3058b4863",
+      "bytes": 37638
+    },
+    {
+      "path": "docs/security/E3_M2E_CONTRACT_CLOSURE.md",
+      "sha256": "b6a8d6c5f7dd6121ffb463234b070ada47c73f72fd5ed54fd78de5faca136612",
+      "bytes": 41617
+    },
+    {
+      "path": "docs/security/E3_M2F1_IMPLEMENTATION_RECORD.md",
+      "sha256": "e853c45e2e7c9917d82d686cd2e2d22438b27152d04f2941f4ddd45aac128080",
+      "bytes": 13807
+    },
+    {
+      "path": "docs/security/E3_M2F2G_VERIFICATION_RECORD.md",
+      "sha256": "be95ad28aa704d05153ad957593b1c6e0748d6dce309cbbd4aa729fa9be66e09",
+      "bytes": 54933
+    },
+    {
+      "path": "docs/security/E3_M2F2_IMPLEMENTATION_RECORD.md",
+      "sha256": "50b480d96563aae56a99a6a6345c0152ce474a1b5960d763b9d2bd2843189902",
+      "bytes": 30885
+    },
+    {
+      "path": "docs/security/E3_M2F3B_IMPLEMENTATION_RECORD.md",
+      "sha256": "90314f0862f60c2bbde542d3fedb8da8dcd28bc51111adbc621dc47e91cb46dd",
+      "bytes": 23162
+    },
+    {
+      "path": "docs/security/E3_M2F3G_VERIFICATION_RECORD.md",
+      "sha256": "ae17e6b7da45b5cd33cd927194d7c8c8ada77af122c156c07481c607e7610351",
+      "bytes": 44768
+    },
+    {
+      "path": "docs/security/E3_M2F3I_IMPLEMENTATION_RECORD.md",
+      "sha256": "4438ec177cb29d460f13df6a3a5507494e16284052bd721559c2b227d6c1f4cb",
+      "bytes": 17602
+    },
+    {
+      "path": "docs/security/E3_M2F3_CONTRACT_CLOSURE.md",
+      "sha256": "da228e8f57c3739d391dd9ed995dd706438870cfe851aab9910f1ad78ec6dabb",
+      "bytes": 96124
+    },
+    {
+      "path": "docs/security/E3_M2F3_DELIVERED_ENTRY_VERIFICATION_DESIGN.md",
+      "sha256": "f832f476d5eb31ca9606b8231e36db677c1f564b2743e42ca17240043d19cbb5",
+      "bytes": 21734
+    },
+    {
+      "path": "docs/security/E3_M2F3_FU_VERIFICATION_RECORD.md",
+      "sha256": "2888b65e06e1966eeba29c7bf2690783500fdb3064d58751b5f56fd684836741",
+      "bytes": 36584
+    },
+    {
+      "path": "docs/security/E3_M2F_CONTRACT_CLOSURE.md",
+      "sha256": "1d5e63974f1be9b8b995dd9425366791bb37389a9e2c510c0717522aacf884ee",
+      "bytes": 46969
+    },
+    {
+      "path": "docs/security/E3_M2_AUTHORITY_DATABASE_CONTRACT.md",
+      "sha256": "2296365ffdb902f656d510005c847d8fd3ec00b2aa56c56fe05f93568b61f786",
+      "bytes": 93750
+    },
+    {
       "path": "docs/security/E4_CONTROLLED_KEY_ACTIVATION.md",
       "sha256": "6ca9e57084fb7c8dadd03b88e90032a94c1c4ebe7921ba1c579710d1c0595fc6",
       "bytes": 12677
@@ -621,6 +716,11 @@
       "path": "docs/security/E6A_MANAGED_HSM_COMPATIBILITY_PROBE.md",
       "sha256": "9193277ba655b7c4c8b779cbc691976fc50c78c92044f329c144196e685fe6a4",
       "bytes": 30373
+    },
+    {
+      "path": "docs/security/F-E2_MIGRATE_GRANT_WINDOW_DEFECT.md",
+      "sha256": "4b0a8f806e50c1b6f205235bebe5a63543759e0c84c1ffe1e9ba842edbdf528d",
+      "bytes": 11098
     },
     {
       "path": "docs/security/FIELD_PROTECTION_RECONCILIATION.md",
@@ -661,6 +761,11 @@
       "path": "docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md",
       "sha256": "888feee620960f2165344ba8a7e6f4b54aa290680443a2279c32c0375c98fadb",
       "bytes": 25148
+    },
+    {
+      "path": "docs/security/SECURITY_BACKLOG.md",
+      "sha256": "b772fa9efa5633eff477c746bc70841678644a7c96b5d316b8970adb8c83269d",
+      "bytes": 3154
     },
     {
       "path": "docs/security/stage-a-vault-transit-vectors.json",
@@ -868,6 +973,76 @@
       "bytes": 6489
     },
     {
+      "path": "scripts/dev/e3-m2b1-carv-pg-gate.ps1",
+      "sha256": "64b1836c2d0be1ade5961b69a91555351ef0b25b5785c7abcbfe1deb4209d899",
+      "bytes": 12353
+    },
+    {
+      "path": "scripts/dev/e3-m2b2-business-pg-gate.ps1",
+      "sha256": "736540e5167af415ea22b02c0d5133b094ca9e73be59f96495cf324341fa2b85",
+      "bytes": 9682
+    },
+    {
+      "path": "scripts/dev/e3-m2b2-s4-pg-gate.ps1",
+      "sha256": "1fe3705162ba34714e7c0809380adbfe40a54835ef74adf0908004d2b48ecba8",
+      "bytes": 6263
+    },
+    {
+      "path": "scripts/dev/e3-m2c-vault-reader.ps1",
+      "sha256": "a56fdbb76d4a7032c631a0b1716ece7f0bbdcda1f5b7a298021618f8d6bdb436",
+      "bytes": 3806
+    },
+    {
+      "path": "scripts/dev/e3-m2d-carv2-pg-gate.ps1",
+      "sha256": "c4508af5b54b2c6c009fa6af2c2e4f45fb8afc6f8285f6b1fd96d3af9099e4be",
+      "bytes": 8492
+    },
+    {
+      "path": "scripts/dev/e3-m2e1-ledger-pg-gate.ps1",
+      "sha256": "db8adf5fc0250615dd290fbf5f0f319b5c768650adf3531cbef3318180ddf666",
+      "bytes": 11405
+    },
+    {
+      "path": "scripts/dev/e3-m2e2-acceptance-pg-gate.ps1",
+      "sha256": "fb3d88e50761b5bb5b0f7ddb3a98f0fa7d785e1edc334891582b3a082a830b2d",
+      "bytes": 28160
+    },
+    {
+      "path": "scripts/dev/e3-m2e2-mutations.ps1",
+      "sha256": "8d41e63a664ab39aebf0b1b9f258c9b79369222b4e30575a004bebb50c7a55da",
+      "bytes": 14081
+    },
+    {
+      "path": "scripts/dev/e3-m2f2g-mutations.ps1",
+      "sha256": "2bf9059757dae23c6453c02b68778dd528e5858676c471731824b5d10123883f",
+      "bytes": 28259
+    },
+    {
+      "path": "scripts/dev/e3-m2f3-fu-mutations.py",
+      "sha256": "4b8cdcde5679791d6dc9893d385be01fa1f62095a74d863a010510a9bca99e20",
+      "bytes": 27198
+    },
+    {
+      "path": "scripts/dev/e3-m2f3-hc12-preflight-check.ps1",
+      "sha256": "8b765b68a7146d05ec7fd44a16444376a4d16935e09104a67e952de6cd501f34",
+      "bytes": 4275
+    },
+    {
+      "path": "scripts/dev/e3-m2f3g-evidence-pg-gate.ps1",
+      "sha256": "52c56227eecb382e06094cb827b46b0c1e6f7d57b9050d4eddd8a07112c13d81",
+      "bytes": 20687
+    },
+    {
+      "path": "scripts/dev/e3-m2f3g-mutations.ps1",
+      "sha256": "1666a502959f32b0d77acc7edd727fe9a120d1a6d683d2e0459d56021590e330",
+      "bytes": 8698
+    },
+    {
+      "path": "scripts/dev/e3-m2f3i-index-pg-gate.ps1",
+      "sha256": "66dc25ac234ab3ca597c4061993948a6f11982be3d0e8105129f3d8cb77d0884",
+      "bytes": 9432
+    },
+    {
       "path": "scripts/dev/e5-vault-hmac-integration.ps1",
       "sha256": "bca0403deea56f23f22a2b449c00916357a66eb22c7615978e9744bcd0586762",
       "bytes": 6703
@@ -903,6 +1078,11 @@
       "bytes": 12121
     },
     {
+      "path": "scripts/integrity/generate_envelope_schema2_vectors.py",
+      "sha256": "4932729d035b866e53de04192e05ebad11743429687254763019a6e31f2c37c4",
+      "bytes": 12662
+    },
+    {
       "path": "scripts/integrity/generate_vault_vectors.py",
       "sha256": "d93a892f67493b53b61509289609e713de04023f52138b72a797e3cc59f626de",
       "bytes": 4915
@@ -924,13 +1104,13 @@
     },
     {
       "path": "scripts/integrity/verify-vectors.mjs",
-      "sha256": "4fab13dd5feddaf3d0bdf96f75b6647d63b1ba4e2402e825b204aef4d43710c6",
-      "bytes": 15301
+      "sha256": "7c70afcd045d34769a2d204569783583c9be2bf4e8591883bc1e5101a9bddc3a",
+      "bytes": 18039
     },
     {
       "path": "scripts/integrity/verify_vectors.py",
-      "sha256": "c7cdab8cbea6b13aad73debc0a92d3b85028737913f6596288a8a5035388c989",
-      "bytes": 9193
+      "sha256": "b1855ab71240d98377162b3fe57314aa5668edb88a2da1a5bfcd887804801077",
+      "bytes": 12150
     },
     {
       "path": "scripts/measurement/ix1/sealbench/Program.cs",
@@ -1054,8 +1234,8 @@
     },
     {
       "path": "trust_authority/DISASTER_RECOVERY_OPERATOR_RUNBOOK.md",
-      "sha256": "255081bae8f2f8a382aa7470d4de005f92835c632b970a7e640f434458178939",
-      "bytes": 5482
+      "sha256": "70456602c6132b638009d41f44b0fb1323f98e4a5ca4794b2ddb9038e0171678",
+      "bytes": 7475
     },
     {
       "path": "trust_authority/DISASTER_RECOVERY_TEST_PLAN.md",
@@ -1153,6 +1333,11 @@
       "bytes": 8063
     },
     {
+      "path": "trust_authority/row-integrity-v1-envelope-schema2.test-vectors.json",
+      "sha256": "1b4d779708628ec90505e83df8ee4cac9324337d3c32e9ac677bd971b045d7ec",
+      "bytes": 34415
+    },
+    {
       "path": "trust_authority/row-integrity-v1.test-vectors.json",
       "sha256": "7a42ce583f61e7efc7ddf07231074b4baaa3e8acd1481b643df3f8bd98a14899",
       "bytes": 18057
@@ -1169,8 +1354,8 @@
     },
     {
       "path": "trust_authority/trust-authority.openapi.yaml",
-      "sha256": "3b6034ad3376dd486fed34fc62cb0e78980ebac6a2a387bdc3efb513a80aafca",
-      "bytes": 20424
+      "sha256": "6f18ce2249def83e5b375aa46886051040330ef2be8a1157ba87f789df7f1349",
+      "bytes": 23189
     }
   ]
 }

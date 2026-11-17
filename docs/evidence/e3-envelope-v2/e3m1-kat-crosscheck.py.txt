@@ -1,0 +1,119 @@
+# E3-M1: independent reproduction of the Envelope v2 known-answer vectors with Python 'cryptography' (HKDF, AESGCM).
+# Written from the specification (docs/security/E3_ENVELOPE_V2_KEY_HIERARCHY_DESIGN.md section 3), not from the C# code.
+#   H0  = "EFE2" || u16 2 || u8 kind || u8 aead(1) || u8 kdf(1) || u8 wrap || u8 flags(0) || org(16)
+#         || u8 len || purpose || u16 len || kek reference || data key id(16)
+#   H   = H0 || commitment(32)
+#   PRK = HKDF-Extract(salt = "DynamicForms/EnvelopeV2/Extract", ikm = seed)
+#   commitment   = HKDF-Expand(PRK, "DynamicForms/EnvelopeV2/Commitment" || H0, 32)
+#   item key     = HKDF-Expand(PRK, "DynamicForms/EnvelopeV2/FieldItem"  || H0 || C_field, 32)   kinds 1 and 3
+#   document key = HKDF-Expand(PRK, "DynamicForms/EnvelopeV2/Document"   || H0 || C_doc, 32)     kind 2
+#   C_field = record(16) || field(16) || item(16) || u8 len || logical type
+#   C_doc   = record(16) || attachment(16) || u32 version || u32 segment size || nonce prefix(8)
+#   field AAD   = H || C_field ; segment AAD = H || C_doc || u32 segment || u8 final
+#   portable field envelope = H || C_field || u16 len || wrapped || nonce(12) || tag(16) || u32 len || ciphertext
+#   portable document header = H || C_doc || u16 len || wrapped
+# UUIDs are RFC 9562 network byte order; integers big-endian.
+import hashlib, hmac, struct, uuid
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
+
+seq = lambda s, n: bytes((s + i) % 256 for i in range(n))
+U = lambda s: uuid.UUID(s).bytes
+SEGMENT = 1024 * 1024
+
+def prk_of(seed):
+    return hmac.new(b"DynamicForms/EnvelopeV2/Extract", seed, hashlib.sha256).digest()
+
+def expand(prk, info):
+    return HKDFExpand(algorithm=hashes.SHA256(), length=32, info=info).derive(prk)
+
+def h0(kind, wrap, org, purpose, ref, dkid):
+    p, r = purpose.encode("ascii"), ref.encode("ascii")
+    return (b"EFE2" + struct.pack(">HBBBBB", 2, kind, 1, 1, wrap, 0) + U(org)
+            + struct.pack(">B", len(p)) + p + struct.pack(">H", len(r)) + r + U(dkid))
+
+def c_field(record, field, item, logical):
+    t = logical.encode("ascii")
+    return U(record) + U(field) + U(item) + struct.pack(">B", len(t)) + t
+
+def c_doc(record, attachment, version, prefix):
+    return U(record) + U(attachment) + struct.pack(">II", version, SEGMENT) + prefix
+
+ORG = "019a5b2c-a001-7000-8000-00000000000a"
+RECORD = "019a5b2c-a002-7000-8000-000000000002"
+
+def field_batch(name, kind, purpose, ref, dkid, seed, wrapped, items):
+    prk = prk_of(seed)
+    head0 = h0(kind, 2, ORG, purpose, ref, dkid)
+    commitment = expand(prk, b"DynamicForms/EnvelopeV2/Commitment" + head0)
+    head = head0 + commitment
+    print(f"{name}.h0_hex={head0.hex()}")
+    print(f"{name}.commitment_hex={commitment.hex()}")
+    for (iname, field, item, logical, plaintext, nonce) in items:
+        ctx = c_field(RECORD, field, item, logical)
+        key = expand(prk, b"DynamicForms/EnvelopeV2/FieldItem" + head0 + ctx)
+        aad = head + ctx
+        sealed = AESGCM(key).encrypt(nonce, plaintext.encode("utf-8"), aad)
+        ct, tag = sealed[:-16], sealed[-16:]
+        portable = aad + struct.pack(">H", len(wrapped)) + wrapped + nonce + tag + struct.pack(">I", len(ct)) + ct
+        print(f"{iname}.item_key_hex={key.hex()}")
+        print(f"{iname}.aad_hex={aad.hex()}")
+        print(f"{iname}.ciphertext_hex={ct.hex()}")
+        print(f"{iname}.tag_hex={tag.hex()}")
+        print(f"{iname}.portable_sha256={hashlib.sha256(portable).hexdigest()}")
+        print(f"{iname}.portable_length={len(portable)}")
+
+# V2-KAT-01..04: one FieldValue batch of three items, wrap code 2 (vault-transit reference), synthetic wrapped seed.
+field_batch("B1", 1, "field-value", f"vault-transit:{ORG}:field-value:3", "019a5b2c-a0d1-7000-8000-0000000000d1", seq(0x60, 32), seq(0xC0, 60), [
+    ("B1.I1", "019a5b2c-a003-7000-8000-000000000003", "019a5b2c-a013-7000-8000-000000000013", "String", "Avery Synthetic", seq(0x90, 12)),
+    ("B1.I2", "019a5b2c-a004-7000-8000-000000000004", "019a5b2c-a014-7000-8000-000000000014", "Decimal", "12345.6789", seq(0xA0, 12)),
+    ("B1.I3", "019a5b2c-a005-7000-8000-000000000005", "019a5b2c-a015-7000-8000-000000000015", "String", "Léa — 東京 ✓", seq(0xB0, 12)),
+])
+
+# V2-KAT-09: SealedKey (creation idempotency fingerprint key), purpose idempotency-protection.
+import base64
+field_batch("S1", 3, "idempotency-protection", f"vault-transit:{ORG}:idempotency-protection:1", "019a5b2c-a0d9-7000-8000-0000000000d9", seq(0x10, 32), seq(0x08, 60), [
+    ("S1.I1", "f0c70100-0000-8000-8000-000000000001", "019a5b2c-a0e1-7000-8000-0000000000e1", "CreationFingerprintKey/v1", base64.b64encode(seq(0x00, 32)).decode("ascii"), seq(0xD0, 12)),
+])
+
+# V2-KAT-05..08: DocumentVersion, plaintext byte i = (7 i + 3) mod 256 (as E0-6).
+ATTACHMENT = "019a5b2c-a0f1-7000-8000-0000000000f1"
+DOC_SEED, DOC_PREFIX, DOC_WRAPPED = seq(0x30, 32), seq(0x70, 8), seq(0x20, 60)
+DOC_REF = f"vault-transit:{ORG}:document:2"
+doc_h0 = h0(2, 2, ORG, "document", DOC_REF, "019a5b2c-a0d2-7000-8000-0000000000d2")
+doc_prk = prk_of(DOC_SEED)
+doc_commitment = expand(doc_prk, b"DynamicForms/EnvelopeV2/Commitment" + doc_h0)
+doc_h = doc_h0 + doc_commitment
+doc_ctx = c_doc(RECORD, ATTACHMENT, 2, DOC_PREFIX)
+doc_key = expand(doc_prk, b"DynamicForms/EnvelopeV2/Document" + doc_h0 + doc_ctx)
+print(f"D.h0_hex={doc_h0.hex()}")
+print(f"D.commitment_hex={doc_commitment.hex()}")
+print(f"D.document_key_hex={doc_key.hex()}")
+print(f"D.portable_header_hex={(doc_h + doc_ctx + struct.pack('>H', len(DOC_WRAPPED)) + DOC_WRAPPED).hex()}")
+
+def document(name, length):
+    plain = bytes(((7 * i) + 3) % 256 for i in range(length))
+    out, tags, segment, offset = bytearray(), [], 0, 0
+    while True:
+        chunk = plain[offset:offset + SEGMENT]
+        offset += len(chunk)
+        # A full segment is final only when nothing follows it; a short (or empty) segment is always final.
+        final = offset == length
+        nonce = DOC_PREFIX + struct.pack(">I", segment)
+        aad = doc_h + doc_ctx + struct.pack(">IB", segment, 1 if final else 0)
+        sealed = AESGCM(doc_key).encrypt(nonce, chunk, aad)
+        out += struct.pack(">I", len(chunk)) + sealed
+        tags.append(sealed[-16:].hex())
+        segment += 1
+        if final:
+            break
+    print(f"{name}.plaintext_sha256={hashlib.sha256(plain).hexdigest()}")
+    print(f"{name}.ciphertext_length={len(out)}")
+    print(f"{name}.ciphertext_sha256={hashlib.sha256(out).hexdigest()}")
+    print(f"{name}.segment_tags={','.join(tags)}")
+    if len(out) <= 64:
+        print(f"{name}.ciphertext_hex={bytes(out).hex()}")
+
+for name, length in [("D0", 0), ("D1", 37), ("D2", SEGMENT), ("D3", SEGMENT + 5), ("D4", 2 * SEGMENT)]:
+    document(name, length)

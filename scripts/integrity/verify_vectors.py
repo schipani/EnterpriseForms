@@ -151,17 +151,58 @@ def verify_rows(doc: dict) -> None:
             pass
 
 
+def verify_envelope_schema2(doc: dict) -> None:
+    """E3-M2b-2: signed schema 2 of the two envelope tables (RowHmac v1 framing unchanged)."""
+    key = bytes.fromhex(doc["testHmacKeyHex"])
+    schemas = {(s["entityKind"], s["schemaVersion"]): schema_from_json(s) for s in doc["schemas"]}
+    for kind in ("field_encrypted_values", "file_attachment_versions"):
+        v1 = {c.column_name for c in schemas[(kind, 1)].columns}
+        v2 = {c.column_name for c in schemas[(kind, 2)].columns}
+        check(v2 - v1 == {"data_key_commitment_bytes", "data_key_identifier", "key_wrap_algorithm_code"} and v1 <= v2, f"{kind}: schema 2 = schema 1 + the three v2 columns")
+        check(all(not c.nullable for c in schemas[(kind, 2)].columns if c.column_name in v2 - v1), f"{kind}: v2 columns are not nullable")
+    by_id = {}
+    for case in doc["cases"]:
+        cid = case["caseId"]
+        schema = schemas[(case["entityKind"], case["schemaVersion"])]
+        canonical = ri.canonical_row_bytes(schema, key_version=case["keyVersion"], organization_id=case["organizationId"], primary_key_id=case["primaryKeyId"],
+                                           row_revision=case["rowRevision"], values=coerce(schema, case["values"]))
+        exp = case["expected"]
+        by_id[cid] = (case, canonical)
+        check(canonical.hex() == exp["canonicalBytesHex"], f"{cid}: canonical bytes")
+        check(len(canonical) == exp["canonicalByteLength"], f"{cid}: length")
+        check(ri.canonical_payload_digest(canonical).hex() == exp["canonicalPayloadDigestHex"], f"{cid}: digest")
+        check(ri.row_signature(canonical, key).hex() == exp["rowSignatureHexWithTestKey"], f"{cid}: hmac")
+        check(int.from_bytes(canonical[1 + 2 + len("DynamicForms/RowHmac/v1"):][:2], "big") == case["schemaVersion"], f"{cid}: header schema_version")
+    check(by_id["ENVS2-FIELD-S1-REFERENCE"][1] != by_id["ENVS2-FIELD-S2-LOCAL-WRAP"][1], "schema 1 and schema 2 bytes of the same item differ")
+    for neg in doc["negativeCases"]:
+        cid = neg["caseId"]
+        base_case, _ = by_id[neg["baseCaseId"]]
+        schema = schemas[(base_case["entityKind"], base_case["schemaVersion"])]
+        values = {**base_case["values"], **neg.get("set", {})}
+        for name in neg.get("remove", []):
+            values.pop(name)
+        try:
+            ri.canonical_row_bytes(schema, key_version=base_case["keyVersion"], organization_id=base_case["organizationId"], primary_key_id=base_case["primaryKeyId"],
+                                   row_revision=base_case["rowRevision"], values=values)
+            check(False, f"{cid}: expected rejection but succeeded")
+        except ri.RowFormatError:
+            pass
+
+
 def main() -> int:
     merkle = json.loads((ROOT / "trust_authority" / "merkle-v1.test-vectors.json").read_text(encoding="utf-8"))
     rows = json.loads((ROOT / "trust_authority" / "row-integrity-v1.test-vectors.json").read_text(encoding="utf-8"))
+    schema2 = json.loads((ROOT / "trust_authority" / "row-integrity-v1-envelope-schema2.test-vectors.json").read_text(encoding="utf-8"))
     verify_merkle(merkle)
     verify_rows(rows)
-    total = len(merkle["cases"]) + len(merkle["negativeCases"]) + len(rows["cases"]) + len(rows["negativeCases"]) + len(rows["decimalEncodingExamples"]) + 1
+    verify_envelope_schema2(schema2)
+    total = (len(merkle["cases"]) + len(merkle["negativeCases"]) + len(rows["cases"]) + len(rows["negativeCases"]) + len(rows["decimalEncodingExamples"]) + 1
+             + len(schema2["cases"]) + len(schema2["negativeCases"]))
     if failures:
         for f in failures:
             print("FAIL:", f, file=sys.stderr)
         return 1
-    print(f"PYTHON VECTOR VERIFICATION PASS ({total} checks across merkle-v1 and row-integrity-v1)")
+    print(f"PYTHON VECTOR VERIFICATION PASS ({total} checks across merkle-v1, row-integrity-v1 and envelope schema 2)")
     return 0
 
 

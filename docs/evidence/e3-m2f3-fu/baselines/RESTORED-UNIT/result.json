@@ -1,0 +1,69 @@
+{
+  "id": "RESTORED-UNIT",
+  "kind": "BASE",
+  "what": "restored tree after all mutations: every declared test class",
+  "files": [],
+  "original_sha256": {},
+  "restored": true,
+  "verdict": "SURVIVED",
+  "results": [
+    {
+      "build": "A",
+      "exit": 0,
+      "seconds": 28.6
+    },
+    {
+      "build": "H",
+      "exit": 0,
+      "seconds": 38.2
+    },
+    {
+      "build": "X",
+      "exit": 0,
+      "seconds": 36.6
+    },
+    {
+      "letter": "A",
+      "classes": [
+        "CapabilityRefusalEvidenceRecorderTests",
+        "EnvelopeCapabilityFloorTests",
+        "CapabilityRefusalEvidenceNoSummaryTests",
+        "CapabilityRefusalEvidenceRemovalTests",
+        "ArchiveProcessorTests",
+        "CapabilityRefusalEvidenceIndexTests",
+        "CapabilityRefusalEvidenceLookupTests"
+      ],
+      "exit": 0,
+      "seconds": 4.2,
+      "total": 173,
+      "succeeded": 173,
+      "failed": []
+    },
+    {
+      "letter": "H",
+      "classes": [
+        "CapabilityRefusalEvidenceHostTests",
+        "EnvelopeCapabilityEnforcementHostTests",
+        "CapabilityRefusalEvidencePreFloorHostTests"
+      ],
+      "exit": 0,
+      "seconds": 9.5,
+      "total": 18,
+      "succeeded": 18,
+      "failed": []
+    },
+    {
+      "letter": "X",
+      "classes": [
+        "CapabilityRefusalEvidenceRecorderBoundaryTests",
+        "CapabilityRefusalEvidenceIndexBoundaryTests"
+      ],
+      "exit": 0,
+      "seconds": 3.5,
+      "total": 41,
+      "succeeded": 41,
+      "failed": []
+    }
+  ],
+  "seconds": 120.7
+}

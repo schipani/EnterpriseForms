@@ -1,0 +1,476 @@
+[
+  {
+    "id": "BASE-PG3I",
+    "kind": "BASE",
+    "verdict": "SURVIVED",
+    "restored": true,
+    "files": [],
+    "failed": {
+      "PG3I": []
+    }
+  },
+  {
+    "id": "BASE-UNIT",
+    "kind": "BASE",
+    "verdict": "SURVIVED",
+    "restored": true,
+    "files": [],
+    "failed": {
+      "A": [],
+      "H": [],
+      "X": []
+    }
+  },
+  {
+    "id": "MZ-02a",
+    "kind": "MZ",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeCapabilityFloor.cs"
+    ],
+    "failed": {
+      "A": [
+        "AuthorizationAuthority.Tests.EnvelopeCapabilityFloorTests.M2F07AndM2F22TheEffectiveFloorIsTheMaximumAndOnlyLevelOneAtFloorOneReadsTheLedger(clientLevel:"
+      ],
+      "H": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.EveryCapabilityRouteRecordsOneEntryOnlyAfterTheRefusedTransactionWasDisposed",
+        "EnterpriseForms.Api.ContractTests.EnvelopeCapabilityEnforcementHostTests.EveryContentEndpointRefusesAnUndeclaredOrUnknownCapabilityInABoundOrganizationBeforeAnyOtherStep",
+        "EnterpriseForms.Api.ContractTests.EnvelopeCapabilityEnforcementHostTests.M2F28TheBusinessSeesANonRetryableRefusalAndAnswersUsersWithAServiceUnavailableCondition"
+      ],
+      "X": [
+        "EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceRecorderBoundaryTests.OnlyTheRecorderAppendsTheEvidenceKind"
+      ]
+    }
+  },
+  {
+    "id": "MZ-02b",
+    "kind": "MZ",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeCapabilityFloor.cs"
+    ],
+    "failed": {
+      "A": [
+        "AuthorizationAuthority.Tests.EnvelopeCapabilityFloorTests.M2F07AndM2F22TheEffectiveFloorIsTheMaximumAndOnlyLevelOneAtFloorOneReadsTheLedger(clientLevel:"
+      ],
+      "H": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.EveryCapabilityRouteRecordsOneEntryOnlyAfterTheRefusedTransactionWasDisposed",
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.TheRefusalIsByteIdenticalWhetherEvidenceIsRecordedSuppressedDeferredOrFailing",
+        "EnterpriseForms.Api.ContractTests.EnvelopeCapabilityEnforcementHostTests.EveryContentEndpointRefusesAnUndeclaredOrUnknownCapabilityInABoundOrganizationBeforeAnyOtherStep",
+        "EnterpriseForms.Api.ContractTests.EnvelopeCapabilityEnforcementHostTests.M2F28TheBusinessSeesANonRetryableRefusalAndAnswersUsersWithAServiceUnavailableCondition"
+      ],
+      "X": [
+        "EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceRecorderBoundaryTests.OnlyTheRecorderAppendsTheEvidenceKind"
+      ]
+    }
+  },
+  {
+    "id": "MZ-03a",
+    "kind": "MZ",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs"
+    ],
+    "failed": {
+      "H": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.EveryCapabilityRouteRecordsOneEntryOnlyAfterTheRefusedTransactionWasDisposed"
+      ],
+      "X": []
+    }
+  },
+  {
+    "id": "MZ-09a",
+    "kind": "MZ",
+    "verdict": "SURVIVED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs"
+    ],
+    "failed": {
+      "H": [],
+      "X": []
+    }
+  },
+  {
+    "id": "MZ-09a-full",
+    "kind": "MZ",
+    "verdict": "SURVIVED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs"
+    ],
+    "failed": {
+      "A": [],
+      "H": []
+    }
+  },
+  {
+    "id": "MZ-09b",
+    "kind": "MZ",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs"
+    ],
+    "failed": {
+      "H": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.AdmittedRequestsAndOtherErrorsAreNeverRecorded"
+      ],
+      "X": [
+        "EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceRecorderBoundaryTests.TheRecorderIsReachedOnlyThroughTheFilterAndItsRetryService"
+      ]
+    }
+  },
+  {
+    "id": "MZ-13",
+    "kind": "MZ",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs"
+    ],
+    "failed": {
+      "A": [
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceNoSummaryTests.NoOutcomeRetryWindowOrHourRolloverEverWritesAnythingButOneEvidenceEntryPerKeyAndBucket",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AnAmbiguousCommitThatTookEffectIsReconciledWithoutASecondEntry"
+      ],
+      "X": []
+    }
+  },
+  {
+    "id": "MZ-24",
+    "kind": "MZ",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs"
+    ],
+    "failed": {
+      "A": [
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AFirstRefusalCommitsOneEntryWithTheExactFootprint",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ConcurrentInstancesNeverExceedOnePerKeyOrSevenPerBucket"
+      ],
+      "X": [
+        "EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceRecorderBoundaryTests.TheEvidenceTransactionFollowsTheSpecifiedOrder"
+      ],
+      "PG3G": [
+        "T-01",
+        "T-05",
+        "T-06",
+        "T-08",
+        "T-09"
+      ]
+    }
+  },
+  {
+    "id": "MZ-34a",
+    "kind": "MZ",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceIndexCommand.cs"
+    ],
+    "failed": {
+      "A": [],
+      "X": [
+        "EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceIndexBoundaryTests.TheCommandNeverReachesTheOrdinaryMigrationPathOrRepairsAnything(forbidden:"
+      ],
+      "PG3I": [
+        "I-01",
+        "I-04",
+        "I-06",
+        "I-09",
+        "I-12",
+        "I-14",
+        "I-19",
+        "I-22",
+        "I-23",
+        "I-24"
+      ]
+    }
+  },
+  {
+    "id": "MZ-34b",
+    "kind": "MZ",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceIndexCommand.cs"
+    ],
+    "failed": {
+      "A": [],
+      "X": [
+        "EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceIndexBoundaryTests.TheCommandBoundsLockWaitsAndTakesItsLockBeforeInspectingAndBuildsInItsOwnStatement",
+        "EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceIndexBoundaryTests.TheCommandNeverReachesTheOrdinaryMigrationPathOrRepairsAnything(forbidden:"
+      ],
+      "PG3I": [
+        "I-01",
+        "I-02",
+        "I-03",
+        "I-04",
+        "I-06",
+        "I-07",
+        "I-08",
+        "I-09",
+        "I-12",
+        "I-14",
+        "I-16",
+        "I-17",
+        "I-19",
+        "I-20",
+        "I-21",
+        "I-22",
+        "I-99"
+      ]
+    }
+  },
+  {
+    "id": "MZ-35",
+    "kind": "MZ",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/CapabilityRefusalEvidenceIndex.cs"
+    ],
+    "failed": {
+      "A": [
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceIndexTests.AnApprovedButUnusableIndexWithoutAVisibleBuildIsInvalid(valid:"
+      ],
+      "X": [],
+      "PG3I": [
+        "I-11",
+        "I-15",
+        "I-16",
+        "I-17",
+        "I-21"
+      ],
+      "PG3G": [
+        "L-11",
+        "L-12"
+      ]
+    }
+  },
+  {
+    "id": "MZ-36a",
+    "kind": "MZ",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/CapabilityRefusalEvidenceIndex.cs"
+    ],
+    "failed": {
+      "A": [
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceIndexTests.TheCreateStatementIsExactlyTheApprovedDdl",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceIndexTests.ThePredicateLiteralsAreTheEvidenceConstants"
+      ],
+      "X": [],
+      "PG3I": [
+        "I-01",
+        "I-02",
+        "I-03",
+        "I-06",
+        "I-07",
+        "I-08",
+        "I-12",
+        "I-14",
+        "I-16",
+        "I-17",
+        "I-19",
+        "I-21",
+        "I-22",
+        "I-23",
+        "I-25a",
+        "I-25b",
+        "I-26a",
+        "I-26b",
+        "I-27a",
+        "I-27b",
+        "I-28a",
+        "I-28b",
+        "I-29",
+        "I-30"
+      ]
+    }
+  },
+  {
+    "id": "MZ-36b",
+    "kind": "MZ",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/CapabilityRefusalEvidenceIndex.cs"
+    ],
+    "failed": {
+      "A": [
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceIndexTests.TheCreateStatementIsExactlyTheApprovedDdl",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceIndexTests.ThePinnedRenderingsDescribeTheSameIndex",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceIndexTests.ThePredicateLiteralsAreTheEvidenceConstants"
+      ],
+      "X": [],
+      "PG3I": [
+        "I-02",
+        "I-03",
+        "I-11",
+        "I-12",
+        "I-14",
+        "I-15",
+        "I-23",
+        "I-25a",
+        "I-25b",
+        "I-26a",
+        "I-26b",
+        "I-27a",
+        "I-27b",
+        "I-28a",
+        "I-28b",
+        "I-29",
+        "I-30"
+      ],
+      "PG3G": [
+        "S-03",
+        "L-01",
+        "L-02",
+        "L-03",
+        "L-04",
+        "L-05",
+        "L-06",
+        "L-12"
+      ]
+    }
+  },
+  {
+    "id": "RESTORED-PG3G",
+    "kind": "BASE",
+    "verdict": "SURVIVED",
+    "restored": true,
+    "files": [],
+    "failed": {
+      "PG3G": []
+    }
+  },
+  {
+    "id": "RESTORED-PG3I",
+    "kind": "BASE",
+    "verdict": "SURVIVED",
+    "restored": true,
+    "files": [],
+    "failed": {
+      "PG3I": []
+    }
+  },
+  {
+    "id": "RESTORED-UNIT",
+    "kind": "BASE",
+    "verdict": "SURVIVED",
+    "restored": true,
+    "files": [],
+    "failed": {
+      "A": [],
+      "H": [],
+      "X": []
+    }
+  },
+  {
+    "id": "V22-1",
+    "kind": "V",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidence.cs"
+    ],
+    "failed": {
+      "H": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidencePreFloorHostTests.RequestsRejectedBeforeTheFloorProduceNoEvidenceOnAnyOfTheSevenRoutes"
+      ]
+    }
+  },
+  {
+    "id": "V22-2",
+    "kind": "V",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs"
+    ],
+    "failed": {
+      "H": [
+        "EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidencePreFloorHostTests.RequestsRejectedBeforeTheFloorProduceNoEvidenceOnAnyOfTheSevenRoutes"
+      ]
+    }
+  },
+  {
+    "id": "V25-1",
+    "kind": "V",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs"
+    ],
+    "failed": {
+      "A": [
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceNoSummaryTests.NoOutcomeRetryWindowOrHourRolloverEverWritesAnythingButOneEvidenceEntryPerKeyAndBucket",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ARestartAfterAnAmbiguousCommitStillWritesAtMostOneEntry",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ARestartedProcessFindsTheEntryAndAppendsNothing",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AnAmbiguousCommitThatTookEffectIsReconciledWithoutASecondEntry"
+      ]
+    }
+  },
+  {
+    "id": "V25-2",
+    "kind": "V",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs"
+    ],
+    "failed": {
+      "A": [
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceNoSummaryTests.NoOutcomeRetryWindowOrHourRolloverEverWritesAnythingButOneEvidenceEntryPerKeyAndBucket",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AClockRegressionDefersUntilTheDatabaseTimeCatchesUp",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AFirstRefusalCommitsOneEntryWithTheExactFootprint",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ARepeatInTheBucketCostsNoTransaction",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ARestartAfterAnAmbiguousCommitStillWritesAtMostOneEntry",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ARestartedProcessFindsTheEntryAndAppendsNothing",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AnAmbiguousCommitThatDidNotTakeEffectIsRecordedOnceByTheRetry",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AnAmbiguousCommitThatTookEffectIsReconciledWithoutASecondEntry",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AnUnusableIndexDefersAndRecordsOnceItIsUsable",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.OrganizationsAreIsolated",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.TheAttemptLimitSuppressesNewKeysUntilTheWindowEndsAndSaysSo",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.TheCommittedEntryIsDeliveredByTheUnchangedArchiveProcessor"
+      ]
+    }
+  },
+  {
+    "id": "V43-1",
+    "kind": "V",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+    ],
+    "failed": {
+      "A": [
+        "AuthorizationAuthority.Tests.ArchiveProcessorTests.BodyThatNoLongerMatchesItsDigestIsNeverArchivedAndQuarantinesTheOrganization",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.AnAlteredDeliveredRowThatIsSentAgainIsRefusedByThePreDeliveryDigestCheckAndQuarantines"
+      ]
+    }
+  },
+  {
+    "id": "V43-2",
+    "kind": "V",
+    "verdict": "DETECTED",
+    "restored": true,
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+    ],
+    "failed": {
+      "A": [
+        "AuthorizationAuthority.Tests.ArchiveProcessorTests.ArchivedBytesThatDifferFromTheJournalAreAConflictNotAnOverwrite",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.AConsistentlyRedigestedDeliveredRowThatIsSentAgainCollidesWithTheArchiveAndQuarantines"
+      ]
+    }
+  }
+]

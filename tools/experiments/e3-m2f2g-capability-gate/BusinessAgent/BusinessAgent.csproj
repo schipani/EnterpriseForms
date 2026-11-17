@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    E3-M2f-2G BusinessAgent (docs/security/E3_M2F2G_VERIFICATION_RECORD.md). Development/Testing only; TEST-ONLY. Not part of
+    EnterpriseForms.All.slnx and never built in place: scripts/dev/e3-m2e2-acceptance-pg-gate.ps1 copies this folder to its work
+    directory and builds it once per business build against that build's own Release output (BusinessBinaries = the bin folder of
+    src/backend/EnterpriseForms.Api of `git archive <commit>`, or of this tree). It references no repository project.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>BusinessAgent</AssemblyName>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS1591;CA2007;CA1303;CS0436</NoWarn>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="$(BusinessBinaries)\*.dll" Exclude="$(BusinessBinaries)\EnterpriseForms.Api.dll" Private="true" />
+  </ItemGroup>
+  <Target Name="RequireBusinessBinaries" BeforeTargets="ResolveAssemblyReferences" Condition="'$(BusinessBinaries)' == '' Or !Exists('$(BusinessBinaries)\EnterpriseForms.Infrastructure.dll')">
+    <Error Text="Build through scripts/dev/e3-m2e2-acceptance-pg-gate.ps1 (BusinessBinaries must name one business Release output)." />
+  </Target>
+</Project>

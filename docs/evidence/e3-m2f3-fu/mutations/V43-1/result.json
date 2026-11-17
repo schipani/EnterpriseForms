@@ -1,0 +1,36 @@
+{
+  "id": "V43-1",
+  "kind": "V",
+  "what": "the archive processor no longer checks a pending body against its digest",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs": "53d6d853dfbf7c1d9fdbc9c5b52f5dd7a9aff50cf1d9812556d44ebb5c95e95a"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "A",
+      "exit": 0,
+      "seconds": 29.1
+    },
+    {
+      "letter": "A",
+      "classes": [
+        "CapabilityRefusalEvidenceRemovalTests",
+        "ArchiveProcessorTests"
+      ],
+      "exit": 2,
+      "seconds": 2.5,
+      "total": 12,
+      "succeeded": 10,
+      "failed": [
+        "AuthorizationAuthority.Tests.ArchiveProcessorTests.BodyThatNoLongerMatchesItsDigestIsNeverArchivedAndQuarantinesTheOrganization",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.AnAlteredDeliveredRowThatIsSentAgainIsRefusedByThePreDeliveryDigestCheckAndQuarantines"
+      ]
+    }
+  ],
+  "seconds": 31.6
+}

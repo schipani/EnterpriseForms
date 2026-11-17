@@ -43,6 +43,9 @@ public interface IAuthorityStore
 /// </summary>
 public sealed record OrganizationChangeMarker(Guid OrganizationId, long AuthorizationRevision, long ContentIntegrityRevision, long AuditJournalRevision);
 
+/// <summary>E3-M2f-3b (closure IXP-6): one capability-refusal evidence journal row as the evidence lookup reads it (no other column).</summary>
+public sealed record CapabilityRefusalEvidenceRow(Guid SecurityJournalEntryId, long JournalStreamRevision, string JournalEventBodyJson, byte[] JournalEventDigest);
+
 public interface IAuthorityScope : IAsyncDisposable
 {
     /// <summary>IX-1: the Authority-owned search index, in this scope's transaction.</summary>
@@ -53,6 +56,17 @@ public interface IAuthorityScope : IAsyncDisposable
 
     /// <summary>SELECT ... FOR UPDATE on the organization state row: serializes every mutation of that organization (A6).</summary>
     Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// RB-CARV-1 (contract §22): the content write fence of this transaction. Release A: no-op. Release B: takes a ROW EXCLUSIVE
+    /// lock on the content operations table (held to the end of the transaction, so no floor DDL can commit until this transaction
+    /// ends), then verifies in this transaction that the required floor and the E3-M2b-1 fence are installed exactly as defined;
+    /// anything else, including an unreadable catalog or an invalid policy, throws
+    /// <see cref="AuthorityErrorCodes.ContentAcceptanceFloorNotEnforced"/> (503) and raises an operational alert. Called at the
+    /// entry of every content mutation (Prepare, Commit, record registration); the store additionally applies it before writing
+    /// any content-acceptance entity, so a path that forgets the call still cannot write.
+    /// </summary>
+    Task RequireContentAcceptanceFloorAsync(CancellationToken cancellationToken);
 
     Task<OrganizationAuthorizationState?> ReadOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
 
@@ -109,6 +123,56 @@ public interface IAuthorityScope : IAsyncDisposable
 
     /// <summary>R-53: the given item ids that appear in any accepted manifest of any organization (identities predating the bindings).</summary>
     Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken);
+
+    /// <summary>E3-M2e DK-4 / P-4: the ledger bindings of the given data-key identifiers, in every organization and operation state.</summary>
+    Task<List<ContentDataKeyBinding>> FindDataKeyBindingsAsync(IReadOnlyCollection<Guid> dataKeyIdentifiers, CancellationToken cancellationToken);
+
+    /// <summary>E3-M2e DK-6: every ledger binding whose binding operation is <paramref name="contentChangeOperationId"/>.</summary>
+    Task<List<ContentDataKeyBinding>> GetDataKeyBindingsForOperationAsync(Guid contentChangeOperationId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// E3-M2e DK-5: inserts ledger bindings with the operation that introduces them, in this transaction (never updated or deleted).
+    /// The global unique identifier refuses a second binding; the store reports it as <c>422 DATA_KEY_IDENTIFIER_REUSED</c> and the
+    /// whole transaction rolls back.
+    /// </summary>
+    void AddDataKeyBindings(IEnumerable<ContentDataKeyBinding> bindings);
+
+    /// <summary>
+    /// E3-M2e L-13: in this transaction, verifies that the ledger's unique identifier index and its P-1 binding guard and P-2
+    /// immutability triggers exist exactly as created, holding a lock that keeps them from being dropped or disabled until the
+    /// transaction ends. Called before any binding insert and before P-4 consults the ledger. Throws (fail closed) otherwise.
+    /// </summary>
+    Task RequireDataKeyLedgerAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// E3-M2f-2 AM-F1 (docs/security/E3_M2F_CONTRACT_CLOSURE.md §5): whether the organization has any data-key binding, in any state, in this
+    /// transaction. Exactly <c>EXISTS (SELECT 1 … WHERE organization_id = @organization)</c>; returns a boolean only, materializes no binding
+    /// column. Called solely by <c>EnvelopeCapabilityFloor</c> under the organization lock; never by a read, verification, search or history
+    /// path for any other purpose. A failure throws (the caller refuses).
+    /// </summary>
+    Task<bool> OrganizationHasDataKeyBindingsAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    // ---- E3-M2f-3b capability-refusal evidence (docs/security/E3_M2F3_CONTRACT_CLOSURE.md §3.2, §5.3, §5A). Called solely by the
+    // evidence recorder, in its own transaction T2, never in a refused transaction. None of them reads the data-key ledger. ----
+
+    /// <summary>T2-3: bounds this transaction's lock waits (<c>SET LOCAL lock_timeout</c>); called first, before the organization lock.</summary>
+    Task SetCapabilityEvidenceLockTimeoutAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// T2-4 / IXP-7: after the organization lock, bounds this transaction's statements (<c>SET LOCAL statement_timeout</c>) and returns the
+    /// authoritative time <c>t_db</c>: the AuthorityDb <c>clock_timestamp()</c> read in its own statement after the lock (never the
+    /// transaction start time, never the instance clock).
+    /// </summary>
+    Task<DateTimeOffset> StartCapabilityEvidenceLookupAsync(CancellationToken cancellationToken);
+
+    /// <summary>T2-8 / IXP-8: whether the E3-M2f-3i index exists, is valid, ready and live, and has exactly the approved definition.</summary>
+    Task<bool> IsCapabilityRefusalEvidenceIndexUsableAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// LK-1 / IXP-6: the newest at most eight capability-refusal evidence entries of the organization (stream and kind as SQL literals,
+    /// ordered by stream revision descending). Unrelated audit entries are not read.
+    /// </summary>
+    Task<IReadOnlyList<CapabilityRefusalEvidenceRow>> GetNewestCapabilityRefusalEvidenceAsync(Guid organizationId, CancellationToken cancellationToken);
 
     void AddEdge(AuthorityRelationshipEdge edge);
 
@@ -253,6 +317,9 @@ public interface IAuthorityScope : IAsyncDisposable
 
     /// <summary>Pending-archive platform entries in revision order (tracked).</summary>
     Task<List<PlatformJournalEntry>> GetPendingPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken);
+
+    /// <summary>E3-M2e (OD-M2e-13): the newest platform journal entries, highest revision first, at most <paramref name="limit"/> (a bounded read of the unique revision index).</summary>
+    Task<List<PlatformJournalEntry>> GetLatestPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken);
 
     Task<int> CountPendingPlatformArchiveAsync(CancellationToken cancellationToken);
 

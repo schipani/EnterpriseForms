@@ -1,0 +1,296 @@
+[
+  {
+    "id": "MD-1",
+    "removal": "commit CHECK without its IS NOT NULL terms (design defect D-1)",
+    "harness": "A",
+    "restoredSha256Matches": true,
+    "checksTotal": 50,
+    "checksFailed": 9,
+    "failedChecks": [
+      {
+        "id": "MG-07c",
+        "observed": "OK"
+      },
+      {
+        "id": "MX-01b",
+        "observed": "OK | OK"
+      },
+      {
+        "id": "MX-01c",
+        "observed": "CHANGED head=3:a5a1b031d462dada1090478702ea1acb972798e9740b60572c8f004a5b7f49a5; commits=11; leaves=33; identities=21; checkpoints=11; journal=11; committedOps=12 -> head=4:50892e598c984dbc8d04d6dad6f5b6bffd86f5ce880d6c8126bd80ac74461009; commits=12; leaves=36; identities=21; checkpoints=12; journal"
+      },
+      {
+        "id": "MX-01d",
+        "observed": "no exception"
+      },
+      {
+        "id": "MX-01e",
+        "observed": "OK; 1/NULL Committed"
+      },
+      {
+        "id": "MX-02a",
+        "observed": "OK"
+      },
+      {
+        "id": "MX-02b",
+        "observed": "CHANGED head=4:50892e598c984dbc8d04d6dad6f5b6bffd86f5ce880d6c8126bd80ac74461009; commits=12; leaves=36; identities=21; checkpoints=12; journal=12; committedOps=13 -> head=5:ea4c5746db95bf9b1c92a64ff77eab7d37ae882b87096c950c4000c9e559f2af; commits=13; leaves=39; identities=21; checkpoints=13; journal"
+      },
+      {
+        "id": "MX-02c",
+        "observed": "OK; NULL/1 Committed"
+      },
+      {
+        "id": "MX-03",
+        "observed": "ok=17; conflicts=7; unexpected=0; 907 ms"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MD-2",
+    "removal": "commit CHECK as the drafted '>=' rule instead of exact equality (D-3)",
+    "harness": "A",
+    "restoredSha256Matches": true,
+    "checksTotal": 50,
+    "checksFailed": 4,
+    "failedChecks": [
+      {
+        "id": "MG-07c",
+        "observed": "OK"
+      },
+      {
+        "id": "MX-02a",
+        "observed": "OK"
+      },
+      {
+        "id": "MX-02b",
+        "observed": "CHANGED head=4:dbfe69e3b3037c5afeb7973dd6ecf2e85dae9a25e036219ba556acbcebb5a4ad; commits=12; leaves=36; identities=21; checkpoints=12; journal=12; committedOps=13 -> head=5:77554747b4cbda65f14246ce733f10534fcb7d9811c3f920456425cba36863ea; commits=13; leaves=39; identities=21; checkpoints=13; journal"
+      },
+      {
+        "id": "MX-02c",
+        "observed": "OK; NULL/1 Committed"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MD-3",
+    "removal": "state guard reduced to Prepare-stamp immutability only (D-5)",
+    "harness": "A",
+    "restoredSha256Matches": true,
+    "checksTotal": 50,
+    "checksFailed": 2,
+    "failedChecks": [
+      {
+        "id": "MG-07d",
+        "observed": "OK"
+      },
+      {
+        "id": "MG-07e",
+        "observed": "OK"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MD-4",
+    "removal": "state-guard trigger not created at all",
+    "harness": "A",
+    "restoredSha256Matches": true,
+    "checksTotal": 50,
+    "checksFailed": 6,
+    "failedChecks": [
+      {
+        "id": "MG-06",
+        "observed": "42704 : trigger \"trg_content_operation_rule_state_guard\" for table \"content_change_operations\" does not exist, OK"
+      },
+      {
+        "id": "MG-07a",
+        "observed": "OK"
+      },
+      {
+        "id": "MG-07c",
+        "observed": "OK"
+      },
+      {
+        "id": "MG-07d",
+        "observed": "OK"
+      },
+      {
+        "id": "MG-07e",
+        "observed": "OK"
+      },
+      {
+        "id": "PF-04",
+        "observed": "42501 : must be owner of table content_change_operations | 42501 : must be owner of table content_change_operations | 42704 : trigger \"trg_content_operation_rule_state_guard\" for table \"content_change_operations\" does not exist | 42501 : permission denied to set parameter \"session_replication_role\""
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MD-5",
+    "removal": "floor restricted to Prepared rows (D-2; harness floor SQL, M2b-1F is not in this release)",
+    "harness": "A",
+    "checksTotal": 50,
+    "checksFailed": 7,
+    "failedChecks": [
+      {
+        "id": "FL-02a",
+        "observed": "waited=True; floor=OK; NULL/NULL Committed"
+      },
+      {
+        "id": "FL-02b",
+        "observed": "OK"
+      },
+      {
+        "id": "FL-02c",
+        "observed": "OK"
+      },
+      {
+        "id": "FL-02d",
+        "observed": "CHANGED head=3:77664af2af86296ebea22afebf4ebd3ff3ede34dc8fed98d15de7893d43c8ef9; commits=20; leaves=60; identities=21; checkpoints=20; journal=20; committedOps=20 -> head=4:fe1e3ce9af6187f6f4269ef13f11a3ccf8efd568407cf1a8be50680b5e925d7e; commits=21; leaves=63; identities=21; checkpoints=21; journal"
+      },
+      {
+        "id": "FL-02e",
+        "observed": "OK; NULL/NULL Committed"
+      },
+      {
+        "id": "FL-04",
+        "observed": "waited=True; OK; CHANGED head=4:fe1e3ce9af6187f6f4269ef13f11a3ccf8efd568407cf1a8be50680b5e925d7e; commits=21; leaves=63; identities=21; checkpoints=21; journal=21; committedOps=21 -> head=5:e0ba490fc836eca3a8b2e891639d75a0c4f64ee96cb1416e935b6b2e3d13d2a2; commits=22; leaves=66; identities=21; checkp"
+      },
+      {
+        "id": "PF-02",
+        "observed": "OK | OK | CHANGED head=1:3ea569d72cf00cfd50ee8aeed8b936d294d5ffd0ecac2a108ad98227a3e588c9; commits=35; leaves=105; identities=21; checkpoints=35; journal=35; committedOps=35 -> head=2:a3ca04679e37817017f850cbafbc846120028d1bd9774b47ef0a2851735ff6a1; commits=36; leaves=108; identities=21; checkpoints"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MD-6",
+    "removal": "floor without its IS NOT NULL term (D-1; harness floor SQL)",
+    "harness": "A",
+    "checksTotal": 50,
+    "checksFailed": 11,
+    "failedChecks": [
+      {
+        "id": "FL-02a",
+        "observed": "waited=True; floor=OK; NULL/NULL Committed"
+      },
+      {
+        "id": "FL-02b",
+        "observed": "OK"
+      },
+      {
+        "id": "FL-02c",
+        "observed": "OK"
+      },
+      {
+        "id": "FL-02d",
+        "observed": "CHANGED head=3:634b95e282594b4c4d9ccbde72647afe34ff0279955885bd4dcd6ea58ea2064a; commits=20; leaves=60; identities=21; checkpoints=20; journal=20; committedOps=20 -> head=4:65b92ebe75654a9d69af9bfbc695c7e8e7be0798f58a341bd0a24d7812099746; commits=21; leaves=63; identities=21; checkpoints=21; journal"
+      },
+      {
+        "id": "FL-02e",
+        "observed": "OK; NULL/NULL Committed"
+      },
+      {
+        "id": "FL-03",
+        "observed": "waited=True; OK; ops 45->46; orphan leaves 0"
+      },
+      {
+        "id": "FL-04",
+        "observed": "waited=True; OK; CHANGED head=4:65b92ebe75654a9d69af9bfbc695c7e8e7be0798f58a341bd0a24d7812099746; commits=21; leaves=63; identities=21; checkpoints=21; journal=21; committedOps=21 -> head=5:5bd5a6f396defef655d75ac9d6c2377c3cd370af9dd4bd52fcd82c6ca9c57837; commits=22; leaves=66; identities=21; checkp"
+      },
+      {
+        "id": "PF-01",
+        "observed": "OK; ops 72->74"
+      },
+      {
+        "id": "PF-01b",
+        "observed": "no exception"
+      },
+      {
+        "id": "PF-02",
+        "observed": "OK | OK | CHANGED head=1:064c56f10cd3e2aa3162d1ea27648f14f5cec34d0c98c3e9ac66d01763d08da5; commits=35; leaves=105; identities=21; checkpoints=35; journal=35; committedOps=35 -> head=2:c1a3ef49185672949e11ec0d54b9f19c9f4a346ea30a8d7bcfe5375ba2e95220; commits=36; leaves=108; identities=21; checkpoints"
+      },
+      {
+        "id": "PF-07",
+        "observed": "OK"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MR-1",
+    "removal": "store adapter no longer maps CARV database refusals",
+    "harness": "B",
+    "restoredSha256Matches": true,
+    "checksTotal": 36,
+    "checksFailed": 2,
+    "failedChecks": [
+      {
+        "id": "RB-18",
+        "observed": "OK; DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v2; alert=:; unchanged (head=4:53fe89c5324bae6e3ff7be6f877d94d2f0daa215bb5fae7897204df366779dc5; commits=31; leaves=93; identities=21; checkpoints=31; journal=31; committedOps=31); 1/NULL Prepared"
+      },
+      {
+        "id": "RB-19",
+        "observed": "DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v2; alert=; ops 70->70"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MR-2",
+    "removal": "host readiness no longer consults the CARV guard",
+    "harness": "B",
+    "restoredSha256Matches": true,
+    "checksTotal": 36,
+    "checksFailed": 3,
+    "failedChecks": [
+      {
+        "id": "RB-R0",
+        "observed": "True test; probe-only fake; probe-only fake; projection markers verified; guard ignored"
+      },
+      {
+        "id": "RB-R1",
+        "observed": "True test; probe-only fake; probe-only fake; projection markers verified; guard ignored"
+      },
+      {
+        "id": "RB-R2",
+        "observed": "True test; probe-only fake; probe-only fake; projection markers verified; guard ignored"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MR-3",
+    "removal": "the CARV Commit rule removed (the database fence alone remains)",
+    "harness": "B",
+    "restoredSha256Matches": true,
+    "checksTotal": 36,
+    "checksFailed": 4,
+    "failedChecks": [
+      {
+        "id": "RB-03a",
+        "observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; verifications 6->9"
+      },
+      {
+        "id": "RB-03b",
+        "observed": "NULL/NULL Prepared NULL; unchanged (head=2:aa7ddf422c4c41fb02e7e906e43277abfd34040b9472a8581626ab1759598707; commits=9; leaves=27; identities=21; checkpoints=9; journal=9; committedOps=9)"
+      },
+      {
+        "id": "RB-03c",
+        "observed": "accepted!"
+      },
+      {
+        "id": "RB-16",
+        "observed": "DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1 | AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False | NULL/NULL Prepared; unchanged (head=1:1176536d4b306cdd128c200ac8b2ef821d20351f32b6894a6f54678ae16e7403; commits=31; leaves=93; identities=21; checkpoint"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "RESTORE",
+    "rebuildOk": true,
+    "identicalToEvidenceBuild": false
+  }
+]

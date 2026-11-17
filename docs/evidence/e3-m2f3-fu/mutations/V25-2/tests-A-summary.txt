@@ -1,0 +1,42 @@
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceNoSummaryTests.NoOutcomeRetryWindowOrHourRolloverEverWritesAnythingButOneEvidenceEntryPerKeyAndBucket (341ms)
+  first: 2 entries added by outcomes [Committed]
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceNoSummaryTests.Ledger.Run(String label, Func`1 action, Nullable`1 refused) in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceNoSummaryTests.cs:81
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AFirstRefusalCommitsOneEntryWithTheExactFootprint (13ms)
+  Assert.Equal() Failure: Collections differ at index 7
+              (pos 0)
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.OrganizationsAreIsolated (4ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 41
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AnUnusableIndexDefersAndRecordsOnceItIsUsable (12ms)
+  Assert.Single() Failure: The collection contained 2 items
+  Collection: [SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }, SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }]
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AnAmbiguousCommitThatTookEffectIsReconciledWithoutASecondEntry (1ms)
+  Assert.Single() Failure: The collection contained 2 items
+  Collection: [SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }, SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }]
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ARestartedProcessFindsTheEntryAndAppendsNothing (1ms)
+  Assert.Single() Failure: The collection contained 2 items
+  Collection: [SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }, SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }]
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.TheCommittedEntryIsDeliveredByTheUnchangedArchiveProcessor (113ms)
+  Assert.Single() Failure: The collection contained 2 items
+  Collection: [SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }, SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }]
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ARepeatInTheBucketCostsNoTransaction (1ms)
+  Assert.Single() Failure: The collection contained 2 items
+  Collection: [SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }, SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }]
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AnAmbiguousCommitThatDidNotTakeEffectIsRecordedOnceByTheRetry (1ms)
+  Assert.Single() Failure: The collection contained 2 items
+  Collection: [SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }, SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }]
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AClockRegressionDefersUntilTheDatabaseTimeCatchesUp (4ms)
+  Assert.Single() Failure: The collection contained 2 items
+  Collection: [SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }, SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }]
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.TheAttemptLimitSuppressesNewKeysUntilTheWindowEndsAndSaysSo (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 3
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ARestartAfterAnAmbiguousCommitStillWritesAtMostOneEntry (1ms)
+  Assert.Single() Failure: The collection contained 2 items
+  Collection: [SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }, SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }]
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 29
+  failed: 12
+  succeeded: 17
+  skipped: 0
+  duration: 1s 648ms

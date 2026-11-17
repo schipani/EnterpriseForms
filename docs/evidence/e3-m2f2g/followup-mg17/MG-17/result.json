@@ -1,0 +1,32 @@
+{
+    "Id":  "MG-17",
+    "What":  "level-2 short-circuit removed (level 2 reads the ledger)",
+    "Groups":  "G",
+    "GateExit":  1,
+    "Detected":  false,
+    "DetectedBy":  "",
+    "ExpectedDetectors":  "G-10c,G-12c,G-42",
+    "Classification":  "INCONCLUSIVE",
+    "DeclaredDetectorsExecuted":  "",
+    "SetupFailures":  "G-00",
+    "AssertionFailures":  "",
+    "AllFailedChecks":  "G-00",
+    "ContainersRemoved":  true,
+    "Restored":  true,
+    "Note":  "scratch restored sha256 equal; repository file sha256 unchanged",
+    "AssembliesDifferingFromCleanBuild":  "AuthorizationAuthority.Api.dll,AuthorizationAuthority.Application.dll",
+    "BuildFailed":  false,
+    "TestedAssembliesAreTheMutantBuild":  true,
+    "CleanApplicationSha256":  "63c0ac441155c501590a1ed2fa493c6f55b7f79d628a28f226f372ddd4e06dfb",
+    "MutantApplicationSha256":  "6ed78fbf18439099318360dee777a87cc9e7121999a25a3b6fca903a7e28e031",
+    "RestoredBaselineRun":  {
+                                "GateExit":  0,
+                                "DeclaredDetectorsPassed":  "G-10c,G-12c,G-42",
+                                "AllDeclaredDetectorsPassed":  true,
+                                "AllFailedChecks":  "",
+                                "ReproducibleAssembliesEqualClean":  true,
+                                "TestedIsRestoredBuild":  true,
+                                "ContainersRemoved":  true,
+                                "RestoredApplicationSha256":  "63c0ac441155c501590a1ed2fa493c6f55b7f79d628a28f226f372ddd4e06dfb"
+                            }
+}

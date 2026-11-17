@@ -124,6 +124,12 @@ public sealed class FieldProtectionReconciliationService(IBusinessStore store, I
             // More records than the migration catalogue may list: nothing partial is attested or claimed.
             await FinishAsync(reconciliation.FieldProtectionReconciliationId, FieldProtectionReconciliationStates.Incomplete, "RECONCILIATION_LIMIT", null, cancellationToken).ConfigureAwait(false);
         }
+        catch (AuthorityClientException ex) when (EnvelopeCapabilityRefusal.Is(ex))
+        {
+            // E3-M2f-2 (CAP-E3): the census was refused for this build's envelope capability. Terminal: nothing partial is attested and the
+            // round is not re-run (every census would be refused the same way, before any verification); a current build is needed.
+            await FinishAsync(reconciliation.FieldProtectionReconciliationId, FieldProtectionReconciliationStates.Incomplete, ex.ErrorCode, null, cancellationToken).ConfigureAwait(false);
+        }
         catch (AuthorityClientException ex) when (ex.Retryable || ex.HttpStatusCode == 503)
         {
             await BlockAsync(reconciliation.FieldProtectionReconciliationId, ex.ErrorCode, cancellationToken).ConfigureAwait(false);

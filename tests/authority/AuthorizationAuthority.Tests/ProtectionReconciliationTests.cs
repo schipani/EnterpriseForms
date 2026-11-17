@@ -3,6 +3,7 @@ using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Application.Features.Catalogue;
 using AuthorizationAuthority.Application.Features.Content;
+using AuthorizationAuthority.Application.Features.Journal;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Domain.Features.Content;
@@ -26,7 +27,7 @@ namespace AuthorizationAuthority.Tests;
 /// state only; the real PostgreSQL/SpiceDB/Vault path and the hostile business DBA run in the Stage B integration suite
 /// (ProtectionReconciliationTests).
 /// </summary>
-public sealed class ProtectionReconciliationTests
+public sealed partial class ProtectionReconciliationTests
 {
     private const string Issuer = "https://issuer.test";
     private const string Verifier = "field-protection-verifier";
@@ -40,6 +41,9 @@ public sealed class ProtectionReconciliationTests
         public Guid OtherField { get; } = Guid.CreateVersion7();
         public Guid Owner { get; } = Guid.CreateVersion7();
         public InMemoryAuthorityStore Store { get; } = new();
+
+        /// <summary>The provider the content service signs through (E3-M2a: counts signatures).</summary>
+        public CountingMacProvider Signer { get; }
         public SearchCatalogueTests.SpiceDb Spice { get; }
         public ContentService Content { get; }
         public SearchCatalogueService Catalogue { get; }
@@ -48,17 +52,19 @@ public sealed class ProtectionReconciliationTests
         public Dictionary<Guid, Guid> AcceptedOperation { get; } = [];
 
         private readonly Dictionary<Guid, Guid> items = [];
+        private readonly LocalHmacProvider mac;
         private byte seed = 10;
 
         public Harness()
         {
-            var mac = new LocalHmacProvider();
+            mac = new LocalHmacProvider();
             mac.ProvisionKeyAsync(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", CancellationToken.None).GetAwaiter().GetResult();
             var spice = DispatchProxy.Create<ISpiceDbProjection, SearchCatalogueTests.SpiceDb>();
             Spice = (SearchCatalogueTests.SpiceDb)(object)spice;
             Spice.Markers = org => TestProjection.MarkerFor(Store.Organizations.Single(o => o.OrganizationId == org));
             var verifier = TestProjection.Verifier(Store, spice);
-            Content = new ContentService(Store, mac, verifier, new NoOpFaultInjector(), TimeProvider.System, new ShareContributorWriteSwitch(false, testingOverrideAllowed: true));
+            Signer = new CountingMacProvider(mac);
+            Content = new ContentService(Store, Signer, verifier, new NoOpFaultInjector(), TimeProvider.System, new ShareContributorWriteSwitch(false, testingOverrideAllowed: true));
             Catalogue = new SearchCatalogueService(Store, verifier, TimeProvider.System, new CatalogueOptions { MigrationPageSize = 1000 });
             Reconciliation = new ProtectionReconciliationService(Store, Content, TimeProvider.System);
             Store.Organizations.Add(new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous }.WithJournalDigest());
@@ -125,6 +131,90 @@ public sealed class ProtectionReconciliationTests
             {
                 entry.ArchiveDeliveryState = ArchiveDeliveryStates.Anchored;
             }
+        }
+
+        /// <summary>A protection-migration write (workload, no delegated user) under <paramref name="command"/>, built on the accepted rows.</summary>
+        public async Task ReprotectAsync(Guid record, Guid command, List<Row> rows)
+        {
+            var head = Head(record);
+            var operation = Guid.CreateVersion7();
+            var candidate = rows.Select(r => Encode(r, Org, operation, head.CommittedContentRevision + 1)).ToList();
+            var request = new PrepareContentChangeRequest(Org, record, operation, State.AuthorizationRevision, head.CommittedContentRevision, Convert.ToBase64String(head.CommittedManifestRoot),
+                candidate.Select(c => new CandidateContentItem(c.Kind, c.ItemId, c.Base64)).ToList(), ReprotectionCommandId: command, CurrentItems: Accepted[record]);
+            var prepared = await Content.PrepareAsync(null, request, "reprotect-" + operation.ToString("N"), Guid.CreateVersion7(), CancellationToken.None);
+            var signatures = prepared.SignedItems.ToDictionary(s => (s.ItemKind, s.ItemId), s => s.RowSignatureBase64);
+            var staged = candidate.Select(c => new StagedContentItem(c.Kind, c.ItemId, c.Base64, signatures[(c.Kind, c.ItemId)])).ToList();
+            await Content.CommitAsync(null, prepared.OperationId, new CommitContentChangeRequest(Org, record, staged), Guid.CreateVersion7(), CancellationToken.None);
+            Accepted[record] = staged;
+            AcceptedOperation[record] = prepared.OperationId;
+            foreach (var entry in Store.Journal)
+            {
+                entry.ArchiveDeliveryState = ArchiveDeliveryStates.Anchored;
+            }
+        }
+
+        /// <summary>
+        /// E3-M2a, test only: content as an Authority build before E3-M2a accepted it, when no envelope rule applied to owner
+        /// writes. The rows are signed with the organization's key and recorded exactly as a content commit records a head
+        /// (manifest commit, leaves, content revision, an anchored ContentHeadCommitted checkpoint), so verification treats them
+        /// as genuinely accepted. Product code has no such path: this models history the census must still report.
+        /// </summary>
+        public async Task AcceptLegacyAsync(Guid record, List<Row> rows)
+        {
+            var head = Head(record);
+            var operation = Guid.CreateVersion7();
+            var revision = head.CommittedContentRevision + 1;
+            var key = new IntegrityKeyReference(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", 1);
+            var staged = new List<StagedContentItem>(rows.Count);
+            var inputs = new List<MerkleLeafInput>(rows.Count);
+            foreach (var row in rows)
+            {
+                var encoded = Encode(row, Org, operation, revision);
+                var signature = (await mac.SignAsync(key, encoded.Bytes, CancellationToken.None)).Mac;
+                staged.Add(new StagedContentItem(encoded.Kind, encoded.ItemId, encoded.Base64, Convert.ToBase64String(signature)));
+                inputs.Add(new MerkleLeafInput((MerkleItemKind)(byte)encoded.Kind, encoded.ItemId, signature, encoded.Digest, (ulong)revision, operation));
+            }
+
+            var manifest = MerkleManifestV1.Build(inputs);
+            var commit = new RecordManifestCommit
+            {
+                RecordManifestCommitId = Guid.CreateVersion7(),
+                OrganizationId = Org,
+                FormRecordId = record,
+                CommittedOperationId = operation,
+                CommittedContentRevision = revision,
+                ManifestSchemaVersion = 1,
+                ManifestAlgorithmVersion = 1,
+                RowSignatureKeyVersion = 1,
+                ManifestLeafCount = (long)manifest.LeafCount,
+                ManifestRootDigest = manifest.MerkleRoot,
+                ManifestLeafIndexDigest = manifest.LeafIndexDigest,
+                ManifestCommittedOn = DateTimeOffset.UtcNow,
+            };
+            Store.Commits.Add(commit);
+            Store.ManifestLeaves.AddRange(manifest.SortedLeaves.Select((leaf, position) => new RecordManifestLeaf
+            {
+                RecordManifestLeafId = Guid.CreateVersion7(),
+                RecordManifestCommitId = commit.RecordManifestCommitId,
+                ManifestLeafPosition = position,
+                ManifestItemKey = leaf.ItemKey,
+                ManifestItemKindCode = (byte)leaf.Kind,
+                ManifestItemId = leaf.ItemId,
+                CanonicalPayloadDigest = leaf.CanonicalPayloadDigest.ToArray(),
+                RowSignature = leaf.RowSignature.ToArray(),
+                ManifestLeafDigest = manifest.LeafHashes[position],
+            }));
+            head.CommittedContentRevision = revision;
+            head.CommittedOperationId = operation;
+            head.CurrentRecordManifestCommitId = commit.RecordManifestCommitId;
+            head.CommittedManifestRoot = manifest.MerkleRoot;
+            head.SignatureKeyVersion = 1;
+            State.AdvanceContentIntegrityRevision(ContentRevisionProjectionAction.AdvanceWithDerivation);
+            var checkpoint = JournalChain.Append(State, JournalStreamNames.Content, State.ContentIntegrityRevision, "ContentHeadCommitted", new { form_record_id = record, committed_content_revision = revision }, null, operation, TimeProvider.System);
+            checkpoint.ArchiveDeliveryState = ArchiveDeliveryStates.Anchored;
+            Store.Journal.Add(checkpoint);
+            Accepted[record] = staged;
+            AcceptedOperation[record] = operation;
         }
 
         /// <summary>An effective protection decision of <paramref name="form"/>'s <see cref="Field"/> (Encrypt = requirement, Decrypt = release), the field's current one.</summary>
@@ -392,14 +482,193 @@ public sealed class ProtectionReconciliationTests
         var shortNonce = await h.RecordAsync(h.FormA);
         var reused = await h.RecordAsync(h.FormA);
         var command = h.Decision(h.FormA);
-        await h.WriteSealedAsync(shortNonce, r => r.With("encryption_nonce_bytes", RowValue.Bytes(Fill(8, 1))));
+        var shortNonceRows = new List<Row> { Header(h.Org, shortNonce), Sealed(h.Org, shortNonce, h.Field, h.ItemFor(shortNonce), 50).With("encryption_nonce_bytes", RowValue.Bytes(Fill(8, 1))) };
         var twin = Sealed(h.Org, reused, h.Field, Guid.CreateVersion7(), 77);
-        await h.WriteAsync(reused, [Header(h.Org, reused), Sealed(h.Org, reused, h.Field, h.ItemFor(reused), 77), twin]);
+        var reusedRows = new List<Row> { Header(h.Org, reused), Sealed(h.Org, reused, h.Field, h.ItemFor(reused), 77), twin };
+
+        // E3-M2a: neither envelope can be written any more (the Authority refuses it before signing)…
+        Assert.Contains(EnvelopeRules.Reasons.NonceLength, (await Assert.ThrowsAsync<AuthorityException>(() => h.WriteAsync(shortNonce, shortNonceRows))).Message, StringComparison.Ordinal);
+        Assert.Contains(EnvelopeRules.Reasons.NonceReused, (await Assert.ThrowsAsync<AuthorityException>(() => h.WriteAsync(reused, reusedRows))).Message, StringComparison.Ordinal);
+
+        // …but content accepted before E3-M2a may hold them, and the census must still report it.
+        await h.AcceptLegacyAsync(shortNonce, shortNonceRows);
+        await h.AcceptLegacyAsync(reused, reusedRows);
 
         var attestation = await h.ReconcileAsync(h.FormA, command);
         Assert.False(attestation.AttestationComplete);
         Assert.Equal(ProtectionAttestationReasons.EnvelopeIssues, attestation.AttestationIncompleteReason);
         Assert.Equal(2, attestation.EnvelopeIssueRecordCount);
+    }
+
+    /// <summary>
+    /// E3-M2b-2 R-M2b2-11: the census applies the S-4 schema/envelope tie as every write does. Content that a write path can no
+    /// longer produce (schema 2 / envelope 1, schema 1 / envelope 2; modelled as accepted history) is reported as an envelope
+    /// issue and blocks completion.
+    /// </summary>
+    [Fact]
+    public async Task MismatchedSchemaEnvelopePairsAreReportedByTheCensus()
+    {
+        var h = new Harness();
+        var schema2Envelope1 = await h.RecordAsync(h.FormA);
+        var schema1Envelope2 = await h.RecordAsync(h.FormA);
+        var command = h.Decision(h.FormA);
+        var schema2 = new RowSchemaDefinition(EncryptedValues.EntityKind, 2, EncryptedValues.Columns.Concat([
+            new RowSignedColumn("data_key_commitment_bytes", RowColumnType.Bytes, false),
+            new RowSignedColumn("data_key_identifier", RowColumnType.Uuid, false),
+            new RowSignedColumn("key_wrap_algorithm_code", RowColumnType.Int32, false),
+        ]).OrderBy(c => c.ColumnName, StringComparer.Ordinal).ToList());
+        var mismatchedV2 = new List<Row>
+        {
+            Header(h.Org, schema2Envelope1),
+            (Sealed(h.Org, schema2Envelope1, h.Field, h.ItemFor(schema2Envelope1), 51) with { Schema = schema2 })
+                .With("data_key_commitment_bytes", RowValue.Bytes(Fill(32, 0xdd)))
+                .With("data_key_identifier", RowValue.Uuid(Guid.CreateVersion7()))
+                .With("key_wrap_algorithm_code", RowValue.Int32(1)),
+        };
+        var mismatchedV1 = new List<Row> { Header(h.Org, schema1Envelope2), Sealed(h.Org, schema1Envelope2, h.Field, h.ItemFor(schema1Envelope2), 52, envelope: 2) };
+
+        // Neither can be written (S-4 refuses both before signing)…
+        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeSchemaTie.MismatchReason, (await Assert.ThrowsAsync<AuthorityException>(() => h.WriteAsync(schema2Envelope1, mismatchedV2))).Message);
+        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeSchemaTie.MismatchReason, (await Assert.ThrowsAsync<AuthorityException>(() => h.WriteAsync(schema1Envelope2, mismatchedV1))).Message);
+
+        // …and accepted history holding them is reported.
+        await h.AcceptLegacyAsync(schema2Envelope1, mismatchedV2);
+        await h.AcceptLegacyAsync(schema1Envelope2, mismatchedV1);
+
+        var attestation = await h.ReconcileAsync(h.FormA, command);
+        Assert.False(attestation.AttestationComplete);
+        Assert.Equal(ProtectionAttestationReasons.EnvelopeIssues, attestation.AttestationIncompleteReason);
+        Assert.Equal(2, attestation.EnvelopeIssueRecordCount);
+    }
+
+    [Theory]
+    [InlineData("version 2", EnvelopeSchemaTie.MismatchReason)] // R-M2b2-11: schema 1 / envelope 2 is refused by the S-4 tie first
+    [InlineData("wrapped key", EnvelopeRules.Reasons.WrappedKeyLength)]
+    [InlineData("tag", EnvelopeRules.Reasons.TagLength)]
+    [InlineData("purpose", EnvelopeRules.Reasons.KeyReferencePurpose)]
+    public async Task AProtectionMigrationWriteWithAMalformedEnvelopeIsRefusedBeforeSigningAndAWellFormedOneCommits(string variant, string reason)
+    {
+        // E3-M2a: the workload path (no delegated user; authorized by the protection decision) had no envelope rule before.
+        var h = new Harness();
+        var record = await h.RecordAsync(h.FormA, withContent: false);
+        var other = Guid.CreateVersion7();
+        await h.WriteAsync(record, [Header(h.Org, record), Text(h.Org, record, h.Field, h.ItemFor(record), "secret"), Integer(h.Org, record, h.OtherField, other, 3)]);
+        var command = h.Decision(h.FormA);
+        var head = (h.Head(record).CommittedContentRevision, h.Head(record).CommittedOperationId);
+        var operations = h.Store.Operations.Count;
+
+        Row Bad(Row r) => variant switch
+        {
+            "version 2" => r.With("encryption_envelope_version", RowValue.Int32(2)),
+            "wrapped key" => r.With("wrapped_data_key_bytes", RowValue.Bytes(Fill(59, 1))),
+            "tag" => r.With("encryption_auth_tag_bytes", RowValue.Bytes(Fill(4, 1))),
+            "purpose" => r.With("encryption_key_reference", RowValue.Text($"localdev:{h.Org:D}:document:1")),
+            _ => throw new ArgumentOutOfRangeException(nameof(variant)),
+        };
+
+        List<Row> Reprotected(Func<Row, Row> alter) => [Header(h.Org, record), alter(Sealed(h.Org, record, h.Field, h.ItemFor(record), 40)), Integer(h.Org, record, h.OtherField, other, 3)];
+        var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.ReprotectAsync(record, command, Reprotected(Bad)));
+        Assert.Equal("ENVELOPE_INVALID: " + reason, ex.Message);
+        Assert.Equal(operations, h.Store.Operations.Count);
+        Assert.Equal(head, (h.Head(record).CommittedContentRevision, h.Head(record).CommittedOperationId));
+
+        await h.ReprotectAsync(record, command, Reprotected(r => r.With("encryption_key_reference", RowValue.Text($"vault-transit:{h.Org:D}:field-value:2"))));
+        Assert.Equal(head.CommittedContentRevision + 1, h.Head(record).CommittedContentRevision);
+    }
+
+    /// <summary>
+    /// E3-M2b-2 (D-3, D-9): signed schema 2 is registered, but a protection-migration write carrying a schema-2 envelope row
+    /// (well-formed metadata; envelope 2 or a mismatched envelope 1) is still refused before signing, as on every user path.
+    /// </summary>
+    [Theory]
+    [InlineData(2)]
+    [InlineData(1)]
+    public async Task AProtectionMigrationWriteCannotIntroduceASchemaTwoEnvelopeRow(int envelopeVersion)
+    {
+        var h = new Harness();
+        var record = await h.RecordAsync(h.FormA, withContent: false);
+        var other = Guid.CreateVersion7();
+        await h.WriteAsync(record, [Header(h.Org, record), Text(h.Org, record, h.Field, h.ItemFor(record), "secret"), Integer(h.Org, record, h.OtherField, other, 3)]);
+        var command = h.Decision(h.FormA);
+        var head = (h.Head(record).CommittedContentRevision, h.Head(record).CommittedOperationId);
+        var operations = h.Store.Operations.Count;
+
+        var schema2 = new RowSchemaDefinition(EncryptedValues.EntityKind, 2, EncryptedValues.Columns.Concat([
+            new RowSignedColumn("data_key_commitment_bytes", RowColumnType.Bytes, false),
+            new RowSignedColumn("data_key_identifier", RowColumnType.Uuid, false),
+            new RowSignedColumn("key_wrap_algorithm_code", RowColumnType.Int32, false),
+        ]).OrderBy(c => c.ColumnName, StringComparer.Ordinal).ToList());
+        var sealedV2 = (Sealed(h.Org, record, h.Field, h.ItemFor(record), 40) with { Schema = schema2 })
+            .With("encryption_envelope_version", RowValue.Int32(envelopeVersion))
+            .With("encryption_key_reference", RowValue.Text($"localdev:{h.Org:D}:field-value:1")) // E3-M2d: well-formed under the v2 rules
+            .With("data_key_commitment_bytes", RowValue.Bytes(Fill(32, 0xdd)))
+            .With("data_key_identifier", RowValue.Uuid(Guid.CreateVersion7()))
+            .With("key_wrap_algorithm_code", RowValue.Int32(1));
+
+        var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.ReprotectAsync(record, command, [Header(h.Org, record), sealedV2, Integer(h.Org, record, h.OtherField, other, 3)]));
+        Assert.Equal("ENVELOPE_INVALID: " + (envelopeVersion == 2 ? EnvelopeV2Rules.Reasons.VersionNotEnabled : EnvelopeSchemaTie.MismatchReason), ex.Message); // S-4 refuses the mismatched pair first; E3-M2d refuses a new v2 row
+        Assert.Equal(operations, h.Store.Operations.Count);
+        Assert.Equal(head, (h.Head(record).CommittedContentRevision, h.Head(record).CommittedOperationId));
+    }
+
+    [Theory]
+    [InlineData("carried key, new nonce", EnvelopeRules.Reasons.WrappedKeyReused)]
+    [InlineData("current key and nonce, row dropped", EnvelopeRules.Reasons.NonceReused)]
+    [InlineData("current key, new nonce, row dropped", EnvelopeRules.Reasons.WrappedKeyReused)]
+    public async Task AProtectionMigrationWriteCannotReuseADataKeyOfTheCurrentRevision(string variant, string reason)
+    {
+        // E3-M2a remediation on the workload path: the record holds an encrypted value of another field; the migration seals
+        // the field's value. Its new envelope must use a fresh data key — not the other value's, whether that value is carried
+        // in the same candidate (caught within the candidate) or left out (caught against the verified current revision; the
+        // reprotection rules would also refuse the removal, but later).
+        var h = new Harness();
+        var record = await h.RecordAsync(h.FormA, withContent: false);
+        var otherItem = Guid.CreateVersion7();
+        var otherSealed = Sealed(h.Org, record, h.OtherField, otherItem, 60);
+        await h.WriteAsync(record, [Header(h.Org, record), Text(h.Org, record, h.Field, h.ItemFor(record), "secret"), otherSealed]);
+        var command = h.Decision(h.FormA);
+        var head = (h.Head(record).CommittedContentRevision, h.Head(record).CommittedOperationId);
+        var operations = h.Store.Operations.Count;
+        var signatures = h.Signer.SignatureCount;
+
+        var reusing = Sealed(h.Org, record, h.Field, h.ItemFor(record), 60).With("encrypted_value_bytes", RowValue.Bytes(Fill(24, 88))); // the other value's key and nonce
+        List<Row> candidate = variant switch
+        {
+            "carried key, new nonce" => [Header(h.Org, record), reusing.With("encryption_nonce_bytes", RowValue.Bytes(Fill(12, 87))), otherSealed],
+            "current key and nonce, row dropped" => [Header(h.Org, record), reusing],
+            "current key, new nonce, row dropped" => [Header(h.Org, record), reusing.With("encryption_nonce_bytes", RowValue.Bytes(Fill(12, 86)))],
+            _ => throw new ArgumentOutOfRangeException(nameof(variant)),
+        };
+
+        var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.ReprotectAsync(record, command, candidate));
+        Assert.Equal("ENVELOPE_INVALID: " + reason, ex.Message);
+        Assert.Equal(signatures, h.Signer.SignatureCount);
+        Assert.Equal(operations, h.Store.Operations.Count);
+        Assert.Equal(head, (h.Head(record).CommittedContentRevision, h.Head(record).CommittedOperationId));
+
+        // Positive control: a fresh data key for the migrated value, the other value carried byte-identically.
+        await h.ReprotectAsync(record, command, [Header(h.Org, record), Sealed(h.Org, record, h.Field, h.ItemFor(record), 40), otherSealed]);
+        Assert.Equal(head.CommittedContentRevision + 1, h.Head(record).CommittedContentRevision);
+    }
+
+    [Fact]
+    public async Task AMalformedEnvelopeAcceptedBeforeTheRulesCannotBeCarriedForwardByALaterWrite()
+    {
+        // Fail closed, as designed: such a row can only stem from before E3-M2a (none exists in the assessed data). It stays
+        // readable and is reported by the census, but no write may carry it on; the business must re-seal the value.
+        var h = new Harness();
+        var record = await h.RecordAsync(h.FormA, withContent: false);
+        List<Row> rows = [Header(h.Org, record), Sealed(h.Org, record, h.Field, h.ItemFor(record), 50).With("encryption_nonce_bytes", RowValue.Bytes(Fill(8, 1)))];
+        await h.AcceptLegacyAsync(record, rows);
+        var head = h.Head(record).CommittedContentRevision;
+
+        var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.WriteAsync(record, [.. rows, Text(h.Org, record, h.OtherField, Guid.CreateVersion7(), "unrelated edit")]));
+        Assert.Equal("ENVELOPE_INVALID: " + EnvelopeRules.Reasons.NonceLength, ex.Message);
+        Assert.Equal(head, h.Head(record).CommittedContentRevision);
+
+        // Re-sealing the value (what the business does on an owner save) is accepted.
+        await h.WriteAsync(record, [Header(h.Org, record), Sealed(h.Org, record, h.Field, h.ItemFor(record), 51)]);
+        Assert.Equal(head + 1, h.Head(record).CommittedContentRevision);
     }
 
     [Fact]

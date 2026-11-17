@@ -88,6 +88,13 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             }
 
             plan.SearchIndexChangesAppliedByCaller = true;
+            if (plan.RegisterResources.Any(r => r.ResourceTypeName == Domain.Features.Organizations.ResourceTypeNames.FormRecord))
+            {
+                // RB-CARV-1 (contract §22): registering a record creates its accepted (empty) content head; Release B verifies the
+                // floor first, so a refusal is recorded as an ordinary rejected command and nothing of the plan is staged.
+                await scope.RequireContentAcceptanceFloorAsync(cancellationToken).ConfigureAwait(false);
+            }
+
             ApplyPlan(scope, state, command, plan, bound, request, cancellationToken);
 
             // IX-1 (C.2): coverage starts, withdrawals and same-transaction purges for this command's approval changes.

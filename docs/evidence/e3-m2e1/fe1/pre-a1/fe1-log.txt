@@ -1,0 +1,163 @@
+07:07:04.043 F-E1 build under test: pre-A-1 (operations lock, then the facts read the history); iterations 6
+07:07:09.812 --migrate (fe1-migrate) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:07:10.025 PASS FE-00: exit 0; floors none
+---- fe1_da
+07:07:13.293 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:07:13.357 PASS DA-setup1: exit 0; floors 1
+07:07:14.565 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:07:14.596 PASS DA-setup2: exit 0; floors 2
+07:07:20.001 --apply-content-acceptance-floor 3 (fe1-floor-da) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:07:20.008 DA lock graph while the writer is paused after the operations lock: floor holds AccessShareLock on authority.ef_migrations_history; floor holds AccessExclusiveLock on authority.ef_migrations_history; floor WAITS FOR AccessExclusiveLock on authority.content_change_operations (blocked by writer); writer holds RowExclusiveLock on authority.content_change_operations
+07:07:20.008 DA lock graph after the writer is released: floor holds AccessShareLock on authority.ef_migrations_history; floor holds AccessExclusiveLock on authority.ef_migrations_history; floor WAITS FOR AccessExclusiveLock on authority.content_change_operations (blocked by writer); writer holds RowExclusiveLock on authority.content_change_operations; writer WAITS FOR AccessShareLock on authority.ef_migrations_history (blocked by floor); mutual blocking: True
+07:07:20.008 FAIL DA-1: LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE
+07:07:20.008 FAIL DA-2: authority.content_change_operations AccessExclusiveLock
+07:07:20.008 FAIL DA-3: MUTUAL BLOCKING; floor holds AccessShareLock on authority.ef_migrations_history; floor holds AccessExclusiveLock on authority.ef_migrations_history; floor WAITS FOR AccessExclusiveLock on authority.content_change_operations (blocked by writer); writer holds RowExclusiveLock on authority.content_change_operations; writer WAITS FOR AccessShareLock on authority.ef_migrations_history (blocked by floor)
+07:07:20.008 FAIL DA-4: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; refusal reasons FloorUnverifiable
+07:07:20.121 PASS DA-5: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; P<>C 0
+07:07:22.637 FAIL DL: 1
+07:07:22.662 drop fe1_da: OK
+---- fe1_db
+07:07:23.986 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:07:24.048 PASS DB-setup1: exit 0; floors 1
+07:07:25.236 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:07:25.265 PASS DB-setup2: exit 0; floors 2
+07:07:29.551 --apply-content-acceptance-floor 3 (fe1-floor-db) exit 3: content acceptance rule floor NOT applied: 40P01: deadlock detected
+07:07:30.161 DB lock graph while the writer is paused after the operations lock: floor holds AccessShareLock on authority.ef_migrations_history; floor holds AccessExclusiveLock on authority.ef_migrations_history; floor WAITS FOR AccessExclusiveLock on authority.content_change_operations (blocked by writer); writer holds RowExclusiveLock on authority.content_change_operations
+07:07:30.161 DB lock graph after the writer is released: floor holds AccessShareLock on authority.ef_migrations_history; floor holds AccessExclusiveLock on authority.ef_migrations_history; floor WAITS FOR AccessExclusiveLock on authority.content_change_operations (blocked by writer); writer holds RowExclusiveLock on authority.content_change_operations; writer WAITS FOR AccessShareLock on authority.ef_migrations_history (blocked by floor); mutual blocking: True
+07:07:30.161 FAIL DB-1: LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE | LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE
+07:07:30.161 FAIL DB-2: authority.content_change_operations AccessExclusiveLock
+07:07:30.161 FAIL DB-3: MUTUAL BLOCKING; floor holds AccessShareLock on authority.ef_migrations_history; floor holds AccessExclusiveLock on authority.ef_migrations_history; floor WAITS FOR AccessExclusiveLock on authority.content_change_operations (blocked by writer); writer holds RowExclusiveLock on authority.content_change_operations; writer WAITS FOR AccessShareLock on authority.ef_migrations_history (blocked by floor)
+07:07:30.161 PASS DB-4: OK; refusal reasons none
+07:07:30.212 FAIL DB-5: exit 3; floors 2; definition DIFFERS; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; P<>C 0
+07:07:30.260 PASS DB-6: floors 2; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; output content acceptance rule floor NOT applied: 40P01: deadlock detected
+07:07:32.779 FAIL DL: 1
+07:07:32.797 drop fe1_db: OK
+---- fe1_d2
+07:07:34.126 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:07:34.165 PASS D2-setup1: exit 0; floors 1
+07:07:39.072 --apply-content-acceptance-floor 2 (fe1-floor-d2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:07:39.072 D2 lock graph while the writer is paused after the operations lock: floor holds AccessShareLock on authority.ef_migrations_history; floor holds AccessExclusiveLock on authority.ef_migrations_history; floor WAITS FOR AccessExclusiveLock on authority.content_change_operations (blocked by writer); writer holds RowExclusiveLock on authority.content_change_operations
+07:07:39.072 D2 lock graph after the writer is released: floor holds AccessShareLock on authority.ef_migrations_history; floor holds AccessExclusiveLock on authority.ef_migrations_history; floor WAITS FOR AccessExclusiveLock on authority.content_change_operations (blocked by writer); writer holds RowExclusiveLock on authority.content_change_operations; writer WAITS FOR AccessShareLock on authority.ef_migrations_history (blocked by floor); mutual blocking: True
+07:07:39.072 FAIL D2-1: LOCK TABLE authority.content_change_operations IN ROW EXCLUSIVE MODE
+07:07:39.072 FAIL D2-2: authority.content_change_operations AccessExclusiveLock
+07:07:39.072 FAIL D2-3: MUTUAL BLOCKING; floor holds AccessShareLock on authority.ef_migrations_history; floor holds AccessExclusiveLock on authority.ef_migrations_history; floor WAITS FOR AccessExclusiveLock on authority.content_change_operations (blocked by writer); writer holds RowExclusiveLock on authority.content_change_operations; writer WAITS FOR AccessShareLock on authority.ef_migrations_history (blocked by floor)
+07:07:39.072 FAIL D2-4: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; refusal reasons FloorUnverifiable
+07:07:39.169 PASS D2-5: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; P<>C 0
+07:07:41.682 FAIL DL: 1
+07:07:41.700 drop fe1_d2: OK
+---- fe1_lt
+07:07:43.022 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:07:43.058 PASS LT-setup1: exit 0; floors 1
+07:07:44.461 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:07:44.488 PASS LT-setup2: exit 0; floors 2
+07:07:50.886 --apply-content-acceptance-floor 3 (fe1-floor-lt) exit 3: content acceptance rule floor NOT applied: 55P03: canceling statement due to lock timeout
+07:07:51.029 FAIL LT-1: waits on authority.content_change_operations AccessExclusiveLock; exit 3 (55P03) after 6.4 s
+07:07:51.029 PASS LT-2: floors 2; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; floor-3 constraint none
+07:07:51.029 PASS LT-3: OK; OK; refusal reasons none
+07:07:52.185 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:07:52.236 PASS LT-4: exit 0; floors 3; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3
+07:07:54.760 PASS DL: 0
+07:07:54.778 drop fe1_lt: OK
+---- fe1_h
+07:07:55.995 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:07:56.032 PASS H-setup1: exit 0; floors 1
+07:07:57.208 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:07:57.235 PASS H-setup2: exit 0; floors 2
+07:07:58.459 --apply-content-acceptance-floor 3 (fe1-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:07:58.487 PASS H-0: exit 0; floors 3
+07:07:58.725 PASS H-ok: OK; OK
+07:07:58.889 PASS H-1a: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32f-1047-736c-a42c-60623b8d53fa, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 2->2; unchanged | unchanged
+07:07:59.030 PASS H-1b: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32f-1047-736c-a42c-60623b8d53fa, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=2 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 2->2; unchanged | unchanged
+07:08:00.173 --apply-content-acceptance-floor 3 (fe1-floor3-history-missing) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor 3 refused: floor 2 must be installed and recorded, and be the only floor (floors are raised one step at a time)
+07:08:00.224 PASS H-1c: exit 3; floors 3; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2
+07:08:00.324 PASS H-1d: OK
+07:08:00.471 PASS H-2: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32f-1047-736c-a42c-60623b8d53fa, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 3->3; unchanged | unchanged
+07:08:00.640 PASS H-3: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32f-1047-736c-a42c-60623b8d53fa, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FenceMigrationNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 3->3; unchanged | unchanged
+07:08:00.808 PASS H-4: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32f-1047-736c-a42c-60623b8d53fa, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorUnverifiable category=UnverifiableFloor recovery=CheckAuthorityDbReachabilityAndPrivileges phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 3->3; unchanged | unchanged
+07:08:00.908 PASS H-4b: OK
+07:08:01.061 PASS H-5a: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32f-1047-736c-a42c-60623b8d53fa, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorRecordedButMissing category=MissingFloor recovery=RecoveryRequired:ReinstateRecordedFloor phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 4->4; unchanged | unchanged
+07:08:02.165 --apply-content-acceptance-floor 3 (fe1-floor3-missing) exit 4: content acceptance rule floor 3 is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with --reinstate-recorded-floor
+07:08:03.442 --apply-content-acceptance-floor 3 --reinstate-recorded-floor (fe1-floor3-reinstate) exit 0: content acceptance rule floor 3 re-installed (recorded floor reinstated)  content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+07:08:03.495 PASS H-5b: exit 4; exit 0; floors 3; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3
+restored: 07:08:03.669 PASS H-6a: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e32f-1047-736c-a42c-60623b8d53fa, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorLowered category=LoweredFloor recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 0->0; unchanged | unchanged
+restored: 07:08:04.948 --apply-content-acceptance-floor 3 (fe1-floor3-restored) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+restored: 07:08:05.085 PASS H-6b: exit 0; floors 3; OK
+07:08:07.615 PASS H-6c: 0
+07:08:07.650 drop fe1_h_snap2: OK
+07:08:11.742 legacy net10.0 prepare exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False mapped=409 {"errorCode":"OPERATION_RULES_OUTDATED","correlationId":"01a1e32f-5229-7c51-8866-ae423420a5bd","retryable":false,"detail":"the operation crosses content acceptance rule versions and was refused; start a fresh operation"} build=2 
+07:08:11.771 PASS H-7: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v3) ; ops 4->4
+07:08:11.824 PASS H-8: P<>C 0; definition exact
+07:08:14.343 PASS DL: 0
+07:08:14.362 drop fe1_h: OK
+---- fe1_s01
+07:08:18.268 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:08:18.948 FAIL F1: exit 0; floors 1; definition exact; RA OK x115, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x83, RB1e OK x8; reasons FloorNotInstalled,FloorUnverifiable; before 22, during 155, after 29
+07:08:22.476 --apply-content-acceptance-floor 2 (fe1-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+07:08:23.196 FAIL F2: exit 0; floors 2; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB1- OK x105, RB1- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x4; reasons FloorUnverifiable; before 8, during 76, after 25
+07:08:26.674 --apply-content-acceptance-floor 3 (fe1-floor3) exit 3: content acceptance rule floor NOT applied: 40P01: deadlock detected
+07:08:27.335 FAIL F3: exit 3; floors 2; definition DIFFERS; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2; RB2- OK x109, RB2- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x3; reasons FloorUnverifiable; before 8, during 75, after 29
+07:08:32.450 --migrate (fe1-migrate-s01) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:08:33.026 FAIL FM: exit 0; floors 2; RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x521, RB3- PostgresException 42501  x43; reasons FloorLowered,FloorUnverifiable
+07:08:33.055 PASS PC: 0
+07:08:35.574 FAIL DL: 10
+07:08:35.594 drop fe1_s01: OK
+---- fe1_s02
+07:08:39.714 --apply-content-acceptance-floor 1 (fe1-floor1) exit 3: content acceptance rule floor NOT applied: 40P01: deadlock detected
+07:08:40.326 FAIL F1: exit 3; floors none; definition DIFFERS; RA OK x122, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x107; reasons FloorNotInstalled,FloorUnverifiable; before 19, during 163, after 47
+07:08:42.467 --apply-content-acceptance-floor 2 (fe1-floor2) exit 2: content acceptance rule floor 2 requires every lower floor to be applied first (floors are raised one step at a time)
+07:08:43.055 FAIL F2: exit 2; floors none; definition DIFFERS; history none; RB1- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x440; reasons FloorNotInstalled; before 59, during 285, after 96
+07:08:45.204 --apply-content-acceptance-floor 3 (fe1-floor3) exit 2: content acceptance rule floor 3 requires every lower floor to be applied first (floors are raised one step at a time)
+07:08:45.779 FAIL F3: exit 2; floors none; definition DIFFERS; history none; RB2- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x415; reasons FloorNotInstalled; before 46, during 274, after 95
+07:08:50.588 --migrate (fe1-migrate-s02) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:08:51.148 FAIL FM: exit 0; floors none; RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x513, RB3- PostgresException 42501  x45; reasons FloorNotInstalled,FloorUnverifiable
+07:08:51.172 PASS PC: 0
+07:08:53.693 FAIL DL: 2
+07:08:53.712 drop fe1_s02: OK
+---- fe1_s03
+07:08:57.349 --apply-content-acceptance-floor 1 (fe1-floor1) exit 3: content acceptance rule floor NOT applied: 40P01: deadlock detected
+07:08:57.941 FAIL F1: exit 3; floors none; definition DIFFERS; RA OK x114, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x100; reasons FloorNotInstalled,FloorUnverifiable; before 17, during 149, after 48
+07:09:00.282 --apply-content-acceptance-floor 2 (fe1-floor2) exit 2: content acceptance rule floor 2 requires every lower floor to be applied first (floors are raised one step at a time)
+07:09:00.877 FAIL F2: exit 2; floors none; definition DIFFERS; history none; RB1- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x452, RB1- NpgsqlException <- SocketException x1; reasons FloorNotInstalled; before 54, during 312, after 87
+07:09:03.502 --apply-content-acceptance-floor 3 (fe1-floor3) exit 2: content acceptance rule floor 3 requires every lower floor to be applied first (floors are raised one step at a time)
+07:09:04.113 FAIL F3: exit 2; floors none; definition DIFFERS; history none; RB2- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x463; reasons FloorNotInstalled; before 49, during 322, after 92
+07:09:09.352 --migrate (fe1-migrate-s03) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:09:09.923 FAIL FM: exit 0; floors none; RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x530, RB3- PostgresException 42501  x42; reasons FloorNotInstalled,FloorUnverifiable
+07:09:09.948 PASS PC: 0
+07:09:12.470 FAIL DL: 2
+07:09:12.488 drop fe1_s03: OK
+---- fe1_s04
+07:09:16.312 --apply-content-acceptance-floor 1 (fe1-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+07:09:17.020 FAIL F1: exit 0; floors 1; definition exact; RA OK x115, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x82, RB1e OK x8; reasons FloorNotInstalled,FloorUnverifiable; before 26, during 149, after 30
+07:09:20.542 --apply-content-acceptance-floor 2 (fe1-floor2) exit 3: content acceptance rule floor NOT applied: 40P01: deadlock detected
+07:09:21.238 FAIL F2: exit 3; floors 1; definition DIFFERS; history 20261115032228_AuthorityContentAcceptanceRuleFloor1; RB1- OK x108, RB1- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x2; reasons FloorUnverifiable; before 8, during 74, after 28
+07:09:23.382 --apply-content-acceptance-floor 3 (fe1-floor3) exit 2: content acceptance rule floor 3 requires every lower floor to be applied first (floors are raised one step at a time)
+07:09:23.974 FAIL F3: exit 2; floors 1; definition DIFFERS; history 20261115032228_AuthorityContentAcceptanceRuleFloor1; RB2- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x427; reasons FloorLowered; before 62, during 275, after 90
+07:09:28.868 --migrate (fe1-migrate-s04) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:09:29.449 FAIL FM: exit 0; floors 1; RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x501, RB3- PostgresException 42501  x45; reasons FloorLowered,FloorUnverifiable
+07:09:29.477 PASS PC: 0
+07:09:32.006 FAIL DL: 5
+07:09:32.025 drop fe1_s04: OK
+---- fe1_s05
+07:09:36.073 --apply-content-acceptance-floor 1 (fe1-floor1) exit 3: content acceptance rule floor NOT applied: 40P01: deadlock detected
+07:09:36.658 FAIL F1: exit 3; floors none; definition DIFFERS; RA OK x122, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x106; reasons FloorNotInstalled,FloorUnverifiable; before 22, during 159, after 47
+07:09:38.984 --apply-content-acceptance-floor 2 (fe1-floor2) exit 2: content acceptance rule floor 2 requires every lower floor to be applied first (floors are raised one step at a time)
+07:09:39.583 FAIL F2: exit 2; floors none; definition DIFFERS; history none; RB1- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x465; reasons FloorNotInstalled; before 62, during 309, after 94
+07:09:41.731 --apply-content-acceptance-floor 3 (fe1-floor3) exit 2: content acceptance rule floor 3 requires every lower floor to be applied first (floors are raised one step at a time)
+07:09:42.311 FAIL F3: exit 2; floors none; definition DIFFERS; history none; RB2- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x436; reasons FloorNotInstalled; before 58, during 284, after 94
+07:09:47.284 --migrate (fe1-migrate-s05) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:09:47.842 FAIL FM: exit 0; floors none; RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x525, RB3- PostgresException 42501  x47; reasons FloorNotInstalled,FloorUnverifiable
+07:09:47.867 PASS PC: 0
+07:09:50.386 FAIL DL: 2
+07:09:50.404 drop fe1_s05: OK
+---- fe1_s06
+07:09:53.981 --apply-content-acceptance-floor 1 (fe1-floor1) exit 3: content acceptance rule floor NOT applied: 40P01: deadlock detected
+07:09:54.574 FAIL F1: exit 3; floors none; definition DIFFERS; RA OK x114, RB1e AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x97; reasons FloorNotInstalled,FloorUnverifiable; before 27, during 143, after 41
+07:09:57.073 --apply-content-acceptance-floor 2 (fe1-floor2) exit 2: content acceptance rule floor 2 requires every lower floor to be applied first (floors are raised one step at a time)
+07:09:57.669 FAIL F2: exit 2; floors none; definition DIFFERS; history none; RB1- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x451; reasons FloorNotInstalled; before 53, during 312, after 86
+07:10:00.261 --apply-content-acceptance-floor 3 (fe1-floor3) exit 2: content acceptance rule floor 3 requires every lower floor to be applied first (floors are raised one step at a time)
+07:10:00.882 FAIL F3: exit 2; floors none; definition DIFFERS; history none; RB2- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x444; reasons FloorNotInstalled; before 47, during 311, after 86
+07:10:06.180 --migrate (fe1-migrate-s06) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+07:10:06.748 FAIL FM: exit 0; floors none; RB3- AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False x521, RB3- PostgresException 42501  x44; reasons FloorNotInstalled,FloorUnverifiable
+07:10:06.774 PASS PC: 0
+07:10:09.303 FAIL DL: 2
+07:10:09.321 drop fe1_s06: OK

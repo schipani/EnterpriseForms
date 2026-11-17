@@ -1,0 +1,12 @@
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AnAmbiguousCommitThatTookEffectIsReconciledWithoutASecondEntry (9ms)
+  Assert.Single() Failure: The collection contained 2 items
+  Collection: [SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }, SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }]
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceNoSummaryTests.NoOutcomeRetryWindowOrHourRolloverEverWritesAnythingButOneEvidenceEntryPerKeyAndBucket (806ms)
+  ambiguous reconcile: an entry was written by a step that refused nothing
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceNoSummaryTests.Ledger.AssertEvidenceOnly(String label, SecurityJournalEntry entry, Nullable`1 refused) in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceNoSummaryTests.cs:103
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 29
+  failed: 2
+  succeeded: 27
+  skipped: 0
+  duration: 2s 113ms

@@ -1,0 +1,561 @@
+{
+  "harness": "E3-M2e-2 controlled Envelope v2 acceptance verification (real Authority build in-process; real E3-M1 core; business signed-column registry; disposable PostgreSQL 18.0 and Vault 1.20.4)",
+  "build": "ContentAcceptanceRules.CurrentVersion = 3; RecognizedFloors = 1,2,3; EnvelopeRules.AllowedEnvelopeVersions = 1",
+  "groups": "P,R",
+  "isolation": {
+    "databases": [
+      "m2e2_floor2",
+      "m2e2_t0",
+      "m2e2gate",
+      "postgres"
+    ],
+    "scrubbedEnvironmentVariables": [],
+    "stopped": false
+  },
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "checksTotal": 43,
+  "checksFailed": 9,
+  "byKind": {
+    "Database": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    "Harness": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    "Negative": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "Positive": {
+      "total": 22,
+      "passed": 15,
+      "failed": 7
+    },
+    "Recovery": {
+      "total": 2,
+      "passed": 1,
+      "failed": 1
+    },
+    "Setup": {
+      "total": 12,
+      "passed": 12,
+      "failed": 0
+    }
+  },
+  "expectedGapDemonstrations": 3,
+  "checks": [
+    {
+      "Id": "S-00",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "target identity: the primary and maintenance databases carry this run\u0027s nonce, the cluster\u0027s system identifier and port 5432 behind the run\u0027s loopback port",
+      "Expected": "admitted m2e2gate, postgres",
+      "Observed": "m2e2gate,postgres",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-01",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "inherited connection strings, content settings, Azure settings and environment overrides are removed from the harness process (and so from every child)",
+      "Expected": "none remaining",
+      "Observed": "removed []; remaining []",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-02",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "the ordinary --migrate runs before any runtime connection: it applies the ledger migration and never a floor",
+      "Expected": "runtime sessions 0; exit 0; floors none; ledger 20261116031706_AuthorityContentDataKeyBindings",
+      "Observed": "runtime sessions 0; exit 0; floors none; ledger 20261116031706_AuthorityContentDataKeyBindings",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-03",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "runtime role on the ledger: SELECT and INSERT only (L-8); the role is ordinary",
+      "Expected": "select=true insert=true update=false delete=false truncate=false; false false",
+      "Observed": "select=true insert=true update=false delete=false truncate=false; false false",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-04",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "floors 1 -\u003E 2 -\u003E 3 applied in order (focused run without group F)",
+      "Expected": "0 0 0; floors 3",
+      "Observed": "0 0 0; floors 3",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-10",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "target identity re-verified for every admitted database immediately before acceptance is enabled",
+      "Expected": "all admitted",
+      "Observed": "m2e2_floor2,m2e2gate,postgres",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-11",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "Release B with RequiredFloor = 3: the readiness guard is ready on floor 3 with the ledger migration",
+      "Expected": "True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3",
+      "Observed": "True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-12",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "the switch refuses to be configured on outside Development/Testing (Staging, Production) and without Release B RequiredFloor 3 (floor 2, Release A)",
+      "Expected": "refused: environment x2; refused: policy x2",
+      "Observed": "refused: environment; refused: environment; refused: policy; refused: policy",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-13",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "the Testing switch is configured on with its static prerequisites; acceptance is NOT effective before the exact policy is recorded",
+      "Expected": "configured True; prerequisites True; enabled False",
+      "Observed": "configured True; prerequisites True; enabled False",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-14",
+      "Kind": "Negative",
+      "Group": "S",
+      "Description": "missing policy observation: with the switch configured on but the policy unrecorded, a New v2 group is refused at Prepare (nothing signed, no operation, no binding)",
+      "Expected": "ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; unchanged",
+      "Observed": "ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; signatures 0-\u003E0; bindings 0-\u003E0; ops 0-\u003E0",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-15",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "the effective policy is recorded on the disposable platform journal (in-memory archive); acceptance becomes effective only then",
+      "Expected": "Recorded; body records the exact digest and acceptance requested; enabled True",
+      "Observed": "Recorded; body has the digest, requested on; enabled True",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-after-activation",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "F-E2 sentinel (after-activation): the runtime role\u0027s table grants equal the setup baseline",
+      "Expected": "unchanged",
+      "Observed": "unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-01",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "raw SQL positive control: the runtime role inserts a binding for a Prepared operation stamped 3 of the same organization and record (P-1 admits it)",
+      "Expected": "setup write OK; seed OK; insert OK",
+      "Observed": "setup OK; seed OK; insert OK",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-02",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "P-1 (database): a binding for a Committed operation is refused by the binding guard trigger",
+      "Expected": "23514 trg_content_data_key_binding_guard",
+      "Observed": "23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-03",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "global uniqueness (database): a second binding of an identifier is refused by the unique index",
+      "Expected": "23505 uq_content_data_key_binding_identifier",
+      "Observed": "23505 uq_content_data_key_binding_identifier: duplicate key value violates unique constraint \u0022uq_content_data_key_binding_identifier\u0022",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-04",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "L-8 (database): the runtime role has no UPDATE, DELETE or TRUNCATE privilege on the ledger",
+      "Expected": "42501 x3 (labelled expected)",
+      "Observed": "42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-05",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "P-2 (database): even the superuser is refused UPDATE, DELETE and TRUNCATE by the immutability triggers; the binding is intact",
+      "Expected": "23514 trg_content_data_key_binding_permanent x3; 1/1",
+      "Observed": "23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated; 1/1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-01",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "a New v2 field batch (3 items, wrap code 1, local provider): Prepare registers exactly one binding per New group in the Prepare transaction (DK-4 then DK-5) with the organization, record, kind, M1 commitment and item count; P = 3",
+      "Expected": "OK; 1 binding(s) equal to the M1 envelope tuple; signed 5; 3/NULL Prepared; wrap code 1",
+      "Observed": "OK ; ledger [01a1e4501f6177f3ba920efb2dc67a5f/k1/n3/e42fa9bc]; matches True; signed 5; 3/NULL Prepared -; wrap 1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-02",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "a New v2 field batch (3 items, wrap code 1, local provider): Commit verifies the bindings (DK-6, P-4), commits with C = 3, advances the head by one and archives the complete binding tuple (DK-8) equal to the ledger row",
+      "Expected": "OK; 3/3 Committed; head \u002B1; ledger unchanged; DK-8 tuples = ledger",
+      "Observed": "OK ; 3/3 Committed -; head 0 -\u003E 1; ledger unchanged True; DK-8 []",
+      "Pass": false,
+      "Gap": null,
+      "Result": "FAIL"
+    },
+    {
+      "Id": "P-03",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "a New v2 document version (wrap code 1, local provider): Prepare registers exactly one binding per New group in the Prepare transaction (DK-4 then DK-5) with the organization, record, kind, M1 commitment and item count; P = 3",
+      "Expected": "OK; 1 binding(s) equal to the M1 envelope tuple; signed 3; 3/NULL Prepared; wrap code 1",
+      "Observed": "OK ; ledger [01a1e45020d076f0a4fea1c8d9c5874a/k2/n1/764490f2]; matches True; signed 3; 3/NULL Prepared -; wrap 1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-04",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "a New v2 document version (wrap code 1, local provider): Commit verifies the bindings (DK-6, P-4), commits with C = 3, advances the head by one and archives the complete binding tuple (DK-8) equal to the ledger row",
+      "Expected": "OK; 3/3 Committed; head \u002B1; ledger unchanged; DK-8 tuples = ledger",
+      "Observed": "OK ; 3/3 Committed -; head 0 -\u003E 1; ledger unchanged True; DK-8 []",
+      "Pass": false,
+      "Gap": null,
+      "Result": "FAIL"
+    },
+    {
+      "Id": "P-05",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "a New v2 field batch (2 items, wrap code 2, Vault Transit): Prepare registers exactly one binding per New group in the Prepare transaction (DK-4 then DK-5) with the organization, record, kind, M1 commitment and item count; P = 3",
+      "Expected": "OK; 1 binding(s) equal to the M1 envelope tuple; signed 4; 3/NULL Prepared; wrap code 2",
+      "Observed": "OK ; ledger [01a1e450222d78dea19c60b9552c81a7/k1/n2/46193620]; matches True; signed 4; 3/NULL Prepared -; wrap 2",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-06",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "a New v2 field batch (2 items, wrap code 2, Vault Transit): Commit verifies the bindings (DK-6, P-4), commits with C = 3, advances the head by one and archives the complete binding tuple (DK-8) equal to the ledger row",
+      "Expected": "OK; 3/3 Committed; head \u002B1; ledger unchanged; DK-8 tuples = ledger",
+      "Observed": "OK ; 3/3 Committed -; head 0 -\u003E 1; ledger unchanged True; DK-8 []",
+      "Pass": false,
+      "Gap": null,
+      "Result": "FAIL"
+    },
+    {
+      "Id": "P-07",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "a New v2 document version (wrap code 2, Vault Transit): Prepare registers exactly one binding per New group in the Prepare transaction (DK-4 then DK-5) with the organization, record, kind, M1 commitment and item count; P = 3",
+      "Expected": "OK; 1 binding(s) equal to the M1 envelope tuple; signed 3; 3/NULL Prepared; wrap code 2",
+      "Observed": "OK ; ledger [01a1e450234c7b54b0c446cbe0c21585/k2/n1/97f04a21]; matches True; signed 3; 3/NULL Prepared -; wrap 2",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-08",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "a New v2 document version (wrap code 2, Vault Transit): Commit verifies the bindings (DK-6, P-4), commits with C = 3, advances the head by one and archives the complete binding tuple (DK-8) equal to the ledger row",
+      "Expected": "OK; 3/3 Committed; head \u002B1; ledger unchanged; DK-8 tuples = ledger",
+      "Observed": "OK ; 3/3 Committed -; head 0 -\u003E 1; ledger unchanged True; DK-8 []",
+      "Pass": false,
+      "Gap": null,
+      "Result": "FAIL"
+    },
+    {
+      "Id": "P-09",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "four New groups in one commit (two field batches, two documents incl. an empty one): one binding each; the DK-8 tuples equal the ledger rows and are in RFC 9562 byte order",
+      "Expected": "OK; 4 bindings; tuples = ledger; byte order",
+      "Observed": "OK ; ledger [01a1e450246d78939771eb59bb4fe3ce/k1/n2/f7479232; 01a1e450246f7351a68128d47a76bc49/k2/n1/dd61c4a9; 01a1e450246d7c5b918f54b7bc253eb3/k1/n1/7968b899; 01a1e45024727b2b8362800af4d99a0c/k2/n1/baec3b8a]; tuples []; byte order True",
+      "Pass": false,
+      "Gap": null,
+      "Result": "FAIL"
+    },
+    {
+      "Id": "P-10",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "M2-ENV-16 through Commit: a committed two-item v2 batch carried byte-identically by the next owner commit is accepted (P-4 against the accepted binding); no new binding; DK-8 empty",
+      "Expected": "first OK; carry Prepare OK; carry Commit OK; 0 new bindings; DK-8 []",
+      "Observed": "first OK; carry Prepare OK; Commit OK ; new bindings 0; DK-8 []; ledger rows for the id 1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-11",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "the same carried batch across three further commits",
+      "Expected": "OK x3; head revision 5; still one binding",
+      "Observed": "OK,OK,OK; head revision 5; bindings for the id 1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-12",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "a partial batch: one item of the two-item batch carried, the other removed (staged rows 1 \u003C= binding count 2)",
+      "Expected": "OK; binding count still 2",
+      "Observed": "OK; binding count 2",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-13",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "removal: the last v2 item removed; the binding stays (permanent, never released)",
+      "Expected": "OK; no v2 item in the head; binding kept",
+      "Observed": "OK; v2 items 0; binding 1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-14",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "re-sealing one item of an accepted batch: the re-sealed item is a New group (fresh binding, count 1) and its sibling is carried under the old binding",
+      "Expected": "OK OK; new binding count 1; old binding count 2",
+      "Observed": "OK OK; new 1; old 2",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-15",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "switch turned off by the Testing override: a carried accepted v2 batch still commits (P-4); a New group is refused at Prepare; clearing the override restores the recorded policy",
+      "Expected": "first OK; enabled False; carry OK; New ENVELOPE_VERSION_NOT_ENABLED; enabled True again",
+      "Observed": "first OK; enabled False; carry OK; New ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; enabled True",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-16",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "an Authority instance configured off (Release B floor 3): the carried accepted batch commits; a New group is refused",
+      "Expected": "carry OK; New ENVELOPE_VERSION_NOT_ENABLED",
+      "Observed": "carry OK; New ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-17",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "a v1-only record (v1 field and v1 document) is written and carried with acceptance on; its DK-8 array is empty; no binding",
+      "Expected": "OK OK; DK-8 []; 0 bindings",
+      "Observed": "OK OK; DK-8 []; bindings 0",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-18",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "a mixed record: the v1 item is updated with a fresh v1 envelope while the v2 batch is carried",
+      "Expected": "OK OK",
+      "Observed": "OK OK",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-19",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "Prepare replay (same idempotency key and request) returns the same operation and inserts nothing (M2-IDM-01)",
+      "Expected": "OK; same operation; bindings 1 -\u003E 1; operations unchanged",
+      "Observed": "OK; replay OK; same True; bindings 1 -\u003E 1; ops 24 -\u003E 24",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-20",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "Commit replay of a committed operation returns the committed head and writes nothing (M2-IDM-03): no journal entry, no binding, no head change",
+      "Expected": "OK; replay OK at the same revision; journal and bindings unchanged",
+      "Observed": "OK; replay OK revision 1 (head 1); journal 20 -\u003E 20; bindings 1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "P-21",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "archive (wrap-1 organization): every content-stream body is archived byte-identically, the digest chain verifies, and the archived DK-8 tuples equal the ledger rows of committed operations",
+      "Expected": "archived all; chain verified; tuples = ledger",
+      "Observed": "20 content entries; archived all; chain verified; ledger 12 rows; archived tuples 0; equal False",
+      "Pass": false,
+      "Gap": null,
+      "Result": "FAIL"
+    },
+    {
+      "Id": "P-22",
+      "Kind": "Positive",
+      "Group": "P",
+      "Description": "archive (wrap-2 organization): every content-stream body is archived byte-identically, the digest chain verifies, and the archived DK-8 tuples equal the ledger rows of committed operations",
+      "Expected": "archived all; chain verified; tuples = ledger",
+      "Observed": "2 content entries; archived all; chain verified; ledger 2 rows; archived tuples 0; equal False",
+      "Pass": false,
+      "Gap": null,
+      "Result": "FAIL"
+    },
+    {
+      "Id": "G-after-positive",
+      "Kind": "Setup",
+      "Group": "P",
+      "Description": "F-E2 sentinel (after-positive): the runtime role\u0027s table grants equal the setup baseline",
+      "Expected": "unchanged",
+      "Observed": "unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "R-00",
+      "Kind": "Recovery",
+      "Group": "R",
+      "Description": "setup: 3 groups accepted before T0; T0 restore copy; K1..K3 accepted after T0; three reservations that never commit (Prepared, aborted at Commit by the switch, expired)",
+      "Expected": "OK x3; OK x3; Prepared OK; aborted NOT_ENABLED; expired OPERATION_EXPIRED",
+      "Observed": "pre OK,OK,OK; post OK,OK,OK; prepared OK; aborted ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; expired AuthorityException OPERATION_EXPIRED 409 retryable=False",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "R-01",
+      "Kind": "Recovery",
+      "Group": "R",
+      "Description": "M2-RST-06: the ledger rebuilt deterministically from the ARCHIVED ContentHeadCommitted bodies (chain verified) equals every binding of a committed operation, column for column (identifier, binding id, organization, record, kind, commitment, count, operation, bound-on)",
+      "Expected": "chain verified; reconstructed = committed ledger (8 rows: 5 groups before T0, K1, K2, K3 after)",
+      "Observed": "6 content entries; archived all; chain verified; reconstructed 0; committed ledger 8; equal False",
+      "Pass": false,
+      "Gap": null,
+      "Result": "FAIL"
+    },
+    {
+      "Id": "HARNESS",
+      "Kind": "Harness",
+      "Group": "harness",
+      "Description": "harness completed",
+      "Expected": "no unexpected exception",
+      "Observed": "InvalidOperationException",
+      "Pass": false,
+      "Gap": null,
+      "Result": "FAIL"
+    }
+  ],
+  "gapDemonstrations": [
+    {
+      "Id": "R-02",
+      "Kind": "Recovery",
+      "Group": "R",
+      "Description": "unrecoverable reservations (OD-M2e-03, accepted loss): bindings of operations that never committed are in the live ledger but in no archived body, so no reconstruction can restore them",
+      "Expected": "3 uncommitted reservations (Prepared, Aborted x2), none reconstructible",
+      "Observed": "uncommitted 3 [Prepared, Aborted, Aborted]; in reconstruction 0",
+      "Pass": true,
+      "Gap": "EXPECTED_LIMIT",
+      "Result": "EXPECTED_LIMIT"
+    },
+    {
+      "Id": "R-03",
+      "Kind": "Recovery",
+      "Group": "R",
+      "Description": "BD-2 (read-only, restore copy T0): the post-T0 bindings are missing from the restored ledger AND the committed operations they reference are missing (FK RESTRICT); P-1 admits a binding only for a Prepared operation, so re-inserting a reconstructed tuple would need a recovery-plane path (not built)",
+      "Expected": "3 tuples missing (K1, K2, K3); their 3 operations missing; the guard requires Prepared",
+      "Observed": "missing bindings 0; missing operations 0 (for 0 tuples); guard requires Prepared True; nothing inserted",
+      "Pass": false,
+      "Gap": "EXPECTED_LIMIT",
+      "Result": "EXPECTED_LIMIT"
+    },
+    {
+      "Id": "R-04",
+      "Kind": "Recovery",
+      "Group": "R",
+      "Description": "archive completeness: with one archived ContentHeadCommitted body missing, the reconstruction silently lacks that commit\u0027s tuples (the reconstruction itself raises nothing); only the digest chain over the archive reveals the gap",
+      "Expected": "reconstruction 7 of 8 tuples, no error; chain incomplete",
+      "Observed": "reconstruction 0 of 0; chain INCOMPLETE (revision gap before r5)",
+      "Pass": false,
+      "Gap": "EXPECTED_LIMIT",
+      "Result": "EXPECTED_LIMIT"
+    }
+  ]
+}

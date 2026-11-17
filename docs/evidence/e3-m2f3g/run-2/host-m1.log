@@ -1,0 +1,762 @@
+info: AuthorizationAuthority.Api.Composition.ContentAcceptancePolicyStartupGuard[9213]
+      Content acceptance policy: phase=ReleaseB requiredFloor=3; this build applies rule version 3
+info: AuthorizationAuthority.Api.Composition.EnvelopeV2AcceptanceStartupGuard[9241]
+      Envelope v2 acceptance configured=False environment=DevelopmentOrTesting phase=ReleaseB requiredFloor=3; acceptance stays off until the policy is recorded on the platform journal
+info: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityFloorStartupGuard[9252]
+      Envelope capability floor enforced: deployment floor 2
+info: AuthorizationAuthority.Api.Composition.AuthorityWorkNotificationListener[5310]
+      R56-B work notification listener connected; committed authorization changes now wake the work loop.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://127.0.0.1:60000
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: <local>\host
+info: AuthorizationAuthority.Api.Composition.ContentAcceptanceRuleGuard[9210]
+      Content acceptance rule guard: ready (content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3)
+warn: Microsoft.EntityFrameworkCore.Query[10103]
+      The query uses the 'First'/'FirstOrDefault' operator without 'OrderBy' and filter operators. This may lead to unpredictable results.
+info: AuthorizationAuthority.Api.Composition.EnvelopeAcceptancePolicyObservationLoop[9243]
+      Envelope v2 acceptance policy AlreadyRecorded on the platform journal (policy digest 9ac5c05d79e0a6c5c960f6dd025aa69829b2dbe4ef0f16e1a73110af3b4da6b1)
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+warn: Microsoft.EntityFrameworkCore.Query[10103]
+      The query uses the 'First'/'FirstOrDefault' operator without 'OrderBy' and filter operators. This may lead to unpredictable results.
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (1,026ms) [Parameters=[p0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='120']
+      SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+      FROM (
+          SELECT * FROM authority.organization_authorization_states WHERE organization_id = @p0 FOR UPDATE
+      ) AS a
+      LIMIT 1
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+fail: Microsoft.EntityFrameworkCore.Query[10100]
+      An exception occurred while iterating over the results of a query for context type 'AuthorizationAuthority.Infrastructure.Persistence.AuthorityDbContext'.
+      System.InvalidOperationException: An exception has been raised that is likely due to a transient failure.
+       ---> Npgsql.PostgresException (0x80004005): 55P03: canceling statement due to lock timeout
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 55P03
+          MessageText: canceling statement due to lock timeout
+          File: postgres.c
+          Line: 3436
+          Routine: ProcessInterrupts
+         --- End of inner exception stack trace ---
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+      System.InvalidOperationException: An exception has been raised that is likely due to a transient failure.
+       ---> Npgsql.PostgresException (0x80004005): 55P03: canceling statement due to lock timeout
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 55P03
+          MessageText: canceling statement due to lock timeout
+          File: postgres.c
+          Line: 3436
+          Routine: ProcessInterrupts
+         --- End of inner exception stack trace ---
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.CapabilityRefusalEvidenceObserver[9253]
+      Capability refusal evidence deferred: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be entry_point=verify outcome=Deferred reason=ERROR; a bounded retry is scheduled
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (1,008ms) [Parameters=[p0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='120']
+      SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+      FROM (
+          SELECT * FROM authority.organization_authorization_states WHERE organization_id = @p0 FOR UPDATE
+      ) AS a
+      LIMIT 1
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+fail: Microsoft.EntityFrameworkCore.Query[10100]
+      An exception occurred while iterating over the results of a query for context type 'AuthorizationAuthority.Infrastructure.Persistence.AuthorityDbContext'.
+      System.InvalidOperationException: An exception has been raised that is likely due to a transient failure.
+       ---> Npgsql.PostgresException (0x80004005): 55P03: canceling statement due to lock timeout
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 55P03
+          MessageText: canceling statement due to lock timeout
+          File: postgres.c
+          Line: 3436
+          Routine: ProcessInterrupts
+         --- End of inner exception stack trace ---
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+      System.InvalidOperationException: An exception has been raised that is likely due to a transient failure.
+       ---> Npgsql.PostgresException (0x80004005): 55P03: canceling statement due to lock timeout
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 55P03
+          MessageText: canceling statement due to lock timeout
+          File: postgres.c
+          Line: 3436
+          Routine: ProcessInterrupts
+         --- End of inner exception stack trace ---
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.CapabilityRefusalEvidenceObserver[9253]
+      Capability refusal evidence deferred: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 entry_point=index-backfill outcome=Deferred reason=ERROR; a bounded retry is scheduled
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (1,021ms) [Parameters=[p0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='120']
+      SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+      FROM (
+          SELECT * FROM authority.organization_authorization_states WHERE organization_id = @p0 FOR UPDATE
+      ) AS a
+      LIMIT 1
+fail: Microsoft.EntityFrameworkCore.Query[10100]
+      An exception occurred while iterating over the results of a query for context type 'AuthorizationAuthority.Infrastructure.Persistence.AuthorityDbContext'.
+      System.InvalidOperationException: An exception has been raised that is likely due to a transient failure.
+       ---> Npgsql.PostgresException (0x80004005): 55P03: canceling statement due to lock timeout
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 55P03
+          MessageText: canceling statement due to lock timeout
+          File: postgres.c
+          Line: 3436
+          Routine: ProcessInterrupts
+         --- End of inner exception stack trace ---
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+      System.InvalidOperationException: An exception has been raised that is likely due to a transient failure.
+       ---> Npgsql.PostgresException (0x80004005): 55P03: canceling statement due to lock timeout
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 55P03
+          MessageText: canceling statement due to lock timeout
+          File: postgres.c
+          Line: 3436
+          Routine: ProcessInterrupts
+         --- End of inner exception stack trace ---
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.CapabilityRefusalEvidenceObserver[9253]
+      Capability refusal evidence deferred: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 entry_point=verify outcome=Deferred reason=ERROR; a bounded retry is scheduled
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (1,015ms) [Parameters=[p0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='120']
+      SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+      FROM (
+          SELECT * FROM authority.organization_authorization_states WHERE organization_id = @p0 FOR UPDATE
+      ) AS a
+      LIMIT 1
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (1,016ms) [Parameters=[p0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='120']
+      SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+      FROM (
+          SELECT * FROM authority.organization_authorization_states WHERE organization_id = @p0 FOR UPDATE
+      ) AS a
+      LIMIT 1
+fail: Microsoft.EntityFrameworkCore.Query[10100]
+      An exception occurred while iterating over the results of a query for context type 'AuthorizationAuthority.Infrastructure.Persistence.AuthorityDbContext'.
+      System.InvalidOperationException: An exception has been raised that is likely due to a transient failure.
+       ---> Npgsql.PostgresException (0x80004005): 55P03: canceling statement due to lock timeout
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 55P03
+          MessageText: canceling statement due to lock timeout
+          File: postgres.c
+          Line: 3436
+          Routine: ProcessInterrupts
+         --- End of inner exception stack trace ---
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+      System.InvalidOperationException: An exception has been raised that is likely due to a transient failure.
+       ---> Npgsql.PostgresException (0x80004005): 55P03: canceling statement due to lock timeout
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 55P03
+          MessageText: canceling statement due to lock timeout
+          File: postgres.c
+          Line: 3436
+          Routine: ProcessInterrupts
+         --- End of inner exception stack trace ---
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+fail: Microsoft.EntityFrameworkCore.Query[10100]
+      An exception occurred while iterating over the results of a query for context type 'AuthorizationAuthority.Infrastructure.Persistence.AuthorityDbContext'.
+      System.InvalidOperationException: An exception has been raised that is likely due to a transient failure.
+       ---> Npgsql.PostgresException (0x80004005): 55P03: canceling statement due to lock timeout
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 55P03
+          MessageText: canceling statement due to lock timeout
+          File: postgres.c
+          Line: 3436
+          Routine: ProcessInterrupts
+         --- End of inner exception stack trace ---
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+      System.InvalidOperationException: An exception has been raised that is likely due to a transient failure.
+       ---> Npgsql.PostgresException (0x80004005): 55P03: canceling statement due to lock timeout
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 55P03
+          MessageText: canceling statement due to lock timeout
+          File: postgres.c
+          Line: 3436
+          Routine: ProcessInterrupts
+         --- End of inner exception stack trace ---
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (1,006ms) [Parameters=[p0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='120']
+      SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+      FROM (
+          SELECT * FROM authority.organization_authorization_states WHERE organization_id = @p0 FOR UPDATE
+      ) AS a
+      LIMIT 1
+warn: AuthorizationAuthority.Api.Composition.CapabilityRefusalEvidenceObserver[9253]
+      Capability refusal evidence deferred: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be entry_point=prepare outcome=Deferred reason=ERROR; a bounded retry is scheduled
+warn: AuthorizationAuthority.Api.Composition.CapabilityRefusalEvidenceObserver[9253]
+      Capability refusal evidence deferred: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 entry_point=verify-batch outcome=Deferred reason=ERROR; a bounded retry is scheduled
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+fail: Microsoft.EntityFrameworkCore.Query[10100]
+      An exception occurred while iterating over the results of a query for context type 'AuthorizationAuthority.Infrastructure.Persistence.AuthorityDbContext'.
+      System.InvalidOperationException: An exception has been raised that is likely due to a transient failure.
+       ---> Npgsql.PostgresException (0x80004005): 55P03: canceling statement due to lock timeout
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 55P03
+          MessageText: canceling statement due to lock timeout
+          File: postgres.c
+          Line: 3436
+          Routine: ProcessInterrupts
+         --- End of inner exception stack trace ---
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+      System.InvalidOperationException: An exception has been raised that is likely due to a transient failure.
+       ---> Npgsql.PostgresException (0x80004005): 55P03: canceling statement due to lock timeout
+         at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+         at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+        Exception data:
+          Severity: ERROR
+          SqlState: 55P03
+          MessageText: canceling statement due to lock timeout
+          File: postgres.c
+          Line: 3436
+          Routine: ProcessInterrupts
+         --- End of inner exception stack trace ---
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+warn: AuthorizationAuthority.Api.Composition.CapabilityRefusalEvidenceObserver[9253]
+      Capability refusal evidence deferred: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be entry_point=index-backfill outcome=Deferred reason=ERROR; a bounded retry is scheduled
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused

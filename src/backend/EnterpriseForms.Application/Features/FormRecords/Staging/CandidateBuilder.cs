@@ -55,6 +55,11 @@ public static class CandidateBuilder
         WrappedDataKey = v.WrappedDataKey,
         EncryptionNoncePrefix = v.EncryptionNoncePrefix,
         EncryptionSegmentSizeBytes = v.EncryptionSegmentSizeBytes,
+        // E3-M2b-2 (S-3): Envelope v2 metadata and the signed schema version are carried with the envelope.
+        DataKeyIdentifier = v.DataKeyIdentifier,
+        DataKeyCommitmentBytes = v.DataKeyCommitmentBytes,
+        KeyWrapAlgorithmCode = v.KeyWrapAlgorithmCode,
+        RowSignatureSchemaVersion = v.RowSignatureSchemaVersion,
         ScanVerdict = v.ScanVerdict,
         ScannerName = v.ScannerName,
         ScanSignatureName = v.ScanSignatureName,

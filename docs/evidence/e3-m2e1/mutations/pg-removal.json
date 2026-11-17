@@ -1,0 +1,96 @@
+{
+  "note": "original_sha256: the working-copy files when the mutation runs were made, before the touched files were normalized from CRLF to LF (line endings only; the restored files were verified byte-identical to these values after every mutation).",
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs": "6a654f2a23dec313d948c8ff8d4b6957ed7376a4a031291ef138bffe75cc4103",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/DataKeyLedgerRules.cs": "f8ba23c2ff20ccf92c516ca892cdd0622484285cbfa26acb90dab62254d34630",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeV2AcceptanceSwitch.cs": "debce7af7226ac2abe2fe787fa29880112ac4aac79028e5bf568d42985454326",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeAcceptancePolicyObserver.cs": "2089cbce3aa51fb37d85cec24fe1047a9e616c3775f0ba14d147e94365cfd894",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/ContentAcceptanceRules.cs": "cd359ca7aec6533594a8be68615e02d5925a6deeb72be3c58513c1cd3ca79d21",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeV2Rules.cs": "f1a4bbc5702a24fc8315c09e97d76478a5a45b6f06d917fb881e53050511db5d",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentDataKeyLedgerSql.cs": "7e7d4b3bcf476932fe6d99d69ee47792b9ef4c05040135affd4dc28d449f0f3e",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceFloor3Sql.cs": "8f5d984e687f9c2377225e21ae5fab7a91c4455f6336b0c34547f6818203b1ee",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityStore.cs": "1bc1ce6f4607b480413037537db1ecf3b7f23f5260ad67622e354369ca965984",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityRuntimeGrants.cs": "e8ccecb73d1fb4d9b6311d63d56f3dde24bb4684ad347eff0bf3f7bb994af594",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/DataKeyLedgerRefusals.cs": "e5afa8be396519b38c8ede9b2809f341352a7a7fa38823cbccb49e1a704ba1ca",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/Migrations/20261116031706_AuthorityContentDataKeyBindings.cs": "a858de1d409d8871143a05a5615dff49e53e468e58ef9eb1c0ca61dccf23e737"
+  },
+  "results": [
+    {
+      "id": "ME-P1",
+      "mutation": "migration: the P-1 binding guard trigger is not created",
+      "mode": "pg",
+      "gate_exit": 1,
+      "timed_out": false,
+      "failed_checks": [
+        "E-01",
+        "E-06",
+        "E-12",
+        "E-13",
+        "HARNESS"
+      ],
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-P2",
+      "mutation": "migration: the P-2 TRUNCATE trigger is not created",
+      "mode": "pg",
+      "gate_exit": 1,
+      "timed_out": false,
+      "failed_checks": [
+        "E-01",
+        "E-05",
+        "E-08",
+        "E-12",
+        "E-13",
+        "E-33b"
+      ],
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-P3",
+      "mutation": "migration: the identifier index is not unique",
+      "mode": "pg",
+      "gate_exit": 1,
+      "timed_out": false,
+      "failed_checks": [
+        "E-01",
+        "E-08",
+        "E-10",
+        "E-11",
+        "E-12",
+        "E-13",
+        "HARNESS"
+      ],
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-P4",
+      "mutation": "the store no longer translates a ledger refusal (23505 / P-1 / P-2)",
+      "mode": "pg",
+      "gate_exit": 1,
+      "timed_out": false,
+      "failed_checks": [
+        "E-10",
+        "E-11",
+        "E-33b"
+      ],
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "ME-P5",
+      "mutation": "floor-3 SQL: the data-key ledger preconditions removed (database behaviour)",
+      "mode": "pg",
+      "gate_exit": 1,
+      "timed_out": false,
+      "failed_checks": [
+        "E-32"
+      ],
+      "detected": true,
+      "restored": true
+    }
+  ]
+}

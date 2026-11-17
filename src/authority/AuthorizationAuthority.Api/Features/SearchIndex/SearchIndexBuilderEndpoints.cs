@@ -28,8 +28,10 @@ public static class SearchIndexBuilderEndpoints
             .WithSummary("IX-2 (builder workload only): a page (record id order, at most 500) of the form's registered population with accepted heads, quarantine flags and whether the record still needs an entry under the current coverages. The first page of a round is journaled on the audit stream (counts only). 409 SEARCH_INDEX_QUARANTINED while quarantined.");
 
         builder.MapPost("/backfill", static async Task<Ok<SearchIndexBackfillResponse>> (SearchIndexBackfillRequest request, HttpContext context, SearchIndexBuilderService service, CancellationToken cancellationToken) =>
-                TypedResults.Ok(await service.BackfillAsync(WorkloadName(context), request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false)))
+                TypedResults.Ok(await service.BackfillAsync(WorkloadName(context), request, InternalAuthentication.Correlation(context), cancellationToken, InternalAuthentication.EnvelopeCapability(context)).ConfigureAwait(false)))
             .WithName("BackfillSearchIndex")
+            .WithEnvelopeCapabilityContract()
+            .WithCapabilityRefusalEvidence(AuthorizationAuthority.Application.Features.Content.CapabilityRefusalEvidence.EntryPoints.IndexBackfill)
             .WithSummary("IX-2 (builder workload only): 1..50 records' observed business bytes. Each is verified like a G19 census against the head the builder expects (complete leaf set, every HMAC, root, archive receipt; tampering quarantines the record), then postings are derived from the verified bytes and sealed, under the organization lock and conditional on the head (HEAD_CHANGED otherwise). Idempotent per record, head and coverage set. Provider outages fail the whole call (503, nothing written).");
 
         builder.MapPost("/attestation", static async Task<Ok<SearchIndexAttestation>> (SearchIndexAttestationRequest request, HttpContext context, SearchIndexBuilderService service, CancellationToken cancellationToken) =>
@@ -43,8 +45,10 @@ public static class SearchIndexBuilderEndpoints
             .WithSummary("IX-2 S-C (builder workload only): entries chosen by the Authority for deep comparison — oldest deep verification first plus the Authority's own random sample.");
 
         builder.MapPost("/deep-sweep/verify", static async Task<Ok<SearchIndexDeepVerifyResponse>> (SearchIndexDeepVerifyRequest request, HttpContext context, SearchIndexBuilderService service, CancellationToken cancellationToken) =>
-                TypedResults.Ok(await service.DeepVerifyAsync(WorkloadName(context), request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false)))
+                TypedResults.Ok(await service.DeepVerifyAsync(WorkloadName(context), request, InternalAuthentication.Correlation(context), cancellationToken, InternalAuthentication.EnvelopeCapability(context)).ConfigureAwait(false)))
             .WithName("DeepVerifySearchIndex")
+            .WithEnvelopeCapabilityContract()
+            .WithCapabilityRefusalEvidence(AuthorizationAuthority.Application.Features.Content.CapabilityRefusalEvidence.EntryPoints.IndexDeepVerify)
             .WithSummary("IX-2 S-C (builder workload only): 1..50 entries; the submitted bytes are verified against the head, postings re-derived and compared with the stored rows. Pass writes the entry's S-C timestamp; a posting mismatch quarantines the search index; unverifiable business bytes quarantine the record and the unit is Inconclusive.");
 
         var workload = endpoints.MapGroup(InternalApi.Prefix + "/search-index").WithTags("SearchIndex").RequireAuthorization(InternalAuthentication.WorkloadPolicy);

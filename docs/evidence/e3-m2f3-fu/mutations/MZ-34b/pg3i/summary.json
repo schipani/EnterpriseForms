@@ -1,0 +1,8 @@
+{
+    "ExitCode":  1,
+    "Checks":  29,
+    "Failed":  17,
+    "ContainerRemoved":  true,
+    "NewDockerVolumes":  0,
+    "DeadlockLines":  0
+}

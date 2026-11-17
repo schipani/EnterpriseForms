@@ -59,8 +59,10 @@ public static class CatalogueEndpoints
             .WithSummary("Validates the verifier's snapshot like the user snapshot, plus that the scoping command is still the field's current protection decision.");
 
         verifier.MapPost("/{snapshotId:guid}/census", static async Task<Ok<ProtectionCensusResponse>> (Guid snapshotId, ProtectionCensusRequest request, HttpContext context, ProtectionReconciliationService service, CancellationToken cancellationToken) =>
-                TypedResults.Ok(await service.CensusAsync(WorkloadName(context), snapshotId, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false)))
+                TypedResults.Ok(await service.CensusAsync(WorkloadName(context), snapshotId, request, InternalAuthentication.Correlation(context), cancellationToken, InternalAuthentication.EnvelopeCapability(context)).ConfigureAwait(false)))
             .WithName("TakeProtectionCensus")
+            .WithEnvelopeCapabilityContract()
+            .WithCapabilityRefusalEvidence(AuthorizationAuthority.Application.Features.Content.CapabilityRefusalEvidence.EntryPoints.ProtectionCensus)
             .WithSummary("Phase C7 M4 (G19, verifier only): verifies 1..50 entries of the verifier's own snapshot against their accepted manifests (complete leaf set, every HMAC, root, archive receipt; tampering quarantines the head) and counts the decision's field rows in the old and the target form from the verified bytes. Counts only — never contents. A census held for the same accepted operation is reused only when it was verified since reuseSinceSnapshotId (this reconciliation's first snapshot) was issued; anything else is re-verified.");
 
         verifier.MapPost("/{snapshotId:guid}/attestation", static async Task<Ok<ProtectionAttestation>> (Guid snapshotId, HttpContext context, ProtectionReconciliationService service, CancellationToken cancellationToken) =>

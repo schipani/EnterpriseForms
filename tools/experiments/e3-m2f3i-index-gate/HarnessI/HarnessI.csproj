@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    E3-M2f-3i capability-refusal evidence index real-PostgreSQL gate (docs/security/E3_M2F3I_IMPLEMENTATION_RECORD.md). Development/
+    Testing only; not part of EnterpriseForms.All.slnx and never built in place: scripts/dev/e3-m2f3i-index-pg-gate.ps1 copies this
+    folder to a temporary work directory (outside the repository, so no repository build settings apply) and builds it against this
+    tree's Authority Release binaries passed as M2f3iBinaries. It references no repository project. The command under test always runs
+    as a separate process of those binaries (dotnet AuthorizationAuthority.Api.dll -provision-...); the harness only sets up,
+    observes and checks.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>M2f3iHarness</AssemblyName>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS1591;CA2007;CA1303</NoWarn>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="$(M2f3iBinaries)\*.dll" Private="true" />
+  </ItemGroup>
+  <Target Name="RequireM2f3iBinaries" BeforeTargets="ResolveAssemblyReferences" Condition="'$(M2f3iBinaries)' == '' Or !Exists('$(M2f3iBinaries)\AuthorizationAuthority.Api.dll')">
+    <Error Text="Build through scripts/dev/e3-m2f3i-index-pg-gate.ps1 (M2f3iBinaries must name a folder of Authority Release binaries)." />
+  </Target>
+</Project>

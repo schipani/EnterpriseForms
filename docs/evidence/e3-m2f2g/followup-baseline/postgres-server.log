@@ -1,0 +1,90 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-11-17 05:37:12.959 UTC [57] app= LOG:  starting PostgreSQL 18.0 (Debian 18.0-1.pgdg13+3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-17 05:37:12.962 UTC [57] app= LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-17 05:37:12.967 UTC [63] app= LOG:  database system was shut down at 2026-11-17 05:37:12 UTC
+2026-11-17 05:37:12.970 UTC [57] app= LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-11-17 05:37:13.217 UTC [57] app= LOG:  received fast shutdown request
+.2026-11-17 05:37:13.217 UTC [57] app= LOG:  aborting any active transactions
+2026-11-17 05:37:13.220 UTC [57] app= LOG:  background worker "logical replication launcher" (PID 66) exited with exit code 1
+2026-11-17 05:37:13.221 UTC [61] app= LOG:  shutting down
+2026-11-17 05:37:13.221 UTC [61] app= LOG:  checkpoint starting: shutdown immediate
+2026-11-17 05:37:13.233 UTC [61] app= LOG:  checkpoint complete: wrote 943 buffers (5.8%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.012 s, sync=0.001 s, total=0.012 s; sync files=303, longest=0.001 s, average=0.000 s; distance=4352 kB, estimate=4352 kB; lsn=0/1B9FBB0, redo lsn=0/1B9FBB0
+2026-11-17 05:37:13.250 UTC [57] app= LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+2026-11-17 05:37:13.350 UTC [1] app= LOG:  starting PostgreSQL 18.0 (Debian 18.0-1.pgdg13+3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-17 05:37:13.351 UTC [1] app= LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-17 05:37:13.351 UTC [1] app= LOG:  listening on IPv6 address "::", port 5432
+2026-11-17 05:37:13.356 UTC [1] app= LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-17 05:37:13.360 UTC [85] app= LOG:  database system was shut down at 2026-11-17 05:37:13 UTC
+2026-11-17 05:37:13.364 UTC [1] app= LOG:  database system is ready to accept connections
+2026-11-17 05:37:13.364 UTC [86] app=[unknown] FATAL:  the database system is starting up
+2026-11-17 05:37:24.197 UTC [136] app=m2e2-migrate ERROR:  relation "authority.ef_migrations_history" does not exist at character 46
+2026-11-17 05:37:24.197 UTC [136] app=m2e2-migrate STATEMENT:  SELECT "MigrationId", "ProductVersion"
+	FROM authority.ef_migrations_history
+	ORDER BY "MigrationId"
+2026-11-17 05:37:36.299 UTC [278] app=m2e2-ledger-insert ERROR:  a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later
+2026-11-17 05:37:36.299 UTC [278] app=m2e2-ledger-insert STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e802-be1f-7c3e-a144-6f24c111e6a5', '01a1e802-be1f-7a47-a514-092a19c48e80', '01a1e802-bb90-79b1-8ca4-a67d304a8bc7', '01a1e802-bb91-7e83-88f9-67a7afc650ce', 1, '\x1212121212121212121212121212121212121212121212121212121212121212', 1, '01a1e802-bba7-7f2a-bc90-5568b7f4dfe1', now())
+2026-11-17 05:37:36.316 UTC [279] app=m2e2-ledger-insert ERROR:  duplicate key value violates unique constraint "uq_content_data_key_binding_identifier"
+2026-11-17 05:37:36.316 UTC [279] app=m2e2-ledger-insert STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e802-be30-7a7a-b834-cda204bfcea3', '01a1e802-be06-7063-b595-a144630e918f', '01a1e802-bb90-79b1-8ca4-a67d304a8bc7', '01a1e802-bb91-7b8b-8d50-aa0801129d9c', 1, '\x1313131313131313131313131313131313131313131313131313131313131313', 1, '01a1e802-bddb-7911-bcb9-8a0c4f55174e', now())
+2026-11-17 05:37:36.337 UTC [280] app=m2e2-expected-42501 ERROR:  permission denied for table content_data_key_bindings
+2026-11-17 05:37:36.337 UTC [280] app=m2e2-expected-42501 STATEMENT:  UPDATE authority.content_data_key_bindings SET binding_item_count = 9 WHERE data_key_identifier = '01a1e802-be06-7063-b595-a144630e918f'
+2026-11-17 05:37:36.350 UTC [281] app=m2e2-expected-42501 ERROR:  permission denied for table content_data_key_bindings
+2026-11-17 05:37:36.350 UTC [281] app=m2e2-expected-42501 STATEMENT:  DELETE FROM authority.content_data_key_bindings WHERE data_key_identifier = '01a1e802-be06-7063-b595-a144630e918f'
+2026-11-17 05:37:36.361 UTC [282] app=m2e2-expected-42501 ERROR:  permission denied for table content_data_key_bindings
+2026-11-17 05:37:36.361 UTC [282] app=m2e2-expected-42501 STATEMENT:  TRUNCATE authority.content_data_key_bindings
+2026-11-17 05:37:36.375 UTC [283] app=[unknown] ERROR:  content data-key bindings are permanent: they are never updated, deleted or truncated
+2026-11-17 05:37:36.375 UTC [283] app=[unknown] CONTEXT:  PL/pgSQL function authority.content_data_key_binding_is_permanent() line 3 at RAISE
+2026-11-17 05:37:36.375 UTC [283] app=[unknown] STATEMENT:  UPDATE authority.content_data_key_bindings SET binding_item_count = 9 WHERE data_key_identifier = '01a1e802-be06-7063-b595-a144630e918f'
+2026-11-17 05:37:36.388 UTC [284] app=[unknown] ERROR:  content data-key bindings are permanent: they are never updated, deleted or truncated
+2026-11-17 05:37:36.388 UTC [284] app=[unknown] CONTEXT:  PL/pgSQL function authority.content_data_key_binding_is_permanent() line 3 at RAISE
+2026-11-17 05:37:36.388 UTC [284] app=[unknown] STATEMENT:  DELETE FROM authority.content_data_key_bindings WHERE data_key_identifier = '01a1e802-be06-7063-b595-a144630e918f'
+2026-11-17 05:37:36.402 UTC [285] app=[unknown] ERROR:  content data-key bindings are permanent: they are never updated, deleted or truncated
+2026-11-17 05:37:36.402 UTC [285] app=[unknown] CONTEXT:  PL/pgSQL function authority.content_data_key_binding_is_permanent() line 3 at RAISE
+2026-11-17 05:37:36.402 UTC [285] app=[unknown] STATEMENT:  TRUNCATE authority.content_data_key_bindings
+2026-11-17 05:38:41.718 UTC [2363] app=m2e2-expected-42501-capability carv-v3 ERROR:  permission denied for table content_data_key_bindings
+2026-11-17 05:38:41.718 UTC [2363] app=m2e2-expected-42501-capability carv-v3 STATEMENT:  SELECT EXISTS (
+	    SELECT 1
+	    FROM authority.content_data_key_bindings AS c
+	    WHERE c.organization_id = $1)
+2026-11-17 05:38:42.349 UTC [2384] app=m2e2-expected-42501-shortcircuit carv-v3 ERROR:  permission denied for table content_data_key_bindings
+2026-11-17 05:38:42.349 UTC [2384] app=m2e2-expected-42501-shortcircuit carv-v3 STATEMENT:  SELECT EXISTS (
+	    SELECT 1
+	    FROM authority.content_data_key_bindings AS c
+	    WHERE c.organization_id = $1)

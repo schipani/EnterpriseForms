@@ -1,5 +1,6 @@
 using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
+using AuthorizationAuthority.Application.Features.Content;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Domain.Features.Content;
@@ -20,16 +21,22 @@ namespace AuthorizationAuthority.Infrastructure.Persistence;
 /// C-150 R56-B: a scope that appended to the authorization stream notifies <see cref="AuthorityWorkOptions.NotificationChannel"/> inside its
 /// transaction (PostgreSQL delivers it to every listening Authority instance only if the transaction commits) and signals this instance's
 /// work loop after the commit returned. Neither is a statement that work exists or completed; the loop reads durable state.
+/// <para>
+/// RB-CARV-1 (contract §22): <paramref name="contentAcceptance"/> is required (no default, so no construction can silently be
+/// Release A). In Release B, or with an invalid policy, every write scope applies <see cref="ContentAcceptanceWriteFence"/> before
+/// it writes any content-acceptance entity.
+/// </para>
 /// </summary>
-public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> contextFactory, AuthorityWorkSignal? workSignal = null, AuthorityWorkOptions? workOptions = null) : IAuthorityStore
+public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> contextFactory, ContentAcceptancePolicy contentAcceptance, AuthorityWorkSignal? workSignal = null, AuthorityWorkOptions? workOptions = null, ISecurityAlertSink? alerts = null) : IAuthorityStore
 {
     private readonly AuthorityWorkSignal? wakeup = workOptions?.CommitWakeupEnabled == true ? workSignal : null;
+    private readonly ContentAcceptancePolicy policy = contentAcceptance ?? throw new ArgumentNullException(nameof(contentAcceptance));
 
     public async Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken)
     {
         var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken).ConfigureAwait(false);
-        return new AuthorityScope(context, transaction, wakeup);
+        return new AuthorityScope(context, transaction, wakeup, alerts, policy);
     }
 
     public async Task<IAuthorityScope> BeginReadOnlySnapshotScopeAsync(CancellationToken cancellationToken)
@@ -37,7 +44,7 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, cancellationToken).ConfigureAwait(false);
         await context.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", cancellationToken).ConfigureAwait(false);
-        return new AuthorityScope(context, transaction, null);
+        return new AuthorityScope(context, transaction, null, alerts, policy);
     }
 
     public async Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken cancellationToken)
@@ -62,11 +69,147 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
             .ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction, AuthorityWorkSignal? wakeup) : IAuthorityScope
+    private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction, AuthorityWorkSignal? wakeup, ISecurityAlertSink? alerts, ContentAcceptancePolicy policy) : IAuthorityScope
     {
         private bool committed;
         private bool authorizationWorkAppended;
+        private const string FenceSavepoint = "content_acceptance_fence";
+        private bool contentFenceVerified;
+        private bool dataKeyLedgerVerified;
+        private Guid lockedOrganizationId;
         private SearchIndexStore? searchIndex;
+
+        public async Task RequireContentAcceptanceFloorAsync(CancellationToken cancellationToken)
+        {
+            if (!policy.GuardsContentWrites || contentFenceVerified)
+            {
+                return; // Release A; or verified earlier in this transaction, whose lock still holds
+            }
+
+            string? failure;
+            if (!policy.IsValid)
+            {
+                failure = ContentAcceptanceFloorFailures.ConfigurationPolicyInvalid;
+            }
+            else
+            {
+                // A savepoint keeps the transaction usable if the catalog cannot be read (so a caller can still record its refusal).
+                // On success it stays open: the lock taken inside it belongs to the transaction until commit or rollback.
+                await transaction.CreateSavepointAsync(FenceSavepoint, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    // The locks first, then the facts in a later statement (READ COMMITTED: a fresh snapshot after the locks are granted).
+                    // A-1 (F-E1): the history before the operations table, the order every EF migration uses, so no lock cycle can form.
+                    await context.Database.ExecuteSqlRawAsync(ContentAcceptanceWriteFence.HistoryLockSql, cancellationToken).ConfigureAwait(false);
+                    await context.Database.ExecuteSqlRawAsync(ContentAcceptanceWriteFence.LockSql, cancellationToken).ConfigureAwait(false);
+                    var facts = await ContentAcceptanceWriteFence.ReadAsync(context.Database.GetDbConnection(), transaction.GetDbTransaction(), policy.RequiredFloor!.Value, cancellationToken).ConfigureAwait(false);
+                    failure = ContentAcceptanceWriteFence.Evaluate(facts, policy.RequiredFloor.Value);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    failure = ContentAcceptanceFloorFailures.FloorUnverifiable; // permission, connection, timeout, missing catalog object: fail closed
+                    try
+                    {
+                        await transaction.RollbackToSavepointAsync(FenceSavepoint, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception rollback) when (rollback is not OperationCanceledException)
+                    {
+                        // The connection itself failed; the scope's disposal rolls back. The refusal below stands either way.
+                    }
+                }
+            }
+
+            if (failure is not null)
+            {
+                alerts?.Raise(new SecurityAlert(ContentAcceptanceFloorFailures.AlertKind, "Critical", lockedOrganizationId, Guid.Empty, null,
+                    $"content write refused: reason={failure} category={ContentAcceptanceFloorFailures.CategoryOf(failure)} recovery={ContentAcceptanceFloorFailures.RecoveryOf(failure)} {policy.Describe()} build={ContentAcceptanceRules.CurrentVersion}",
+                    Guid.Empty));
+                throw ContentAcceptanceFloorFailures.Refusal(); // the transaction is rolled back when the scope is disposed
+            }
+
+            contentFenceVerified = true;
+        }
+
+        /// <summary>
+        /// E3-M2e L-13: verifies the data-key ledger's unique index and its P-1/P-2 triggers in this transaction, after a ROW
+        /// EXCLUSIVE lock on the ledger that conflicts with every statement able to drop, replace or disable them until the
+        /// transaction ends. Once per transaction. Any failure (including a missing table or an unreadable catalog) refuses with
+        /// <c>503 CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED</c> and an alert; nothing is written (the transaction is rolled back on disposal).
+        /// </summary>
+        public async Task RequireDataKeyLedgerAsync(CancellationToken cancellationToken)
+        {
+            if (dataKeyLedgerVerified)
+            {
+                return;
+            }
+
+            string? failure;
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync(ContentDataKeyLedgerSql.LockSql, cancellationToken).ConfigureAwait(false);
+                var facts = await ContentDataKeyLedgerSql.ReadAsync(context.Database.GetDbConnection(), transaction.GetDbTransaction(), cancellationToken).ConfigureAwait(false);
+                failure = ContentDataKeyLedgerSql.Evaluate(facts);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                failure = ContentDataKeyLedgerSql.Failures.Unverifiable;
+            }
+
+            if (failure is not null)
+            {
+                alerts?.Raise(new SecurityAlert(DataKeyLedgerFailures.AlertKind, "Critical", lockedOrganizationId, Guid.Empty, null,
+                    $"data-key ledger not enforced: reason={failure} build={ContentAcceptanceRules.CurrentVersion}", Guid.Empty));
+                throw DataKeyLedgerFailures.NotEnforced();
+            }
+
+            dataKeyLedgerVerified = true;
+        }
+
+        /// <summary>
+        /// RB-CARV-1 catch-all: true when the tracked changes would write content-acceptance state. Only two protective changes are
+        /// exempt, so a refused fence never stops an abort or a quarantine: a Prepared operation becoming Aborted (state and abort
+        /// reason only) and a head becoming quarantined (quarantine fields and modification time only).
+        /// </summary>
+        private bool HasContentAcceptanceWrites()
+        {
+            context.ChangeTracker.DetectChanges();
+            foreach (var entry in context.ChangeTracker.Entries())
+            {
+                if (entry.State is EntityState.Unchanged or EntityState.Detached)
+                {
+                    continue;
+                }
+
+                switch (entry.Entity)
+                {
+                    case ContentChangeOperation operation:
+                        if (entry.State == EntityState.Modified
+                            && operation.OperationStateName == ContentOperationStates.Aborted
+                            && Equals(entry.Property(nameof(ContentChangeOperation.OperationStateName)).OriginalValue, ContentOperationStates.Prepared)
+                            && OnlyModified(entry, nameof(ContentChangeOperation.OperationStateName), nameof(ContentChangeOperation.OperationQuarantineReasonCode)))
+                        {
+                            continue;
+                        }
+
+                        return true;
+                    case RecordContentHead head:
+                        if (entry.State == EntityState.Modified && head.ContentHeadQuarantined
+                            && OnlyModified(entry, nameof(RecordContentHead.ContentHeadQuarantined), nameof(RecordContentHead.QuarantineReasonCode), nameof(RecordContentHead.ContentHeadModifiedOn)))
+                        {
+                            continue;
+                        }
+
+                        return true;
+                    case RecordManifestCommit or RecordManifestLeaf or ContentItemIdentity or ContentCandidateLeaf or ContentIntegrityCheckpoint or ContentDataKeyBinding:
+                        return true; // E3-M2e (L-11): a data-key binding is content-acceptance state
+                }
+            }
+
+            return false;
+        }
+
+        private static bool OnlyModified(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry, params string[] allowed) =>
+            entry.Properties.Where(p => p.IsModified).All(p => Array.IndexOf(allowed, p.Metadata.Name) >= 0);
 
         /// <summary>IX-1: the search index on this scope's context and transaction.</summary>
         public ISearchIndexStore SearchIndex => searchIndex ??= new SearchIndexStore(context);
@@ -75,9 +218,12 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public ISearchAccessStore SearchAccess => searchAccess ??= new SearchAccessStore(context);
 
-        public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>
-            context.OrganizationStates.FromSqlInterpolated($"SELECT * FROM authority.organization_authorization_states WHERE organization_id = {organizationId} FOR UPDATE")
+        public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            lockedOrganizationId = organizationId; // diagnostics of a refused content write only
+            return context.OrganizationStates.FromSqlInterpolated($"SELECT * FROM authority.organization_authorization_states WHERE organization_id = {organizationId} FOR UPDATE")
                 .AsTracking().FirstOrDefaultAsync(cancellationToken);
+        }
 
         public Task<OrganizationAuthorizationState?> ReadOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>
             context.OrganizationStates.AsNoTracking().FirstOrDefaultAsync(o => o.OrganizationId == organizationId, cancellationToken);
@@ -221,6 +367,60 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public void AddItemIdentities(IEnumerable<ContentItemIdentity> identities) => context.ContentItemIdentities.AddRange(identities);
 
+        public Task<List<ContentDataKeyBinding>> FindDataKeyBindingsAsync(IReadOnlyCollection<Guid> dataKeyIdentifiers, CancellationToken cancellationToken) =>
+            dataKeyIdentifiers.Count == 0
+                ? Task.FromResult(new List<ContentDataKeyBinding>())
+                : context.ContentDataKeyBindings.AsNoTracking().Where(b => dataKeyIdentifiers.Contains(b.DataKeyIdentifier)).ToListAsync(cancellationToken);
+
+        public Task<List<ContentDataKeyBinding>> GetDataKeyBindingsForOperationAsync(Guid contentChangeOperationId, CancellationToken cancellationToken) =>
+            context.ContentDataKeyBindings.AsNoTracking().Where(b => b.BindingContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken);
+
+        public void AddDataKeyBindings(IEnumerable<ContentDataKeyBinding> bindings) => context.ContentDataKeyBindings.AddRange(bindings);
+
+        /// <summary>E3-M2f-2 AM-F1: <c>SELECT EXISTS (SELECT 1 FROM authority.content_data_key_bindings WHERE organization_id = @p)</c> on this scope's transaction (index <c>ix_content_data_key_bindings_record</c>).</summary>
+        public Task<bool> OrganizationHasDataKeyBindingsAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            context.ContentDataKeyBindings.AnyAsync(b => b.OrganizationId == organizationId, cancellationToken);
+
+        // ---- E3-M2f-3b capability-refusal evidence (T2 only; the SQL is defined and pinned in CapabilityRefusalEvidenceIndex) ----
+
+        public Task SetCapabilityEvidenceLockTimeoutAsync(CancellationToken cancellationToken) =>
+            context.Database.ExecuteSqlRawAsync(CapabilityRefusalEvidenceIndex.EvidenceLockTimeoutSql, cancellationToken);
+
+        public async Task<DateTimeOffset> StartCapabilityEvidenceLookupAsync(CancellationToken cancellationToken)
+        {
+            await context.Database.ExecuteSqlRawAsync(CapabilityRefusalEvidenceIndex.EvidenceStatementTimeoutSql, cancellationToken).ConfigureAwait(false);
+            await using var command = EvidenceCommand(CapabilityRefusalEvidenceIndex.DatabaseClockSql);
+            var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            return value switch
+            {
+                DateTime utc => new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc)),
+                DateTimeOffset offset => offset.ToUniversalTime(),
+                _ => throw new InvalidOperationException("clock_timestamp() returned no timestamp"),
+            };
+        }
+
+        public async Task<bool> IsCapabilityRefusalEvidenceIndexUsableAsync(CancellationToken cancellationToken) =>
+            (await CapabilityRefusalEvidenceIndex.InspectAsync(EvidenceConnection(), cancellationToken).ConfigureAwait(false)).State == CapabilityRefusalEvidenceIndexState.ValidMatching;
+
+        public async Task<IReadOnlyList<CapabilityRefusalEvidenceRow>> GetNewestCapabilityRefusalEvidenceAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            await using var command = EvidenceCommand(CapabilityRefusalEvidenceIndex.EvidenceLookupSql);
+            command.Parameters.AddWithValue("organization_id", organizationId);
+            var rows = new List<CapabilityRefusalEvidenceRow>(CapabilityRefusalEvidence.LookupLimit);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                rows.Add(new CapabilityRefusalEvidenceRow(reader.GetGuid(0), reader.GetInt64(1), reader.GetString(2), reader.GetFieldValue<byte[]>(3)));
+            }
+
+            return rows;
+        }
+
+        private Npgsql.NpgsqlConnection EvidenceConnection() => (Npgsql.NpgsqlConnection)context.Database.GetDbConnection();
+
+        private Npgsql.NpgsqlCommand EvidenceCommand(string sql) =>
+            new(sql, EvidenceConnection(), (Npgsql.NpgsqlTransaction)transaction.GetDbTransaction());
+
         public Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken)
         {
             var ids = manifestItemIds.Distinct().ToList();
@@ -354,6 +554,9 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public void AddPlatformJournalHead(PlatformJournalHead head) => context.PlatformJournalHeads.Add(head);
 
         public void AddPlatformJournalEntry(PlatformJournalEntry entry) => context.PlatformJournalEntries.Add(entry);
+
+        public Task<List<PlatformJournalEntry>> GetLatestPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken) =>
+            context.PlatformJournalEntries.AsNoTracking().OrderByDescending(e => e.PlatformJournalRevision).Take(limit).ToListAsync(cancellationToken);
 
         public Task<List<PlatformJournalEntry>> GetPendingPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken) =>
             context.PlatformJournalEntries.AsTracking().Where(e => e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending).OrderBy(e => e.PlatformJournalRevision).Take(limit).ToListAsync(cancellationToken);
@@ -628,11 +831,37 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public Task<int> CountSessionsCreatedSinceAsync(Guid identityBindingId, DateTimeOffset since, CancellationToken cancellationToken) =>
             context.Sessions.AsNoTracking().CountAsync(s => s.IdentityBindingId == identityBindingId && s.SessionCreatedOn >= since, cancellationToken);
 
-        public Task FlushAsync(CancellationToken cancellationToken) => context.SaveChangesAsync(cancellationToken);
+        public Task FlushAsync(CancellationToken cancellationToken) => SaveAsync(cancellationToken);
+
+        /// <summary>
+        /// E3-M2b-1: every write of the scope goes through here, so a CARV fence refusal is always classified (and alerted).
+        /// RB-CARV-1: in Release B the content write fence runs here, in this transaction, before any content-acceptance entity is
+        /// written, whichever path staged it (defence in depth behind the explicit entry calls).
+        /// </summary>
+        private async Task SaveAsync(CancellationToken cancellationToken)
+        {
+            if (policy.GuardsContentWrites && !contentFenceVerified && HasContentAcceptanceWrites())
+            {
+                await RequireContentAcceptanceFloorAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (DbUpdateException ex) when (ContentAcceptanceRuleRefusals.Translate(ex, alerts) is { } refused)
+            {
+                throw refused;
+            }
+            catch (DbUpdateException ex) when (DataKeyLedgerRefusals.Translate(ex, alerts) is { } refused)
+            {
+                throw refused; // E3-M2e: 23505 on the ledger identifier (L-3) or a P-1/P-2 refusal (L-12); the transaction rolls back
+            }
+        }
 
         public async Task CommitAsync(CancellationToken cancellationToken)
         {
-            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await SaveAsync(cancellationToken).ConfigureAwait(false);
             var notify = wakeup is not null && authorizationWorkAppended;
             if (notify)
             {

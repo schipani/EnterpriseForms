@@ -1,0 +1,11 @@
+﻿START TRANSACTION;
+DO $$
+BEGIN
+    RAISE EXCEPTION 'CARV floor down refused: content acceptance rule floors are never lowered';
+END $$;
+
+DELETE FROM authority.ef_migrations_history
+WHERE "MigrationId" = '20261115032228_AuthorityContentAcceptanceRuleFloor1';
+
+COMMIT;
+

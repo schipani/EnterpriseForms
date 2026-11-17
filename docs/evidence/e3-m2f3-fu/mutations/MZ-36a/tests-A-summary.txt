@@ -1,0 +1,12 @@
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceIndexTests.TheCreateStatementIsExactlyTheApprovedDdl (4ms)
+  Assert.Equal() Failure: Strings differ
+                                                                (pos 245)
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceIndexTests.ThePredicateLiteralsAreTheEvidenceConstants (0ms)
+  Assert.Contains() Failure: Sub-string not found
+  String:    "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_journal"���
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 40
+  failed: 2
+  succeeded: 38
+  skipped: 0
+  duration: 1s 947ms

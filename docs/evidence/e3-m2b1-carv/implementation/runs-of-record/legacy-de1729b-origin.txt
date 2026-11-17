@@ -1,0 +1,1 @@
+prebuilt: the frozen design-gate Release build of de1729b (local scratch copy; hashes in legacy-de1729b-sha256.txt equal the design-gate evidence)

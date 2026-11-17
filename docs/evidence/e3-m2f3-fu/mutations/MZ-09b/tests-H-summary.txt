@@ -1,0 +1,9 @@
+failed EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.AdmittedRequestsAndOtherErrorsAreNeverRecorded (704ms)
+  Assert.DoesNotContain() Failure: Filter matched in collection
+                                                                                                                                       (pos 1)
+Test run summary: Failed! - <clone>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+  total: 4
+  failed: 1
+  succeeded: 3
+  skipped: 0
+  duration: 6s 915ms

@@ -1,0 +1,113 @@
+{
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeV2Rules.cs": "b8c2212bb1aa45af327845b285cc1b1082a570e980aa06742bfb427c67f64056",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeRules.cs": "c05d460ca389d3a8c3220562033acd9a1588521cda15add2e0d10b0ad9c1e9b7",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs": "1aa338340927bdfd5c3882811cab47172c0a21969b54cda010685242569b9394",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/ContentAcceptanceRules.cs": "8b650827b0f48607141bf242b21955cb9455e9ec927108186e26461a6a21be17",
+    "src/authority/AuthorizationAuthority.Application/Features/Content/ContentAcceptancePolicy.cs": "9cda0a804cea7b1f08b5e3cf8b32766ef5297a0529e88cea37fbe43ba8ddec9e",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceWriteFence.cs": "6ec996f2e48ba2940a4a112081646d6d31c3ee5126b37623ec679659644ac107",
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceFloor2Sql.cs": "93f8d505445c8b73242964a3b085810266387bb538f4f5000af9cad3b4351815",
+    "src/authority/AuthorizationAuthority.Api/Composition/ContentAcceptanceFloorCommand.cs": "11754d0b78e4ab79407d0b9de90ad2985e10532260a4027587c30036b2bb30eb"
+  },
+  "results": [
+    {
+      "id": "MD-23",
+      "mutation": "command migrates every pending floor (no explicit target)",
+      "mode": "pg",
+      "gate_exit": 1,
+      "timed_out": false,
+      "failed_checks": [
+        "D-00b",
+        "D-A1",
+        "D-A4",
+        "D-A5",
+        "D-X1a",
+        "D-X1b",
+        "D-X3",
+        "D-X4",
+        "D-X5",
+        "D-F1",
+        "D-F2",
+        "D-F3",
+        "D-F4",
+        "D-F5",
+        "D-F12",
+        "D-F13"
+      ],
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-26",
+      "mutation": "command: applying a lower floor after a higher one no longer refused",
+      "mode": "pg",
+      "gate_exit": 1,
+      "timed_out": false,
+      "failed_checks": [
+        "D-F10"
+      ],
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-27",
+      "mutation": "command: skipping floor 1 no longer refused",
+      "mode": "pg",
+      "gate_exit": 1,
+      "timed_out": false,
+      "failed_checks": [
+        "D-F0"
+      ],
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-24",
+      "mutation": "floor-2 SQL: an older-marker session no longer blocks the raise",
+      "mode": "pg",
+      "gate_exit": 1,
+      "timed_out": false,
+      "failed_checks": [
+        "D-F2",
+        "D-F3",
+        "D-F4",
+        "D-F5",
+        "D-F12"
+      ],
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-25",
+      "mutation": "floor-2 SQL: floor 1 not dropped by the raise",
+      "mode": "pg",
+      "gate_exit": 1,
+      "timed_out": false,
+      "failed_checks": [
+        "D-F6",
+        "D-F7",
+        "D-F8",
+        "D-F9",
+        "D-F10",
+        "D-F13",
+        "D-M1a"
+      ],
+      "detected": true,
+      "restored": true
+    },
+    {
+      "id": "MD-18",
+      "mutation": "fence minimum semantics removed (a lower installed floor accepted)",
+      "mode": "pg",
+      "gate_exit": 1,
+      "timed_out": false,
+      "failed_checks": [
+        "D-A1",
+        "D-A4",
+        "D-M4b"
+      ],
+      "detected": true,
+      "restored": true
+    }
+  ]
+}

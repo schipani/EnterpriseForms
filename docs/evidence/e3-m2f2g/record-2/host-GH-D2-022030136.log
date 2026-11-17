@@ -1,0 +1,94 @@
+info: AuthorizationAuthority.Api.Composition.ContentAcceptancePolicyStartupGuard[9213]
+      Content acceptance policy: phase=ReleaseB requiredFloor=3; this build applies rule version 3
+info: AuthorizationAuthority.Api.Composition.ContentAcceptanceRuleGuard[9210]
+      Content acceptance rule guard: ready (content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3)
+info: AuthorizationAuthority.Api.Composition.EnvelopeV2AcceptanceStartupGuard[9241]
+      Envelope v2 acceptance configured=True environment=DevelopmentOrTesting phase=ReleaseB requiredFloor=3; acceptance stays off until the policy is recorded on the platform journal
+info: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityFloorStartupGuard[9252]
+      Envelope capability floor enforced: deployment floor 2
+info: AuthorizationAuthority.Api.Composition.AuthorityWorkNotificationListener[5310]
+      R56-B work notification listener connected; committed authorization changes now wake the work loop.
+warn: Microsoft.EntityFrameworkCore.Query[10103]
+      The query uses the 'First'/'FirstOrDefault' operator without 'OrderBy' and filter operators. This may lead to unpredictable results.
+warn: Microsoft.EntityFrameworkCore.Query[10103]
+      The query uses the 'First'/'FirstOrDefault' operator without 'OrderBy' and filter operators. This may lead to unpredictable results.
+info: AuthorizationAuthority.Api.Composition.EnvelopeAcceptancePolicyObservationLoop[9243]
+      Envelope v2 acceptance policy AlreadyRecorded on the platform journal (policy digest 05434fe3ba42864506494e405063cff959416c7f046263304402c0fb91a950df)
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://127.0.0.1:63182
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: <local>\host
+info: AuthorizationAuthority.Api.Composition.SearchIndexSweepLoop[1041593436]
+      Search index sweep for 01a1e74d-5011-7799-a1ae-64cf47615e96: S-A Pass (); S-B Pass, passed 2, inconclusive 0 ().
+info: AuthorizationAuthority.Api.Composition.SearchIndexSweepLoop[9305]
+      IX4-SWEEP-LOCK organization=01a1e74d-5011-7799-a1ae-64cf47615e96 s_a_ms=864.5 s_b_transactions=1 s_b_longest_ms=371.1 s_b_total_ms=371.1
+info: AuthorizationAuthority.Api.Composition.SearchIndexSweepLoop[1041593436]
+      Search index sweep for 01a1e74d-50a8-7c31-a3b7-c1a1fb12da5e: S-A Pass (); S-B Pass, passed 4, inconclusive 0 ().
+info: AuthorizationAuthority.Api.Composition.SearchIndexSweepLoop[9305]
+      IX4-SWEEP-LOCK organization=01a1e74d-50a8-7c31-a3b7-c1a1fb12da5e s_a_ms=31.3 s_b_transactions=1 s_b_longest_ms=162.8 s_b_total_ms=162.8
+warn: Microsoft.EntityFrameworkCore.Query[10103]
+      The query uses the 'First'/'FirstOrDefault' operator without 'OrderBy' and filter operators. This may lead to unpredictable results.
+warn: Microsoft.EntityFrameworkCore.Query[10103]
+      The query uses the 'First'/'FirstOrDefault' operator without 'OrderBy' and filter operators. This may lead to unpredictable results.
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e74d-50a8-7c31-a3b7-c1a1fb12da5e client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e74d-50a8-7c31-a3b7-c1a1fb12da5e client_level=1 outcome=refused
+warn: Microsoft.EntityFrameworkCore.Query[10103]
+      The query uses the 'First'/'FirstOrDefault' operator without 'OrderBy' and filter operators. This may lead to unpredictable results.
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:62959/v1/transit/hmac/org-01a1e74d50a87c31a3b7c1a1fb12da5e-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:62959/v1/transit/hmac/org-01a1e74d50a87c31a3b7c1a1fb12da5e-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 60.7073ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 71.4818ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:62959/v1/transit/hmac/org-01a1e74d50a87c31a3b7c1a1fb12da5e-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:62959/v1/transit/hmac/org-01a1e74d50a87c31a3b7c1a1fb12da5e-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 4.5209ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 4.6524ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:62959/v1/transit/hmac/org-01a1e74d50a87c31a3b7c1a1fb12da5e-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:62959/v1/transit/hmac/org-01a1e74d50a87c31a3b7c1a1fb12da5e-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.3527ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.4553ms - 200
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:62959/v1/transit/verify/org-01a1e74d50a87c31a3b7c1a1fb12da5e-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:62959/v1/transit/verify/org-01a1e74d50a87c31a3b7c1a1fb12da5e-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 7.2926ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 7.5301ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:62959/v1/transit/verify/org-01a1e74d50a87c31a3b7c1a1fb12da5e-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:62959/v1/transit/verify/org-01a1e74d50a87c31a3b7c1a1fb12da5e-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 4.1609ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 4.3254ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:62959/v1/transit/verify/org-01a1e74d50a87c31a3b7c1a1fb12da5e-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:62959/v1/transit/verify/org-01a1e74d50a87c31a3b7c1a1fb12da5e-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 4.2523ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 4.4642ms - 200

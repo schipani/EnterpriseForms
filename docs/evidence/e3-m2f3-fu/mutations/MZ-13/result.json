@@ -1,0 +1,52 @@
+{
+  "id": "MZ-13",
+  "kind": "MZ",
+  "what": "append again after an ambiguous commit without a lookup decision (the retry of an Ambiguous key ignores the durable lookup)",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs": "334aada9cfc27cbe6ec7852bfe28b20ba728f37c64da04c010e8e60e36ad26b1"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "A",
+      "exit": 0,
+      "seconds": 28.9
+    },
+    {
+      "build": "X",
+      "exit": 0,
+      "seconds": 36.2
+    },
+    {
+      "letter": "A",
+      "classes": [
+        "CapabilityRefusalEvidenceRecorderTests",
+        "CapabilityRefusalEvidenceNoSummaryTests"
+      ],
+      "exit": 2,
+      "seconds": 4.2,
+      "total": 29,
+      "succeeded": 27,
+      "failed": [
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceNoSummaryTests.NoOutcomeRetryWindowOrHourRolloverEverWritesAnythingButOneEvidenceEntryPerKeyAndBucket",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AnAmbiguousCommitThatTookEffectIsReconciledWithoutASecondEntry"
+      ]
+    },
+    {
+      "letter": "X",
+      "classes": [
+        "CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "exit": 0,
+      "seconds": 3.3,
+      "total": 20,
+      "succeeded": 20,
+      "failed": []
+    }
+  ],
+  "seconds": 72.7
+}

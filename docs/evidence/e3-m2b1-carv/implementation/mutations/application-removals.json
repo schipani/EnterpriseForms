@@ -1,0 +1,209 @@
+[
+  {
+    "id": "MA-1",
+    "removal": "remove the CARV Commit rule (abort of an operation prepared under other rules)",
+    "file": "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs",
+    "occurrences": 1,
+    "testsRun": 102,
+    "testsFailed": 3,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitOfAnOperationPreparedUnderOtherRulesIsAbortedBeforeAnyVerificationAndNothingIsAccepted(prepareVersion: 2)",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitOfAnOperationPreparedUnderOtherRulesIsAbortedBeforeAnyVerificationAndNothingIsAccepted(prepareVersion: null)",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnUnstampedOperationReusingTheCurrentKeyAndNonceIsRefusedAtCommitAndNeverAccepted"
+    ],
+    "detected": true,
+    "restoredSha256Matches": true
+  },
+  {
+    "id": "MA-2",
+    "removal": "remove the CARV Prepare replay rule",
+    "file": "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs",
+    "occurrences": 1,
+    "testsRun": 102,
+    "testsFailed": 2,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.APrepareReplayOfAnOutdatedPreparedOperationIsRefusedAndWritesNothing(storedVersion: 2)",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.APrepareReplayOfAnOutdatedPreparedOperationIsRefusedAndWritesNothing(storedVersion: null)"
+    ],
+    "detected": true,
+    "restoredSha256Matches": true
+  },
+  {
+    "id": "MA-3",
+    "removal": "remove the Prepare stamp (P = V)",
+    "file": "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs",
+    "occurrences": 1,
+    "testsRun": 102,
+    "testsFailed": 61,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACandidateBoundToAnotherTenantIsRefused",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitOfAnOperationPreparedUnderOtherRulesIsAbortedBeforeAnyVerificationAndNothingIsAccepted(prepareVersion: 2)",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitOfAnOperationPreparedUnderOtherRulesIsAbortedBeforeAnyVerificationAndNothingIsAccepted(prepareVersion: null)",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitOfAnOperationPreparedWithoutTheRulesIsRefusedAndTheOperationAborted",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitReplayOfAHistoricalUnstampedCommittedOperationReturnsTheHeadAndWritesNothing",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AContributorChangesOnlyTheSharedValueAndEveryOtherItemIsPreserved",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AContributorWithAValidShareCannotWriteALockedRecordThroughTheAuthority(locked: \"Archived\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AContributorWithAValidShareCannotWriteALockedRecordThroughTheAuthority(locked: \"Submitted\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ALifecycleTransitionCommittedBetweenPrepareAndCommitDefeatsTheContributorCommit",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.APrepareReplayOfACurrentOperationIsUnchangedAndAnIdempotencyConflictStillWins",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.APrepareReplayOfAnOutdatedPreparedOperationIsRefusedAndWritesNothing(storedVersion: 2)",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.APrepareReplayOfAnOutdatedPreparedOperationIsRefusedAndWritesNothing(storedVersion: null)",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARevocationBetweenPrepareAndCommitAbortsTheCommit",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditorCannotIntroduceAnEnvelopeTheRulesRefuseButAWellFormedUpdateStillCommits",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditorCannotReuseTheCurrentKeyOfItsItemOrOfAnotherItem",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AStagedCandidateAlteredBeforeCommitIsRefused",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AStaleAuthorizationRevisionOrMissingSnapshotIsRefusedAtPrepare",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AStaleHeadCannotBypassTheReuseRule",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ATamperedCurrentSnapshotIsRefusedJournaledAndNothingIsSigned",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AbortedOperationsKeepTheirPrepareStampAndNeverReceiveACommitStamp",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnExpiredOutdatedOperationIsStillReportedAsExpired",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCarryingTwoValuesUnderOneWrappedKeyAndNonceIsRefused",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant: \"document prefix\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant: \"document reference\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant: \"document segment\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant: \"document version 2\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant: \"document wrapped key\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant: \"field algorithm\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant: \"field empty ciphertext\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant: \"field nonce\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant: \"field reference\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant: \"field tag\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant: \"field version 2\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant: \"field wrapped key\")",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnUnstampedOperationReusingTheCurrentKeyAndNonceIsRefusedAtCommitAndNeverAccepted",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnotherItemCannotTakeTheCurrentKeyEvenWhenTheOriginalItemIsRemovedOrReplaced",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ConcurrentWritesOnTheSameHeadAcceptExactlyOne",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ContributorWritesAreRefusedWhenTheSwitchIsOffAndNothingIsSigned",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.EveryReferenceFormTheBusinessWritesIsAcceptedAndCarriedOnLaterWrites",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.HeaderAndDocumentChangesByAContributorAreRefusedEndToEnd",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.LeavingTheRecipientTeamBetweenPrepareAndCommitAbortsTheCommit",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.OwnerByteIdenticalCarryForwardAndFreshEncryptionAreBothAccepted",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.OwnerChangedCiphertextUnderTheCurrentKeyAndNonceIsRefusedBeforeSigning",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.OwnerReuseOfTheCurrentKeyUnderANewNonceIsRefusedBeforeSigning",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.OwnerWritesAreUnchangedAndPassIdentityBinding",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.OwnersAndTheSwitchAreUnaffectedByTheLock",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.PrepareStampsTheBuildRuleVersionAndCommitStampsItWithTheCommittedTransition",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53ACommitRacingAnotherBindingOfTheSameNewIdIsRefused",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53ADocumentKeepsItsIdAcrossVersionsButNotAcrossFields",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53ANewOwnerAfterTransferInheritsTheBindingsUnchanged",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53ARemovedItemCanNeverReturnUnderItsOriginalFieldOrAnother",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53AShareEditorDirectOrThroughATeamCanEditASharedItemButNotMoveIt(viaTeam: False)",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53AShareEditorDirectOrThroughATeamCanEditASharedItemButNotMoveIt(viaTeam: True)",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53AdversarialPayloadsFailClosed",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53AnExistingItemMayBeEditedInItsFieldButNeverMovedToAnotherField",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53LegacyItemsAcceptedBeforeTheBindingsExistedAreAlsoProtectedFromReuse",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53MultiSelectSelectionsKeepTheirIdsAndARemovedSelectionCannotReturn",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53RepeatingGroupValuesStayInTheirEntryAndRemovedEntriesCannotReturn",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ReadersAndUnsharedItemsCannotBeWritten",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ReplayIsIdempotentForTheSamePayloadAndRefusedForAnother",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.TurningTheSwitchOffBetweenPrepareAndCommitBlocksTheCommit"
+    ],
+    "detected": true,
+    "restoredSha256Matches": true
+  },
+  {
+    "id": "MA-4",
+    "removal": "remove the Commit stamp (C = V)",
+    "file": "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs",
+    "occurrences": 1,
+    "testsRun": 102,
+    "testsFailed": 1,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.PrepareStampsTheBuildRuleVersionAndCommitStampsItWithTheCommittedTransition"
+    ],
+    "detected": true,
+    "restoredSha256Matches": true
+  },
+  {
+    "id": "MA-5",
+    "removal": "the store adapter no longer recognises CARV database refusals",
+    "file": "src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceRuleRefusals.cs",
+    "occurrences": 1,
+    "testsRun": 102,
+    "testsFailed": 4,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.ADatabaseFenceRefusalBecomesOperationRulesOutdatedAndRaisesAnAlert(fenceObject: \"ck_content_operation_commit_rule_version\")",
+      "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.ADatabaseFenceRefusalBecomesOperationRulesOutdatedAndRaisesAnAlert(fenceObject: \"ck_content_operation_rule_floor_v1\")",
+      "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.ADatabaseFenceRefusalBecomesOperationRulesOutdatedAndRaisesAnAlert(fenceObject: \"ck_content_operation_rule_floor_v12\")",
+      "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.ADatabaseFenceRefusalBecomesOperationRulesOutdatedAndRaisesAnAlert(fenceObject: \"trg_content_operation_rule_state_guard\")"
+    ],
+    "detected": true,
+    "restoredSha256Matches": true
+  },
+  {
+    "id": "MA-6",
+    "removal": "the readiness decision ignores a floor above the build",
+    "file": "src/authority/AuthorizationAuthority.Application/Features/Content/ContentAcceptanceRules.cs",
+    "occurrences": 1,
+    "testsRun": 102,
+    "testsFailed": 2,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.ARunningInstanceBecomesNotReadyWhenANewerFloorAppearsOrTheFenceCannotBeRead",
+      "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.TheGuardIsReadyOnlyForACompleteFenceAtOrBelowThisBuild(scenario: \"floor above the build\", ready: False, detail: \"ContentAcceptanceRuleFloorAboveBuild(floor=2, buil\"\u00b7\u00b7\u00b7)"
+    ],
+    "detected": true,
+    "restoredSha256Matches": true
+  },
+  {
+    "id": "MA-7",
+    "removal": "the readiness decision ignores a missing migration",
+    "file": "src/authority/AuthorizationAuthority.Application/Features/Content/ContentAcceptanceRules.cs",
+    "occurrences": 1,
+    "testsRun": 102,
+    "testsFailed": 1,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests.TheGuardIsReadyOnlyForACompleteFenceAtOrBelowThisBuild(scenario: \"migration missing\", ready: False, detail: \"ContentAcceptanceRuleMigrationMissing\")"
+    ],
+    "detected": true,
+    "restoredSha256Matches": true
+  },
+  {
+    "id": "MA-8",
+    "removal": "record creation step 1 no longer recovers from OPERATION_RULES_OUTDATED",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/CreateFormRecord/CreateFormRecordHandler.cs",
+    "occurrences": 1,
+    "testsRun": 3,
+    "testsFailed": 1,
+    "failingTests": [
+      "EnterpriseForms.Api.ContractTests.ContentAcceptanceRuleBusinessMappingTests.RecordCreationStepOneTreatsOutdatedRulesLikeAnExpiredOperation"
+    ],
+    "detected": true,
+    "restoredSha256Matches": true
+  },
+  {
+    "id": "MA-9",
+    "removal": "record creation step 2 no longer recovers from OPERATION_RULES_OUTDATED",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/CreateFormRecord/CreateFormRecordHandler.cs",
+    "occurrences": 1,
+    "testsRun": 3,
+    "testsFailed": 1,
+    "failingTests": [
+      "EnterpriseForms.Api.ContractTests.ContentAcceptanceRuleBusinessMappingTests.RecordCreationStepTwoTreatsOutdatedRulesLikeAnUnusableKey"
+    ],
+    "detected": true,
+    "restoredSha256Matches": true
+  },
+  {
+    "id": "MA-10",
+    "removal": "the protection migration no longer retries OPERATION_RULES_OUTDATED",
+    "file": "src/backend/EnterpriseForms.Application/Features/FormDesigner/ProtectionMigration/FieldProtectionMigrationService.cs",
+    "occurrences": 1,
+    "testsRun": 3,
+    "testsFailed": 1,
+    "failingTests": [
+      "EnterpriseForms.Api.ContractTests.ContentAcceptanceRuleBusinessMappingTests.TheProtectionMigrationRetriesOutdatedRulesWithAFreshAttempt"
+    ],
+    "detected": true,
+    "restoredSha256Matches": true
+  },
+  {
+    "id": "REBUILD",
+    "project": "tests/authority/AuthorizationAuthority.Tests",
+    "ok": true
+  },
+  {
+    "id": "REBUILD",
+    "project": "tests/features/EnterpriseForms.Api.ContractTests",
+    "ok": true
+  }
+]

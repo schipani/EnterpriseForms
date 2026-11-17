@@ -1,0 +1,102 @@
+{
+  "id": "MZ-36b",
+  "kind": "MZ",
+  "what": "the shared pinned definition (CREATE statement and expected predicate) uses an event-kind literal that differs from the recorder constant; the lookup keeps the constant",
+  "files": [
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/CapabilityRefusalEvidenceIndex.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/CapabilityRefusalEvidenceIndex.cs": "85661647f058848625428acf73f85273eaf87f25b6cdb0fced066a7b4ab9dac1"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "R",
+      "exit": 0,
+      "seconds": 24.2
+    },
+    {
+      "build": "A",
+      "exit": 0,
+      "seconds": 29.6
+    },
+    {
+      "build": "X",
+      "exit": 0,
+      "seconds": 37.3
+    },
+    {
+      "letter": "A",
+      "classes": [
+        "CapabilityRefusalEvidenceIndexTests"
+      ],
+      "exit": 2,
+      "seconds": 3.1,
+      "total": 40,
+      "succeeded": 37,
+      "failed": [
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceIndexTests.TheCreateStatementIsExactlyTheApprovedDdl",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceIndexTests.ThePinnedRenderingsDescribeTheSameIndex",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceIndexTests.ThePredicateLiteralsAreTheEvidenceConstants"
+      ]
+    },
+    {
+      "letter": "X",
+      "classes": [
+        "CapabilityRefusalEvidenceIndexBoundaryTests"
+      ],
+      "exit": 0,
+      "seconds": 2.5,
+      "total": 21,
+      "succeeded": 21,
+      "failed": []
+    },
+    {
+      "kind": "PG3I",
+      "groups": "",
+      "exit": 1,
+      "seconds": 58.4,
+      "report": true,
+      "checks": 40,
+      "failed": [
+        "I-02",
+        "I-03",
+        "I-11",
+        "I-12",
+        "I-14",
+        "I-15",
+        "I-23",
+        "I-25a",
+        "I-25b",
+        "I-26a",
+        "I-26b",
+        "I-27a",
+        "I-27b",
+        "I-28a",
+        "I-28b",
+        "I-29",
+        "I-30"
+      ]
+    },
+    {
+      "kind": "PG3G",
+      "groups": "L",
+      "exit": 1,
+      "seconds": 91.1,
+      "report": true,
+      "checks": 19,
+      "failed": [
+        "S-03",
+        "L-01",
+        "L-02",
+        "L-03",
+        "L-04",
+        "L-05",
+        "L-06",
+        "L-12"
+      ]
+    }
+  ],
+  "seconds": 246.2
+}

@@ -1,0 +1,462 @@
+info: AuthorizationAuthority.Api.Composition.ContentAcceptancePolicyStartupGuard[9213]
+      Content acceptance policy: phase=ReleaseB requiredFloor=3; this build applies rule version 3
+info: AuthorizationAuthority.Api.Composition.EnvelopeV2AcceptanceStartupGuard[9241]
+      Envelope v2 acceptance configured=False environment=DevelopmentOrTesting phase=ReleaseB requiredFloor=3; acceptance stays off until the policy is recorded on the platform journal
+info: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityFloorStartupGuard[9252]
+      Envelope capability floor enforced: deployment floor 2
+info: AuthorizationAuthority.Api.Composition.AuthorityWorkNotificationListener[5310]
+      R56-B work notification listener connected; committed authorization changes now wake the work loop.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://127.0.0.1:59995
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: <local>\host
+info: AuthorizationAuthority.Api.Composition.ContentAcceptanceRuleGuard[9210]
+      Content acceptance rule guard: ready (content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3)
+warn: Microsoft.EntityFrameworkCore.Query[10103]
+      The query uses the 'First'/'FirstOrDefault' operator without 'OrderBy' and filter operators. This may lead to unpredictable results.
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+info: AuthorizationAuthority.Api.Composition.EnvelopeAcceptancePolicyObservationLoop[9243]
+      Envelope v2 acceptance policy Recorded on the platform journal (policy digest 9ac5c05d79e0a6c5c960f6dd025aa69829b2dbe4ef0f16e1a73110af3b4da6b1)
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+warn: Microsoft.EntityFrameworkCore.Query[10103]
+      The query uses the 'First'/'FirstOrDefault' operator without 'OrderBy' and filter operators. This may lead to unpredictable results.
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f21-7fca-8ffe-ccfe70e5e4a3 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f63-7eaf-8ef2-99d1fd9fb396 client_level=1 outcome=refused
+fail: Microsoft.EntityFrameworkCore.Database.Connection[20004]
+      An error occurred using the connection to database 'g3_m1' on server 'tcp://127.0.0.1:56041'.
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+fail: Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware[1]
+      An unhandled exception has occurred while executing the request.
+      System.InvalidOperationException: An exception has been raised that is likely due to a transient failure.
+       ---> Npgsql.NpgsqlException (0x80004005): Failed to connect to 127.0.0.1:56041
+       ---> System.Net.Sockets.SocketException (10055): An operation on a socket could not be performed because the system lacked sufficient buffer space or because a queue was full.
+         at System.Net.Sockets.Socket.UpdateStatusAfterSocketErrorAndThrowException(SocketError error, Boolean disconnectOnFailure, String callerName)
+         at System.Net.Sockets.Socket.DoBind(EndPoint endPointSnapshot, SocketAddress socketAddress)
+         at System.Net.Sockets.Socket.ConnectAsync(SocketAsyncEventArgs e, Boolean userSocket, Boolean saeaMultiConnectCancelable, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ConnectAsync(Socket socket, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.ConnectAsync(EndPoint remoteEP, CancellationToken cancellationToken)
+         at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+         at Npgsql.Internal.NpgsqlConnector.ConnectAsync(NpgsqlTimeout timeout, CancellationToken cancellationToken)
+         at Npgsql.Internal.NpgsqlConnector.RawOpen(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+         at Npgsql.Internal.NpgsqlConnector.<Open>g__OpenCore|209_0(NpgsqlConnector conn, String username, SslMode sslMode, GssEncryptionMode gssEncMode, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+         at Npgsql.Internal.NpgsqlConnector.Open(NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+         at Npgsql.PoolingDataSource.OpenNewConnector(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+         at Npgsql.PoolingDataSource.<Get>g__RentAsync|33_0(NpgsqlConnection conn, NpgsqlTimeout timeout, Boolean async, CancellationToken cancellationToken)
+         at Npgsql.NpgsqlConnection.<Open>g__OpenAsync|42_0(Boolean async, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         --- End of inner exception stack trace ---
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at AuthorizationAuthority.Infrastructure.Persistence.AuthorityStore.BeginScopeAsync(CancellationToken cancellationToken) in <local>\src\authority\AuthorizationAuthority.Infrastructure\Persistence\AuthorityStore.cs:line 38
+         at AuthorizationAuthority.Application.Features.SearchIndex.SearchIndexBuilderService.DeepVerifyAsync(String workloadName, SearchIndexDeepVerifyRequest request, Guid correlationId, CancellationToken cancellationToken, ClientEnvelopeCapability envelopeCapability) in <local>\src\authority\AuthorizationAuthority.Application\Features\SearchIndex\SearchIndexBuilderService.cs:line 334
+         at AuthorizationAuthority.Api.Features.SearchIndex.SearchIndexBuilderEndpoints.<>c.<<MapSearchIndexBuilderEndpoints>b__0_5>d.MoveNext() in <local>\src\authority\AuthorizationAuthority.Api\Features\SearchIndex\SearchIndexBuilderEndpoints.cs:line 48
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Http.RequestDelegateFactory.<TaskOfTToValueTaskOfObject>g__ExecuteAwaited|92_0[T](Task`1 task)
+         at AuthorizationAuthority.Api.Composition.CapabilityRefusalEvidenceFilter.InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) in <local>\src\authority\AuthorizationAuthority.Api\Composition\CapabilityRefusalEvidenceComposition.cs:line 59
+         at Microsoft.AspNetCore.Http.RequestDelegateFactory.<ExecuteValueTaskOfObject>g__ExecuteAwaited|130_0(ValueTask`1 valueTask, HttpContext httpContext, JsonTypeInfo`1 jsonTypeInfo)
+         at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.StatusCodePagesMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6ff4-79d3-af02-de41ad831fd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f9d-7098-9590-6ac96789d538 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6f80-7c54-bb66-39a3c1d737be client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fd7-7610-b6e8-ef16b0227231 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-702d-7c74-8ff6-70f58b7e2d64 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7011-7eea-ace5-b82abe53cf65 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-704a-7561-b0af-d27985ecdfd8 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7066-7f1c-a066-5e429bba617f client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-7082-7b2f-896b-a35d211d6835 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e9dd-6fba-71a8-9f74-1162a31d3fe2 client_level=1 outcome=refused

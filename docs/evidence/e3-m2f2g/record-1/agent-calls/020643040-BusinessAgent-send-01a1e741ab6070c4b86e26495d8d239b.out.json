@@ -1,0 +1,1 @@
+{"Ok":false,"Status":503,"Error":"AuthorityClientException","ErrorCode":"AUTHORITY_NOT_READY","HttpStatusCode":503,"Retryable":true,"Sent":[{"Path":"/internal/v1/integrity/verify-record-projection","CapabilityHeaderValues":["2"],"Status":503}]}

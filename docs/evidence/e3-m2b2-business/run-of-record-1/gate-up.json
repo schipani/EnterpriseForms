@@ -1,0 +1,50 @@
+{
+  "gate": "E3-M2b-2 business PostgreSQL gate",
+  "phase": "up",
+  "checksTotal": 7,
+  "checksFailed": 0,
+  "checks": [
+    {
+      "checkId": "UP-01",
+      "description": "the migration applies: history row, six nullable columns without defaults (uuid/bytea/integer), six validated CHECKs, the open envelope_positive CHECK dropped",
+      "passed": true,
+      "detail": "field_encrypted_values.ck_field_encrypted_values_envelope_metadata: CHECK ((((encryption_envelope_version = 1) AND (data_key_identifier IS NULL) AND (data_key_commitment_bytes IS NULL) AND (key_wrap_algorithm_code IS NULL)) OR ((encryption_envelope_version = 2) AND (data_key_identifier IS NOT NULL) AND (data_key_commitment_bytes IS NOT NULL) AND (octet_length(data_key_commitment_bytes) = 32) AND (key_wrap_algorithm_code IS NOT NULL) AND (key_wrap_algorithm_code = ANY (ARRAY[1, 2]))))) | field_encrypted_values.ck_field_encrypted_values_envelope_version: CHECK ((encryption_envelope_version = ANY (ARRAY[1, 2]))) | field_encrypted_values.ck_field_encrypted_values_schema_envelope_tie: CHECK ((row_signature_schema_version = encryption_envelope_version)) | file_attachment_versions.ck_file_attachment_versions_envelope_metadata: CHECK ((((encryption_envelope_version = 1) AND (data_key_identifier IS NULL) AND (data_key_commitment_bytes IS NULL) AND (key_wrap_algorithm_code IS NULL)) OR ((encryption_envelope_version = 2) AND (data_key_identifier IS NOT NULL) AND (data_key_commitment_bytes IS NOT NULL) AND (octet_length(data_key_commitment_bytes) = 32) AND (key_wrap_algorithm_code IS NOT NULL) AND (key_wrap_algorithm_code = ANY (ARRAY[1, 2]))))) | file_attachment_versions.ck_file_attachment_versions_envelope_version: CHECK ((encryption_envelope_version = ANY (ARRAY[1, 2]))) | file_attachment_versions.ck_file_attachment_versions_schema_envelope_tie: CHECK ((row_signature_schema_version = encryption_envelope_version))"
+    },
+    {
+      "checkId": "UP-02",
+      "description": "the business schema guard is ready on the migrated database (runtime role, real reader)",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "checkId": "UP-03",
+      "description": "the real Worker startup guard starts and the real API monitor does not stop the host on the migrated database",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "checkId": "UP-04",
+      "description": "an unreachable database is Unreadable (not ready, no host stop)",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "checkId": "UP-05",
+      "description": "CHECK matrix (32 cases, both tables): each v2 column NULL alone, lengths, wrap codes, v1 with metadata, both tie directions, closed versions",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "checkId": "UP-06",
+      "description": "EF round trip and clone persistence: v1 and v2 field and document rows keep every envelope column, the schema version and their canonical bytes; persisted clones keep them too",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "checkId": "UP-07",
+      "description": "the runtime role cannot alter, drop or weaken the CHECKs or columns, update envelope rows, or change the migration history (42501), and can read the history",
+      "passed": true,
+      "detail": null
+    }
+  ]
+}

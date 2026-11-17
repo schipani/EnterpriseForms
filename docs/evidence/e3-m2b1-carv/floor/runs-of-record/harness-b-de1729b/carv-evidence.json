@@ -1,0 +1,263 @@
+{
+  "harness": "E3-M2b-1 CARV implementation gate, harness B (real CARV build \u002B legacy agent)",
+  "carvBuild": "E3-M2b-1 Release build of the working tree (newbin-sha256.txt); ContentAcceptanceRules.CurrentVersion = 1",
+  "legacyBuild": "legacy Authority Release build de1729b (legacy-de1729b-sha256.txt), driven by the legacy agent",
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "legacyAgentCalls": 26,
+  "checksTotal": 36,
+  "checksFailed": 0,
+  "checks": [
+    {
+      "Id": "RB-G0",
+      "Description": "real guard on the legacy schema (runtime role): not ready, migration missing",
+      "Expected": "False ContentAcceptanceRuleMigrationMissing",
+      "Observed": "False ContentAcceptanceRuleMigrationMissing",
+      "Pass": true
+    },
+    {
+      "Id": "RB-R0",
+      "Description": "host readiness (AuthorityReadiness) reports the guard: not ready on the legacy schema",
+      "Expected": "False ContentAcceptanceRuleMigrationMissing",
+      "Observed": "False ContentAcceptanceRuleMigrationMissing",
+      "Pass": true
+    },
+    {
+      "Id": "RB-P0",
+      "Description": "legacy binary writes before the migration (agent)",
+      "Expected": "9 commits, 1 Prepared, all unstamped later",
+      "Observed": "Committed=9, Prepared=1",
+      "Pass": true
+    },
+    {
+      "Id": "RB-M1",
+      "Description": "the real CARV migration applies over the legacy schema; the emulation trigger is NOT installed",
+      "Expected": "OK; carv recorded; no emulation trigger",
+      "Observed": "OK; history carv=1; emulation triggers=0",
+      "Pass": true
+    },
+    {
+      "Id": "RB-G1",
+      "Description": "real guard after the migration: ready, no floor",
+      "Expected": "True content acceptance rules v1 (floor none)",
+      "Observed": "True content acceptance rules v1 (floor none)",
+      "Pass": true
+    },
+    {
+      "Id": "RB-R1",
+      "Description": "host readiness after the migration: ready, with the guard\u0027s detail",
+      "Expected": "True ...; content acceptance rules v1 (floor none)",
+      "Observed": "True test; probe-only fake; probe-only fake; projection markers verified; content acceptance rules v1 (floor none)",
+      "Pass": true
+    },
+    {
+      "Id": "RB-01",
+      "Description": "a real CARV write stamps P = V at Prepare and C = V at Commit",
+      "Expected": "1/1 Committed",
+      "Observed": "1/1 Committed",
+      "Pass": true
+    },
+    {
+      "Id": "RB-02a",
+      "Description": "real CARV Prepare stamps the operation",
+      "Expected": "1/NULL Prepared",
+      "Observed": "1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "RB-02b",
+      "Description": "the legacy binary cannot commit a real-CARV-prepared operation; nothing advances",
+      "Expected": "23514 ck_content_operation_commit_rule_version; snapshot unchanged; 1/NULL Prepared",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_commit_rule_version; unchanged (head=1:e3d4864fa4e297b6f325600ef547ae9ef1b5cc0a7c2d2a763a62efae5db8665f; commits=8; leaves=24; identities=21; checkpoints=8; journal=8; committedOps=8); 1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "RB-02c",
+      "Description": "legacy host classification of that refusal",
+      "Expected": "503 AUTHORITY_NOT_READY retryable (R-CARV-2)",
+      "Observed": "503 {\u0022errorCode\u0022:\u0022AUTHORITY_NOT_READY\u0022,\u0022correlationId\u0022:\u002201a1dd71-8569-7445-bc5b-7852763b4ac0\u0022,\u0022retryable\u0022:true,\u0022detail\u0022:\u0022authority store unavailable\u0022}",
+      "Pass": true
+    },
+    {
+      "Id": "RB-02d",
+      "Description": "the same operation then commits through the real CARV build",
+      "Expected": "OK; 1/1 Committed",
+      "Observed": "OK; 1/1 Committed",
+      "Pass": true
+    },
+    {
+      "Id": "RB-03a",
+      "Description": "real CARV Commit of a legacy-prepared operation: 409 OPERATION_RULES_OUTDATED before any verification",
+      "Expected": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; no signature verified",
+      "Observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; verifications 6-\u003E6",
+      "Pass": true
+    },
+    {
+      "Id": "RB-03b",
+      "Description": "the operation is aborted with reason OPERATION_RULES_OUTDATED; nothing advances",
+      "Expected": "NULL/NULL Aborted OPERATION_RULES_OUTDATED; snapshot unchanged",
+      "Observed": "NULL/NULL Aborted OPERATION_RULES_OUTDATED; unchanged (head=2:53e03bf18168dc82e3a1606616c995e0a2099be064599ffc65c05e30e20b6cbd; commits=9; leaves=27; identities=21; checkpoints=9; journal=9; committedOps=9)",
+      "Pass": true
+    },
+    {
+      "Id": "RB-03c",
+      "Description": "the aborted operation can never be accepted afterwards, not even by the legacy build",
+      "Expected": "OPERATION_STATE_INVALID",
+      "Observed": "AuthorityException OPERATION_STATE_INVALID 409 retryable=False",
+      "Pass": true
+    },
+    {
+      "Id": "RB-03d",
+      "Description": "recovery: a fresh operation (new idempotency key) on the real build completes",
+      "Expected": "OK",
+      "Observed": "OK",
+      "Pass": true
+    },
+    {
+      "Id": "RB-05",
+      "Description": "real CARV Commit replay of a historical NULL/NULL Committed operation returns the head and writes nothing",
+      "Expected": "OK; snapshot unchanged; NULL/NULL Committed",
+      "Observed": "OK; unchanged (head=1:cb29e13b5e1e306aa7e02ce9049e19f382b54762dd8caa91f34e8798f409ce1f; commits=10; leaves=30; identities=21; checkpoints=10; journal=10; committedOps=10); NULL/NULL Committed",
+      "Pass": true
+    },
+    {
+      "Id": "RB-04",
+      "Description": "real CARV Prepare replay of a legacy-prepared operation (same key and request): 409, nothing written",
+      "Expected": "OPERATION_RULES_OUTDATED; no new operation or leaf; NULL/NULL Prepared",
+      "Observed": "legacy prepared; AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; ops 15-\u003E15; leaves 45-\u003E45; NULL/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "RB-06a",
+      "Description": "control: the real build\u0027s Prepare refuses a candidate reusing the current wrapped key and nonce",
+      "Expected": "AuthorityException INVALID_COMMAND (ENVELOPE_INVALID)",
+      "Observed": "AuthorityException INVALID_COMMAND 422 retryable=False",
+      "Pass": true
+    },
+    {
+      "Id": "RB-06b",
+      "Description": "R-M2a-3: the legacy build prepared the reuse (no cross-revision rule); the real CARV Commit refuses it; never accepted",
+      "Expected": "legacy prepared; OPERATION_RULES_OUTDATED; snapshot unchanged; NULL/NULL Aborted",
+      "Observed": "legacy prepared; AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; unchanged (head=1:e181340d4bc8477613c8c5be1f917e9dfb8675a35977269accc2d73c5998c6db; commits=10; leaves=30; identities=21; checkpoints=10; journal=10; committedOps=10); NULL/NULL Aborted",
+      "Pass": true
+    },
+    {
+      "Id": "RB-07",
+      "Description": "expiry abort of a stamped operation (real build, clock past the lifetime)",
+      "Expected": "OPERATION_EXPIRED; 1/NULL Aborted",
+      "Observed": "AuthorityException OPERATION_EXPIRED 409 retryable=False; 1/NULL Aborted",
+      "Pass": true
+    },
+    {
+      "Id": "RB-08",
+      "Description": "revision-conflict abort of a stamped operation",
+      "Expected": "OK; CONTENT_REVISION_CONFLICT; 1/1 Committed, 1/NULL Aborted",
+      "Observed": "OK; AuthorityException CONTENT_REVISION_CONFLICT 409 retryable=False; 1/1 Committed, 1/NULL Aborted",
+      "Pass": true
+    },
+    {
+      "Id": "RB-09",
+      "Description": "6 concurrent real CARV instances x 4 rounds on 4 records in 2 organizations",
+      "Expected": "only OK or CONTENT_REVISION_CONFLICT; every Committed row P = C",
+      "Observed": "ok=14; conflicts=10; unexpected=0; 968 ms; committed rows with P\u003C\u003EC: 0",
+      "Pass": true
+    },
+    {
+      "Id": "RB-10",
+      "Description": "real CARV connections carry the rule version in application_name (pg_stat_activity)",
+      "Expected": "contains \u0027carv-v1\u0027; commit OK",
+      "Observed": "carv-runtime-RB carv-v1; OK",
+      "Pass": true
+    },
+    {
+      "Id": "RB-11",
+      "Description": "the real guarded Down refuses while an operation prepared by the real build is in flight",
+      "Expected": "refused (in flight); 1/NULL Prepared",
+      "Observed": "P0001 : CARV down refused: operations prepared under CARV rules are in flight; 1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "RB-12",
+      "Description": "real guard: a disabled state guard (superuser) is not ready; re-enabled is ready",
+      "Expected": "False ContentAcceptanceRuleStateGuardMissing | True ...",
+      "Observed": "False ContentAcceptanceRuleStateGuardMissing | True content acceptance rules v1 (floor none)",
+      "Pass": true
+    },
+    {
+      "Id": "RB-13",
+      "Description": "G08 inventory: the state-guard function is SECURITY INVOKER, fixed search_path, no PUBLIC or runtime EXECUTE (the trigger still fires)",
+      "Expected": "secdef=false; search_path=pg_catalog, pg_temp; runtime_execute=false",
+      "Observed": "content_operation_rule_state_guard|secdef=false|owner=postgres|config=search_path=pg_catalog, pg_temp|acl={postgres=X/postgres}|runtime_execute=false",
+      "Pass": true
+    },
+    {
+      "Id": "RB-14",
+      "Description": "4 concurrent real CARV instances while the floor is installed (held 1.5 s)",
+      "Expected": "only OK or CONTENT_REVISION_CONFLICT; floor 1",
+      "Observed": "ok=24; conflicts=0; unexpected=0; 2386 ms; floor=1",
+      "Pass": true
+    },
+    {
+      "Id": "RB-G2",
+      "Description": "real guard with floor 1 = build version 1: ready",
+      "Expected": "True content acceptance rules v1 (floor 1)",
+      "Observed": "True content acceptance rules v1 (floor 1)",
+      "Pass": true
+    },
+    {
+      "Id": "RB-15",
+      "Description": "the legacy binary cannot prepare after the floor; nothing persisted",
+      "Expected": "23514 ck_content_operation_rule_floor_v1; no new operation",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1; ops 69-\u003E69",
+      "Pass": true
+    },
+    {
+      "Id": "RB-16",
+      "Description": "an operation the legacy build prepared before the migration: the legacy Commit is refused by the floor, the real build aborts it",
+      "Expected": "23514 floor_v1 | OPERATION_RULES_OUTDATED | NULL/NULL Aborted; snapshot unchanged",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1 | AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False | NULL/NULL Aborted; unchanged (head=1:e77ad2fe9a61cf95cac03cb0e1e74888fa0716883fba8694caffa5916b08ec6b; commits=30; leaves=90; identities=21; checkpoints=30; journal=30; committedOps=30)",
+      "Pass": true
+    },
+    {
+      "Id": "RB-17",
+      "Description": "a real CARV write after the floor succeeds",
+      "Expected": "OK",
+      "Observed": "OK",
+      "Pass": true
+    },
+    {
+      "Id": "RB-18",
+      "Description": "after a raise to floor 2, the real v1 build\u0027s Commit is refused by the database and mapped to 409 OPERATION_RULES_OUTDATED with an alert; nothing advances",
+      "Expected": "OK raise; OPERATION_RULES_OUTDATED; alert names ck_content_operation_rule_floor_v2; snapshot unchanged; 1/NULL Prepared",
+      "Observed": "OK; AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; alert=CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE:the database content acceptance rule fence (ck_content_operation_rule_floor_v2) refused a content operation write; this build applies rule version 1 (mixed-version fleet or a newer floor); unchanged (head=4:ef4a5b8b5db006fbcdd2411c3e7bd4d9e823ba539b0cd7c941b545663cd3be34; commits=31; leaves=93; identities=21; checkpoints=31; journal=31; committedOps=31); 1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "RB-19",
+      "Description": "the real v1 build\u0027s Prepare after the raise is refused by the database, mapped and alerted; nothing persisted",
+      "Expected": "OPERATION_RULES_OUTDATED; alert; no new operation",
+      "Observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; alert=CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE; ops 71-\u003E71",
+      "Pass": true
+    },
+    {
+      "Id": "RB-G3",
+      "Description": "real guard with floor 2 above build version 1: not ready",
+      "Expected": "False ContentAcceptanceRuleFloorAboveBuild(floor=2, build=1)",
+      "Observed": "False ContentAcceptanceRuleFloorAboveBuild(floor=2, build=1)",
+      "Pass": true
+    },
+    {
+      "Id": "RB-R2",
+      "Description": "host readiness of the overtaken v1 build: not ready",
+      "Expected": "False ContentAcceptanceRuleFloorAboveBuild(floor=2, build=1)",
+      "Observed": "False ContentAcceptanceRuleFloorAboveBuild(floor=2, build=1)",
+      "Pass": true
+    },
+    {
+      "Id": "FINAL",
+      "Description": "final operation table summary",
+      "Expected": "informational",
+      "Observed": "Aborted=15, Committed=53, Prepared=3; legacy agent calls=26",
+      "Pass": true
+    }
+  ]
+}

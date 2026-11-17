@@ -1,0 +1,2 @@
+dev: fev_total 602, all violations 0; fav_total 62 (processed 25), all violations 0; columns_already_present 0; latest 20261103054837_PhaseC8M3RegionalPreferences
+default: fev_total 436, all violations 0; fav_total 122 (processed 49), all violations 0; columns_already_present 0; latest 20261020104151_PhaseC3RepeatingGroups

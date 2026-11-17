@@ -111,15 +111,40 @@ public static class FieldValueCodec
         sealedRow.FormRecordGroupId = typedRow.FormRecordGroupId;
         sealedRow.CreatedOn = typedRow.CreatedOn;
         sealedRow.CreatedByUserId = typedRow.CreatedByUserId;
+
+        // E3-M2c OD-M2c-02a: only an envelope freshly sealed here, from this operation's own input, may later be decrypted in
+        // self-sealed mode (an already-encrypted row passed in is returned above unchanged and is never registered).
+        SelfSealedFieldValues.Register(sealedRow);
         return sealedRow;
     }
 
-    /// <summary>Invariant wire string of a stored row; an encrypted row is decrypted (authenticated) through the field encryption service with the tenant's FieldValue key.</summary>
+    /// <summary>
+    /// E3-M2c OD-M2c-02a Mode A: invariant wire string of a stored row of an Authority-verified read; an encrypted row is decrypted
+    /// (authenticated) through the verified reader (strict S-8 dispatch, FieldValue key of the row's tenant).
+    /// </summary>
     public static async Task<string> FormatAsync(ISignedContentRow row, IReadOnlyDictionary<Guid, FieldOption> optionsById, Encryption.IFieldEncryptionService encryption, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(encryption);
         if (row is FieldEncryptedValue encrypted)
         {
+            var plaintexts = await encryption.DecryptVerifiedAsync(encrypted.TenantId, [encrypted], cancellationToken).ConfigureAwait(false);
+            return plaintexts.Count == 1 ? plaintexts[0] : throw new InvalidOperationException("the verified reader returned a different number of values");
+        }
+
+        return Format(row, optionsById);
+    }
+
+    /// <summary>
+    /// E3-M2c OD-M2c-02a Mode B: invariant wire string of a row this operation itself just sealed (<see cref="ProtectAsync"/>), for
+    /// a self-check of its own output. Any other encrypted row is refused before any key operation; stored content uses
+    /// <see cref="FormatAsync"/>.
+    /// </summary>
+    public static async Task<string> FormatSelfSealedAsync(ISignedContentRow row, IReadOnlyDictionary<Guid, FieldOption> optionsById, Encryption.IFieldEncryptionService encryption, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(encryption);
+        if (row is FieldEncryptedValue encrypted)
+        {
+            SelfSealedFieldValues.RequireAll([encrypted]);
             return await encryption.DecryptAsync(encrypted, Documents.Ports.EncryptionKeyPurpose.FieldValue, cancellationToken).ConfigureAwait(false);
         }
 

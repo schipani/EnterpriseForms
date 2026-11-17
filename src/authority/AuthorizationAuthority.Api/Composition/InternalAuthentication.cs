@@ -198,6 +198,18 @@ public static class InternalAuthentication
         ArgumentNullException.ThrowIfNull(context);
         return Guid.TryParse(context.Request.Headers[CorrelationHeader].ToString(), out var id) ? id : Guid.CreateVersion7();
     }
+
+    /// <summary>
+    /// E3-M2f-2 (CAP-S3/S5/S6): the business envelope capability the request declares in
+    /// <see cref="AuthorizationAuthority.Application.Features.Content.ClientEnvelopeCapability.HeaderName"/>. Every header instance is
+    /// passed to the parser, so a repeated header is level 1; nothing is echoed or logged here.
+    /// </summary>
+    public static AuthorizationAuthority.Application.Features.Content.ClientEnvelopeCapability EnvelopeCapability(HttpContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return AuthorizationAuthority.Application.Features.Content.ClientEnvelopeCapability.FromHeaderValues(
+            context.Request.Headers[AuthorizationAuthority.Application.Features.Content.ClientEnvelopeCapability.HeaderName]);
+    }
 }
 
 public class CredentialOptions

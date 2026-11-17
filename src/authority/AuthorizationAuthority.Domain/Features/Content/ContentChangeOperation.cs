@@ -43,6 +43,18 @@ public sealed class ContentChangeOperation
 
     /// <summary>Set for workload reprotection operations: the effective PublishFormSecurityRevision command that authorizes them. Null for user operations.</summary>
     public Guid? ReprotectionCommandId { get; set; }
+
+    /// <summary>
+    /// E3-M2b-1 CARV (P): the content acceptance rule version the preparing build applied, written once in the Prepare insert and
+    /// immutable afterwards (database state guard). NULL for operations prepared by a build that predates CARV.
+    /// </summary>
+    public int? PrepareAcceptanceRuleVersion { get; set; }
+
+    /// <summary>
+    /// E3-M2b-1 CARV (C): the rule version of the build that committed the operation, written only with the Committed transition.
+    /// The database requires C = P for a stamped operation (or both NULL for a legacy one) and C NULL for any other state.
+    /// </summary>
+    public int? CommitAcceptanceRuleVersion { get; set; }
 }
 
 public static class ContentOperationStates

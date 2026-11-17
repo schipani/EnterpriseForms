@@ -199,6 +199,7 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
             request.Headers.Add("Idempotency-Key", idempotencyKey);
         }
 
+        EnvelopeCapability.Declare(request); // E3-M2f-1: every request of this build declares its fixed capability (CAP-S2)
         if (body is not null)
         {
             request.Content = JsonContent.Create(body, options: Json);

@@ -62,6 +62,7 @@ public sealed class SearchIndexBuilderHttpClient(IHttpClientFactory httpClientFa
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", MintToken(settings));
         request.Headers.Add("X-Correlation-Id", Guid.CreateVersion7().ToString("D"));
+        EnvelopeCapability.Declare(request); // E3-M2f-1: every request of this build declares its fixed capability (CAP-S2)
         request.Content = JsonContent.Create(body, options: Json);
 
         HttpResponseMessage response;

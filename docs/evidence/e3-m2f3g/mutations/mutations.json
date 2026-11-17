@@ -1,0 +1,95 @@
+﻿{
+    "Mutations":  [
+                      {
+                          "Id":  "PM-01",
+                          "What":  "t_db from transaction_timestamp() instead of clock_timestamp() after the lock (M2F3-71)",
+                          "File":  "src\\authority\\AuthorizationAuthority.Infrastructure\\Persistence\\CapabilityRefusalEvidenceIndex.cs",
+                          "Groups":  "T",
+                          "Classification":  "DETECTED",
+                          "FailedChecks":  "T-01,T-05,T-06,T-08",
+                          "Restored":  true,
+                          "OriginalSha256":  "85661647f058848625428acf73f85273eaf87f25b6cdb0fced066a7b4ab9dac1"
+                      },
+                      {
+                          "Id":  "PM-02",
+                          "What":  "no T2 lock-wait bound (lock_timeout 0 = wait indefinitely; only the 2 s budget remains)",
+                          "File":  "src\\authority\\AuthorizationAuthority.Infrastructure\\Persistence\\CapabilityRefusalEvidenceIndex.cs",
+                          "Groups":  "T",
+                          "Classification":  "DETECTED",
+                          "FailedChecks":  "T-09",
+                          "Restored":  true,
+                          "OriginalSha256":  "85661647f058848625428acf73f85273eaf87f25b6cdb0fced066a7b4ab9dac1"
+                      },
+                      {
+                          "Id":  "PM-03",
+                          "What":  "no T2 statement bound (statement_timeout 0)",
+                          "File":  "src\\authority\\AuthorizationAuthority.Infrastructure\\Persistence\\CapabilityRefusalEvidenceIndex.cs",
+                          "Groups":  "T",
+                          "Classification":  "DETECTED",
+                          "FailedChecks":  "T-10,T-11",
+                          "Restored":  true,
+                          "OriginalSha256":  "85661647f058848625428acf73f85273eaf87f25b6cdb0fced066a7b4ab9dac1"
+                      },
+                      {
+                          "Id":  "PM-04",
+                          "What":  "lookup not restricted to evidence entries (event-kind predicate dropped: IX-B no longer matches; unrelated audit entries read)",
+                          "File":  "src\\authority\\AuthorizationAuthority.Infrastructure\\Persistence\\CapabilityRefusalEvidenceIndex.cs",
+                          "Groups":  "L",
+                          "Classification":  "DETECTED",
+                          "FailedChecks":  "L-01,L-02,L-03,L-04,L-05,L-06,L-07,L-12",
+                          "Restored":  true,
+                          "OriginalSha256":  "85661647f058848625428acf73f85273eaf87f25b6cdb0fced066a7b4ab9dac1"
+                      },
+                      {
+                          "Id":  "PM-05",
+                          "What":  "catalogue check bypassed (IX-B always reported usable)",
+                          "File":  "src\\authority\\AuthorizationAuthority.Infrastructure\\Persistence\\AuthorityStore.cs",
+                          "Groups":  "L",
+                          "Classification":  "DETECTED",
+                          "FailedChecks":  "L-09,L-10,L-11,L-12",
+                          "Restored":  true,
+                          "OriginalSha256":  "5056f7430ad5a889d451ea38f801e5f75f5722957754611b739cb4a8c608e5fb"
+                      },
+                      {
+                          "Id":  "PM-06",
+                          "What":  "T2 reads the organization row without the row lock (no FOR UPDATE, untracked)",
+                          "File":  "src\\authority\\AuthorizationAuthority.Application\\Features\\Content\\CapabilityRefusalEvidenceRecorder.cs",
+                          "Groups":  "T",
+                          "Classification":  "DETECTED",
+                          "FailedChecks":  "T-01,T-02,T-03,T-04,T-05,T-06,T-07,T-08,T-09,T-11,T-12",
+                          "Restored":  true,
+                          "OriginalSha256":  "334aada9cfc27cbe6ec7852bfe28b20ba728f37c64da04c010e8e60e36ad26b1"
+                      },
+                      {
+                          "Id":  "PM-07",
+                          "What":  "the durable lookup decision ignored (always append)",
+                          "File":  "src\\authority\\AuthorizationAuthority.Application\\Features\\Content\\CapabilityRefusalEvidenceRecorder.cs",
+                          "Groups":  "T",
+                          "Classification":  "DETECTED",
+                          "FailedChecks":  "T-05,T-06,T-08",
+                          "Restored":  true,
+                          "OriginalSha256":  "334aada9cfc27cbe6ec7852bfe28b20ba728f37c64da04c010e8e60e36ad26b1"
+                      },
+                      {
+                          "Id":  "MZ-22",
+                          "What":  "E3-M2f-3b MZ-22 re-run on PostgreSQL: \"eight rows, none older than the bucket =\u003e inconclusive\" disabled (expected equivalent, F-09)",
+                          "File":  "src\\authority\\AuthorizationAuthority.Application\\Features\\Content\\CapabilityRefusalEvidenceLookup.cs",
+                          "Groups":  "F",
+                          "Classification":  "SURVIVED",
+                          "FailedChecks":  "",
+                          "Restored":  true,
+                          "OriginalSha256":  "24bdaceb3cc75dc59ca0068e453383ea2a3504ddc34e9971bc9243bf70cdd050"
+                      }
+                  ],
+    "Total":  8,
+    "Detected":  7,
+    "Survived":  1,
+    "Inconclusive":  0,
+    "AllRestored":  true,
+    "RestoredBaseline":  {
+                             "Groups":  "F,L,T",
+                             "ExitCode":  0,
+                             "Checks":  41,
+                             "Failed":  0
+                         }
+}

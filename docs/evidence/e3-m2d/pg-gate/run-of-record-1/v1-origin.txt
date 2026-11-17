@@ -1,0 +1,1 @@
+git archive 8915f77c10299c08b27e36d40b7a2388d1e38d0f (accepted signed E3-M2c commit; ContentAcceptanceRules.CurrentVersion = 1), Release build in the work directory; release builds are not byte-reproducible, so no binary hash is claimed as provenance

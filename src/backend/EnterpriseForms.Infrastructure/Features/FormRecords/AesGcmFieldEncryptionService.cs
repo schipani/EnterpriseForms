@@ -87,10 +87,184 @@ public sealed class AesGcmFieldEncryptionService(IEncryptionKeyProvider keys) : 
         }
     }
 
-    public async Task<string> DecryptAsync(FieldEncryptedValue value, EncryptionKeyPurpose purpose, CancellationToken cancellationToken)
+    /// <summary>
+    /// E3-M2c OD-M2c-02a Mode B (self-sealed): envelope 1 only, signed schema 0 or 1, every Envelope v2 column NULL, then the
+    /// unchanged v1 decryption. Never reaches the Envelope v2 reader; a refusal happens before the key provider is asked.
+    /// </summary>
+    public Task<string> DecryptAsync(FieldEncryptedValue value, EncryptionKeyPurpose purpose, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(value);
         RequireSupportedPurpose(purpose);
+        if (value.EncryptionEnvelopeVersion != EnvelopeVersion || value.RowSignatureSchemaVersion is not (0 or 1) || HasAnyEnvelopeV2Column(value))
+        {
+            throw Refused(value, "the self-sealed field decryption accepts only an Envelope v1 value of signed schema 0 or 1 without Envelope v2 columns");
+        }
+
+        return OpenV1Async(value, purpose, cancellationToken);
+    }
+
+    /// <summary>
+    /// E3-M2c OD-M2c-02a Mode A (Authority-verified, FieldValue purpose): strict S-8 dispatch per row — (schema 1, envelope 1, no v2
+    /// column) to the v1 reader; (schema 2, envelope 2, every v2 column) to the Envelope v2 reader; anything else (schema 0 included)
+    /// refused. Every row is validated before any key operation; v1 rows unwrap once each, v2 rows once per data-key group; the first
+    /// failure aborts the call (no partial result, no fallback).
+    /// </summary>
+    public async Task<IReadOnlyList<string>> DecryptVerifiedAsync(Guid organizationId, IReadOnlyList<FieldEncryptedValue> values, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        if (organizationId == Guid.Empty)
+        {
+            throw new ArgumentException("a verified decryption names its organization", nameof(organizationId));
+        }
+
+        var seen = new HashSet<FieldEncryptedValue>(ReferenceEqualityComparer.Instance);
+        var isV2 = new bool[values.Count];
+        var v2Indexes = new List<int>();
+        var batch = new Documents.EnvelopeV2.EnvelopeV2ProductReader.FieldBatch(organizationId);
+
+        // 1. Everything that needs no key, for every row, before the key provider is asked anything.
+        for (var i = 0; i < values.Count; i++)
+        {
+            var value = values[i] ?? throw new ArgumentException("a verified decryption batch has no null rows", nameof(values));
+            if (!seen.Add(value))
+            {
+                throw new ArgumentException("a verified decryption batch lists each row once", nameof(values));
+            }
+
+            if (value.TenantId != organizationId)
+            {
+                throw Refused(value, "a verified decryption batch belongs to exactly one organization");
+            }
+
+            switch ((value.RowSignatureSchemaVersion, value.EncryptionEnvelopeVersion))
+            {
+                case (1, EnvelopeVersion) when !HasAnyEnvelopeV2Column(value):
+                    break;
+                case (2, 2) when HasEveryEnvelopeV2Column(value):
+                    try
+                    {
+                        batch.Add(value);
+                    }
+                    catch (Exception ex) when (Documents.EnvelopeV2.EnvelopeV2ProductReader.ReasonFor(ex) is { } reason)
+                    {
+                        AttachFieldFailure(ex, reason, value);
+                        throw;
+                    }
+
+                    isV2[i] = true;
+                    v2Indexes.Add(i);
+                    break;
+                default:
+                    throw Refused(value, "unsupported signed schema and envelope version combination for a verified field read");
+            }
+        }
+
+        if (values.Count > 0 && !keys.IsConfigured)
+        {
+            var unavailable = new EncryptionUnavailableException("no encryption key provider is configured; encrypted fields cannot be read");
+            AttachFieldFailure(unavailable, DecryptionFailureReasons.KeyUnavailable, values[0]);
+            throw unavailable;
+        }
+
+        // 2. Key operations: v1 rows one by one, then every v2 row in one opener call.
+        var results = new string[values.Count];
+        for (var i = 0; i < values.Count; i++)
+        {
+            if (!isV2[i])
+            {
+                results[i] = await OpenV1Async(values[i], EncryptionKeyPurpose.FieldValue, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        if (batch.Count > 0)
+        {
+            IReadOnlyList<string> opened;
+            try
+            {
+                opened = await batch.OpenAsync(keys, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (Documents.EnvelopeV2.EnvelopeV2ProductReader.ReasonFor(ex) is { } reason)
+            {
+                // The opener refuses the whole batch; the failure names the record and the batch's first v2 item (R-M2c-3).
+                AttachFieldFailure(ex, reason, values[v2Indexes[0]]);
+                throw;
+            }
+
+            for (var k = 0; k < v2Indexes.Count; k++)
+            {
+                results[v2Indexes[k]] = opened[k];
+            }
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// E3-M2c R-M2c-1: opens a stored creation-fingerprint key. The envelope type carries no field identity, logical type, schema or
+    /// v2 member; the seal identity is fixed here, so only a fingerprint seal of exactly this attempt can authenticate (AAD) and only
+    /// under the organization's IdempotencyProtection key (key scope). Envelope v1 only; a key that is not 32 bytes is refused.
+    /// </summary>
+    public async Task<byte[]> OpenCreationFingerprintKeyAsync(CreationFingerprintKeyEnvelope envelope, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(envelope);
+        var value = new FieldEncryptedValue
+        {
+            TenantId = envelope.TenantId,
+            FormRecordId = envelope.FormRecordId,
+            FieldDefinitionId = Application.Features.FormRecords.CreateFormRecord.CreationRequestFingerprint.SealPurposeId,
+            FieldValueItemId = envelope.FormRecordCreationAttemptId,
+            EncryptedLogicalType = Application.Features.FormRecords.CreateFormRecord.CreationRequestFingerprint.SealLogicalType,
+            EncryptedValueBytes = envelope.Ciphertext ?? [],
+            EncryptionNonceBytes = envelope.Nonce ?? [],
+            EncryptionAuthTagBytes = envelope.Tag ?? [],
+            WrappedDataKeyBytes = envelope.WrappedKey ?? [],
+            EncryptionAlgorithmName = envelope.AlgorithmName ?? string.Empty,
+            EncryptionKeyReference = envelope.KeyReference ?? string.Empty,
+            EncryptionEnvelopeVersion = envelope.EnvelopeVersion, // signed schema stays 0 (never staged) and no v2 column exists on the input type
+        };
+        if (envelope.TenantId == Guid.Empty || envelope.FormRecordId == Guid.Empty || envelope.FormRecordCreationAttemptId == Guid.Empty || envelope.EnvelopeVersion != EnvelopeVersion)
+        {
+            throw Refused(value, "a creation-fingerprint key opens only from an Envelope v1 seal of one attempt");
+        }
+
+        var encoded = await OpenV1Async(value, EncryptionKeyPurpose.IdempotencyProtection, cancellationToken).ConfigureAwait(false);
+        byte[] key;
+        try
+        {
+            key = Convert.FromBase64String(encoded);
+        }
+        catch (FormatException)
+        {
+            throw new CryptographicException("the creation-fingerprint key is malformed");
+        }
+
+        if (key.Length != 32)
+        {
+            CryptographicOperations.ZeroMemory(key);
+            throw new CryptographicException("the creation-fingerprint key is malformed");
+        }
+
+        return key;
+    }
+
+    private static bool HasAnyEnvelopeV2Column(FieldEncryptedValue value) => value.DataKeyIdentifier is not null || value.DataKeyCommitmentBytes is not null || value.KeyWrapAlgorithmCode is not null;
+
+    private static bool HasEveryEnvelopeV2Column(FieldEncryptedValue value) => value.DataKeyIdentifier is not null && value.DataKeyCommitmentBytes is not null && value.KeyWrapAlgorithmCode is not null;
+
+    /// <summary>A refusal before any key operation (E0-4 reason UNSUPPORTED_ENVELOPE, identifiers only).</summary>
+    private static CryptographicException Refused(FieldEncryptedValue value, string message)
+    {
+        var refusal = new CryptographicException(message);
+        AttachFieldFailure(refusal, DecryptionFailureReasons.UnsupportedEnvelope, value);
+        return refusal;
+    }
+
+    private static void AttachFieldFailure(Exception exception, string reason, FieldEncryptedValue value) =>
+        DecryptionFailure.ForFieldValue(reason, value.TenantId, value.FormRecordId, value.FieldDefinitionId, value.FieldValueItemId).AttachTo(exception);
+
+    /// <summary>The unchanged Envelope v1 field decryption (shared by both modes after their own admission checks).</summary>
+    private async Task<string> OpenV1Async(FieldEncryptedValue value, EncryptionKeyPurpose purpose, CancellationToken cancellationToken)
+    {
         var stage = DecryptionStage.Envelope;
         try
         {

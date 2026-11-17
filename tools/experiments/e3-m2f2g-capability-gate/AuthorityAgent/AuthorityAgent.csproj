@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    E3-M2f-2G AuthorityAgent (docs/security/E3_M2F2G_VERIFICATION_RECORD.md): one content entry-point call of ONE Authority Release build
+    per process (AuthorityBinaries = 0be5f52, the E3-M2e-2 baseline without capability enforcement, or this tree as a control).
+    Development/Testing only; TEST-ONLY. Not part of EnterpriseForms.All.slnx and never built in place: scripts/dev/e3-m2e2-acceptance-pg-gate.ps1
+    copies this folder to its work directory and builds it there. It references no repository project.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>AuthorityAgent</AssemblyName>
+    <!-- Without a deps file the host loads every assembly in the output folder: the copies of AuthorityBinaries. -->
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS1591;CA2007;CA1303</NoWarn>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="$(AuthorityBinaries)\*.dll" Private="true" />
+  </ItemGroup>
+  <Target Name="RequireAuthorityBinaries" BeforeTargets="ResolveAssemblyReferences" Condition="'$(AuthorityBinaries)' == '' Or !Exists('$(AuthorityBinaries)\AuthorizationAuthority.Api.dll')">
+    <Error Text="Build through scripts/dev/e3-m2e2-acceptance-pg-gate.ps1 (AuthorityBinaries must name a folder of Authority Release binaries)." />
+  </Target>
+</Project>

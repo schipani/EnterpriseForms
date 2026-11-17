@@ -20,12 +20,27 @@ namespace AuthorizationAuthority.Application.Features.Content;
 /// commit proves the staged bytes equal the approved candidate and CAS-advances the trusted head, verify compares an
 /// observed projection with the complete accepted leaf index. No generic signing path exists (A9).
 /// </summary>
-public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ProjectionIntegrityVerifier verifier, IFaultInjector faultInjector, TimeProvider clock, ShareContributorWriteSwitch contributorWrites, AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator? revisionCoordinator = null, IOperationTimingObserver? timing = null)
+public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ProjectionIntegrityVerifier verifier, IFaultInjector faultInjector, TimeProvider clock, ShareContributorWriteSwitch contributorWrites, AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator? revisionCoordinator = null, IOperationTimingObserver? timing = null, EnvelopeV2AcceptanceSwitch? envelopeV2Acceptance = null, EnvelopeCapabilityFloor? envelopeCapabilityFloor = null)
 {
+    /// <summary>
+    /// E3-M2f-2 (CAP-O7): the one shared capability check of the seven content entry points; the protection census and the search-index
+    /// builder use this same instance. The host composes it from deployment configuration; without one (unit tests, tools) the deployment
+    /// floor is 1, exactly as for an absent configuration value.
+    /// </summary>
+    public EnvelopeCapabilityFloor CapabilityFloor { get; } = envelopeCapabilityFloor ?? EnvelopeCapabilityFloor.Default;
+
+    // E3-M2e (OD-M2e-07): Envelope v2 acceptance, default off. The Authority host always composes it; without one (unit tests,
+    // tools) acceptance is off and the Development/Testing wrap codes apply, so the E3-M2d behaviour of existing fixtures holds.
+    private readonly EnvelopeV2AcceptanceSwitch v2Acceptance = envelopeV2Acceptance ?? EnvelopeV2AcceptanceSwitch.DarkForTests;
+
     // IX-1 (INV-R): the only way the content-integrity revision advances; without a configured index it still keeps INV-R.
     private readonly AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator revisions = revisionCoordinator ?? AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator.WithoutIndex;
 
     private const int MaxCandidateItems = 500;
+
+    /// <summary>E3-M2b-2: abort reason recorded on an operation whose verified staged bytes fail the registered-schema rule (S-9) at commit.</summary>
+    public const string SignedSchemaInvalidAtCommitReason = "SIGNED_SCHEMA_INVALID_AT_COMMIT";
+
     private static readonly TimeSpan OperationLifetime = TimeSpan.FromMinutes(10);
 
     private static readonly Dictionary<ManifestItemKind, string[]> AllowedEntityKinds = new()
@@ -38,14 +53,15 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         [ManifestItemKind.AttachmentLifecycle] = ["file_attachment_lifecycle_events"],
     };
 
-    public async Task<PreparedContentOperation> PrepareAsync(VerifiedActor? actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken)
+    /// <param name="envelopeCapability">E3-M2f-2: the capability the request declared (null ⇒ level 1, CAP-S5).</param>
+    public async Task<PreparedContentOperation> PrepareAsync(VerifiedActor? actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken, ClientEnvelopeCapability? envelopeCapability = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         var timer = new LockTiming();
         var outcome = "Completed";
         try
         {
-            return await PrepareCoreAsync(actor, request, idempotencyKey, correlationId, timer, cancellationToken).ConfigureAwait(false);
+            return await PrepareCoreAsync(actor, request, idempotencyKey, correlationId, timer, envelopeCapability, cancellationToken).ConfigureAwait(false);
         }
         catch (AuthorityException ex)
         {
@@ -63,7 +79,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
     }
 
-    private async Task<PreparedContentOperation> PrepareCoreAsync(VerifiedActor? actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, LockTiming timer, CancellationToken cancellationToken)
+    private async Task<PreparedContentOperation> PrepareCoreAsync(VerifiedActor? actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, LockTiming timer, ClientEnvelopeCapability? envelopeCapability, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length is < 8 or > 128)
         {
@@ -76,6 +92,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
         timer.Locked();
+        // RB-CARV-1 (contract §22): Release B verifies the floor in this transaction before anything else, replays included.
+        await scope.RequireContentAcceptanceFloorAsync(cancellationToken).ConfigureAwait(false);
+        // E3-M2f-2 (CAP-O2/O3): the capability floor next, before actor resolution, the gate, replays and snapshot binding (G-2).
+        await CapabilityFloor.RequireAsync(scope, state, envelopeCapability, cancellationToken).ConfigureAwait(false);
         var (bound, reprotection) = await ResolveActorAsync(scope, state, actor, request.ReprotectionCommandId, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
@@ -85,6 +105,13 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             if (!existing.OperationRequestDigest.AsSpan().SequenceEqual(requestDigest) || existing.ActorIdentityBindingId != bound.Binding.IdentityBindingId)
             {
                 throw new AuthorityException(AuthorityErrorCodes.IdempotencyConflict, 409, false, "idempotency key reused with a different request or actor");
+            }
+
+            // E3-M2b-1 CARV (OD-M2-18): a Prepared operation stamped with other rules (an older build's NULL stamp included) is never
+            // handed back for commit; nothing is written. Replays of operations in any other state keep their existing behaviour.
+            if (existing.OperationStateName == ContentOperationStates.Prepared && !ContentAcceptanceRules.IsCommittableByThisBuild(existing.PrepareAcceptanceRuleVersion))
+            {
+                throw new AuthorityException(AuthorityErrorCodes.OperationRulesOutdated, 409, false, "the prepared operation was prepared under other content acceptance rules; start a fresh operation");
             }
 
             var leaves = await scope.GetCandidateLeavesAsync(existing.ContentChangeOperationId, cancellationToken).ConfigureAwait(false);
@@ -137,9 +164,29 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         var parsed = ParseCandidate(request, state.OrganizationId, key.CurrentSigningKeyVersion);
 
+        // E3-M2e (AM-9): Envelope v2 wrap codes {1, 2} only in Development/Testing; elsewhere no v2 row is admitted at all.
+        EnvelopeV2Rules.EnforceEnvironmentWrapCodes(parsed.Select(p => p.Document), v2Acceptance.AllowedWrapCodes);
+
         // R-53 (C-148): the complete current snapshot is proven equal to the accepted head on every write path, and the
         // candidate's item identities are checked against it and against the permanent bindings (ContentItemIdentityRules).
         var current = await BindAcceptedSnapshotAsync(scope, state, request, currentLeaves, head, key, bound, correlationId, cancellationToken).ConfigureAwait(false);
+
+        // E3-M2a remediation: no data-key or nonce reuse against the verified current revision, on every write path (owner,
+        // share editor, protection migration; creation has an empty current revision). Commit binds the same head by its
+        // revision compare-and-set, so a candidate checked against an older head can never be accepted on a newer one.
+        EnvelopeRules.EnforceAgainstCurrent(parsed.Select(p => (p.ItemId, p.Document)), current.Select(c => (c.ItemId, c.Document)));
+
+        // E3-M2d (CARV 2; Prepare-only, needs the verified current revision): every v2 row is Carried (a byte-identical schema-2 row
+        // of the current accepted head) or New; DK-3; every New v2 row is refused (no v2 acceptance in E3-M2d); no v2 item may be
+        // downgraded to a v1 envelope; no v1 row may reuse a current v2 wrapped key. Before classification, authorization or signing.
+        // E3-M2e (CARV 3): the same Prepare-only rules now return the New rows; with acceptance off (the default, OD-M2e-07) they are
+        // refused here exactly as in E3-M2d (ENVELOPE_VERSION_NOT_ENABLED; share-edit codes OA-M2d-3 unchanged).
+        var newV2Rows = EnvelopeV2Rules.ClassifyAgainstCurrent(parsed.Select(p => (p.ItemId, p.Document)).ToList(), current.Select(c => (c.ItemId, c.Document)).ToList());
+        if (newV2Rows.Count > 0 && !v2Acceptance.Enabled)
+        {
+            throw EnvelopeRules.Refused(EnvelopeV2Rules.Reasons.VersionNotEnabled);
+        }
+
         await ContentItemIdentityRules.EnforceAtPrepareAsync(scope, state.OrganizationId, request.FormRecordId,
             current.Select(i => (i.Kind, i.ItemId, i.Document)).ToList(), parsed.Select(p => (p.Kind, p.ItemId, p.Document)).ToList(), cancellationToken).ConfigureAwait(false);
         Dictionary<string, string> mutations;
@@ -164,6 +211,19 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         else
         {
             mutations = await AuthorizeReprotectionAsync(request, parsed, currentLeaves, head, key, reprotection, cancellationToken).ConfigureAwait(false);
+        }
+
+        // E3-M2e DK-4 (OD-M2e-12: after authorization, before signing): no New identifier may be bound anywhere, in any state. Reached
+        // only with acceptance on. The ledger is verified in this transaction first (L-13); the unique index is the backstop (L-3).
+        IReadOnlyList<DataKeyLedgerRules.DataKeyGroup> newV2Groups = newV2Rows.Count == 0 ? [] : DataKeyLedgerRules.GroupsOf(newV2Rows);
+        if (newV2Groups.Count > 0)
+        {
+            await scope.RequireDataKeyLedgerAsync(cancellationToken).ConfigureAwait(false);
+            var existingBindings = await scope.FindDataKeyBindingsAsync(newV2Groups.Select(g => g.DataKeyIdentifier).ToList(), cancellationToken).ConfigureAwait(false);
+            if (DataKeyLedgerRules.PrepareViolation(newV2Groups, existingBindings) is { } reuse)
+            {
+                throw EnvelopeRules.Refused(reuse);
+            }
         }
 
         var keyReference = new IntegrityKeyReference(state.OrganizationId, key.KeyPurposeName, key.ProviderKeyName, key.CurrentSigningKeyVersion);
@@ -204,8 +264,18 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             OperationCreatedOn = clock.GetUtcNow(),
             OperationExpiresOn = clock.GetUtcNow().Add(OperationLifetime),
             ReprotectionCommandId = reprotection?.CommandId,
+
+            // E3-M2b-1 CARV: the rules applied above; immutable after this insert (database state guard).
+            PrepareAcceptanceRuleVersion = ContentAcceptanceRules.CurrentVersion,
         };
         scope.AddOperation(operation);
+
+        // E3-M2e DK-5 (OD-M2e-02/03): one permanent binding per New group, in this transaction with the operation and its candidate
+        // leaves (EF inserts the operation first; the P-1 guard re-checks the binding against it in the database).
+        if (newV2Groups.Count > 0)
+        {
+            scope.AddDataKeyBindings(DataKeyLedgerRules.BindingsFor(newV2Groups, state.OrganizationId, request.FormRecordId, operationId, clock.GetUtcNow()));
+        }
 
         var candidateLeaves = new List<ContentCandidateLeaf>();
         for (var i = 0; i < manifest.SortedLeaves.Count; i++)
@@ -232,14 +302,15 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         return ToPrepared(operation, candidateLeaves, correlationId);
     }
 
-    public async Task<ContentRevision> CommitAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, CancellationToken cancellationToken)
+    /// <param name="envelopeCapability">E3-M2f-2: the capability the request declared (null ⇒ level 1, CAP-S5).</param>
+    public async Task<ContentRevision> CommitAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, CancellationToken cancellationToken, ClientEnvelopeCapability? envelopeCapability = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         var timer = new LockTiming();
         var outcome = "Completed";
         try
         {
-            return await CommitCoreAsync(actor, operationId, request, correlationId, timer, cancellationToken).ConfigureAwait(false);
+            return await CommitCoreAsync(actor, operationId, request, correlationId, timer, envelopeCapability, cancellationToken).ConfigureAwait(false);
         }
         catch (AuthorityException ex)
         {
@@ -257,7 +328,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
     }
 
-    private async Task<ContentRevision> CommitCoreAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, LockTiming timer, CancellationToken cancellationToken)
+    private async Task<ContentRevision> CommitCoreAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, LockTiming timer, ClientEnvelopeCapability? envelopeCapability, CancellationToken cancellationToken)
     {
 
         // Testing only (no-op elsewhere): holds a commit before it takes the organization lock, so integration tests can
@@ -267,6 +338,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
         timer.Locked();
+        // RB-CARV-1 (contract §22): Release B verifies the floor in this transaction before anything else, replays included.
+        await scope.RequireContentAcceptanceFloorAsync(cancellationToken).ConfigureAwait(false);
+        // E3-M2f-2 (CAP-O2/O3): the capability floor next, before the gate, replays, expiry/CARV aborts and staged verification (G-2).
+        await CapabilityFloor.RequireAsync(scope, state, envelopeCapability, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
         var operation = await scope.FindOperationAsync(operationId, cancellationToken).ConfigureAwait(false);
@@ -308,6 +383,16 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             operation.OperationStateName = ContentOperationStates.Aborted;
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             throw new AuthorityException(AuthorityErrorCodes.OperationExpired, 409, false, "prepared operation expired");
+        }
+
+        // E3-M2b-1 CARV (§19.4 step 4): before any verification, an operation prepared under other rules (an older build's NULL
+        // stamp included) is aborted; it can never be accepted by this build. The database refuses the same commit independently.
+        if (!ContentAcceptanceRules.IsCommittableByThisBuild(operation.PrepareAcceptanceRuleVersion))
+        {
+            operation.OperationStateName = ContentOperationStates.Aborted;
+            operation.OperationQuarantineReasonCode = ContentAcceptanceRules.OutdatedAbortReason;
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            throw new AuthorityException(AuthorityErrorCodes.OperationRulesOutdated, 409, false, "the operation was prepared under other content acceptance rules; start a fresh operation");
         }
 
         if (head.ContentHeadQuarantined)
@@ -368,6 +453,96 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         // R-53 (C-148): every committed item matches its permanent identity binding; new items are bound in this transaction.
         var stagedDocuments = request.StagedItems.Select(i => (i.ItemKind, i.ItemId, RowCanonicalDecoder.Decode(Convert.FromBase64String(i.CanonicalBytesBase64)))).ToList();
+
+        // E3-M2b-2 (S-9, owner decision D-2): the registered-schema rule (supported schema, exact columns, pinned types and
+        // nullability) again on the verified staged bytes, so an operation prepared by a build without S-9 cannot commit a row
+        // it refuses. Commit re-derives it from the bytes alone, so the content acceptance rule version is unchanged.
+        try
+        {
+            foreach (var staged in stagedDocuments)
+            {
+                ContentDeltaRules.EnforceRegisteredSchema(staged.Item3);
+            }
+        }
+        catch (AuthorityException)
+        {
+            operation.OperationStateName = ContentOperationStates.Aborted;
+            operation.OperationQuarantineReasonCode = SignedSchemaInvalidAtCommitReason;
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+
+        // E3-M2b-2 R-M2b2-11 (S-4): the schema/envelope tie again on the verified staged bytes, so an operation prepared by a
+        // build without S-4 cannot commit a mismatched row. Re-derived from the bytes alone (the CARV version is unchanged). A
+        // refusal aborts the operation and accepts nothing.
+        try
+        {
+            EnvelopeSchemaTie.Enforce(stagedDocuments.Select(d => d.Item3));
+        }
+        catch (AuthorityException)
+        {
+            operation.OperationStateName = ContentOperationStates.Aborted;
+            operation.OperationQuarantineReasonCode = EnvelopeSchemaTie.MismatchAtCommitReason;
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+
+        // E3-M2a: the envelope rules again on the verified staged bytes, so an operation prepared before the rules existed (an
+        // older Authority build) cannot commit an envelope they refuse. A refusal aborts the operation, nothing is accepted.
+        try
+        {
+            EnvelopeRules.Enforce(stagedDocuments.Select(d => d.Item3));
+            EnvelopeV2Rules.EnforceEnvironmentWrapCodes(stagedDocuments.Select(d => d.Item3), v2Acceptance.AllowedWrapCodes); // E3-M2e (AM-9)
+        }
+        catch (AuthorityException)
+        {
+            operation.OperationStateName = ContentOperationStates.Aborted;
+            operation.OperationQuarantineReasonCode = "ENVELOPE_INVALID_AT_COMMIT";
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+
+        // E3-M2e (replaces the E3-M2d blanket refusal, OA-M2d-1): a v2 row is committed only when the data-key ledger confirms it.
+        // DK-6: the bindings of this operation equal exactly the New groups of the verified staged bytes. P-4: every other v2 group is
+        // bound to a Committed operation of this organization and record, kind and commitment, with no more rows than its binding.
+        // A mismatch aborts the operation and journals a minimal content-stream incident (OD-M2e-11). Then the switch re-check: with
+        // acceptance off, a New group is refused (tightening wins). Integrity first, so a forged operation is an incident either way.
+        var stagedV2Groups = DataKeyLedgerRules.GroupsOf(stagedDocuments.Select(d => d.Item3));
+        var bindingsOfOperation = await scope.GetDataKeyBindingsForOperationAsync(operationId, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<ContentDataKeyBinding> newBindings = [];
+        if (stagedV2Groups.Count > 0 || bindingsOfOperation.Count > 0)
+        {
+            await scope.RequireDataKeyLedgerAsync(cancellationToken).ConfigureAwait(false); // L-13
+            var bindingsOfStaged = await scope.FindDataKeyBindingsAsync(stagedV2Groups.Select(g => g.DataKeyIdentifier).ToList(), cancellationToken).ConfigureAwait(false);
+            var bindingOperationIds = bindingsOfStaged.Select(b => b.BindingContentChangeOperationId).Where(id => id != operationId).Distinct().ToList();
+            var committedOperationIds = bindingOperationIds.Count == 0
+                ? new HashSet<Guid>()
+                : (await scope.GetOperationsAsync(bindingOperationIds, cancellationToken).ConfigureAwait(false))
+                    .Where(o => o.OperationStateName == ContentOperationStates.Committed && o.OrganizationId == state.OrganizationId && o.FormRecordId == request.FormRecordId)
+                    .Select(o => o.ContentChangeOperationId).ToHashSet();
+            var (bindingViolation, newGroups) = DataKeyLedgerRules.CommitDecision(stagedV2Groups, bindingsOfOperation, bindingsOfStaged, committedOperationIds, state.OrganizationId, request.FormRecordId, operationId);
+            if (bindingViolation is not null)
+            {
+                operation.OperationStateName = ContentOperationStates.Aborted;
+                operation.OperationQuarantineReasonCode = DataKeyLedgerFailures.BindingMismatchReason;
+                await revisions.AdvanceWithoutIndexChangeAsync(scope, state, cancellationToken).ConfigureAwait(false); // W4 (IX-1, INV-R)
+                var incident = new IntegrityIncidentBody(request.FormRecordId, head.CommittedContentRevision, head.CommittedOperationId, bindingViolation, bound.AuthorityUserId, correlationId);
+                scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "IntegrityVerificationFailed", incident, null, head.CommittedOperationId, clock));
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                throw DataKeyLedgerFailures.BindingMismatch();
+            }
+
+            if (newGroups.Count > 0 && !v2Acceptance.Enabled)
+            {
+                operation.OperationStateName = ContentOperationStates.Aborted;
+                operation.OperationQuarantineReasonCode = EnvelopeV2Rules.NotEnabledAtCommitReason;
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                throw EnvelopeRules.Refused(EnvelopeV2Rules.Reasons.VersionNotEnabled);
+            }
+
+            newBindings = bindingsOfOperation;
+        }
+
         var newIdentities = await ContentItemIdentityRules.BindAtCommitAsync(scope, state.OrganizationId, request.FormRecordId, operationId, stagedDocuments, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false);
 
         if (shareEditorOperation)
@@ -430,6 +605,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         operation.OperationStateName = ContentOperationStates.Committed;
         operation.OperationCommittedOn = now;
+        operation.CommitAcceptanceRuleVersion = ContentAcceptanceRules.CurrentVersion; // CARV: C = V (= P, checked above and by the database)
 
         // W1 (IX-1): derive and seal the record's search index from the bytes verified above, then advance both revisions (INV-R).
         await revisions.AdvanceForCommitAsync(scope, state, new AuthorizationAuthority.Application.Features.SearchIndex.CommitIndexInput(request.FormRecordId, head, request.StagedItems, now, registeredFormDefinitionId), cancellationToken).ConfigureAwait(false);
@@ -441,7 +617,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             await scope.FlushAsync(cancellationToken).ConfigureAwait(false);
             faultInjector.CrashIfArmed(FaultNames.CrashAfterSearchIndexDerivation);
         }
-        var checkpointBody = new ContentCheckpointBody(request.FormRecordId, head.CommittedContentRevision, operationId, Convert.ToHexStringLower(head.CommittedManifestRoot), Convert.ToHexStringLower(commit.ManifestLeafIndexDigest), commit.ManifestLeafCount, operation.CandidateKeyVersion, bound.AuthorityUserId, state.AuthorizationRevision, correlationId);
+        // E3-M2e DK-8 (AM-3): the complete tuples of the New groups' bindings, always present from CARV 3 (empty when there are none).
+        var checkpointBody = new ContentCheckpointBody(request.FormRecordId, head.CommittedContentRevision, operationId, Convert.ToHexStringLower(head.CommittedManifestRoot), Convert.ToHexStringLower(commit.ManifestLeafIndexDigest), commit.ManifestLeafCount, operation.CandidateKeyVersion, bound.AuthorityUserId, state.AuthorizationRevision, correlationId,
+            DataKeyLedgerRules.ArchiveTuples(newBindings));
         var journal = JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "ContentHeadCommitted", checkpointBody, null, operationId, clock);
         scope.AddJournalEntry(journal);
         scope.AddContentCheckpoint(new ContentIntegrityCheckpoint
@@ -608,12 +786,15 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         return new ContentHistoryPage(state.OrganizationId, formRecordId, head.CommittedContentRevision, entries, hasMore ? entries[^1].ContentRevision : null, state.AuthorizationRevision, correlationId);
     }
 
-    public async Task<VerifyRecordProjectionResult> VerifyProjectionAsync(VerifiedActor actor, VerifyRecordProjectionRequest request, Guid correlationId, CancellationToken cancellationToken)
+    /// <param name="envelopeCapability">E3-M2f-2: the capability the request declared (null ⇒ level 1, CAP-S5).</param>
+    public async Task<VerifyRecordProjectionResult> VerifyProjectionAsync(VerifiedActor actor, VerifyRecordProjectionRequest request, Guid correlationId, CancellationToken cancellationToken, ClientEnvelopeCapability? envelopeCapability = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        // E3-M2f-2 (CAP-O2/O3): right after the lock, before actor resolution, pinning and verification (G-2: no false quarantine).
+        await CapabilityFloor.RequireAsync(scope, state, envelopeCapability, cancellationToken).ConfigureAwait(false);
         var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
@@ -660,7 +841,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     /// must fail its whole search on any of them, D3); provider outages fail the whole call; tamper evidence is committed
     /// even when the authorization state moved meanwhile (then the call fails as not ready). Read action only.
     /// </summary>
-    public async Task<VerifyRecordProjectionsResponse> VerifyProjectionsAsync(VerifiedActor actor, VerifyRecordProjectionsRequest request, Guid correlationId, CancellationToken cancellationToken)
+    /// <param name="envelopeCapability">E3-M2f-2: the capability the request declared (null ⇒ level 1, CAP-S5).</param>
+    public async Task<VerifyRecordProjectionsResponse> VerifyProjectionsAsync(VerifiedActor actor, VerifyRecordProjectionsRequest request, Guid correlationId, CancellationToken cancellationToken, ClientEnvelopeCapability? envelopeCapability = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (request.Records is null || request.Records.Count is 0 or > MaximumBatchRecords)
@@ -676,6 +858,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        // E3-M2f-2 (CAP-O2/O3): right after the lock, before actor resolution, pinning and any record's verification (G-2).
+        await CapabilityFloor.RequireAsync(scope, state, envelopeCapability, cancellationToken).ConfigureAwait(false);
         var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
@@ -730,16 +914,13 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     /// <summary>Not a registered record of the scoped form (or its registration was revoked).</summary>
     public const string NotInScope = "NOT_IN_SCOPE";
 
-    /// <summary>The only AEAD envelope the business encrypts with (B-28); anything else in a target-form row is an envelope issue.</summary>
-    private const string ApprovedEncryptionAlgorithm = "AES-256-GCM";
-
     /// <summary>
     /// Phase C7 M4 (G19, verifier workload only — no user, no SpiceDB): verifies one record of the scoped form exactly as
     /// <see cref="VerifyRecordCoreAsync"/> does — registry, quarantine, archive receipt, verification key, complete leaf set,
     /// every HMAC, root — against the head the verifier expects, then counts the rows of <paramref name="fieldDefinitionId"/>
     /// in the verified canonical bytes: all occurrences (top level and repeating sections), those still in the form the
-    /// decision removes, and target-form encrypted rows whose envelope is not the approved shape or reuses a nonce under the
-    /// same wrapped key. Integrity failures quarantine the head and journal a minimal incident naming the workload, exactly
+    /// decision removes, and target-form encrypted rows whose envelope is not the approved shape or reuses another row's wrapped
+    /// data key (E3-M2a: with the same or a different nonce). Integrity failures quarantine the head and journal a minimal incident naming the workload, exactly
     /// like a user verification; nothing is repaired or re-signed. Provider outages throw (the caller's whole call fails).
     /// The caller holds the organization lock and commits the scope when <c>Quarantined</c> is true.
     /// IX-2: the verification itself is <see cref="VerifyWorkloadObservedContentAsync"/>, shared with the search-index builder.
@@ -769,7 +950,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         // The bytes are now exactly the accepted, signed rows of this revision: count from them alone.
         int occurrences = 0, oldForm = 0, envelopeIssues = 0;
         string? status = null;
-        var nonces = new HashSet<string>(StringComparer.Ordinal);
+        var nonces = new EnvelopeV2Rules.CensusState(); // E3-M2d: v1 rows exactly as before; v2 rows by the v2 rules (per revision)
         foreach (var item in observedItems)
         {
             var document = RowCanonicalDecoder.Decode(Convert.FromBase64String(item.CanonicalBytesBase64));
@@ -892,25 +1073,13 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     }
 
     /// <summary>
-    /// Shape of a target-form AEAD envelope as far as the Authority can judge without keys: the approved algorithm, a 96-bit
-    /// nonce, a 128-bit tag, non-empty ciphertext, wrapped data key and key reference, and no (wrapped key, nonce) pair seen
-    /// before in this revision. The tag itself can only be checked by the key holder (the worker's decrypt check).
+    /// Shape of a target-form AEAD envelope as far as the Authority can judge without keys: the v1 rules every write enforces
+    /// (<see cref="EnvelopeRules"/>, E3-M2a), and no wrapped data key seen before in this revision. Rows accepted before
+    /// E3-M2a may still fail them, which is what the census reports. The tag itself can only be checked by the key holder.
     /// </summary>
-    private static bool EnvelopeLooksApproved(RowCanonicalDocument document, HashSet<string> nonces)
-    {
-        var algorithm = document.Column("encryption_algorithm_name")?.AsText();
-        var nonce = document.Column("encryption_nonce_bytes")?.AsBytes();
-        var tag = document.Column("encryption_auth_tag_bytes")?.AsBytes();
-        var ciphertext = document.Column("encrypted_value_bytes")?.AsBytes();
-        var wrapped = document.Column("wrapped_data_key_bytes")?.AsBytes();
-        var keyReference = document.Column("encryption_key_reference")?.AsText();
-        if (algorithm != ApprovedEncryptionAlgorithm || nonce is not { Length: 12 } || tag is not { Length: 16 } || ciphertext is not { Length: > 0 } || wrapped is not { Length: > 0 } || string.IsNullOrEmpty(keyReference))
-        {
-            return false;
-        }
-
-        return nonces.Add(Convert.ToHexStringLower(wrapped.Value.Span) + ":" + Convert.ToHexStringLower(nonce.Value.Span));
-    }
+    private static bool EnvelopeLooksApproved(RowCanonicalDocument document, EnvelopeV2Rules.CensusState census) =>
+        EnvelopeSchemaTie.Violation(document) is null // E3-M2b-2 S-4: the schema/envelope tie, as on every write
+        && census.Accepts(document); // E3-M2a rules for v1 rows (one value per v1 data key); E3-M2d v2 rules for v2 rows
 
     /// <summary>
     /// One record's verification (shared by the single and the batch operation). Throws the single operation's typed
@@ -1226,6 +1395,13 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             throw AuthorityException.Invalid("exactly one record header item is required");
         }
 
+        // E3-M2b-2 R-M2b2-11 (S-4): the signed schema version and the envelope version of every encrypted row are tied
+        // (1/1 or 2/2 only), independently of and before the envelope rules, on every write path.
+        EnvelopeSchemaTie.Enforce(parsed.Select(p => p.Document));
+
+        // E3-M2a: every encrypted row of every write path (owner, share editor, protection migration; new and carried rows)
+        // must be a well-formed v1 envelope, before anything is classified or signed.
+        EnvelopeRules.Enforce(parsed.Select(p => p.Document));
         return parsed;
     }
 
@@ -1550,7 +1726,12 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
     private sealed record ParsedCandidateItem(ManifestItemKind Kind, Guid ItemId, byte[] Key, byte[] CanonicalBytes, byte[] Digest, RowCanonicalDocument Document);
 
-    private sealed record ContentCheckpointBody(Guid FormRecordId, long CommittedContentRevision, Guid CommittedOperationId, string ManifestRootHex, string LeafIndexDigestHex, long LeafCount, int KeyVersion, Guid ActorUserId, long AuthorizationRevision, Guid CorrelationId);
+    /// <summary>
+    /// The <c>ContentHeadCommitted</c> body. E3-M2e (AM-3, DK-8): <see cref="NewDataKeyBindings"/> is present on every commit by a CARV 3 or
+    /// later build; bodies written before carry no such field and hold no accepted v2 binding by construction (E3-M2d refused every v2 row).
+    /// </summary>
+    private sealed record ContentCheckpointBody(Guid FormRecordId, long CommittedContentRevision, Guid CommittedOperationId, string ManifestRootHex, string LeafIndexDigestHex, long LeafCount, int KeyVersion, Guid ActorUserId, long AuthorizationRevision, Guid CorrelationId,
+        IReadOnlyList<DataKeyLedgerRules.ArchivedBinding> NewDataKeyBindings);
 
     private sealed record IntegrityIncidentBody(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, string FailureReasonCode, Guid ObservedByUserId, Guid CorrelationId);
 

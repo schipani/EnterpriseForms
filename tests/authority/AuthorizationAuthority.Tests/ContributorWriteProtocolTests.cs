@@ -2,8 +2,10 @@ using System.Reflection;
 using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Application.Features.Content;
+using AuthorizationAuthority.Application.Features.Journal;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.Content;
+using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
@@ -49,12 +51,19 @@ public sealed partial class ContributorWriteProtocolTests
         /// <summary>The accepted rows of the head with their signatures (what the business store would hold).</summary>
         public List<(Staged Row, byte[] Signature)> Accepted { get; private set; } = [];
 
-        public Harness(bool contributorWritesEnabled = true)
+        /// <summary>The organization's in-process HMAC provider (E3-M2a: lets a test reproduce what an older Authority build signed).</summary>
+        public LocalHmacProvider Mac { get; }
+
+        /// <summary>The provider the content service signs through (E3-M2a: counts signatures, so a refusal can be shown to precede signing).</summary>
+        public CountingMacProvider Signer { get; }
+
+        public Harness(bool contributorWritesEnabled = true, EnvelopeV2AcceptanceSwitch? envelopeV2Acceptance = null)
         {
-            var mac = new LocalHmacProvider();
+            var mac = Mac = new LocalHmacProvider();
             mac.ProvisionKeyAsync(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", CancellationToken.None).GetAwaiter().GetResult();
             Switch = new ShareContributorWriteSwitch(contributorWritesEnabled, testingOverrideAllowed: true);
-            Service = new ContentService(Store, mac, TestProjection.Verifier(Store, ThrowingProxy.Create<ISpiceDbProjection>()), new NoOpFaultInjector(), TimeProvider.System, Switch);
+            Signer = new CountingMacProvider(mac);
+            Service = new ContentService(Store, Signer, TestProjection.Verifier(Store, ThrowingProxy.Create<ISpiceDbProjection>()), new NoOpFaultInjector(), TimeProvider.System, Switch, envelopeV2Acceptance: envelopeV2Acceptance);
             State = new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous };
             Store.Organizations.Add(State);
             foreach (var user in new[] { Owner, Contributor })
@@ -69,6 +78,9 @@ public sealed partial class ContributorWriteProtocolTests
         }
 
         public RecordContentHead Head => Store.Heads.Single();
+
+        /// <summary>E3-M2f-2: the envelope capability this harness's business build declares on Prepare and Commit (null: no declaration, level 1).</summary>
+        public ClientEnvelopeCapability? EnvelopeCapability { get; set; }
 
         public static VerifiedActor Actor(Guid user) => new(Issuer, user.ToString("D"), "test");
 
@@ -118,13 +130,13 @@ public sealed partial class ContributorWriteProtocolTests
         public List<Staged> Stage(IEnumerable<Row> rows, Guid operation) => rows.Select(r => Encode(r, Org, operation, Head.CommittedContentRevision + 1)).ToList();
 
         public async Task<PreparedContentOperation> PrepareAsync(Guid actor, Guid operation, List<Staged> candidate, bool withCurrent, string? key = null) =>
-            await Service.PrepareAsync(Actor(actor), Request(operation, candidate, withCurrent), key ?? "key-" + operation.ToString("N"), Guid.CreateVersion7(), CancellationToken.None);
+            await Service.PrepareAsync(Actor(actor), Request(operation, candidate, withCurrent), key ?? "key-" + operation.ToString("N"), Guid.CreateVersion7(), CancellationToken.None, EnvelopeCapability);
 
         public async Task<ContentRevision> CommitAsync(Guid actor, PreparedContentOperation prepared, List<Staged> candidate)
         {
             var signatures = prepared.SignedItems.ToDictionary(s => (s.ItemKind, s.ItemId), s => Convert.FromBase64String(s.RowSignatureBase64));
             var staged = candidate.Select(c => new StagedContentItem(c.Kind, c.ItemId, c.Base64, Convert.ToBase64String(signatures[(c.Kind, c.ItemId)]))).ToList();
-            var revision = await Service.CommitAsync(Actor(actor), prepared.OperationId, new CommitContentChangeRequest(Org, Record, staged), Guid.CreateVersion7(), CancellationToken.None);
+            var revision = await Service.CommitAsync(Actor(actor), prepared.OperationId, new CommitContentChangeRequest(Org, Record, staged), Guid.CreateVersion7(), CancellationToken.None, EnvelopeCapability);
             Accepted = candidate.Select(c => (c, signatures[(c.Kind, c.ItemId)])).ToList();
             return revision;
         }
@@ -141,6 +153,67 @@ public sealed partial class ContributorWriteProtocolTests
         {
             await WriteAsync(Owner, Rows(), withCurrent: true);
             return this;
+        }
+
+        /// <summary>
+        /// Test-only (E3-M2d, as ProtectionReconciliationTests.AcceptLegacyAsync): records <paramref name="rows"/> as the accepted head
+        /// without running Prepare or Commit, signed with the organization's key, with an anchored content checkpoint. It models
+        /// accepted history this build would not itself accept (an Envelope v2 head, which no build accepts before E3-M2e).
+        /// </summary>
+        public async Task AcceptDirectlyAsync(List<Row> rows)
+        {
+            var operation = Guid.CreateVersion7();
+            var revision = Head.CommittedContentRevision + 1;
+            var key = new IntegrityKeyReference(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", 1);
+            var accepted = new List<(Staged Row, byte[] Signature)>(rows.Count);
+            var inputs = new List<MerkleLeafInput>(rows.Count);
+            foreach (var row in rows)
+            {
+                var encoded = Encode(row, Org, operation, revision);
+                var signature = (await Mac.SignAsync(key, encoded.Bytes, CancellationToken.None)).Mac;
+                accepted.Add((encoded, signature));
+                inputs.Add(new MerkleLeafInput((MerkleItemKind)(byte)encoded.Kind, encoded.ItemId, signature, encoded.Digest, (ulong)revision, operation));
+            }
+
+            var manifest = MerkleManifestV1.Build(inputs);
+            var commit = new RecordManifestCommit
+            {
+                RecordManifestCommitId = Guid.CreateVersion7(),
+                OrganizationId = Org,
+                FormRecordId = Record,
+                CommittedOperationId = operation,
+                CommittedContentRevision = revision,
+                ManifestSchemaVersion = 1,
+                ManifestAlgorithmVersion = 1,
+                RowSignatureKeyVersion = 1,
+                ManifestLeafCount = (long)manifest.LeafCount,
+                ManifestRootDigest = manifest.MerkleRoot,
+                ManifestLeafIndexDigest = manifest.LeafIndexDigest,
+                ManifestCommittedOn = DateTimeOffset.UtcNow,
+            };
+            Store.Commits.Add(commit);
+            Store.ManifestLeaves.AddRange(manifest.SortedLeaves.Select((leaf, position) => new RecordManifestLeaf
+            {
+                RecordManifestLeafId = Guid.CreateVersion7(),
+                RecordManifestCommitId = commit.RecordManifestCommitId,
+                ManifestLeafPosition = position,
+                ManifestItemKey = leaf.ItemKey,
+                ManifestItemKindCode = (byte)leaf.Kind,
+                ManifestItemId = leaf.ItemId,
+                CanonicalPayloadDigest = leaf.CanonicalPayloadDigest.ToArray(),
+                RowSignature = leaf.RowSignature.ToArray(),
+                ManifestLeafDigest = manifest.LeafHashes[position],
+            }));
+            Head.CommittedContentRevision = revision;
+            Head.CommittedOperationId = operation;
+            Head.CurrentRecordManifestCommitId = commit.RecordManifestCommitId;
+            Head.CommittedManifestRoot = manifest.MerkleRoot;
+            Head.SignatureKeyVersion = 1;
+            State.AdvanceContentIntegrityRevision(ContentRevisionProjectionAction.AdvanceWithDerivation);
+            var checkpoint = JournalChain.Append(State, JournalStreamNames.Content, State.ContentIntegrityRevision, "ContentHeadCommitted", new { form_record_id = Record, committed_content_revision = revision }, null, operation, TimeProvider.System);
+            checkpoint.ArchiveDeliveryState = ArchiveDeliveryStates.Anchored;
+            Store.Journal.Add(checkpoint);
+            Accepted = accepted;
         }
     }
 

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -66,7 +67,13 @@ public sealed class ReadinessFailsClosedTests
             b.UseEnvironment("Development");
             b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(new Dictionary<string, string?> { ["TrustAuthority:BaseAddress"] = "http://authority.test" }));
             b.ConfigureServices(services =>
-                services.AddHttpClient(TrustAuthorityReadinessProbe.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => authorityHandler));
+            {
+                services.AddHttpClient(TrustAuthorityReadinessProbe.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => authorityHandler);
+                // E3-M2b-2 (D-5): readiness also requires a verified business schema; this host has no database, so the migration
+                // history is supplied (the real reader against migrated and unmigrated PostgreSQL is in the E3-M2b-2 gate).
+                services.RemoveAll<EnterpriseForms.Infrastructure.Persistence.IBusinessMigrationHistoryReader>();
+                services.AddSingleton<EnterpriseForms.Infrastructure.Persistence.IBusinessMigrationHistoryReader>(BusinessSchemaGuardTests.FakeHistory.Migrated());
+            });
         });
 
         using var client = api.CreateClient();

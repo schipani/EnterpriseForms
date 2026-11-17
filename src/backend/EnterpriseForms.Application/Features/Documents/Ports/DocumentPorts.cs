@@ -49,12 +49,46 @@ public sealed record FileEncryptionEnvelope(string AlgorithmName, int EnvelopeVe
 
 public sealed record EncryptionOutcome(FileEncryptionEnvelope Envelope, long PlaintextSizeBytes, byte[] PlaintextSha256, long CiphertextSizeBytes, byte[] CiphertextSha256);
 
+/// <summary>
+/// E3-M2c: the stored envelope of one Authority-verified document version, with its signed schema version and the three Envelope
+/// v2 columns (NULL for every envelope-1 row). The reader dispatches on (signed schema, envelope version) under rule S-8.
+/// </summary>
+public sealed record VerifiedDocumentEnvelope(
+    int SignedSchemaVersion,
+    string AlgorithmName,
+    int EnvelopeVersion,
+    string KeyReference,
+    byte[] WrappedDataKey,
+    byte[] NoncePrefix,
+    int SegmentSizeBytes,
+    Guid? DataKeyIdentifier,
+    byte[]? DataKeyCommitmentBytes,
+    int? KeyWrapAlgorithmCode)
+{
+    /// <summary>The envelope columns of a verified attachment-version row, exactly as stored.</summary>
+    public static VerifiedDocumentEnvelope Of(Domain.Features.Documents.FileAttachmentVersion version)
+    {
+        ArgumentNullException.ThrowIfNull(version);
+        return new(version.RowSignatureSchemaVersion, version.EncryptionAlgorithmName, version.EncryptionEnvelopeVersion, version.EncryptionKeyReference, version.WrappedDataKey,
+            version.EncryptionNoncePrefix, version.EncryptionSegmentSizeBytes, version.DataKeyIdentifier, version.DataKeyCommitmentBytes, version.KeyWrapAlgorithmCode);
+    }
+}
+
 /// <summary>Authenticated streaming encryption (segmented AES-256-GCM). Keys never leave the provider; nonces are unique per data key.</summary>
 public interface IFileEncryptionService
 {
     Task<EncryptionOutcome> EncryptAsync(Stream plaintext, Stream ciphertextSink, FileEncryptionContext context, CancellationToken cancellationToken);
 
+    /// <summary>The Envelope v1 decryptor (envelope version 1 only). Product reads of stored documents use <see cref="DecryptVerifiedAsync"/>; this overload has no product caller of its own (DecryptionCallSiteTests).</summary>
     Task DecryptAsync(Stream ciphertext, Stream plaintextSink, FileEncryptionEnvelope envelope, FileEncryptionContext context, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// E3-M2c: decrypts an Authority-verified document version. Strict S-8 dispatch: signed schema 1 with envelope 1 (no v2 column
+    /// set) uses the v1 decryptor; schema 2 with envelope 2 (every v2 column set) uses the Envelope v2 reader (key commitment checked
+    /// before any segment); schema 0 and every other combination is refused before the key provider is asked, with no fallback.
+    /// Streaming caller contract as v1 (OD-E3-15): only normal completion signals success; on any exception the sink must be discarded.
+    /// </summary>
+    Task DecryptVerifiedAsync(Stream ciphertext, Stream plaintextSink, VerifiedDocumentEnvelope envelope, FileEncryptionContext context, CancellationToken cancellationToken);
 }
 
 /// <summary>

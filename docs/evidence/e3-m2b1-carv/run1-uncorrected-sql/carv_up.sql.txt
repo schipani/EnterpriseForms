@@ -1,0 +1,45 @@
+-- E3-M2b-1 proposed AuthorityDb migration "AuthorityContentAcceptanceRuleVersion" (design artifact, not a repository migration).
+-- Runs as the migration identity inside one transaction (EF wraps each migration in a transaction).
+SET LOCAL lock_timeout = '5s';
+
+ALTER TABLE authority.content_change_operations
+    ADD COLUMN prepare_acceptance_rule_version integer NULL,
+    ADD COLUMN commit_acceptance_rule_version integer NULL;
+
+ALTER TABLE authority.content_change_operations
+    ADD CONSTRAINT ck_content_operation_rule_versions_positive
+        CHECK ((prepare_acceptance_rule_version IS NULL OR prepare_acceptance_rule_version >= 1)
+           AND (commit_acceptance_rule_version IS NULL OR commit_acceptance_rule_version >= 1)),
+    -- A Committed row is either a legacy commit (no stamps at all) or a CARV commit whose committer ran exactly the rules
+    -- its Prepare ran. A non-Committed row never carries a commit stamp.
+    ADD CONSTRAINT ck_content_operation_commit_rule_version
+        CHECK ((operation_state_name = 'Committed'
+                AND ((prepare_acceptance_rule_version IS NULL AND commit_acceptance_rule_version IS NULL)
+                  OR (prepare_acceptance_rule_version IS NOT NULL AND commit_acceptance_rule_version = prepare_acceptance_rule_version)))
+            OR (operation_state_name <> 'Committed' AND commit_acceptance_rule_version IS NULL));
+
+-- State guard: inserts are Prepared and unstamped for commit; only a Prepared row may change; the Prepare stamp never changes.
+CREATE FUNCTION authority.content_operation_rule_state_guard() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.operation_state_name <> 'Prepared' OR NEW.commit_acceptance_rule_version IS NOT NULL THEN
+            RAISE EXCEPTION 'content operation must be inserted as Prepared without a commit rule version'
+                USING ERRCODE = 'check_violation', CONSTRAINT = 'trg_content_operation_rule_state_guard';
+        END IF;
+        RETURN NEW;
+    END IF;
+    IF OLD.operation_state_name <> 'Prepared' THEN
+        RAISE EXCEPTION 'a terminal content operation is immutable'
+            USING ERRCODE = 'check_violation', CONSTRAINT = 'trg_content_operation_rule_state_guard';
+    END IF;
+    IF NEW.prepare_acceptance_rule_version IS DISTINCT FROM OLD.prepare_acceptance_rule_version THEN
+        RAISE EXCEPTION 'content operation prepare rule version is immutable'
+            USING ERRCODE = 'check_violation', CONSTRAINT = 'trg_content_operation_rule_state_guard';
+    END IF;
+    RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION authority.content_operation_rule_state_guard() FROM PUBLIC;
+CREATE TRIGGER trg_content_operation_rule_state_guard
+    BEFORE INSERT OR UPDATE ON authority.content_change_operations
+    FOR EACH ROW EXECUTE FUNCTION authority.content_operation_rule_state_guard();

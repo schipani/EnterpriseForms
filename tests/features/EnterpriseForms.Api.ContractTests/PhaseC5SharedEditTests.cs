@@ -49,8 +49,23 @@ public sealed class PhaseC5SharedEditTests
         public Task<string> DecryptAsync(FieldEncryptedValue value, EnterpriseForms.Application.Features.Documents.Ports.EncryptionKeyPurpose purpose, CancellationToken cancellationToken)
         {
             DecryptedItems.Add(value.FieldValueItemId);
+            SelfSealedItems.Add(value.FieldValueItemId);
             return inner.DecryptAsync(value, purpose, cancellationToken);
         }
+
+        /// <summary>E3-M2c: items decrypted in self-sealed mode (Mode B) and in verified mode (Mode A).</summary>
+        public List<Guid> SelfSealedItems { get; } = [];
+
+        public List<Guid> VerifiedItems { get; } = [];
+
+        public Task<IReadOnlyList<string>> DecryptVerifiedAsync(Guid organizationId, IReadOnlyList<FieldEncryptedValue> values, CancellationToken cancellationToken)
+        {
+            DecryptedItems.AddRange(values.Select(v => v.FieldValueItemId));
+            VerifiedItems.AddRange(values.Select(v => v.FieldValueItemId));
+            return inner.DecryptVerifiedAsync(organizationId, values, cancellationToken);
+        }
+
+        public Task<byte[]> OpenCreationFingerprintKeyAsync(CreationFingerprintKeyEnvelope envelope, CancellationToken cancellationToken) => inner.OpenCreationFingerprintKeyAsync(envelope, cancellationToken);
     }
 
     private static SpyEncryption NewEncryption() => new(new AesGcmFieldEncryptionService(new LocalDevelopmentKeyProvider(Options.Create(new EncryptionOptions { KeyProvider = "LocalDevelopment", LocalDevelopmentKekBase64 = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) }))));
@@ -110,6 +125,29 @@ public sealed class PhaseC5SharedEditTests
             var created = keys.Select((k, i) => new FieldOption { FieldOptionId = Guid.CreateVersion7(), FieldDefinitionId = field.FieldDefinitionId, OptionKey = k, OptionDisplayText = k, OptionSortOrder = i, IsActive = true }).ToList();
             Options.AddRange(created);
             return created;
+        }
+
+        /// <summary>
+        /// E3-M2c: replaces every encrypted row with what the store returns for it — a new instance with the same bytes and signed
+        /// schema (EF materialization) — so the record's rows are stored content, not this process's own seals.
+        /// </summary>
+        public void MaterializeAsStored()
+        {
+            for (var i = 0; i < Rows.Count; i++)
+            {
+                if (Rows[i] is FieldEncryptedValue e)
+                {
+                    var stored = new FieldEncryptedValue
+                    {
+                        FieldEncryptedValueId = Guid.CreateVersion7(), TenantId = e.TenantId, FormRecordId = e.FormRecordId, FieldDefinitionId = e.FieldDefinitionId, FieldValueItemId = e.FieldValueItemId,
+                        EncryptedValueBytes = e.EncryptedValueBytes.ToArray(), EncryptionNonceBytes = e.EncryptionNonceBytes.ToArray(), EncryptionAuthTagBytes = e.EncryptionAuthTagBytes.ToArray(), WrappedDataKeyBytes = e.WrappedDataKeyBytes.ToArray(),
+                        EncryptionAlgorithmName = e.EncryptionAlgorithmName, EncryptionKeyReference = e.EncryptionKeyReference, EncryptionEnvelopeVersion = e.EncryptionEnvelopeVersion, EncryptedLogicalType = e.EncryptedLogicalType,
+                        CreatedOn = e.CreatedOn, CreatedByUserId = e.CreatedByUserId,
+                    };
+                    Stamp(stored);
+                    Rows[i] = stored;
+                }
+            }
         }
 
         public static void Stamp(ISignedContentRow row)
@@ -344,5 +382,75 @@ public sealed class PhaseC5SharedEditTests
         f.Add(Field("note"), "x", readable: true, editable: true);
         var result = InProcessCompletion.Completed(SharedFieldWriteBuilder.BuildAsync(f.Build(), new Dictionary<string, string> { ["note"] = "y" }, null, Tenant, Record, Now, Editor, CancellationToken.None));
         Assert.Equal(2, result.Header.RowSignatureSchemaVersion);
+    }
+
+    // ---- E3-M2c OD-M2c-02a path E: shared-edit response provenance ------------------------------------------------------
+
+    /// <summary>A record with an editable encrypted note and a readable-but-not-editable encrypted reference, all stored content.</summary>
+    private static (Fixture Fixture, FieldValueRowBase Note, FieldValueRowBase Reference, FieldValueRowBase Secret) StoredRecord()
+    {
+        var f = new Fixture();
+        f.Add(Field("note", protection: "ApplicationEncrypted", classification: "Confidential"), "before", readable: true, editable: true);
+        f.Add(Field("reference", protection: "ApplicationEncrypted", classification: "Confidential"), "readable only", readable: true, editable: false);
+        f.Add(Field("secret", protection: "ApplicationEncrypted", classification: "Confidential"), "never released", readable: false, editable: false, placed: false);
+        f.MaterializeAsStored();
+        return (f, f.Rows[0] as FieldValueRowBase ?? throw new InvalidOperationException(), (FieldValueRowBase)f.Rows[1], (FieldValueRowBase)f.Rows[2]);
+    }
+
+    /// <summary>The rows the handler releases: the editor's readable items of the new revision (unchanged copies + edited rows).</summary>
+    private static List<FieldValueRowBase> Released(VerifiedRecord verified, SharedFieldWriteBuilder.Result built)
+    {
+        var readable = SharedFieldWriteBuilder.ReadableRows(verified).Select(r => r.FieldValueItemId).ToHashSet();
+        return built.Rows.OfType<FieldValueRowBase>().Where(v => v.FormRecordGroupId is null && readable.Contains(v.FieldValueItemId)).ToList();
+    }
+
+    [Fact]
+    public void PathETheSharedEditResponseDecryptsEditedRowsSelfSealedAndCopiedRowsVerified()
+    {
+        var (f, note, reference, secret) = StoredRecord();
+        var verified = f.Build();
+        var built = InProcessCompletion.Completed(SharedFieldWriteBuilder.BuildAsync(verified, new Dictionary<string, string> { ["note"] = "after" }, null, Tenant, Record, Now, Editor, CancellationToken.None));
+        var released = Released(verified, built);
+        f.Encryption.SelfSealedItems.Clear();
+        f.Encryption.VerifiedItems.Clear();
+
+        var decrypted = InProcessCompletion.Completed(EnterpriseForms.Application.Features.FormRecords.UpdateFormRecord.UpdateFormRecordHandler.DecryptSharedResponseAsync(f.Encryption, released, built.EditedRows, CancellationToken.None));
+
+        var edited = (FieldEncryptedValue)Assert.Single(built.EditedRows);
+        var copied = (FieldEncryptedValue)released.Single(r => r.FieldValueItemId == reference.FieldValueItemId);
+        Assert.Equal("after", decrypted.WireOf(edited));
+        Assert.Equal("readable only", decrypted.WireOf(copied));
+        Assert.Equal([note.FieldValueItemId], f.Encryption.SelfSealedItems);   // only this request's fresh seal
+        Assert.Equal([reference.FieldValueItemId], f.Encryption.VerifiedItems); // the stored copy, through the verified reader
+        Assert.DoesNotContain(secret.FieldValueItemId, f.Encryption.DecryptedItems); // unauthorized content is never decrypted
+        Assert.True(((FieldEncryptedValue)reference).EncryptedValueBytes.SequenceEqual(copied.EncryptedValueBytes)); // the copy is stored ciphertext
+    }
+
+    [Fact]
+    public void PathEAnIdempotentReplayKeepsTheSameSplitAndCannotPassStoredContentAsSelfSealed()
+    {
+        // The first attempt committed: its edited note is now stored content of the verified snapshot.
+        var (f, note, _, _) = StoredRecord();
+        var first = InProcessCompletion.Completed(SharedFieldWriteBuilder.BuildAsync(f.Build(), new Dictionary<string, string> { ["note"] = "after" }, null, Tenant, Record, Now, Editor, CancellationToken.None));
+        f.Rows[0] = first.EditedRows.Single();
+        f.MaterializeAsStored();
+        var replaySnapshot = f.Build();
+
+        // The replayed request supplies the same value: nothing changes, so nothing is freshly sealed and nothing can be self-sealed.
+        Assert.Equal("NO_CHANGE", Refusal(replaySnapshot, new() { ["note"] = "after" }).ErrorCode);
+
+        // A replay that changes the value again builds a new fresh seal; the stored note of the first attempt is never self-sealed.
+        var replay = InProcessCompletion.Completed(SharedFieldWriteBuilder.BuildAsync(replaySnapshot, new Dictionary<string, string> { ["note"] = "again" }, null, Tenant, Record, Now, Editor, CancellationToken.None));
+        var released = Released(replaySnapshot, replay);
+        var decrypted = InProcessCompletion.Completed(EnterpriseForms.Application.Features.FormRecords.UpdateFormRecord.UpdateFormRecordHandler.DecryptSharedResponseAsync(f.Encryption, released, replay.EditedRows, CancellationToken.None));
+        Assert.Equal("again", decrypted.WireOf((FieldEncryptedValue)replay.EditedRows.Single()));
+
+        // Misclassifying stored copies as fresh fails closed at run time, whichever way it is attempted.
+        var storedCopies = released.Except(replay.EditedRows).ToList();
+        Assert.NotEmpty(storedCopies);
+        Assert.Throws<InvalidOperationException>(() => InProcessCompletion.Completed(EnterpriseForms.Application.Features.FormRecords.UpdateFormRecord.UpdateFormRecordHandler.DecryptSharedResponseAsync(f.Encryption, released, released, CancellationToken.None)));
+        Assert.Throws<InvalidOperationException>(() => InProcessCompletion.Completed(DecryptedFieldValues.DecryptSelfSealedAsync(f.Encryption, storedCopies, CancellationToken.None)));
+        Assert.Throws<InvalidOperationException>(() => InProcessCompletion.Completed(DecryptedFieldValues.DecryptSelfSealedAsync(f.Encryption, f.Rows, CancellationToken.None)));
+        Assert.NotEqual(note.FieldValueItemId, Guid.Empty);
     }
 }

@@ -1,0 +1,75 @@
+{
+  "id": "MZ-34a",
+  "kind": "MZ",
+  "what": "the index command re-applies the runtime grants (AuthorityRuntimeGrants.Apply) after the build",
+  "files": [
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceIndexCommand.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceIndexCommand.cs": "f72817169c996ab46d93aa3cf07adc5980ccd3455c82cdd22804b72593c322c5"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "R",
+      "exit": 0,
+      "seconds": 22.6
+    },
+    {
+      "build": "A",
+      "exit": 0,
+      "seconds": 29.5
+    },
+    {
+      "build": "X",
+      "exit": 0,
+      "seconds": 36.3
+    },
+    {
+      "letter": "A",
+      "classes": [
+        "CapabilityRefusalEvidenceIndexTests"
+      ],
+      "exit": 0,
+      "seconds": 3.0,
+      "total": 40,
+      "succeeded": 40,
+      "failed": []
+    },
+    {
+      "letter": "X",
+      "classes": [
+        "CapabilityRefusalEvidenceIndexBoundaryTests"
+      ],
+      "exit": 2,
+      "seconds": 2.3,
+      "total": 21,
+      "succeeded": 19,
+      "failed": [
+        "EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceIndexBoundaryTests.TheCommandNeverReachesTheOrdinaryMigrationPathOrRepairsAnything(forbidden:"
+      ]
+    },
+    {
+      "kind": "PG3I",
+      "groups": "",
+      "exit": 1,
+      "seconds": 71.5,
+      "report": true,
+      "checks": 40,
+      "failed": [
+        "I-01",
+        "I-04",
+        "I-06",
+        "I-09",
+        "I-12",
+        "I-14",
+        "I-19",
+        "I-22",
+        "I-23",
+        "I-24"
+      ]
+    }
+  ],
+  "seconds": 165.4
+}

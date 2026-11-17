@@ -1,0 +1,1 @@
+{"Ok":false,"Result":null,"Error":"AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False","Message":"the calling workload\u0027s envelope capability is insufficient for this request; a current business build is required","BuildRuleVersion":3,"MacVerifications":0}

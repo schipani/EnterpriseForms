@@ -1,0 +1,513 @@
+2026-11-17 15:05:02.931 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.010 ms  plan:
+	Query Text: SELECT version();
+	
+	SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid
+	FROM (
+	    -- Arrays have typtype=b - this subquery identifies them by their typreceive and converts their typtype to a
+	    -- We first do this for the type (innerest-most subquery), and then for its element type
+	    -- This also returns the array element, range subtype and domain base type as elemtypoid
+	    SELECT
+	        typ.oid, typ.typnamespace, typ.typname, typ.typtype, typ.typrelid, typ.typnotnull, typ.relkind,
+	        elemtyp.oid AS elemtypoid, elemtyp.typname AS elemtypname, elemcls.relkind AS elemrelkind,
+	        CASE WHEN elemproc.proname='array_recv' THEN 'a' ELSE elemtyp.typtype END AS elemtyptype
+	        , typ.typcategory
+	    FROM (
+	        SELECT typ.oid, typnamespace, typname, typrelid, typnotnull, relkind, typelem AS elemoid,
+	            CASE WHEN proc.proname='array_recv' THEN 'a' ELSE typ.typtype END AS typtype,
+	            CASE
+	                WHEN proc.proname='array_recv' THEN typ.typelem
+	                WHEN typ.typtype='r' THEN rngsubtype
+	                WHEN typ.typtype='m' THEN (SELECT rngtypid FROM pg_range WHERE rngmultitypid = typ.oid)
+	                WHEN typ.typtype='d' THEN typ.typbasetype
+	            END AS elemtypoid
+	            , typ.typcategory
+	        FROM pg_type AS typ
+	        LEFT JOIN pg_class AS cls ON (cls.oid = typ.typrelid)
+	        LEFT JOIN pg_proc AS proc ON proc.oid = typ.typreceive
+	        LEFT JOIN pg_range ON (pg_range.rngtypid = typ.oid)
+	    ) AS typ
+	    LEFT JOIN pg_type AS elemtyp ON elemtyp.oid = elemtypoid
+	    LEFT JOIN pg_class AS elemcls ON (elemcls.oid = elemtyp.typrelid)
+	    LEFT JOIN pg_proc AS elemproc ON elemproc.oid = elemtyp.typreceive
+	) AS t
+	JOIN pg_namespace AS ns ON (ns.oid = typnamespace)
+	WHERE
+	    
+	    (typtype IN ('b', 'r', 'm', 'e', 'd') OR -- Base, range, multirange, enum, domain
+	    (typtype = 'c' AND relkind='c') OR -- User-defined free-standing composites (not table composites) by default
+	    (typtype = 'p' AND typname IN ('record', 'void', 'unknown')) OR -- Some special supported pseudo-types
+	    (typtype = 'a' AND (  -- Array of...
+	        elemtyptype IN ('b', 'r', 'm', 'e', 'd') OR -- Array of base, range, multirange, enum, domain
+	        (elemtyptype = 'p' AND elemtypname IN ('record', 'void')) OR -- Arrays of special supported pseudo-types
+	        (elemtyptype = 'c' AND elemrelkind='c') -- Array of user-defined free-standing composites (not table composites) by default
+	    )))
+	ORDER BY CASE
+	       WHEN typtype IN ('b', 'e', 'p') THEN 0           -- First base types, enums, pseudo-types
+	       WHEN typtype = 'c' THEN 1                        -- Composites after (fields loaded later in 2nd pass)
+	       WHEN typtype = 'r' THEN 2                        -- Ranges after
+	       WHEN typtype = 'm' THEN 3                        -- Multiranges after
+	       WHEN typtype = 'd' AND elemtyptype <> 'a' THEN 4 -- Domains over non-arrays after
+	       WHEN typtype = 'a' THEN 5                        -- Arrays after
+	       WHEN typtype = 'd' AND elemtyptype = 'a' THEN 6  -- Domains over arrays last
+	END;
+	
+	-- Load field definitions for (free-standing) composite types
+	SELECT typ.oid, att.attname, att.atttypid
+	FROM pg_type AS typ
+	JOIN pg_namespace AS ns ON (ns.oid = typ.typnamespace)
+	JOIN pg_class AS cls ON (cls.oid = typ.typrelid)
+	JOIN pg_attribute AS att ON (att.attrelid = typ.typrelid)
+	WHERE
+	  (typ.typtype = 'c' AND cls.relkind='c') AND
+	  
+	  attnum > 0 AND     -- Don't load system attributes
+	  NOT attisdropped
+	ORDER BY typ.oid, att.attnum;
+	
+	-- Load enum fields
+	SELECT typ.oid, enumlabel
+	FROM pg_enum
+	JOIN pg_type AS typ ON typ.oid = enumtypid
+	JOIN pg_namespace AS ns ON ns.oid = typ.typnamespace
+	
+	ORDER BY oid, enumsortorder;
+	
+	Result  (cost=0.00..0.01 rows=1 width=32)
+2026-11-17 15:05:02.936 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 2.226 ms  plan:
+	Query Text: SELECT version();
+	
+	SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid
+	FROM (
+	    -- Arrays have typtype=b - this subquery identifies them by their typreceive and converts their typtype to a
+	    -- We first do this for the type (innerest-most subquery), and then for its element type
+	    -- This also returns the array element, range subtype and domain base type as elemtypoid
+	    SELECT
+	        typ.oid, typ.typnamespace, typ.typname, typ.typtype, typ.typrelid, typ.typnotnull, typ.relkind,
+	        elemtyp.oid AS elemtypoid, elemtyp.typname AS elemtypname, elemcls.relkind AS elemrelkind,
+	        CASE WHEN elemproc.proname='array_recv' THEN 'a' ELSE elemtyp.typtype END AS elemtyptype
+	        , typ.typcategory
+	    FROM (
+	        SELECT typ.oid, typnamespace, typname, typrelid, typnotnull, relkind, typelem AS elemoid,
+	            CASE WHEN proc.proname='array_recv' THEN 'a' ELSE typ.typtype END AS typtype,
+	            CASE
+	                WHEN proc.proname='array_recv' THEN typ.typelem
+	                WHEN typ.typtype='r' THEN rngsubtype
+	                WHEN typ.typtype='m' THEN (SELECT rngtypid FROM pg_range WHERE rngmultitypid = typ.oid)
+	                WHEN typ.typtype='d' THEN typ.typbasetype
+	            END AS elemtypoid
+	            , typ.typcategory
+	        FROM pg_type AS typ
+	        LEFT JOIN pg_class AS cls ON (cls.oid = typ.typrelid)
+	        LEFT JOIN pg_proc AS proc ON proc.oid = typ.typreceive
+	        LEFT JOIN pg_range ON (pg_range.rngtypid = typ.oid)
+	    ) AS typ
+	    LEFT JOIN pg_type AS elemtyp ON elemtyp.oid = elemtypoid
+	    LEFT JOIN pg_class AS elemcls ON (elemcls.oid = elemtyp.typrelid)
+	    LEFT JOIN pg_proc AS elemproc ON elemproc.oid = elemtyp.typreceive
+	) AS t
+	JOIN pg_namespace AS ns ON (ns.oid = typnamespace)
+	WHERE
+	    
+	    (typtype IN ('b', 'r', 'm', 'e', 'd') OR -- Base, range, multirange, enum, domain
+	    (typtype = 'c' AND relkind='c') OR -- User-defined free-standing composites (not table composites) by default
+	    (typtype = 'p' AND typname IN ('record', 'void', 'unknown')) OR -- Some special supported pseudo-types
+	    (typtype = 'a' AND (  -- Array of...
+	        elemtyptype IN ('b', 'r', 'm', 'e', 'd') OR -- Array of base, range, multirange, enum, domain
+	        (elemtyptype = 'p' AND elemtypname IN ('record', 'void')) OR -- Arrays of special supported pseudo-types
+	        (elemtyptype = 'c' AND elemrelkind='c') -- Array of user-defined free-standing composites (not table composites) by default
+	    )))
+	ORDER BY CASE
+	       WHEN typtype IN ('b', 'e', 'p') THEN 0           -- First base types, enums, pseudo-types
+	       WHEN typtype = 'c' THEN 1                        -- Composites after (fields loaded later in 2nd pass)
+	       WHEN typtype = 'r' THEN 2                        -- Ranges after
+	       WHEN typtype = 'm' THEN 3                        -- Multiranges after
+	       WHEN typtype = 'd' AND elemtyptype <> 'a' THEN 4 -- Domains over non-arrays after
+	       WHEN typtype = 'a' THEN 5                        -- Arrays after
+	       WHEN typtype = 'd' AND elemtyptype = 'a' THEN 6  -- Domains over arrays last
+	END;
+	
+	-- Load field definitions for (free-standing) composite types
+	SELECT typ.oid, att.attname, att.atttypid
+	FROM pg_type AS typ
+	JOIN pg_namespace AS ns ON (ns.oid = typ.typnamespace)
+	JOIN pg_class AS cls ON (cls.oid = typ.typrelid)
+	JOIN pg_attribute AS att ON (att.attrelid = typ.typrelid)
+	WHERE
+	  (typ.typtype = 'c' AND cls.relkind='c') AND
+	  
+	  attnum > 0 AND     -- Don't load system attributes
+	  NOT attisdropped
+	ORDER BY typ.oid, att.attnum;
+	
+	-- Load enum fields
+	SELECT typ.oid, enumlabel
+	FROM pg_enum
+	JOIN pg_type AS typ ON typ.oid = enumtypid
+	JOIN pg_namespace AS ns ON ns.oid = typ.typnamespace
+	
+	ORDER BY oid, enumsortorder;
+	
+	Sort  (cost=401.76..401.81 rows=19 width=142)
+	  Sort Key: (CASE WHEN (CASE WHEN (proc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE typ.typtype END = ANY ('{b,e,p}'::"char"[])) THEN 0 WHEN (CASE WHEN (proc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE typ.typtype END = 'c'::"char") THEN 1 WHEN (CASE WHEN (proc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE typ.typtype END = 'r'::"char") THEN 2 WHEN (CASE WHEN (proc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE typ.typtype END = 'm'::"char") THEN 3 WHEN ((CASE WHEN (proc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE typ.typtype END = 'd'::"char") AND (CASE WHEN (elemproc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE elemtyp.typtype END <> 'a'::"char")) THEN 4 WHEN (CASE WHEN (proc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE typ.typtype END = 'a'::"char") THEN 5 WHEN ((CASE WHEN (proc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE typ.typtype END = 'd'::"char") AND (CASE WHEN (elemproc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE elemtyp.typtype END = 'a'::"char")) THEN 6 ELSE NULL::integer END)
+	  ->  Nested Loop  (cost=113.31..401.35 rows=19 width=142)
+	        ->  Hash Left Join  (cost=113.17..399.54 rows=19 width=207)
+	              Hash Cond: (elemtyp.typrelid = elemcls.oid)
+	              Filter: ((CASE WHEN (proc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE typ.typtype END = ANY ('{b,r,m,e,d}'::"char"[])) OR ((CASE WHEN (proc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE typ.typtype END = 'c'::"char") AND (cls.relkind = 'c'::"char")) OR ((CASE WHEN (proc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE typ.typtype END = 'p'::"char") AND (typ.typname = ANY ('{record,void,unknown}'::name[]))) OR ((CASE WHEN (proc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE typ.typtype END = 'a'::"char") AND ((CASE WHEN (elemproc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE elemtyp.typtype END = ANY ('{b,r,m,e,d}'::"char"[])) OR ((CASE WHEN (elemproc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE elemtyp.typtype END = 'p'::"char") AND (elemtyp.typname = ANY ('{record,void}'::name[]))) OR ((CASE WHEN (elemproc.proname = 'array_recv'::name) THEN 'a'::"char" ELSE elemtyp.typtype END = 'c'::"char") AND (elemcls.relkind = 'c'::"char")))))
+	              ->  Nested Loop Left Join  (cost=74.82..359.17 rows=745 width=276)
+	                    ->  Hash Left Join  (cost=74.53..252.84 rows=745 width=216)
+	                          Hash Cond: (CASE WHEN (proc.proname = 'array_recv'::name) THEN typ.typelem WHEN (typ.typtype = 'r'::"char") THEN pg_range.rngsubtype WHEN (typ.typtype = 'm'::"char") THEN (SubPlan 1) WHEN (typ.typtype = 'd'::"char") THEN typ.typbasetype ELSE NULL::oid END = elemtyp.oid)
+	                          ->  Hash Left Join  (cost=39.77..175.20 rows=745 width=151)
+	                                Hash Cond: (typ.oid = pg_range.rngtypid)
+	                                ->  Nested Loop Left Join  (cost=38.63..172.10 rows=745 width=147)
+	                                      ->  Hash Left Join  (cost=38.34..65.76 rows=745 width=87)
+	                                            Hash Cond: (typ.typrelid = cls.oid)
+	                                            ->  Seq Scan on pg_type typ  (cost=0.00..25.45 rows=745 width=90)
+	                                            ->  Hash  (cost=29.82..29.82 rows=682 width=5)
+	                                                  ->  Seq Scan on pg_class cls  (cost=0.00..29.82 rows=682 width=5)
+	                                      ->  Memoize  (cost=0.29..0.92 rows=1 width=68)
+	                                            Cache Key: typ.typreceive
+	                                            Cache Mode: logical
+	                                            ->  Index Scan using pg_proc_oid_index on pg_proc proc  (cost=0.28..0.91 rows=1 width=68)
+	                                                  Index Cond: (oid = (typ.typreceive)::oid)
+	                                ->  Hash  (cost=1.06..1.06 rows=6 width=8)
+	                                      ->  Seq Scan on pg_range  (cost=0.00..1.06 rows=6 width=8)
+	                          ->  Hash  (cost=25.45..25.45 rows=745 width=77)
+	                                ->  Seq Scan on pg_type elemtyp  (cost=0.00..25.45 rows=745 width=77)
+	                          SubPlan 1
+	                            ->  Seq Scan on pg_range pg_range_1  (cost=0.00..1.07 rows=1 width=4)
+	                                  Filter: (rngmultitypid = typ.oid)
+	                    ->  Memoize  (cost=0.29..0.92 rows=1 width=68)
+	                          Cache Key: elemtyp.typreceive
+	                          Cache Mode: logical
+	                          ->  Index Scan using pg_proc_oid_index on pg_proc elemproc  (cost=0.28..0.91 rows=1 width=68)
+	                                Index Cond: (oid = (elemtyp.typreceive)::oid)
+	              ->  Hash  (cost=29.82..29.82 rows=682 width=5)
+	                    ->  Seq Scan on pg_class elemcls  (cost=0.00..29.82 rows=682 width=5)
+	        ->  Memoize  (cost=0.14..0.17 rows=1 width=68)
+	              Cache Key: typ.typnamespace
+	              Cache Mode: logical
+	              ->  Index Scan using pg_namespace_oid_index on pg_namespace ns  (cost=0.13..0.16 rows=1 width=68)
+	                    Index Cond: (oid = typ.typnamespace)
+2026-11-17 15:05:02.938 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.185 ms  plan:
+	Query Text: SELECT version();
+	
+	SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid
+	FROM (
+	    -- Arrays have typtype=b - this subquery identifies them by their typreceive and converts their typtype to a
+	    -- We first do this for the type (innerest-most subquery), and then for its element type
+	    -- This also returns the array element, range subtype and domain base type as elemtypoid
+	    SELECT
+	        typ.oid, typ.typnamespace, typ.typname, typ.typtype, typ.typrelid, typ.typnotnull, typ.relkind,
+	        elemtyp.oid AS elemtypoid, elemtyp.typname AS elemtypname, elemcls.relkind AS elemrelkind,
+	        CASE WHEN elemproc.proname='array_recv' THEN 'a' ELSE elemtyp.typtype END AS elemtyptype
+	        , typ.typcategory
+	    FROM (
+	        SELECT typ.oid, typnamespace, typname, typrelid, typnotnull, relkind, typelem AS elemoid,
+	            CASE WHEN proc.proname='array_recv' THEN 'a' ELSE typ.typtype END AS typtype,
+	            CASE
+	                WHEN proc.proname='array_recv' THEN typ.typelem
+	                WHEN typ.typtype='r' THEN rngsubtype
+	                WHEN typ.typtype='m' THEN (SELECT rngtypid FROM pg_range WHERE rngmultitypid = typ.oid)
+	                WHEN typ.typtype='d' THEN typ.typbasetype
+	            END AS elemtypoid
+	            , typ.typcategory
+	        FROM pg_type AS typ
+	        LEFT JOIN pg_class AS cls ON (cls.oid = typ.typrelid)
+	        LEFT JOIN pg_proc AS proc ON proc.oid = typ.typreceive
+	        LEFT JOIN pg_range ON (pg_range.rngtypid = typ.oid)
+	    ) AS typ
+	    LEFT JOIN pg_type AS elemtyp ON elemtyp.oid = elemtypoid
+	    LEFT JOIN pg_class AS elemcls ON (elemcls.oid = elemtyp.typrelid)
+	    LEFT JOIN pg_proc AS elemproc ON elemproc.oid = elemtyp.typreceive
+	) AS t
+	JOIN pg_namespace AS ns ON (ns.oid = typnamespace)
+	WHERE
+	    
+	    (typtype IN ('b', 'r', 'm', 'e', 'd') OR -- Base, range, multirange, enum, domain
+	    (typtype = 'c' AND relkind='c') OR -- User-defined free-standing composites (not table composites) by default
+	    (typtype = 'p' AND typname IN ('record', 'void', 'unknown')) OR -- Some special supported pseudo-types
+	    (typtype = 'a' AND (  -- Array of...
+	        elemtyptype IN ('b', 'r', 'm', 'e', 'd') OR -- Array of base, range, multirange, enum, domain
+	        (elemtyptype = 'p' AND elemtypname IN ('record', 'void')) OR -- Arrays of special supported pseudo-types
+	        (elemtyptype = 'c' AND elemrelkind='c') -- Array of user-defined free-standing composites (not table composites) by default
+	    )))
+	ORDER BY CASE
+	       WHEN typtype IN ('b', 'e', 'p') THEN 0           -- First base types, enums, pseudo-types
+	       WHEN typtype = 'c' THEN 1                        -- Composites after (fields loaded later in 2nd pass)
+	       WHEN typtype = 'r' THEN 2                        -- Ranges after
+	       WHEN typtype = 'm' THEN 3                        -- Multiranges after
+	       WHEN typtype = 'd' AND elemtyptype <> 'a' THEN 4 -- Domains over non-arrays after
+	       WHEN typtype = 'a' THEN 5                        -- Arrays after
+	       WHEN typtype = 'd' AND elemtyptype = 'a' THEN 6  -- Domains over arrays last
+	END;
+	
+	-- Load field definitions for (free-standing) composite types
+	SELECT typ.oid, att.attname, att.atttypid
+	FROM pg_type AS typ
+	JOIN pg_namespace AS ns ON (ns.oid = typ.typnamespace)
+	JOIN pg_class AS cls ON (cls.oid = typ.typrelid)
+	JOIN pg_attribute AS att ON (att.attrelid = typ.typrelid)
+	WHERE
+	  (typ.typtype = 'c' AND cls.relkind='c') AND
+	  
+	  attnum > 0 AND     -- Don't load system attributes
+	  NOT attisdropped
+	ORDER BY typ.oid, att.attnum;
+	
+	-- Load enum fields
+	SELECT typ.oid, enumlabel
+	FROM pg_enum
+	JOIN pg_type AS typ ON typ.oid = enumtypid
+	JOIN pg_namespace AS ns ON ns.oid = typ.typnamespace
+	
+	ORDER BY oid, enumsortorder;
+	
+	Sort  (cost=61.98..61.99 rows=6 width=74)
+	  Sort Key: typ.oid, att.attnum
+	  ->  Nested Loop  (cost=31.95..61.90 rows=6 width=74)
+	        Join Filter: (cls.oid = att.attrelid)
+	        ->  Nested Loop  (cost=31.67..59.72 rows=1 width=12)
+	              ->  Hash Join  (cost=31.54..59.52 rows=1 width=16)
+	                    Hash Cond: (typ.typrelid = cls.oid)
+	                    ->  Seq Scan on pg_type typ  (cost=0.00..27.31 rows=256 width=12)
+	                          Filter: (typtype = 'c'::"char")
+	                    ->  Hash  (cost=31.52..31.52 rows=1 width=4)
+	                          ->  Seq Scan on pg_class cls  (cost=0.00..31.52 rows=1 width=4)
+	                                Filter: (relkind = 'c'::"char")
+	              ->  Index Only Scan using pg_namespace_oid_index on pg_namespace ns  (cost=0.13..0.18 rows=1 width=4)
+	                    Index Cond: (oid = typ.typnamespace)
+	        ->  Index Scan using pg_attribute_relid_attnum_index on pg_attribute att  (cost=0.28..2.11 rows=6 width=74)
+	              Index Cond: ((attrelid = typ.typrelid) AND (attnum > 0))
+	              Filter: (NOT attisdropped)
+2026-11-17 15:05:02.938 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.024 ms  plan:
+	Query Text: SELECT version();
+	
+	SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid
+	FROM (
+	    -- Arrays have typtype=b - this subquery identifies them by their typreceive and converts their typtype to a
+	    -- We first do this for the type (innerest-most subquery), and then for its element type
+	    -- This also returns the array element, range subtype and domain base type as elemtypoid
+	    SELECT
+	        typ.oid, typ.typnamespace, typ.typname, typ.typtype, typ.typrelid, typ.typnotnull, typ.relkind,
+	        elemtyp.oid AS elemtypoid, elemtyp.typname AS elemtypname, elemcls.relkind AS elemrelkind,
+	        CASE WHEN elemproc.proname='array_recv' THEN 'a' ELSE elemtyp.typtype END AS elemtyptype
+	        , typ.typcategory
+	    FROM (
+	        SELECT typ.oid, typnamespace, typname, typrelid, typnotnull, relkind, typelem AS elemoid,
+	            CASE WHEN proc.proname='array_recv' THEN 'a' ELSE typ.typtype END AS typtype,
+	            CASE
+	                WHEN proc.proname='array_recv' THEN typ.typelem
+	                WHEN typ.typtype='r' THEN rngsubtype
+	                WHEN typ.typtype='m' THEN (SELECT rngtypid FROM pg_range WHERE rngmultitypid = typ.oid)
+	                WHEN typ.typtype='d' THEN typ.typbasetype
+	            END AS elemtypoid
+	            , typ.typcategory
+	        FROM pg_type AS typ
+	        LEFT JOIN pg_class AS cls ON (cls.oid = typ.typrelid)
+	        LEFT JOIN pg_proc AS proc ON proc.oid = typ.typreceive
+	        LEFT JOIN pg_range ON (pg_range.rngtypid = typ.oid)
+	    ) AS typ
+	    LEFT JOIN pg_type AS elemtyp ON elemtyp.oid = elemtypoid
+	    LEFT JOIN pg_class AS elemcls ON (elemcls.oid = elemtyp.typrelid)
+	    LEFT JOIN pg_proc AS elemproc ON elemproc.oid = elemtyp.typreceive
+	) AS t
+	JOIN pg_namespace AS ns ON (ns.oid = typnamespace)
+	WHERE
+	    
+	    (typtype IN ('b', 'r', 'm', 'e', 'd') OR -- Base, range, multirange, enum, domain
+	    (typtype = 'c' AND relkind='c') OR -- User-defined free-standing composites (not table composites) by default
+	    (typtype = 'p' AND typname IN ('record', 'void', 'unknown')) OR -- Some special supported pseudo-types
+	    (typtype = 'a' AND (  -- Array of...
+	        elemtyptype IN ('b', 'r', 'm', 'e', 'd') OR -- Array of base, range, multirange, enum, domain
+	        (elemtyptype = 'p' AND elemtypname IN ('record', 'void')) OR -- Arrays of special supported pseudo-types
+	        (elemtyptype = 'c' AND elemrelkind='c') -- Array of user-defined free-standing composites (not table composites) by default
+	    )))
+	ORDER BY CASE
+	       WHEN typtype IN ('b', 'e', 'p') THEN 0           -- First base types, enums, pseudo-types
+	       WHEN typtype = 'c' THEN 1                        -- Composites after (fields loaded later in 2nd pass)
+	       WHEN typtype = 'r' THEN 2                        -- Ranges after
+	       WHEN typtype = 'm' THEN 3                        -- Multiranges after
+	       WHEN typtype = 'd' AND elemtyptype <> 'a' THEN 4 -- Domains over non-arrays after
+	       WHEN typtype = 'a' THEN 5                        -- Arrays after
+	       WHEN typtype = 'd' AND elemtyptype = 'a' THEN 6  -- Domains over arrays last
+	END;
+	
+	-- Load field definitions for (free-standing) composite types
+	SELECT typ.oid, att.attname, att.atttypid
+	FROM pg_type AS typ
+	JOIN pg_namespace AS ns ON (ns.oid = typ.typnamespace)
+	JOIN pg_class AS cls ON (cls.oid = typ.typrelid)
+	JOIN pg_attribute AS att ON (att.attrelid = typ.typrelid)
+	WHERE
+	  (typ.typtype = 'c' AND cls.relkind='c') AND
+	  
+	  attnum > 0 AND     -- Don't load system attributes
+	  NOT attisdropped
+	ORDER BY typ.oid, att.attnum;
+	
+	-- Load enum fields
+	SELECT typ.oid, enumlabel
+	FROM pg_enum
+	JOIN pg_type AS typ ON typ.oid = enumtypid
+	JOIN pg_namespace AS ns ON ns.oid = typ.typnamespace
+	
+	ORDER BY oid, enumsortorder;
+	
+	Sort  (cost=8.49..8.50 rows=1 width=72)
+	  Sort Key: typ.oid, pg_enum.enumsortorder
+	  ->  Nested Loop  (cost=0.41..8.48 rows=1 width=72)
+	        ->  Nested Loop  (cost=0.28..8.31 rows=1 width=76)
+	              ->  Seq Scan on pg_enum  (cost=0.00..0.00 rows=1 width=72)
+	              ->  Index Scan using pg_type_oid_index on pg_type typ  (cost=0.28..8.29 rows=1 width=8)
+	                    Index Cond: (oid = pg_enum.enumtypid)
+	        ->  Index Only Scan using pg_namespace_oid_index on pg_namespace ns  (cost=0.13..0.16 rows=1 width=4)
+	              Index Cond: (oid = typ.typnamespace)
+2026-11-17 15:05:02.944 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.043 ms  plan:
+	Query Text: SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+	FROM (
+	    SELECT * FROM authority.organization_authorization_states WHERE organization_id = $1 FOR UPDATE
+	) AS a
+	LIMIT 1
+	Query Parameters: $1 = '01a1ea0a-40ac-7a39-9ab7-f85094ce0263'
+	Limit  (cost=0.14..8.18 rows=1 width=971)
+	  ->  Subquery Scan on a  (cost=0.14..8.18 rows=1 width=971)
+	        ->  LockRows  (cost=0.14..8.17 rows=1 width=977)
+	              ->  Index Scan using "IX_organization_authorization_states_organization_id" on organization_authorization_states  (cost=0.14..8.16 rows=1 width=977)
+	                    Index Cond: (organization_id = '01a1ea0a-40ac-7a39-9ab7-f85094ce0263'::uuid)
+2026-11-17 15:05:02.948 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.004 ms  plan:
+	Query Text: SELECT pg_catalog.clock_timestamp()
+	Result  (cost=0.00..0.01 rows=1 width=8)
+2026-11-17 15:05:02.955 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.543 ms  plan:
+	Query Text: SELECT c.oid::bigint AS relation_oid, c.relkind::text AS relation_kind, coalesce(i.indrelid = to_regclass('authority.security_journal_entries'), false) AS on_target_table, am.amname::text AS access_method, coalesce(i.indisunique, false) AS is_unique, coalesce(i.indisprimary, false) AS is_primary, coalesce(i.indisexclusion, false) AS is_exclusion, coalesce(i.indisvalid, false) AS is_valid, coalesce(i.indisready, false) AS is_ready, coalesce(i.indislive, false) AS is_live, coalesce(i.indnatts, 0)::integer AS attribute_count, coalesce(i.indnkeyatts, 0)::integer AS key_attribute_count, (i.indexprs IS NOT NULL) AS has_expressions, coalesce(ARRAY(SELECT a.attname::text FROM unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord) JOIN pg_catalog.pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum ORDER BY k.ord), ARRAY[]::text[]) AS key_columns, i.indoption::text AS key_options, coalesce(ARRAY(SELECT oc.opcname::text FROM unnest(i.indclass::oid[]) WITH ORDINALITY AS k(opc, ord) JOIN pg_catalog.pg_opclass oc ON oc.oid = k.opc ORDER BY k.ord), ARRAY[]::text[]) AS operator_classes, CASE WHEN i.indrelid = to_regclass('authority.security_journal_entries') THEN pg_catalog.pg_get_expr(i.indpred, i.indrelid) END AS predicate, CASE WHEN i.indrelid = to_regclass('authority.security_journal_entries') THEN pg_catalog.pg_get_indexdef(c.oid) END AS definition, coalesce(c.relowner = t.relowner, false) AS owned_by_table_owner, (c.relacl IS NOT NULL) AS has_privileges, (EXISTS (SELECT 1 FROM pg_catalog.pg_stat_progress_create_index p WHERE p.index_relid = c.oid) OR EXISTS (SELECT 1 FROM pg_catalog.pg_locks l WHERE l.locktype = 'relation' AND l.relation = i.indrelid AND l.granted AND l.mode = 'ShareUpdateExclusiveLock' AND l.pid <> pg_catalog.pg_backend_pid())) AS build_visibly_in_progress FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace LEFT JOIN pg_catalog.pg_index i ON i.indexrelid = c.oid LEFT JOIN pg_catalog.pg_class t ON t.oid = i.indrelid LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam WHERE n.nspname = 'authority' AND c.relname = 'ix_journal_capability_refusal_evidence'
+	Nested Loop Left Join  (cost=0.82..71.83 rows=1 width=251)
+	  Join Filter: (am.oid = c.relam)
+	  ->  Nested Loop  (cost=0.82..18.18 rows=1 width=231)
+	        Join Filter: (c.relnamespace = n.oid)
+	        ->  Nested Loop Left Join  (cost=0.82..17.11 rows=1 width=235)
+	              ->  Index Scan using pg_class_relname_nsp_index on pg_class c  (cost=0.28..8.29 rows=1 width=69)
+	                    Index Cond: (relname = 'ix_journal_capability_refusal_evidence'::name)
+	              ->  Nested Loop Left Join  (cost=0.55..8.81 rows=1 width=170)
+	                    ->  Index Scan using pg_index_indexrelid_index on pg_index i  (cost=0.27..8.29 rows=1 width=166)
+	                          Index Cond: (indexrelid = c.oid)
+	                    ->  Index Scan using pg_class_oid_index on pg_class t  (cost=0.28..0.52 rows=1 width=8)
+	                          Index Cond: (oid = i.indrelid)
+	        ->  Seq Scan on pg_namespace n  (cost=0.00..1.05 rows=1 width=4)
+	              Filter: (nspname = 'authority'::name)
+	  ->  Seq Scan on pg_am am  (cost=0.00..1.07 rows=7 width=68)
+	  SubPlan 1
+	    ->  Sort  (cost=22.47..22.47 rows=1 width=40)
+	          Sort Key: k.ord
+	          ->  Hash Join  (cost=0.51..22.46 rows=1 width=40)
+	                Hash Cond: (a.attnum = k.attnum)
+	                ->  Index Scan using pg_attribute_relid_attnum_index on pg_attribute a  (cost=0.28..22.19 rows=8 width=66)
+	                      Index Cond: (attrelid = i.indrelid)
+	                ->  Hash  (cost=0.10..0.10 rows=10 width=10)
+	                      ->  Function Scan on unnest k  (cost=0.00..0.10 rows=10 width=10)
+	  SubPlan 2
+	    ->  Sort  (cost=5.95..5.98 rows=10 width=40)
+	          Sort Key: k_1.ord
+	          ->  Hash Join  (cost=0.23..5.79 rows=10 width=40)
+	                Hash Cond: (oc.oid = k_1.opc)
+	                ->  Seq Scan on pg_opclass oc  (cost=0.00..4.77 rows=177 width=68)
+	                ->  Hash  (cost=0.10..0.10 rows=10 width=12)
+	                      ->  Function Scan on unnest k_1  (cost=0.00..0.10 rows=10 width=12)
+	  SubPlan 3
+	    ->  Function Scan on pg_stat_get_progress_info s  (cost=0.00..1.50 rows=1 width=0)
+	          Filter: ((param7)::oid = c.oid)
+	  SubPlan 6
+	    ->  Function Scan on pg_lock_status l  (cost=0.00..20.00 rows=1 width=4)
+	          Filter: (granted AND (locktype = 'relation'::text) AND (mode = 'ShareUpdateExclusiveLock'::text) AND (pid <> pg_backend_pid()))
+2026-11-17 15:05:02.957 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.005 ms  plan:
+	Query Text: SELECT security_journal_entry_id, journal_stream_revision, journal_event_body_json, journal_event_digest FROM authority.security_journal_entries WHERE organization_id = $1 AND journal_stream_name = 'audit' AND journal_event_kind = 'EnvelopeCapabilityRefused' ORDER BY journal_stream_revision DESC LIMIT 8
+	Query Parameters: $1 = '01a1ea0a-40ac-7a39-9ab7-f85094ce0263'
+	Limit  (cost=0.12..8.14 rows=1 width=88)
+	  ->  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.12..8.14 rows=1 width=88)
+	        Index Cond: (organization_id = '01a1ea0a-40ac-7a39-9ab7-f85094ce0263'::uuid)
+2026-11-17 15:05:02.959 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.646 ms  plan:
+	Query Text: UPDATE authority.organization_authorization_states SET audit_journal_revision = $1, latest_audit_journal_digest = $2, state_modified_on = $3
+	WHERE organization_authorization_state_id = $4
+	Query Parameters: $1 = '1', $2 = '\x1e5a53cf5ebdcf0d1132f7398467ceeca988bcbf09699197bf8856be0f33b094', $3 = '2026-11-17 15:05:02.956583+00', $4 = '01a1ea0a-40ac-707a-83b2-6cdf1be5d03c'
+	Update on organization_authorization_states  (cost=0.14..8.16 rows=0 width=0)
+	  ->  Index Scan using "PK_organization_authorization_states" on organization_authorization_states  (cost=0.14..8.16 rows=1 width=54)
+	        Index Cond: (organization_authorization_state_id = '01a1ea0a-40ac-707a-83b2-6cdf1be5d03c'::uuid)
+2026-11-17 15:05:02.960 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.325 ms  plan:
+	Query Text: INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+	Query Parameters: $1 = '01a1ea0a-40ec-7673-9243-836a797dc769', $2 = '0', $3 = 'Pending', $4 = NULL, $5 = NULL, $6 = NULL, $7 = NULL, $8 = '2026-11-17 15:05:02.956635+00', $9 = '{"envelope_format":"DynamicForms/SecurityJournal/v1","organization_id":"01a1ea0a-40ac-7a39-9ab7-f85094ce0263","stream_name":"audit","stream_revision":1,"event_kind":"EnvelopeCapabilityRefused","previous_digest_hex":null,"created_on_utc":"2026-11-17T15:05:02.9565844+00:00","body":{"evidence_schema_version":1,"refusal_code":"CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT","organization_id":"01a1ea0a-40ac-7a39-9ab7-f85094ce0263","workload_name":"business-api","entry_point":"verify","client_capability_level":1,"evidence_database_time_utc":"2026-11-17T15:05:02.946255+00:00","evidence_bucket_start_utc":"2026-11-17T15:00:00+00:00","refusal_observed_on_utc":"2026-11-17T15:05:02.9202857+00:00"}}', $10 = '\x1e5a53cf5ebdcf0d1132f7398467ceeca988bcbf09699197bf8856be0f33b094', $11 = 'EnvelopeCapabilityRefused', $12 = NULL, $13 = 'audit', $14 = '1', $15 = NULL, $16 = '01a1ea0a-40ac-7a39-9ab7-f85094ce0263', $17 = NULL
+	Insert on security_journal_entries  (cost=0.00..0.01 rows=0 width=0)
+	  ->  Result  (cost=0.00..0.01 rows=1 width=1248)
+2026-11-17 15:05:02.967 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.083 ms  plan:
+	Query Text: SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+	FROM (
+	    SELECT * FROM authority.organization_authorization_states WHERE organization_id = $1 FOR UPDATE
+	) AS a
+	LIMIT 1
+	Query Parameters: $1 = '01a1ea0a-40ac-7a39-9ab7-f85094ce0263'
+	Limit  (cost=0.14..8.18 rows=1 width=971)
+	  ->  Subquery Scan on a  (cost=0.14..8.18 rows=1 width=971)
+	        ->  LockRows  (cost=0.14..8.17 rows=1 width=977)
+	              ->  Index Scan using "IX_organization_authorization_states_organization_id" on organization_authorization_states  (cost=0.14..8.16 rows=1 width=977)
+	                    Index Cond: (organization_id = '01a1ea0a-40ac-7a39-9ab7-f85094ce0263'::uuid)
+2026-11-17 15:05:02.971 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.004 ms  plan:
+	Query Text: SELECT pg_catalog.clock_timestamp()
+	Result  (cost=0.00..0.01 rows=1 width=8)
+2026-11-17 15:05:02.973 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.338 ms  plan:
+	Query Text: SELECT c.oid::bigint AS relation_oid, c.relkind::text AS relation_kind, coalesce(i.indrelid = to_regclass('authority.security_journal_entries'), false) AS on_target_table, am.amname::text AS access_method, coalesce(i.indisunique, false) AS is_unique, coalesce(i.indisprimary, false) AS is_primary, coalesce(i.indisexclusion, false) AS is_exclusion, coalesce(i.indisvalid, false) AS is_valid, coalesce(i.indisready, false) AS is_ready, coalesce(i.indislive, false) AS is_live, coalesce(i.indnatts, 0)::integer AS attribute_count, coalesce(i.indnkeyatts, 0)::integer AS key_attribute_count, (i.indexprs IS NOT NULL) AS has_expressions, coalesce(ARRAY(SELECT a.attname::text FROM unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord) JOIN pg_catalog.pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum ORDER BY k.ord), ARRAY[]::text[]) AS key_columns, i.indoption::text AS key_options, coalesce(ARRAY(SELECT oc.opcname::text FROM unnest(i.indclass::oid[]) WITH ORDINALITY AS k(opc, ord) JOIN pg_catalog.pg_opclass oc ON oc.oid = k.opc ORDER BY k.ord), ARRAY[]::text[]) AS operator_classes, CASE WHEN i.indrelid = to_regclass('authority.security_journal_entries') THEN pg_catalog.pg_get_expr(i.indpred, i.indrelid) END AS predicate, CASE WHEN i.indrelid = to_regclass('authority.security_journal_entries') THEN pg_catalog.pg_get_indexdef(c.oid) END AS definition, coalesce(c.relowner = t.relowner, false) AS owned_by_table_owner, (c.relacl IS NOT NULL) AS has_privileges, (EXISTS (SELECT 1 FROM pg_catalog.pg_stat_progress_create_index p WHERE p.index_relid = c.oid) OR EXISTS (SELECT 1 FROM pg_catalog.pg_locks l WHERE l.locktype = 'relation' AND l.relation = i.indrelid AND l.granted AND l.mode = 'ShareUpdateExclusiveLock' AND l.pid <> pg_catalog.pg_backend_pid())) AS build_visibly_in_progress FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace LEFT JOIN pg_catalog.pg_index i ON i.indexrelid = c.oid LEFT JOIN pg_catalog.pg_class t ON t.oid = i.indrelid LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam WHERE n.nspname = 'authority' AND c.relname = 'ix_journal_capability_refusal_evidence'
+	Nested Loop Left Join  (cost=0.82..71.83 rows=1 width=251)
+	  Join Filter: (am.oid = c.relam)
+	  ->  Nested Loop  (cost=0.82..18.18 rows=1 width=231)
+	        Join Filter: (c.relnamespace = n.oid)
+	        ->  Nested Loop Left Join  (cost=0.82..17.11 rows=1 width=235)
+	              ->  Index Scan using pg_class_relname_nsp_index on pg_class c  (cost=0.28..8.29 rows=1 width=69)
+	                    Index Cond: (relname = 'ix_journal_capability_refusal_evidence'::name)
+	              ->  Nested Loop Left Join  (cost=0.55..8.81 rows=1 width=170)
+	                    ->  Index Scan using pg_index_indexrelid_index on pg_index i  (cost=0.27..8.29 rows=1 width=166)
+	                          Index Cond: (indexrelid = c.oid)
+	                    ->  Index Scan using pg_class_oid_index on pg_class t  (cost=0.28..0.52 rows=1 width=8)
+	                          Index Cond: (oid = i.indrelid)
+	        ->  Seq Scan on pg_namespace n  (cost=0.00..1.05 rows=1 width=4)
+	              Filter: (nspname = 'authority'::name)
+	  ->  Seq Scan on pg_am am  (cost=0.00..1.07 rows=7 width=68)
+	  SubPlan 1
+	    ->  Sort  (cost=22.47..22.47 rows=1 width=40)
+	          Sort Key: k.ord
+	          ->  Hash Join  (cost=0.51..22.46 rows=1 width=40)
+	                Hash Cond: (a.attnum = k.attnum)
+	                ->  Index Scan using pg_attribute_relid_attnum_index on pg_attribute a  (cost=0.28..22.19 rows=8 width=66)
+	                      Index Cond: (attrelid = i.indrelid)
+	                ->  Hash  (cost=0.10..0.10 rows=10 width=10)
+	                      ->  Function Scan on unnest k  (cost=0.00..0.10 rows=10 width=10)
+	  SubPlan 2
+	    ->  Sort  (cost=5.95..5.98 rows=10 width=40)
+	          Sort Key: k_1.ord
+	          ->  Hash Join  (cost=0.23..5.79 rows=10 width=40)
+	                Hash Cond: (oc.oid = k_1.opc)
+	                ->  Seq Scan on pg_opclass oc  (cost=0.00..4.77 rows=177 width=68)
+	                ->  Hash  (cost=0.10..0.10 rows=10 width=12)
+	                      ->  Function Scan on unnest k_1  (cost=0.00..0.10 rows=10 width=12)
+	  SubPlan 3
+	    ->  Function Scan on pg_stat_get_progress_info s  (cost=0.00..1.50 rows=1 width=0)
+	          Filter: ((param7)::oid = c.oid)
+	  SubPlan 6
+	    ->  Function Scan on pg_lock_status l  (cost=0.00..20.00 rows=1 width=4)
+	          Filter: (granted AND (locktype = 'relation'::text) AND (mode = 'ShareUpdateExclusiveLock'::text) AND (pid <> pg_backend_pid()))
+2026-11-17 15:05:02.975 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.016 ms  plan:
+	Query Text: SELECT security_journal_entry_id, journal_stream_revision, journal_event_body_json, journal_event_digest FROM authority.security_journal_entries WHERE organization_id = $1 AND journal_stream_name = 'audit' AND journal_event_kind = 'EnvelopeCapabilityRefused' ORDER BY journal_stream_revision DESC LIMIT 8
+	Query Parameters: $1 = '01a1ea0a-40ac-7a39-9ab7-f85094ce0263'
+	Limit  (cost=0.14..8.16 rows=1 width=88)
+	  ->  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.14..8.16 rows=1 width=88)
+	        Index Cond: (organization_id = '01a1ea0a-40ac-7a39-9ab7-f85094ce0263'::uuid)
+2026-11-17 15:05:02.977 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.134 ms  plan:
+	Query Text: UPDATE authority.organization_authorization_states SET audit_journal_revision = $1, latest_audit_journal_digest = $2, state_modified_on = $3
+	WHERE organization_authorization_state_id = $4
+	Query Parameters: $1 = '2', $2 = '\x30fdf35e8f538f852c2f945c62024201e9a07864fb860a48f116a7eccb8097ea', $3 = '2026-11-17 15:05:02.974893+00', $4 = '01a1ea0a-40ac-707a-83b2-6cdf1be5d03c'
+	Update on organization_authorization_states  (cost=0.14..8.16 rows=0 width=0)
+	  ->  Index Scan using "PK_organization_authorization_states" on organization_authorization_states  (cost=0.14..8.16 rows=1 width=54)
+	        Index Cond: (organization_authorization_state_id = '01a1ea0a-40ac-707a-83b2-6cdf1be5d03c'::uuid)
+2026-11-17 15:05:02.977 UTC [548] g3_q1 g3q01 carv-v3 LOG:  duration: 0.130 ms  plan:
+	Query Text: INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+	Query Parameters: $1 = '01a1ea0a-40fe-741d-9ddf-6ded09f916c9', $2 = '0', $3 = 'Pending', $4 = NULL, $5 = NULL, $6 = NULL, $7 = NULL, $8 = '2026-11-17 15:05:02.974923+00', $9 = '{"envelope_format":"DynamicForms/SecurityJournal/v1","organization_id":"01a1ea0a-40ac-7a39-9ab7-f85094ce0263","stream_name":"audit","stream_revision":2,"event_kind":"EnvelopeCapabilityRefused","previous_digest_hex":"1e5a53cf5ebdcf0d1132f7398467ceeca988bcbf09699197bf8856be0f33b094","created_on_utc":"2026-11-17T15:05:02.9748989+00:00","body":{"evidence_schema_version":1,"refusal_code":"CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT","organization_id":"01a1ea0a-40ac-7a39-9ab7-f85094ce0263","workload_name":"business-api","entry_point":"prepare","client_capability_level":1,"evidence_database_time_utc":"2026-11-17T15:05:02.96923+00:00","evidence_bucket_start_utc":"2026-11-17T15:00:00+00:00","refusal_observed_on_utc":"2026-11-17T15:05:02.9637652+00:00"}}', $10 = '\x30fdf35e8f538f852c2f945c62024201e9a07864fb860a48f116a7eccb8097ea', $11 = 'EnvelopeCapabilityRefused', $12 = '\x1e5a53cf5ebdcf0d1132f7398467ceeca988bcbf09699197bf8856be0f33b094', $13 = 'audit', $14 = '2', $15 = NULL, $16 = '01a1ea0a-40ac-7a39-9ab7-f85094ce0263', $17 = NULL
+	Insert on security_journal_entries  (cost=0.00..0.01 rows=0 width=0)
+	  ->  Result  (cost=0.00..0.01 rows=1 width=1248)
+

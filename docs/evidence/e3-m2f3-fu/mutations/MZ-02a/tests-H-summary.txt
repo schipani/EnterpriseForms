@@ -1,0 +1,15 @@
+failed EnterpriseForms.Api.ContractTests.CapabilityRefusalEvidenceHostTests.EveryCapabilityRouteRecordsOneEntryOnlyAfterTheRefusedTransactionWasDisposed (3s 437ms)
+  Assert.DoesNotContain() Failure: Item found in collection
+                                                                                                                           (pos 4)
+failed EnterpriseForms.Api.ContractTests.EnvelopeCapabilityEnforcementHostTests.M2F28TheBusinessSeesANonRetryableRefusalAndAnswersUsersWithAServiceUnavailableCondition (397ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Tuple ("CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT", 409, False)
+failed EnterpriseForms.Api.ContractTests.EnvelopeCapabilityEnforcementHostTests.EveryContentEndpointRefusesAnUndeclaredOrUnknownCapabilityInABoundOrganizationBeforeAnyOtherStep (402ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Tuple (Conflict, "CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT", False, "the calling workload's envelope capability is insu"���)
+Test run summary: Failed! - <clone>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+  total: 17
+  failed: 3
+  succeeded: 14
+  skipped: 0
+  duration: 7s 040ms
