@@ -26,7 +26,7 @@ public static class SharedFieldWriteBuilder
 
     public sealed record Result(FormRecordRevision Header, List<ISignedContentRow> Rows, List<FieldValueRowBase> EditedRows, IReadOnlyList<string> EditedFieldKeys);
 
-    public static Result Build(VerifiedRecord verified, IReadOnlyDictionary<string, string> values, IReadOnlyList<RecordGroupValuesRequest>? groups, Guid tenantId, Guid formRecordId, DateTimeOffset now, Guid actorUserId)
+    public static async Task<Result> BuildAsync(VerifiedRecord verified, IReadOnlyDictionary<string, string> values, IReadOnlyList<RecordGroupValuesRequest>? groups, Guid tenantId, Guid formRecordId, DateTimeOffset now, Guid actorUserId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(verified);
         ArgumentNullException.ThrowIfNull(values);
@@ -52,13 +52,14 @@ public static class SharedFieldWriteBuilder
         }
 
         var readableWire = new Dictionary<Guid, string>();
-        string Read(Guid fieldId)
+        async Task<string> ReadAsync(Guid fieldId)
         {
-            // Decrypts only rows the editor is authorized to read (inputs of rules R1/R2 and the edited fields themselves).
+            // Decrypts only rows the editor is authorized to read, and only when needed (inputs of rules R1/R2 and the edited fields themselves).
             if (!readableWire.TryGetValue(fieldId, out var wire))
             {
                 var rows = readable.Where(r => r.FieldDefinitionId == fieldId && r.FormRecordGroupId is null).ToList();
-                wire = rows.Count == 0 ? string.Empty : FieldValueCodec.FormatField(fieldsById[fieldId], rows, verified.OptionsById, verified.Encryption);
+                var decrypted = await DecryptedFieldValues.DecryptAsync(verified.Encryption, rows, cancellationToken).ConfigureAwait(false);
+                wire = rows.Count == 0 ? string.Empty : FieldValueCodec.FormatField(fieldsById[fieldId], rows, verified.OptionsById, decrypted);
                 readableWire[fieldId] = wire;
             }
 
@@ -82,14 +83,14 @@ public static class SharedFieldWriteBuilder
                 throw new BusinessException("CLEAR_NOT_PERMITTED", 422, "a shared value can be changed but not cleared; ask the record owner") { FieldKeys = [key] };
             }
 
-            if (string.Equals(wire, Read(field.FieldDefinitionId), StringComparison.Ordinal))
+            if (string.Equals(wire, await ReadAsync(field.FieldDefinitionId).ConfigureAwait(false), StringComparison.Ordinal))
             {
                 continue; // unchanged value: carried verbatim, not re-encrypted
             }
 
             var current = fieldAccess.CurrentRow;
             var typed = FieldValueCodec.CreateRow(field, fieldAccess.Element, verified.Options, wire, tenantId, formRecordId, current.FieldValueItemId, now, actorUserId);
-            var protectedRow = FieldValueCodec.Protect(typed, field, verified.OptionsById, verified.Encryption);
+            var protectedRow = await FieldValueCodec.ProtectAsync(typed, field, verified.OptionsById, verified.Encryption, cancellationToken).ConfigureAwait(false);
             if (protectedRow.EntityKind != current.EntityKind)
             {
                 throw new BusinessException("FIELD_PROTECTION_MIGRATION_PENDING", 409, "this field's protection is being changed; try again later") { FieldKeys = [key] };
@@ -106,7 +107,7 @@ public static class SharedFieldWriteBuilder
             throw new BusinessException("NO_CHANGE", 422, "nothing to change: every supplied value equals the stored value");
         }
 
-        EnforceRules(verified, access, edited, after, Read);
+        await EnforceRulesAsync(verified, access, edited, after, ReadAsync).ConfigureAwait(false);
 
         // Candidate: verbatim copies (new physical row ids, same signed schema version) + the edited rows.
         var header = CandidateBuilder.CloneHeader(verified.Header);
@@ -137,7 +138,7 @@ public static class SharedFieldWriteBuilder
     }
 
     /// <summary>R1/R2 evaluated over readable values only (the static eligibility guarantees every input is readable).</summary>
-    private static void EnforceRules(VerifiedRecord verified, IReadOnlyDictionary<Guid, SharedFieldAccess> access, Dictionary<Guid, FieldValueRowBase> edited, Dictionary<Guid, string> after, Func<Guid, string> read)
+    private static async Task EnforceRulesAsync(VerifiedRecord verified, IReadOnlyDictionary<Guid, SharedFieldAccess> access, Dictionary<Guid, FieldValueRowBase> edited, Dictionary<Guid, string> after, Func<Guid, Task<string>> read)
     {
         var fieldsById = verified.FieldsById;
         var elements = verified.Layout.Elements.Where(e => e.Kind == LayoutElementKinds.Field && e.FieldDefinitionId is not null).GroupBy(e => e.FieldDefinitionId!.Value).ToDictionary(g => g.Key, g => g.First());
@@ -156,7 +157,7 @@ public static class SharedFieldWriteBuilder
         var wires = new Dictionary<Guid, string>();
         foreach (var fieldId in involved.Where(access.ContainsKey))
         {
-            wires[fieldId] = after.TryGetValue(fieldId, out var changed) ? changed : read(fieldId);
+            wires[fieldId] = after.TryGetValue(fieldId, out var changed) ? changed : await read(fieldId).ConfigureAwait(false);
         }
 
         var states = FormRules.Evaluate(verified.Layout, fieldsById, wires);

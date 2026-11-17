@@ -229,18 +229,27 @@ public sealed class SecurityAdministratorTests(StageBFixture fixture)
         Assert.Equal(other.Administrator.AuthorityUserId.ToString("D"), SystemAdministratorEdges(other.OrganizationId));
     }
 
-    /// <summary>Tests 6, 7, 11, 12, 13: removal, last-administrator protection, and immediate loss of every privilege on existing tokens.</summary>
+    /// <summary>
+    /// Tests 6, 7, 11, 12, 13: removal and immediate loss of every privilege on existing tokens. D8-62a (C-109/C-110): nobody
+    /// removes themself — refused 403 SELF_CHANGE_FORBIDDEN by the Authority, before this change allowed while another
+    /// administrator remained — so another administrator always performs the removal and the organization always keeps the
+    /// acting administrator (the last-administrator rule stays as defence in depth; see the Authority unit tests).
+    /// </summary>
     [Fact]
-    public async Task RemovalTakesEffectImmediatelyAndTheLastAdministratorCannotBeRemoved()
+    public async Task RemovalTakesEffectImmediatelyAndNobodyRemovesThemself()
     {
         var s = await ScenarioAsync("sa-remove");
-        var last = await RemoveAsync(s, s.Administrator, s.Administrator.AuthorityUserId);
-        Assert.Equal(HttpStatusCode.Conflict, last.Status);
-        Assert.Equal("LAST_SECURITY_ADMINISTRATOR", last.ErrorCode);
+        var only = await RemoveAsync(s, s.Administrator, s.Administrator.AuthorityUserId);
+        Assert.Equal(HttpStatusCode.Forbidden, only.Status);
+        Assert.Equal("SELF_CHANGE_FORBIDDEN", only.ErrorCode);
 
         AssertOk(await AppointAsync(s, s.Administrator, s.Clerk.AuthorityUserId));
         var clerkToken = s.Token(s.Clerk); // one token, used before and after removal
         Assert.True((await fixture.Api.GetAsync("/api/v1/organization/search-approvals", clerkToken)).IsSuccess);
+
+        // Self-removal stays refused with another administrator present, through the API and directly at the Authority.
+        Assert.Equal("SELF_CHANGE_FORBIDDEN", (await RemoveAsync(s, s.Administrator, s.Administrator.AuthorityUserId)).ErrorCode);
+        Assert.Equal("SELF_CHANGE_FORBIDDEN", (await DirectCommandAsync(s.OrganizationId, s.Token(s.Clerk), "RevokeSystemRole", s.Clerk.AuthorityUserId)).ErrorCode);
 
         // Removing someone who is not an administrator is refused; the newcomer removes the original administrator.
         Assert.Equal("INVALID_COMMAND", (await RemoveAsync(s, s.Clerk, s.Reader.AuthorityUserId)).ErrorCode);
@@ -253,19 +262,17 @@ public sealed class SecurityAdministratorTests(StageBFixture fixture)
         Assert.False((await fixture.Api.GetAsync("/api/v1/organization/search-approvals", s.Token(s.Administrator))).IsSuccess);
         Assert.Equal(HttpStatusCode.Forbidden, (await AppointAsync(s, s.Administrator, s.Administrator.AuthorityUserId)).Status);
 
-        // Now the clerk is the last one.
-        var lastAgain = await RemoveAsync(s, s.Clerk, s.Clerk.AuthorityUserId);
-        Assert.Equal("LAST_SECURITY_ADMINISTRATOR", lastAgain.ErrorCode);
-
-        // Restore the bootstrap administrator, then the clerk removes themself; the clerk's same token is then refused.
+        // Restore the bootstrap administrator, who then removes the clerk; the clerk's same token is then refused.
         AssertOk(await AppointAsync(s, s.Clerk, s.Administrator.AuthorityUserId));
-        AssertOk(await RemoveAsync(s, s.Clerk, s.Clerk.AuthorityUserId));
+        AssertOk(await RemoveAsync(s, s.Administrator, s.Clerk.AuthorityUserId));
         Assert.False((await fixture.Api.GetAsync("/api/v1/organization/search-approvals", clerkToken)).IsSuccess);
         Assert.Equal(HttpStatusCode.Forbidden, (await fixture.Api.GetAsync(Roster, clerkToken)).Status);
 
         Assert.Equal(s.Administrator.AuthorityUserId.ToString("D"), SystemAdministratorEdges(s.OrganizationId));
         Assert.Equal(2, CommittedCommands(s.OrganizationId, "RevokeSystemRole"));
-        Assert.Contains("LAST_SECURITY_ADMINISTRATOR", AuthorityAudit(s.OrganizationId, "SecurityAdministratorCommandRejected"), StringComparison.Ordinal);
+        var refusals = AuthorityAudit(s.OrganizationId, "SecurityAdministratorCommandRejected");
+        Assert.Contains("SELF_CHANGE_FORBIDDEN", refusals, StringComparison.Ordinal);
+        Assert.DoesNotContain("rotation SA-2", refusals, StringComparison.Ordinal);
         Assert.Equal("2", fixture.Stack.AttackerSql($"SELECT count(*) FROM audit_events WHERE tenant_id = '{s.OrganizationId:D}' AND event_action = 'SECURITY_ADMINISTRATOR_REMOVED';").Trim());
     }
 

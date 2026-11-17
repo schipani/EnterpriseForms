@@ -84,15 +84,18 @@ public sealed record RecordListQuery(Guid? FormDefinitionId, string? RecordStatu
     public static string ReferenceFor(Guid formRecordId) => "REC-" + formRecordId.ToString("N")[^8..].ToUpperInvariant();
 }
 
-/// <summary>Position of a page within one listing scope, bound to the caller and the authorization revision it was computed at.</summary>
-public sealed record RecordListCursor(Guid OrganizationId, Guid UserId, long AuthorizationRevision, string ScopeDigest, int Offset)
+/// <summary>
+/// Position of a page within one listing scope, bound to the caller and the authorization revision it was computed at. IX-6:
+/// <c>Engine</c> names the engine that produced the listing (null: the C-29 listing); a page is served only by that engine.
+/// </summary>
+public sealed record RecordListCursor(Guid OrganizationId, Guid UserId, long AuthorizationRevision, string ScopeDigest, int Offset, string? Engine = null)
 {
     public static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(15);
 
     public string Encode(IOpaqueCursorProtector protector)
     {
         ArgumentNullException.ThrowIfNull(protector);
-        return protector.Protect(JsonSerializer.Serialize(new Payload(1, OrganizationId, UserId, AuthorizationRevision, ScopeDigest, Offset)), Lifetime);
+        return protector.Protect(JsonSerializer.Serialize(new Payload(1, OrganizationId, UserId, AuthorizationRevision, ScopeDigest, Offset, Engine)), Lifetime);
     }
 
     /// <summary>
@@ -101,6 +104,22 @@ public sealed record RecordListCursor(Guid OrganizationId, Guid UserId, long Aut
     /// <c>LIST_CHANGED</c> (retryable) when access changed since it was issued — the client restarts from the first page.
     /// </summary>
     public static RecordListCursor Decode(IOpaqueCursorProtector protector, string token, RequestContext context, RecordListQuery query, long currentAuthorizationRevision)
+    {
+        var cursor = DecodeAny(protector, token, context, query);
+        if (cursor.Engine is not null || cursor.AuthorizationRevision != currentAuthorizationRevision)
+        {
+            throw new BusinessException("LIST_CHANGED", 409, "access changed since this page was loaded; reload the list from the first page");
+        }
+
+        return cursor;
+    }
+
+    /// <summary>
+    /// IX-6: decodes and checks a cursor of either engine (400 <c>CURSOR_INVALID</c> / <c>CURSOR_SCOPE_MISMATCH</c> as above) without
+    /// the revision check, which the engine that produced it performs (the C-29 listing against its enumeration, the indexed listing
+    /// at the Authority's pin).
+    /// </summary>
+    public static RecordListCursor DecodeAny(IOpaqueCursorProtector protector, string token, RequestContext context, RecordListQuery query)
     {
         ArgumentNullException.ThrowIfNull(protector);
         ArgumentNullException.ThrowIfNull(context);
@@ -129,15 +148,10 @@ public sealed record RecordListCursor(Guid OrganizationId, Guid UserId, long Aut
             throw new BusinessException("CURSOR_SCOPE_MISMATCH", 400, "this page link belongs to different filters or sorting; reload the list");
         }
 
-        if (payload.R != currentAuthorizationRevision)
-        {
-            throw new BusinessException("LIST_CHANGED", 409, "access changed since this page was loaded; reload the list from the first page");
-        }
-
-        return new RecordListCursor(payload.O, payload.U, payload.R, payload.Q, payload.S);
+        return new RecordListCursor(payload.O, payload.U, payload.R, payload.Q, payload.S, payload.E);
     }
 
-    private sealed record Payload(int V, Guid O, Guid U, long R, string Q, int S);
+    private sealed record Payload(int V, Guid O, Guid U, long R, string Q, int S, string? E = null);
 }
 
 /// <summary>Status literals used by listing (the lifecycle rules live in <c>Lifecycle.RecordLifecycle</c>).</summary>

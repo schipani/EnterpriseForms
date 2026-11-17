@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, Download, History, Pencil, Plus, RefreshCw, RotateCcw, Save, Search, Send, Settings, SlidersHorizontal, Trash2, Undo2, type LucideIcon } from "lucide-react";
+import { Archive, ArchiveRestore, Download, Eraser, History, Pencil, Plus, RefreshCw, RotateCcw, Save, Search, Send, Settings, SlidersHorizontal, Trash2, Undo2, type LucideIcon } from "lucide-react";
 
 export type ActionIconComponent = LucideIcon;
 
@@ -20,6 +20,8 @@ export const ActionIcons = {
   reopen: Undo2,
   configure: Settings,
   delete: Trash2,
+  /** Clear the fields of a designer row or column while keeping its empty cells (FD-01 row management). */
+  clear: Eraser,
   download: Download,
   /** Independent refresh of one card or panel (PB-07; Phase C8 M1 administration pages). */
   refresh: RefreshCw,

@@ -20,6 +20,22 @@ public interface IAcceptedRecordItemsReader
     /// values are never decoded here.
     /// </summary>
     Task<AcceptedRecordContent> ReadAcceptedContentAsync(Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// IX-2 O-2 (IX-D10): <see cref="ReadAcceptedContentAsync"/> for several records at once. The default reads them one by one;
+    /// the business implementation reads them set-based (one query per row table) with byte-identical results.
+    /// </summary>
+    async Task<IReadOnlyDictionary<Guid, AcceptedRecordContent>> ReadAcceptedContentBatchAsync(IReadOnlyList<(Guid FormRecordId, Guid CommittedOperationId)> records, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(records);
+        var result = new Dictionary<Guid, AcceptedRecordContent>(records.Count);
+        foreach (var (record, operation) in records)
+        {
+            result[record] = await ReadAcceptedContentAsync(record, operation, cancellationToken).ConfigureAwait(false);
+        }
+
+        return result;
+    }
 }
 
 /// <summary>Signed header columns of an accepted revision (Phase C7 M3): what a verified search may filter and display.</summary>
@@ -41,9 +57,24 @@ public sealed class AcceptedRecordItemsReader(RecordCandidateStager stager) : IA
     public async Task<IReadOnlyList<StagedContentItem>> ReadObservedItemsAsync(Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken) =>
         (await stager.ReadStagedAsync(formRecordId, committedOperationId, cancellationToken).ConfigureAwait(false)).Items;
 
-    public async Task<AcceptedRecordContent> ReadAcceptedContentAsync(Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken)
+    public async Task<AcceptedRecordContent> ReadAcceptedContentAsync(Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken) =>
+        ToContent(await stager.ReadStagedAsync(formRecordId, committedOperationId, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>IX-2 O-2: set-based read (one query per row table for the whole batch); each result equals the per-record read.</summary>
+    public async Task<IReadOnlyDictionary<Guid, AcceptedRecordContent>> ReadAcceptedContentBatchAsync(IReadOnlyList<(Guid FormRecordId, Guid CommittedOperationId)> records, CancellationToken cancellationToken)
     {
-        var snapshot = await stager.ReadStagedAsync(formRecordId, committedOperationId, cancellationToken).ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(records);
+        if (records.Select(r => r.FormRecordId).Distinct().Count() != records.Count)
+        {
+            throw new ArgumentException("each record may appear once per batch", nameof(records));
+        }
+
+        var snapshots = await stager.ReadStagedBatchAsync(records, cancellationToken).ConfigureAwait(false);
+        return records.ToDictionary(r => r.FormRecordId, r => ToContent(snapshots[(r.FormRecordId, r.CommittedOperationId)]));
+    }
+
+    private static AcceptedRecordContent ToContent(RecordCandidateStager.StagedSnapshot snapshot)
+    {
         var header = snapshot.Header is { } h ? new AcceptedRecordHeaderFacts(h.FormDefinitionId, h.RecordStatus, h.CreatedByUserId, h.ParentFormRecordId) : null;
         var values = new List<AcceptedFieldValue>(snapshot.Rows.Count);
         foreach (var row in snapshot.Rows)

@@ -35,6 +35,9 @@ public enum RequestedAction
 
     /// <summary>Phase C7 M2 (OD-4): query the form's approved fields (SpiceDB <c>form_definition#query_fields</c>).</summary>
     QueryFields,
+
+    /// <summary>C8 M4 (AC-8): read organization audit (SpiceDB <c>organization#view_audit</c>: Security Auditors). Grants no record content.</summary>
+    ViewAudit,
 }
 
 public sealed record ResourceRef(ResourceKind ResourceKind, Guid ResourceId);

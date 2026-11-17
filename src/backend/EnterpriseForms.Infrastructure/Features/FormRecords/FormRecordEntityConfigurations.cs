@@ -176,7 +176,10 @@ public sealed class FieldEncryptedValueConfiguration : IEntityTypeConfiguration<
         {
             t.HasCheckConstraint("ck_field_encrypted_values_nonce_length", "octet_length(encryption_nonce_bytes) = 12");
             t.HasCheckConstraint("ck_field_encrypted_values_tag_length", "octet_length(encryption_auth_tag_bytes) = 16");
-            t.HasCheckConstraint("ck_field_encrypted_values_envelope_positive", "encryption_envelope_version >= 1");
+            // E3-M2b-2 (§9.3, D-1): closed envelope versions, the schema/envelope tie (S-11) and the v2 metadata rule.
+            t.HasCheckConstraint(EnvelopeMetadataConstraints.FieldEnvelopeVersionName, EnvelopeMetadataConstraints.EnvelopeVersionSql);
+            t.HasCheckConstraint(EnvelopeMetadataConstraints.FieldSchemaEnvelopeTieName, EnvelopeMetadataConstraints.SchemaEnvelopeTieSql);
+            t.HasCheckConstraint(EnvelopeMetadataConstraints.FieldMetadataName, EnvelopeMetadataConstraints.MetadataSql);
             t.HasCheckConstraint("ck_field_encrypted_values_logical_type", "encrypted_logical_type IN ('String','Integer','Decimal','Date','DateTime','Boolean','Guid','Option')");
         });
         // No lookup index on the ciphertext: encrypted values are never searched (ADR-PB-004).

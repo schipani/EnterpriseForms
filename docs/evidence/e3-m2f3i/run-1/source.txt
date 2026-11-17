@@ -1,0 +1,16 @@
+3009878f55dc4430cc90ef5092764ed01abeff80 plus the uncommitted working tree (git status --short below)
+ M SHA256SUMS.txt
+ M docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md
+ M docs/security/E3_M2E_CONTRACT_CLOSURE.md
+ M docs/security/E3_M2F_CONTRACT_CLOSURE.md
+ M spec-files.json
+ M src/authority/AuthorizationAuthority.Api/Program.cs
+?? docs/evidence/e3-m2f3i/
+?? docs/security/E3_M2F3_CONTRACT_CLOSURE.md
+?? scripts/dev/e3-m2f3i-index-pg-gate.ps1
+?? src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceIndexCommand.cs
+?? src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidence.cs
+?? src/authority/AuthorizationAuthority.Infrastructure/Persistence/CapabilityRefusalEvidenceIndex.cs
+?? tests/architecture/EnterpriseForms.ArchitectureTests/CapabilityRefusalEvidenceIndexBoundaryTests.cs
+?? tests/authority/AuthorizationAuthority.Tests/CapabilityRefusalEvidenceIndexTests.cs
+?? tools/experiments/e3-m2f3i-index-gate/

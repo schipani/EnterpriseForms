@@ -1,0 +1,9 @@
+== 2026-11-05T00:48:40Z administration-membership fresh stack at 5f5fb07
+failed EnterpriseForms.StageBTests.Tests.MembershipRequestEditCancelTests.StaleAndConcurrentChangesLoseCleanlyAndValidationHolds (1s 338ms)
+failed EnterpriseForms.StageBTests.Tests.TeamMembershipReconciliationTests.RC24QuarantineProjectsNothingAndResumesAfterTheAuthoritysClearance (18s 041ms)
+failed EnterpriseForms.StageBTests.Tests.TeamMembershipReconciliationTests.RC19TheMigrationGoesDownAndUpCleanlyOnAScratchDatabase (2s 830ms)
+  total: 55
+  failed: 3
+  succeeded: 52
+  skipped: 0
+exit 1 elapsed 675s

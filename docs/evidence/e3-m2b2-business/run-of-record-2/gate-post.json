@@ -1,0 +1,38 @@
+{
+  "gate": "E3-M2b-2 business PostgreSQL gate",
+  "phase": "post",
+  "checksTotal": 5,
+  "checksFailed": 0,
+  "checks": [
+    {
+      "checkId": "POST-01",
+      "description": "a pre-E3-M2b-2 business build (legacy EF model without the columns) writes v1 rows to the migrated database; they satisfy every CHECK, are schema 1 / envelope 1 with NULL metadata, and encode to the same canonical bytes in both builds",
+      "passed": true,
+      "detail": "pre-E3-M2b-2 business Release build 11e15ee (git archive)"
+    },
+    {
+      "checkId": "POST-02",
+      "description": "the guarded Down refuses while envelope-2 rows exist (P0001, fixed message) and changes nothing",
+      "passed": true,
+      "detail": "E3-M2b-2 Down refused: envelope version 2 rows exist"
+    },
+    {
+      "checkId": "POST-03",
+      "description": "the Down runs once no envelope-2 row exists: columns and CHECKs removed, envelope_positive restored, history row removed, v1 rows intact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "checkId": "POST-04",
+      "description": "after the Down the guard reports MigrationMissing again",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "checkId": "POST-05",
+      "description": "re-applying the migration over existing v1 data succeeds; the guard is ready and the v1 rows still encode identically",
+      "passed": true,
+      "detail": null
+    }
+  ]
+}

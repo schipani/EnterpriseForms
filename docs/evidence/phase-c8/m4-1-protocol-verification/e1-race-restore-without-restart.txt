@@ -1,0 +1,8 @@
+RACE baseline:ALLOW count=44024 first_at=13.4s
+RACE baseline:DENY count=8576 first_at=0.3s
+RACE protocol:DENY count=6578 first_at=0.4s
+RACE protocol:M1_MISMATCH count=46005 first_at=12.1s
+RACE protocol:M1_MISSING count=8 first_at=12.1s
+RACE protocol:RPC_Internal:an internal error occurred while accessing the datastore count=1 first_at=12.1s
+RACE protocol:RPC_Internal:unexpected consistency middleware error count=8 first_at=12.1s
+RACE protocol:ALLOW for revoked user = 0 (must be 0)

@@ -1,0 +1,6 @@
+Test run summary: Passed! - <clone>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+  total: 953
+  failed: 0
+  succeeded: 941
+  skipped: 12
+  duration: 1m 04s 592ms

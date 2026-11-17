@@ -1,0 +1,66 @@
+04:21:46.925 PASS RB-G0: False ContentAcceptanceRuleMigrationMissing
+04:21:46.953 PASS RB-R0: False ContentAcceptanceRuleMigrationMissing
+04:21:50.657 LB prepare: OK
+04:21:53.212 LB commit: OK
+04:21:55.769 LB prepare: OK
+04:21:58.355 LB commit: OK
+04:22:00.930 LB prepare: OK
+04:22:03.868 LB commit: OK
+04:22:06.925 LB prepare: OK
+04:22:09.855 LB commit: OK
+04:22:12.281 LB prepare: OK
+04:22:14.942 LB commit: OK
+04:22:17.467 LB prepare: OK
+04:22:20.108 LB commit: OK
+04:22:22.586 LB prepare: OK
+04:22:25.384 LB commit: OK
+04:22:27.991 LB prepare: OK
+04:22:31.270 LB commit: OK
+04:22:34.170 LB prepare: OK
+04:22:37.036 LB commit: OK
+04:22:39.802 LB prepare: OK
+04:22:39.838 PASS RB-P0: Committed=9, Prepared=1
+04:22:42.998 real --migrate (carv-migration) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+04:22:43.050 PASS RB-M1: OK; history carv=1; emulation triggers=0
+04:22:43.057 PASS RB-G1: True content acceptance rules v1 (floor none)
+04:22:43.064 PASS RB-R1: True test; probe-only fake; probe-only fake; projection markers verified; content acceptance rules v1 (floor none)
+04:22:44.067 PASS RB-01: 1/1 Committed
+04:22:46.913 LB commit: DbUpdateException <- PostgresException 23514 ck_content_operation_commit_rule_version
+04:22:46.932 PASS RB-02a: 1/NULL Prepared
+04:22:46.958 PASS RB-02b: DbUpdateException <- PostgresException 23514 ck_content_operation_commit_rule_version; unchanged (head=1:e3d4864fa4e297b6f325600ef547ae9ef1b5cc0a7c2d2a763a62efae5db8665f; commits=8; leaves=24; identities=21; checkpoints=8; journal=8; committedOps=8); 1/NULL Prepared
+04:22:46.958 PASS RB-02c: 503 {"errorCode":"AUTHORITY_NOT_READY","correlationId":"01a1dd71-8569-7445-bc5b-7852763b4ac0","retryable":true,"detail":"authority store unavailable"}
+04:22:47.027 PASS RB-02d: OK; 1/1 Committed
+04:22:49.740 LB prepare: OK
+04:22:49.794 PASS RB-03a: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; verifications 6->6
+04:22:49.850 PASS RB-03b: NULL/NULL Aborted OPERATION_RULES_OUTDATED; unchanged (head=2:53e03bf18168dc82e3a1606616c995e0a2099be064599ffc65c05e30e20b6cbd; commits=9; leaves=27; identities=21; checkpoints=9; journal=9; committedOps=9)
+04:22:51.961 LB commit: AuthorityException OPERATION_STATE_INVALID 409 retryable=False
+04:22:51.961 PASS RB-03c: AuthorityException OPERATION_STATE_INVALID 409 retryable=False
+04:22:52.042 PASS RB-03d: OK
+04:22:52.121 PASS RB-05: OK; unchanged (head=1:cb29e13b5e1e306aa7e02ce9049e19f382b54762dd8caa91f34e8798f409ce1f; commits=10; leaves=30; identities=21; checkpoints=10; journal=10; committedOps=10); NULL/NULL Committed
+04:22:54.966 LB prepare: OK
+04:22:55.101 PASS RB-04: legacy prepared; AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; ops 15->15; leaves 45->45; NULL/NULL Prepared
+04:22:55.144 PASS RB-06a: AuthorityException INVALID_COMMAND 422 retryable=False
+04:22:58.079 LB prepare: OK
+04:22:58.148 PASS RB-06b: legacy prepared; AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; unchanged (head=1:e181340d4bc8477613c8c5be1f917e9dfb8675a35977269accc2d73c5998c6db; commits=10; leaves=30; identities=21; checkpoints=10; journal=10; committedOps=10); NULL/NULL Aborted
+04:22:58.269 PASS RB-07: AuthorityException OPERATION_EXPIRED 409 retryable=False; 1/NULL Aborted
+04:22:58.455 PASS RB-08: OK; AuthorityException CONTENT_REVISION_CONFLICT 409 retryable=False; 1/1 Committed, 1/NULL Aborted
+04:22:59.429 concurrent: ok=14; conflicts=10; unexpected=0; 968 ms
+04:22:59.445 PASS RB-09: ok=14; conflicts=10; unexpected=0; 968 ms; committed rows with P<>C: 0
+04:22:59.557 PASS RB-10: carv-runtime-RB carv-v1; OK
+04:22:59.709 PASS RB-11: P0001 : CARV down refused: operations prepared under CARV rules are in flight; 1/NULL Prepared
+04:22:59.748 PASS RB-12: False ContentAcceptanceRuleStateGuardMissing | True content acceptance rules v1 (floor none)
+04:22:59.765 PASS RB-13: content_operation_rule_state_guard|secdef=false|owner=postgres|config=search_path=pg_catalog, pg_temp|acl={postgres=X/postgres}|runtime_execute=false
+04:23:02.152 concurrent: ok=24; conflicts=0; unexpected=0; 2386 ms
+04:23:02.181 PASS RB-14: ok=24; conflicts=0; unexpected=0; 2386 ms; floor=1
+04:23:02.187 PASS RB-G2: True content acceptance rules v1 (floor 1)
+04:23:04.915 LB prepare: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1
+04:23:04.942 PASS RB-15: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1; ops 69->69
+04:23:07.473 LB commit: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1
+04:23:07.538 PASS RB-16: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v1 | AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False | NULL/NULL Aborted; unchanged (head=1:e77ad2fe9a61cf95cac03cb0e1e74888fa0716883fba8694caffa5916b08ec6b; commits=30; leaves=90; identities=21; checkpoints=30; journal=30; committedOps=30)
+04:23:07.620 PASS RB-17: OK
+04:23:07.674 floor_v2.sql applied (carv-floor)
+04:23:07.775 PASS RB-18: OK; AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; alert=CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE:the database content acceptance rule fence (ck_content_operation_rule_floor_v2) refused a content operation write; this build applies rule version 1 (mixed-version fleet or a newer floor); unchanged (head=4:ef4a5b8b5db006fbcdd2411c3e7bd4d9e823ba539b0cd7c941b545663cd3be34; commits=31; leaves=93; identities=21; checkpoints=31; journal=31; committedOps=31); 1/NULL Prepared
+04:23:07.852 PASS RB-19: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; alert=CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE; ops 71->71
+04:23:07.857 PASS RB-G3: False ContentAcceptanceRuleFloorAboveBuild(floor=2, build=1)
+04:23:07.860 PASS RB-R2: False ContentAcceptanceRuleFloorAboveBuild(floor=2, build=1)
+04:23:07.873 PASS FINAL: Aborted=15, Committed=53, Prepared=3; legacy agent calls=26

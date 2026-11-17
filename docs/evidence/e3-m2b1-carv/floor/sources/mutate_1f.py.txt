@@ -1,0 +1,149 @@
+"""E3-M2b-1F enforcement-removal checks. Each mutation removes one part of the floor design, applied alone to the working tree,
+then either (unit) rebuilds and runs the focused Authority test classes, or (pg) builds a mutated Release Authority and runs
+harness F against the frozen legacy build 66f0aa7 on a disposable PostgreSQL container. Every file is backed up in the
+scratchpad, restored and SHA-256 verified. Usage: python -I mutate_1f.py <repo> <scratch-carv-dir>"""
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+repo, S = sys.argv[1], sys.argv[2]
+INF = "src/authority/AuthorizationAuthority.Infrastructure/Persistence/"
+DESIGNER = INF + "FloorMigrations/20261115032228_AuthorityContentAcceptanceRuleFloor1.Designer.cs"
+FLOOR_SQL = INF + "ContentAcceptanceFloorSql.cs"
+RULES = "src/authority/AuthorizationAuthority.Application/Features/Content/ContentAcceptanceRules.cs"
+COMMAND = "src/authority/AuthorizationAuthority.Api/Composition/ContentAcceptanceFloorCommand.cs"
+AUTH_TESTS = "tests/authority/AuthorizationAuthority.Tests"
+AUTH_EXE = os.path.join(repo, AUTH_TESTS, "bin/Debug/net10.0/AuthorizationAuthority.Tests.exe")
+CLASSES = ["AuthorizationAuthority.Tests.ContentAcceptanceFloorTests", "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests"]
+API = "src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj"
+API_OUT = os.path.join(repo, "src/authority/AuthorizationAuthority.Api/bin/Release/net10.0")
+
+SEPARATION = ("[DbContext(typeof(ContentAcceptanceFloorContext))]\n    [Migration(", "[DbContext(typeof(AuthorityDbContext))]\n    [Migration(")
+IN_FLIGHT = ("            IF blocking > 0 THEN\n                RAISE EXCEPTION 'CARV floor refused: % unexpired operation(s)",
+             "            IF blocking < 0 THEN\n                RAISE EXCEPTION 'CARV floor refused: % unexpired operation(s)")
+SESSIONS = ("            IF blocking > 0 THEN\n                RAISE EXCEPTION 'CARV floor refused: % session(s)",
+            "            IF blocking < 0 THEN\n                RAISE EXCEPTION 'CARV floor refused: % session(s)")
+SCOPE_UP = ("CHECK (operation_state_name NOT IN ('Prepared', 'Committed') OR (prepare_acceptance_rule_version IS NOT NULL AND prepare_acceptance_rule_version >= 1)) NOT VALID;",
+            "CHECK (operation_state_name <> 'Prepared' OR (prepare_acceptance_rule_version IS NOT NULL AND prepare_acceptance_rule_version >= 1)) NOT VALID;")
+NULL_UP = ("CHECK (operation_state_name NOT IN ('Prepared', 'Committed') OR (prepare_acceptance_rule_version IS NOT NULL AND prepare_acceptance_rule_version >= 1)) NOT VALID;",
+           "CHECK (operation_state_name NOT IN ('Prepared', 'Committed') OR prepare_acceptance_rule_version >= 1) NOT VALID;")
+DOWN = ("            RAISE EXCEPTION 'CARV floor down refused: content acceptance rule floors are never lowered';",
+        "            ALTER TABLE authority.content_change_operations DROP CONSTRAINT IF EXISTS ck_content_operation_rule_floor_v1;")
+REINSTATE = ("            if (installed < ContentAcceptanceFloorSql.FloorVersion)\n", "            if (installed < 0)\n")
+
+MUTATIONS = [
+    ("MF-1", "the floor migration attributed to AuthorityDbContext (Release A/B separation removed)", "unit", [(DESIGNER, *SEPARATION)]),
+    ("MF-2", "readiness ignores a recorded floor whose constraint is missing", "unit",
+     [(RULES, "        if (facts.FloorRecorded && facts.InstalledFloor is null)\n", "        if (facts.FloorRecorded && facts.InstalledFloor is null && !facts.FloorRecorded)\n")]),
+    ("MF-3", "readiness ignores the deployment's required floor", "unit",
+     [(RULES, "        if (requiredFloor is { } minimum && (facts.InstalledFloor ?? 0) < minimum)\n", "        if (requiredFloor is { } minimum && minimum < 0)\n")]),
+    ("MF-4", "the floor command accepts --migrate in the same invocation", "unit",
+     [(COMMAND, '        if (Array.IndexOf(args, "--migrate") >= 0)\n', '        if (Array.IndexOf(args, "--migrate") > args.Length)\n')]),
+    ("MF-5", "the floor Down drops the floor instead of refusing", "unit", [(FLOOR_SQL, *DOWN)]),
+    ("MF-6", "the floor migration no longer takes the table lock before its preconditions", "unit",
+     [(FLOOR_SQL, "        LOCK TABLE authority.content_change_operations IN ACCESS EXCLUSIVE MODE;\n", "")]),
+    ("MP-1", "the floor migration attributed to AuthorityDbContext (Release A/B separation removed)", "pg", [(DESIGNER, *SEPARATION)]),
+    ("MP-2", "the in-flight legacy operation precondition removed", "pg", [(FLOOR_SQL, *IN_FLIGHT)]),
+    ("MP-3", "the unmarked-session precondition removed", "pg", [(FLOOR_SQL, *SESSIONS)]),
+    ("MP-4", "the floor restricted to Prepared rows (D-2)", "pg", [(FLOOR_SQL, *SCOPE_UP)]),
+    ("MP-5", "the floor without its IS NOT NULL term (D-1)", "pg", [(FLOOR_SQL, *NULL_UP)]),
+    ("MP-6", "the floor Down drops the floor instead of refusing", "pg", [(FLOOR_SQL, *DOWN)]),
+    ("MP-7", "the command no longer verifies that the recorded floor exists", "pg", [(COMMAND, *REINSTATE)]),
+]
+
+
+def sha(path):
+    return hashlib.sha256(open(path, "rb").read()).hexdigest()
+
+
+def run(args, cwd=None):
+    return subprocess.run(args, cwd=cwd or repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+
+def unit_tests():
+    r = run(["dotnet", "build", AUTH_TESTS, "-c", "Debug", "-nologo", "-v", "q"])
+    if r.returncode != 0:
+        return {"build": "FAILED: " + (r.stdout + r.stderr)[-1200:]}
+    args = [AUTH_EXE]
+    for c in CLASSES:
+        args += ["--filter-class", c]
+    t = run(args)
+    text = t.stdout + t.stderr
+    total, failed = re.search(r"total: (\d+)", text), re.search(r"failed: (\d+)", text)
+    return {"testsRun": int(total.group(1)) if total else None, "testsFailed": int(failed.group(1)) if failed else None,
+            "failingTests": sorted(set(re.findall(r"failed ([A-Za-z0-9_.]+(?:\([^)]*\))?)", text)))}
+
+
+def dlls(directory):
+    return [n for n in os.listdir(directory) if n.endswith(".dll") and (n.startswith("AuthorizationAuthority.") or n == "EnterpriseForms.Integrity.dll")]
+
+
+def pg_run(mid):
+    r = run(["dotnet", "build", API, "-c", "Release", "-nologo", "-v", "q"])
+    if r.returncode != 0:
+        return {"build": "FAILED: " + (r.stdout + r.stderr)[-1200:]}
+    newbin = os.path.join(S, f"newbin-{mid}")
+    shutil.rmtree(newbin, ignore_errors=True)
+    shutil.copytree(API_OUT, newbin)
+    return {"newbin": newbin}
+
+
+def pg_harness(mid, newbin):
+    harness_bin = os.path.join(S, f"harnessF-bin-{mid}")
+    shutil.rmtree(harness_bin, ignore_errors=True)
+    shutil.copytree(os.path.join(S, "harnessF", "bin", "Release", "net10.0"), harness_bin)
+    for name in dlls(newbin):
+        shutil.copyfile(os.path.join(newbin, name), os.path.join(harness_bin, name))
+    hashfile = os.path.join(S, f"hashes-{mid}.txt")
+    open(hashfile, "w", encoding="ascii", newline="\r\n").write("\n".join(f"{sha(os.path.join(newbin, n))} *{n}" for n in sorted(dlls(newbin))) + "\n")
+    evidence = os.path.join(S, "mutation-evidence-1f", mid)
+    shutil.rmtree(evidence, ignore_errors=True)
+    os.makedirs(evidence)
+    args = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(S, "run-B.ps1"), "-Legacy", "66f0aa7", "-Evidence", evidence,
+            "-NewBin", newbin, "-HarnessBin", harness_bin, "-NewBinHashFile", hashfile,
+            "-AgentBin", os.path.join(S, "agentF-66f0aa7", "bin", "Release", "net10.0"), "-HarnessExe", "CarvHarnessF.exe"]
+    r = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    report = os.path.join(evidence, "carv-evidence.json")
+    if not os.path.exists(report):
+        return {"harnessError": (r.stdout + r.stderr)[-2000:]}
+    data = json.load(open(report, encoding="utf-8"))
+    failed = [c for c in data["checks"] if not c["Pass"]]
+    return {"checksTotal": data["checksTotal"], "checksFailed": data["checksFailed"], "failedChecks": [{"id": c["Id"], "observed": c["Observed"][:300]} for c in failed]}
+
+
+results = []
+for mid, removal, kind, edits in MUTATIONS:
+    entry = {"id": mid, "removal": removal, "kind": kind}
+    print("running", mid, flush=True)
+    backups = []
+    outcome = {}
+    try:
+        for rel, old, new in edits:
+            path = os.path.join(repo, rel)
+            backup = os.path.join(S, "mutation-backups-1f", f"{mid}-{os.path.basename(path)}")
+            os.makedirs(os.path.dirname(backup), exist_ok=True)
+            shutil.copyfile(path, backup)
+            backups.append((path, backup, sha(path)))
+            text = open(path, encoding="utf-8").read()
+            assert text.count(old) == 1, (mid, rel, text.count(old))
+            open(path, "w", encoding="utf-8", newline="").write(text.replace(old, new))
+        outcome = unit_tests() if kind == "unit" else pg_run(mid)
+    finally:
+        for path, backup, original in backups:
+            shutil.copyfile(backup, path)
+        entry["restoredSha256Matches"] = all(sha(p) == o for p, _, o in backups)
+    if kind == "pg" and "newbin" in outcome:
+        outcome = pg_harness(mid, outcome["newbin"])  # the source is already restored; the harness runs the mutated build
+    entry.update(outcome)
+    entry["detected"] = bool(entry.get("testsFailed") or entry.get("checksFailed"))
+    results.append(entry)
+    print(json.dumps({k: v for k, v in entry.items() if k not in ("failedChecks", "failingTests")}), flush=True)
+
+r = run(["dotnet", "build", AUTH_TESTS, "-c", "Debug", "-nologo", "-v", "q"])
+results.append({"id": "REBUILD", "authorityTestsBuildOk": r.returncode == 0})
+json.dump(results, open(os.path.join(S, "mutation-1f-results.json"), "w", encoding="utf-8"), indent=2)
+print("done", flush=True)

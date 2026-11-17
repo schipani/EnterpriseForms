@@ -29,11 +29,30 @@ public sealed class Program
             return probeExitCode;
         }
 
+        // E3-M2f-3i: the capability-refusal evidence index, a separate privileged step (migration identity, CREATE INDEX
+        // CONCURRENTLY, no EF migration, no grant re-application). It refuses --migrate and the floor command alongside it, so it
+        // is dispatched first.
+        if (CapabilityRefusalEvidenceIndexCommand.TryRun(args, out var evidenceIndexExitCode))
+        {
+            return evidenceIndexExitCode;
+        }
+
+        // E3-M2b-1F: Release B only, an explicit operator action; ordinary --migrate never applies the floor, and the two are
+        // never combined in one invocation (the command refuses --migrate alongside it).
+        if (ContentAcceptanceFloorCommand.TryRun(args, out var floorExitCode))
+        {
+            return floorExitCode;
+        }
+
         if (MigrateCommand.TryRun(args, out var migrateExitCode))
         {
             return migrateExitCode;
         }
 
+        // IX-7 ST-PERF-7: the seal-throughput harness runs on the fully composed host (same signer, policy and pin), then exits.
+        var measureSeal = SealThroughputCommand.Requested(args, out var sealCount, out var sealConcurrency, out args);
+        // E-5: Development/Testing operator command, run on the composed host (same store and signing provider), then exits.
+        var activateKey = IntegrityKeyActivationCommand.Requested(args, out var activation, out args);
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.ConfigureHttpJsonOptions(options => AuthorityJson.Configure(options.SerializerOptions));
@@ -54,11 +73,26 @@ public sealed class Program
 
         builder.Services.AddAuthorityInfrastructure(builder.Configuration, builder.Environment);
         builder.Services.AddSigningProviderConfiguration(builder.Configuration, builder.Environment);
+        // IX-1 (C-126): Authority-owned search index; Disabled unless configured, Dark (no query path) only in Development/Testing.
+        builder.Services.AddSearchIndex(builder.Configuration, builder.Environment);
+        builder.Services.AddSearchAccessProjection(builder.Configuration, builder.Environment); // IX-5a: dark Tier 2 access projection
+        // C-137 (R-37): optional phase-duration diagnostics; off unless configured, Development/Testing only.
+        builder.Services.AddOperationTiming(builder.Configuration, builder.Environment);
         // Phase C5 (D10): field-scoped contributor writes; off unless the deployment sets exactly "true"; refused in Production.
         builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.Content.ShareContributorWriteSwitch.Create(
             builder.Configuration[AuthorizationAuthority.Application.Features.Content.ShareContributorWriteSwitch.ConfigurationKey],
             builder.Environment.IsProduction(),
             builder.Environment.IsEnvironment("Testing")));
+        // E3-M2e (OD-M2e-07): Envelope v2 acceptance; off unless the deployment sets exactly "true"; refused outside Development/Testing,
+        // without Release B RequiredFloor 3, or without the data-key ledger migration. E3-M2e-1 is dark: never enabled.
+        builder.Services.AddEnvelopeV2Acceptance();
+        // E3-M2f-2 (§9): the business envelope capability floor; deployment floor from Content:MinimumBusinessEnvelopeCapability (absent => 1,
+        // exactly "1" or "2" otherwise; anything else refuses the start). The check itself runs at the seven content entry points.
+        builder.Services.AddEnvelopeCapabilityFloor();
+
+        // E3-M2f-3b: bounded capability-refusal evidence on the organization audit stream (recorder, endpoint filter on the seven
+        // capability routes, in-memory retry). Never changes a refusal; adds no endpoint, permission or configuration key.
+        builder.Services.AddCapabilityRefusalEvidence();
         AuthorizationAuthority.Api.Features.Health.TestStackIdentityEndpoints.RefuseOutsideTesting(builder.Configuration, builder.Environment);
         builder.Services.AddInternalAuthentication(builder.Configuration);
         // Phase C8 AC-9: read-only outcome lookup for the business reconciler (own credential, rate limit; bad limits fail at startup).
@@ -92,8 +126,28 @@ public sealed class Program
         builder.Services.AddSingleton<SpiceDbSchemaInitializer>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<SpiceDbSchemaInitializer>());
         builder.Services.AddHostedService<AuthorityWorkLoop>();
+        // C-150 R56-B: every instance listens for committed authorization changes (any instance's commit wakes all loops).
+        var authorityWork = builder.Configuration.GetSection(AuthorizationAuthority.Application.Common.AuthorityWorkOptions.SectionName).Get<AuthorizationAuthority.Application.Common.AuthorityWorkOptions>() ?? new AuthorizationAuthority.Application.Common.AuthorityWorkOptions();
+        if (authorityWork.CommitWakeupEnabled && builder.Configuration.GetConnectionString("AuthorityDb") is { Length: > 0 } workListenerConnection)
+        {
+            builder.Services.AddHostedService(sp => new AuthorityWorkNotificationListener(workListenerConnection, sp.GetRequiredService<AuthorizationAuthority.Application.Common.AuthorityWorkSignal>(),
+                sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILogger<AuthorityWorkNotificationListener>>()));
+        }
+        // C8 M4 S1 (S2): periodic projection-integrity check; it complements, never replaces, the decision-time protocol.
+        builder.Services.AddSingleton(builder.Configuration.GetSection(ProjectionIntegrityOptions.SectionName).Get<ProjectionIntegrityOptions>() ?? new ProjectionIntegrityOptions());
+        builder.Services.AddHostedService<ProjectionIntegrityMonitorLoop>();
 
         var app = builder.Build();
+        if (measureSeal)
+        {
+            return SealThroughputCommand.Run(app.Services, app.Environment, sealCount, sealConcurrency);
+        }
+
+        if (activateKey)
+        {
+            return IntegrityKeyActivationCommand.Run(app.Services, app.Environment, activation);
+        }
+
 
         app.UseMiddleware<ReconcilerLookupRefusalMiddleware>(); // outermost: observes the final status of AC-9 refusals
         app.UseExceptionHandler();
@@ -101,6 +155,10 @@ public sealed class Program
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseRateLimiter();
+        if (app.Environment.IsEnvironment("Testing"))
+        {
+            AuthorizationAuthority.Api.Features.Health.SpiceDbCallCountingEndpoints.UseSpiceDbCallAttribution(app); // C-149 P-2 (when enabled)
+        }
 
         if (app.Environment.IsDevelopment())
         {
@@ -111,6 +169,10 @@ public sealed class Program
         if (app.Environment.IsEnvironment("Testing"))
         {
             app.MapTestStackIdentityEndpoints();
+            AuthorizationAuthority.Api.Features.SearchIndex.IndexedSearchEndpoints.MapIndexedSearchTestingEndpoints(app); // IX-3 plan-shape test
+            AuthorizationAuthority.Api.Features.SearchIndex.SearchAccessTestingEndpoints.MapSearchAccessTestingEndpoints(app); // IX-5a
+            AuthorizationAuthority.Api.Features.Health.SpiceDbCallCountingEndpoints.MapSpiceDbCallCountingEndpoints(app); // C-149 P-2
+            AuthorizationAuthority.Api.Features.Health.AuthorityWorkTestingEndpoints.MapAuthorityWorkTestingEndpoints(app); // C-150 R56-B
         }
 
         app.MapAuthorizationEndpoints();
@@ -125,6 +187,8 @@ public sealed class Program
         AuthorizationAuthority.Api.Features.PlatformOperators.OwnerRecoveryEndpoints.MapOwnerRecoveryEndpoints(app);
         app.MapSessionEndpoints();
         app.MapFieldSearchEndpoints();
+        AuthorizationAuthority.Api.Features.SearchIndex.SearchIndexBuilderEndpoints.MapSearchIndexBuilderEndpoints(app);
+        AuthorizationAuthority.Api.Features.SearchIndex.IndexedSearchEndpoints.MapIndexedSearchEndpoints(app); // IX-3
         AuthorizationAuthority.Api.Features.Membership.MembershipEndpoints.MapMembershipEndpoints(app);
 
         app.Run();

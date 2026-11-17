@@ -48,7 +48,13 @@ public static class LayoutElementKinds
     public const string DocumentCollection = "documentCollection";
 }
 
-public sealed record LayoutPlacement(int ColumnSpan, bool StartOnNewRow);
+/// <summary>
+/// Placement on the four-column desktop grid. <see cref="ColumnStart"/> (FD-01, optional, additive to schema v2) pins the
+/// element to an explicit desktop column so empty cells before it are preserved; it is omitted from the serialized layout
+/// when absent, so layouts written before FD-01 serialize byte-for-byte as before and keep their ordered-flow packing.
+/// Tablet and phone renderers ignore it (source-order reflow).
+/// </summary>
+public sealed record LayoutPlacement(int ColumnSpan, bool StartOnNewRow, int? ColumnStart = null);
 
 /// <summary>Validation rules carried in the immutable version (subset for Stage B). Server-enforced on every write.</summary>
 public sealed record LayoutValidation(bool Required, int? MinLength, int? MaxLength, string? Pattern, decimal? Minimum, decimal? Maximum, DateOnly? MinDate, DateOnly? MaxDate);
@@ -207,7 +213,7 @@ public static class FormLayoutCodec
                     label = e.Label,
                     helpText = e.HelpText,
                     placeholder = e.Placeholder,
-                    layout = new { columnSpan = e.Layout.ColumnSpan, startOnNewRow = e.Layout.StartOnNewRow },
+                    layout = new { columnSpan = e.Layout.ColumnSpan, startOnNewRow = e.Layout.StartOnNewRow, columnStart = e.Layout.ColumnStart },
                     required = e.Validation.Required,
                     validation = new { minLength = e.Validation.MinLength, maxLength = e.Validation.MaxLength, pattern = e.Validation.Pattern, minimum = e.Validation.Minimum, maximum = e.Validation.Maximum, minDate = e.Validation.MinDate, maxDate = e.Validation.MaxDate },
                     upload = e.Upload is null ? null : new { allowMultiple = e.Upload.AllowMultiple, maxFiles = e.Upload.MaxFiles, maxFileSizeBytes = e.Upload.MaxFileSizeBytes, allowedContentTypes = e.Upload.AllowedContentTypes },
@@ -390,6 +396,7 @@ public static class FormLayoutCodec
     {
         var span = 4;
         var newRow = false;
+        int? columnStart = null;
         if (element.TryGetProperty("layout", out var layout) && layout.ValueKind == JsonValueKind.Object)
         {
             if (layout.TryGetProperty("columnSpan", out var cs))
@@ -409,9 +416,25 @@ public static class FormLayoutCodec
 
                 newRow = nr.GetBoolean();
             }
+
+            // FD-01: optional explicit desktop start column; together with the span it must stay inside the four-column grid.
+            if (layout.TryGetProperty("columnStart", out var start) && start.ValueKind != JsonValueKind.Null)
+            {
+                if (start.ValueKind != JsonValueKind.Number || !start.TryGetInt32(out var value) || value is < 1 or > 4)
+                {
+                    throw new BusinessException("LAYOUT_INVALID", 422, "columnStart must be 1..4");
+                }
+
+                if (value + span - 1 > 4)
+                {
+                    throw new BusinessException("LAYOUT_INVALID", 422, "columnStart and columnSpan extend beyond the four-column grid");
+                }
+
+                columnStart = value;
+            }
         }
 
-        return new LayoutPlacement(span, newRow);
+        return new LayoutPlacement(span, newRow, columnStart);
     }
 
     private static LayoutProtection? ParseProtection(JsonElement element)

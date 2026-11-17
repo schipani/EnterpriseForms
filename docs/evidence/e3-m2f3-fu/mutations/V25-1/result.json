@@ -1,0 +1,38 @@
+{
+  "id": "V25-1",
+  "kind": "V",
+  "what": "a summary event is appended (and committed) when T2 finds the key already recorded",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs": "334aada9cfc27cbe6ec7852bfe28b20ba728f37c64da04c010e8e60e36ad26b1"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "A",
+      "exit": 0,
+      "seconds": 30.0
+    },
+    {
+      "letter": "A",
+      "classes": [
+        "CapabilityRefusalEvidenceNoSummaryTests",
+        "CapabilityRefusalEvidenceRecorderTests"
+      ],
+      "exit": 2,
+      "seconds": 3.3,
+      "total": 29,
+      "succeeded": 25,
+      "failed": [
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceNoSummaryTests.NoOutcomeRetryWindowOrHourRolloverEverWritesAnythingButOneEvidenceEntryPerKeyAndBucket",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ARestartAfterAnAmbiguousCommitStillWritesAtMostOneEntry",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ARestartedProcessFindsTheEntryAndAppendsNothing",
+        "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AnAmbiguousCommitThatTookEffectIsReconciledWithoutASecondEntry"
+      ]
+    }
+  ],
+  "seconds": 33.3
+}

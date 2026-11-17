@@ -37,10 +37,10 @@ public sealed class PeopleDirectoryTests(StageBFixture fixture)
         Assert.Equal("NeverSignedIn", newcomer.GetProperty("signInStatus").GetString());
         Assert.Equal(string.Empty, newcomer.GetProperty("displayName").GetString());
         Assert.Equal(s.Newcomer.Subject, newcomer.GetProperty("identitySubject").GetString());
-        Assert.Equal(["AppointSecurityAdministrator"], Actions(newcomer));
+        Assert.Equal(["AppointSecurityAdministrator", "AppointSecurityAuditor"], Actions(newcomer)); // C8 M4 (AC-8.1)
         var self = Assert.Single(members, m => m.GetProperty("userId").GetGuid() == s.Administrator.AuthorityUserId);
         Assert.Equal(["SecurityAdministrator"], self.GetProperty("authorityRoles").EnumerateArray().Select(r => r.GetString()).ToList());
-        Assert.Empty(Actions(self)); // the last Security Administrator cannot be removed
+        Assert.Empty(Actions(self)); // never on one's own row (D8-62a: nobody changes their own roles)
         Assert.DoesNotContain("email", asAdministrator.Body, StringComparison.OrdinalIgnoreCase);
 
         // Organization owner (C8 M2, AC-7.3): the same complete Authority roster, owner action hints, never on themself.
@@ -51,7 +51,7 @@ public sealed class PeopleDirectoryTests(StageBFixture fixture)
         Assert.True(asOwner.Root.GetProperty("canManageMembers").GetBoolean());
         Assert.Contains("GrantDesigner", Actions(Members(asOwner).Single(m => m.GetProperty("userId").GetGuid() == s.Newcomer.AuthorityUserId)));
         Assert.Empty(Actions(Members(asOwner).Single(m => m.GetProperty("userId").GetGuid() == s.Designer.AuthorityUserId)));
-        Assert.DoesNotContain(Members(asOwner).SelectMany(Actions), a => a is "AppointSecurityAdministrator" or "RemoveSecurityAdministrator");
+        Assert.DoesNotContain(Members(asOwner).SelectMany(Actions), a => a is "AppointSecurityAdministrator" or "RemoveSecurityAdministrator" or "AppointSecurityAuditor" or "RemoveSecurityAuditor");
 
         // Everyone else is refused without counts or names.
         foreach (var user in new[] { s.Clerk, s.Reader, s.DesignerOnly })

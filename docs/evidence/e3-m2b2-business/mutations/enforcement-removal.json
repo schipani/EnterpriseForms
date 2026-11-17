@@ -1,0 +1,716 @@
+{
+  "gate": "E3-M2b-2 enforcement-removal checks",
+  "method": "each mutation applied to one source file (backup + sha256), the affected suite rebuilt and run (focused classes), or the real-PostgreSQL gate re-run (MU-14, MU-15); the file restored from the backup and its sha256 verified",
+  "results": [
+    {
+      "mutation": "MU-01",
+      "description": "S-1 removed for field rows: schema chosen by type (always 1)",
+      "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/Integrity/BusinessSignedSchemas.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.Api.ContractTests",
+          "classes": [
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests.TheBusinessEncoderReproducesEveryVectorCaseFromDomainRows(caseId:",
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests.TheSignedSchemaFollowsTheEnvelopeVersionNotTheType"
+          ],
+          "totals": {
+            "total": "15",
+            "failed": "3",
+            "succeeded": "12",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-02",
+      "description": "S-1 removed for document rows: schema chosen by type (always 1)",
+      "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/Integrity/BusinessSignedSchemas.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.Api.ContractTests",
+          "classes": [
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests.TheBusinessEncoderReproducesEveryVectorCaseFromDomainRows(caseId:",
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests.TheSignedSchemaFollowsTheEnvelopeVersionNotTheType"
+          ],
+          "totals": {
+            "total": "15",
+            "failed": "2",
+            "succeeded": "13",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-03",
+      "description": "S-1 removed in document processing: hard-coded schema 1 restored",
+      "file": "src/backend/EnterpriseForms.Application/Features/Documents/Processing/DocumentProcessingService.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.ArchitectureTests",
+          "classes": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeRowFidelityTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeRowFidelityTests.NoProductCodeAssignsAConstantSignedSchemaVersionToAnEnvelopeRow"
+          ],
+          "totals": {
+            "total": "4",
+            "failed": "1",
+            "succeeded": "3",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-04",
+      "description": "S-2 removed for field rows: encoding ignores the stored schema",
+      "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/Integrity/BusinessSignedSchemas.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.Api.ContractTests",
+          "classes": [
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests.ASchemaTwoRowWithoutEachMetadataColumnCannotBeEncoded(column:",
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests.EncodingUsesTheStoredSchemaVersionWithNoFallbackAndRefusesADisagreement(caseId:",
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests.TheBusinessEncoderReproducesEveryVectorCaseFromDomainRows(caseId:"
+          ],
+          "totals": {
+            "total": "15",
+            "failed": "7",
+            "succeeded": "8",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-05",
+      "description": "S-2 weakened: an unknown stored schema falls back to schema 1",
+      "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/Integrity/BusinessSignedSchemas.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.Api.ContractTests",
+          "classes": [
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests.EncodingUsesTheStoredSchemaVersionWithNoFallbackAndRefusesADisagreement(caseId:"
+          ],
+          "totals": {
+            "total": "15",
+            "failed": "4",
+            "succeeded": "11",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-06",
+      "description": "S-10 removed: a schema/envelope disagreement is encoded",
+      "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/Integrity/BusinessSignedSchemas.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.Api.ContractTests",
+          "classes": [
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.Api.ContractTests.EnvelopeSchema2BusinessRegistryTests.EncodingUsesTheStoredSchemaVersionWithNoFallbackAndRefusesADisagreement(caseId:"
+          ],
+          "totals": {
+            "total": "15",
+            "failed": "4",
+            "succeeded": "11",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-07",
+      "description": "S-3 removed: the field clone drops the wrap-algorithm code",
+      "file": "src/backend/EnterpriseForms.Application/Features/Documents/UploadSessions/UploadSessionHandlers.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.ArchitectureTests",
+          "classes": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeRowFidelityTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeRowFidelityTests.TheFieldCloneCopiesEveryMappedPropertyExceptThePerOperationBinding"
+          ],
+          "totals": {
+            "total": "4",
+            "failed": "1",
+            "succeeded": "3",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-08",
+      "description": "S-3 removed: the document clone drops the key commitment",
+      "file": "src/backend/EnterpriseForms.Application/Features/FormRecords/Staging/CandidateBuilder.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.ArchitectureTests",
+          "classes": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeRowFidelityTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeRowFidelityTests.TheAttachmentCloneCopiesEveryMappedPropertyExceptThePerOperationBinding"
+          ],
+          "totals": {
+            "total": "4",
+            "failed": "1",
+            "succeeded": "3",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-09",
+      "description": "S-3 removed: the field clone drops the signed schema version",
+      "file": "src/backend/EnterpriseForms.Application/Features/Documents/UploadSessions/UploadSessionHandlers.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.ArchitectureTests",
+          "classes": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeRowFidelityTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeRowFidelityTests.NoProductCodeAssignsAConstantSignedSchemaVersionToAnEnvelopeRow",
+            "EnterpriseForms.ArchitectureTests.EnvelopeRowFidelityTests.TheFieldCloneCopiesEveryMappedPropertyExceptThePerOperationBinding"
+          ],
+          "totals": {
+            "total": "4",
+            "failed": "2",
+            "succeeded": "2",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-10",
+      "description": "S-9 removed at Prepare (and Commit): pinned types and nullability not checked",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/ContentDeltaRules.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "AuthorizationAuthority.Tests",
+          "classes": [
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.S9IsReappliedAtCommitOnTheVerifiedStagedBytes(variant:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.S9RefusesAWrongTypeOrNullAtPrepareBeforeAnythingIsSigned(variant:"
+          ],
+          "totals": {
+            "total": "101",
+            "failed": "10",
+            "succeeded": "91",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-11",
+      "description": "S-9 removed at Commit only",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "AuthorizationAuthority.Tests",
+          "classes": [
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.S9IsReappliedAtCommitOnTheVerifiedStagedBytes(variant:"
+          ],
+          "totals": {
+            "total": "101",
+            "failed": "3",
+            "succeeded": "98",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-12",
+      "description": "S-9 pin drift: the Authority pins scanned_on as Text",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/ContentDeltaRules.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.ArchitectureTests",
+          "classes": [
+            "EnterpriseForms.ArchitectureTests.SignedColumnRegistryTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.ArchitectureTests.SignedColumnRegistryTests.TheAuthorityPinnedShapesEqualTheBusinessRegistryForTheEnvelopeKinds"
+          ],
+          "totals": {
+            "total": "5",
+            "failed": "1",
+            "succeeded": "4",
+            "skipped": "0"
+          }
+        },
+        {
+          "suite": "AuthorizationAuthority.Tests",
+          "classes": [
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACandidateBoundToAnotherTenantIsRefused",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitOfAConformingOperationPreparedWithoutS9StillCommits",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitOfAnOperationPreparedUnderOtherRulesIsAbortedBeforeAnyVerificationAndNothingIsAccepted(prepareVersion:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitOfAnOperationPreparedWithoutTheRulesIsRefusedAndTheOperationAborted",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitReplayIsRefusedWhileTheFloorIsNotEnforced",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitReplayOfAHistoricalUnstampedCommittedOperationReturnsTheHeadAndWritesNothing",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AContributorChangesOnlyTheSharedValueAndEveryOtherItemIsPreserved",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AContributorWithAValidShareCannotWriteALockedRecordThroughTheAuthority(locked:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ALifecycleTransitionCommittedBetweenPrepareAndCommitDefeatsTheContributorCommit",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.APrepareReplayOfACurrentOperationIsUnchangedAndAnIdempotencyConflictStillWins",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.APrepareReplayOfAnOutdatedPreparedOperationIsRefusedAndWritesNothing(storedVersion:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCannotBeCreatedWithASchemaTwoEnvelopeRow(kind:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCreatedWithAMalformedEnvelopeIsRefusedBeforeAnythingIsSigned(variant:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCreatedWithTwoValuesUnderOneWrappedKeyIsRefusedBeforeSigning",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AReleaseBInstanceWhoseFloorIsNotEnforcedRefusesPrepareAndWritesNothing",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARevocationBetweenPrepareAndCommitAbortsTheCommit",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditorCannotIntroduceASchemaTwoEnvelopeRow(envelopeVersion:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditorCannotIntroduceAnEnvelopeTheRulesRefuseButAWellFormedUpdateStillCommits",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditorCannotReuseTheCurrentKeyOfItsItemOrOfAnotherItem",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AStagedCandidateAlteredBeforeCommitIsRefused",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AStaleAuthorizationRevisionOrMissingSnapshotIsRefusedAtPrepare",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AStaleHeadCannotBypassTheReuseRule",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ATamperedCurrentSnapshotIsRefusedJournaledAndNothingIsSigned",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AbortedOperationsKeepTheirPrepareStampAndNeverReceiveACommitStamp",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnExpiredOutdatedOperationIsStillReportedAsExpired",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnInFlightOperationCannotBeReplayedOrCommittedWhileTheFloorIsNotEnforcedAndCommitsOnceItIs",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCannotIntroduceASchemaTwoEnvelopeRow(kind:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCarryingTwoValuesUnderOneWrappedKeyAndNonceIsRefused",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnUnstampedOperationReusingTheCurrentKeyAndNonceIsRefusedAtCommitAndNeverAccepted",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnotherItemCannotTakeTheCurrentKeyEvenWhenTheOriginalItemIsRemovedOrReplaced",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ConcurrentWritesOnTheSameHeadAcceptExactlyOne",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ContributorWritesAreRefusedWhenTheSwitchIsOffAndNothingIsSigned",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.EveryContentWriteEntryChecksTheFenceExactlyOnce",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.EveryReferenceFormTheBusinessWritesIsAcceptedAndCarriedOnLaterWrites",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.HeaderAndDocumentChangesByAContributorAreRefusedEndToEnd",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.LeavingTheRecipientTeamBetweenPrepareAndCommitAbortsTheCommit",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.OwnerByteIdenticalCarryForwardAndFreshEncryptionAreBothAccepted",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.OwnerChangedCiphertextUnderTheCurrentKeyAndNonceIsRefusedBeforeSigning",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.OwnerReuseOfTheCurrentKeyUnderANewNonceIsRefusedBeforeSigning",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.OwnerWritesAreUnchangedAndPassIdentityBinding",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.OwnersAndTheSwitchAreUnaffectedByTheLock",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.PrepareStampsTheBuildRuleVersionAndCommitStampsItWithTheCommittedTransition",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53ACommitRacingAnotherBindingOfTheSameNewIdIsRefused",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53ADocumentKeepsItsIdAcrossVersionsButNotAcrossFields",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53ANewOwnerAfterTransferInheritsTheBindingsUnchanged",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53ARemovedItemCanNeverReturnUnderItsOriginalFieldOrAnother",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53AShareEditorDirectOrThroughATeamCanEditASharedItemButNotMoveIt(viaTeam:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53AdversarialPayloadsFailClosed",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53AnExistingItemMayBeEditedInItsFieldButNeverMovedToAnotherField",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53LegacyItemsAcceptedBeforeTheBindingsExistedAreAlsoProtectedFromReuse",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53MultiSelectSelectionsKeepTheirIdsAndARemovedSelectionCannotReturn",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.R53RepeatingGroupValuesStayInTheirEntryAndRemovedEntriesCannotReturn",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ReadersAndUnsharedItemsCannotBeWritten",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ReplayIsIdempotentForTheSamePayloadAndRefusedForAnother",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.S9IsReappliedAtCommitOnTheVerifiedStagedBytes(variant:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.S9RefusesAWrongTypeOrNullAtPrepareBeforeAnythingIsSigned(variant:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.SchemaTwoIsRegisteredForBothEnvelopeKindsWithPinnedShapesAndTheRuleVersionIsUnchanged",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.TurningTheSwitchOffBetweenPrepareAndCommitBlocksTheCommit"
+          ],
+          "totals": {
+            "total": "101",
+            "failed": "100",
+            "succeeded": "1",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-13",
+      "description": "D-1 reintroduced in the model constant: no IS NOT NULL on the wrap code",
+      "file": "src/backend/EnterpriseForms.Infrastructure/Persistence/EnvelopeMetadataConstraints.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.ArchitectureTests",
+          "classes": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeMetadataMigrationTests",
+            "EnterpriseForms.ArchitectureTests.SignedColumnRegistryTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeMetadataMigrationTests.TheEnvelopeTwoDisjunctRequiresEveryColumnExplicitly",
+            "EnterpriseForms.ArchitectureTests.EnvelopeMetadataMigrationTests.TheMigrationAddsExactlyTheReviewedChecksAndDropsTheOpenOne",
+            "EnterpriseForms.ArchitectureTests.SignedColumnRegistryTests.RegisteredColumnsExistInTheModelAndUnsignedColumnsAreJustified"
+          ],
+          "totals": {
+            "total": "8",
+            "failed": "3",
+            "succeeded": "5",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-14",
+      "description": "D-1 reintroduced in the migration SQL only (both tables)",
+      "file": "src/backend/EnterpriseForms.Infrastructure/Persistence/Migrations/20261115125042_EnvelopeV2SignedColumns.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.ArchitectureTests",
+          "classes": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeMetadataMigrationTests",
+            "EnterpriseForms.ArchitectureTests.SignedColumnRegistryTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeMetadataMigrationTests.TheMigrationAddsExactlyTheReviewedChecksAndDropsTheOpenOne"
+          ],
+          "totals": {
+            "total": "8",
+            "failed": "1",
+            "succeeded": "7",
+            "skipped": "0"
+          }
+        },
+        {
+          "suite": "real-PostgreSQL gate",
+          "exitCode": 1,
+          "failed": [
+            "RST-02: field envelope 2 with a NULL wrap code (D-1 regression): expected ck_field_encrypted_values_envelope_metadata, got accepted; attachment envelope 2 with a NULL wrap code (D-1 regression): expected ck_file_attachment_versions_envelope_metadata, got accepted",
+            "UP-05: field envelope 2 with a NULL wrap code (D-1 regression): expected ck_field_encrypted_values_envelope_metadata, got accepted; attachment envelope 2 with a NULL wrap code (D-1 regression): expected ck_file_attachment_versions_envelope_metadata, got accepted"
+          ]
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-15",
+      "description": "S-11 tie CHECKs removed from the migration",
+      "file": "src/backend/EnterpriseForms.Infrastructure/Persistence/Migrations/20261115125042_EnvelopeV2SignedColumns.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.ArchitectureTests",
+          "classes": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeMetadataMigrationTests",
+            "EnterpriseForms.ArchitectureTests.SignedColumnRegistryTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.ArchitectureTests.EnvelopeMetadataMigrationTests.TheMigrationAddsExactlyTheReviewedChecksAndDropsTheOpenOne"
+          ],
+          "totals": {
+            "total": "8",
+            "failed": "1",
+            "succeeded": "7",
+            "skipped": "0"
+          }
+        },
+        {
+          "suite": "real-PostgreSQL gate",
+          "exitCode": 1,
+          "failed": [
+            "POST-02: E3-M2b-2 Down refused: envelope version 2 rows exist",
+            "HARNESS: PostgresException: 42704: constraint \"ck_file_attachment_versions_schema_envelope_tie\" of relation \"file_attachment_versions\" does not exist",
+            "PRE-06:  ",
+            "PRE-07:  after 0.1 s",
+            "RST-01: 0 mismatched rows of 4",
+            "RST-02: field schema 1 / envelope 2 (tie): expected ck_field_encrypted_values_schema_envelope_tie, got accepted; field schema 2 / envelope 1 (tie): expected ck_field_encrypted_values_schema_envelope_tie, got accepted; attachment schema 1 / envelope 2 (tie): expected ck_file_attachment_versions_schema_envelo",
+            "RST-03: Ready / ",
+            "UP-01: field_encrypted_values.ck_field_encrypted_values_envelope_metadata: CHECK ((((encryption_envelope_version = 1) AND (data_key_identifier IS NULL) AND (data_key_commitment_bytes IS NULL) AND (key_wrap_algorithm_code IS NULL)) OR ((encryption_envelope_version = 2) AND (data_key_identifier IS NOT NULL) ",
+            "UP-05: field schema 1 / envelope 2 (tie): expected ck_field_encrypted_values_schema_envelope_tie, got accepted; field schema 2 / envelope 1 (tie): expected ck_field_encrypted_values_schema_envelope_tie, got accepted; attachment schema 1 / envelope 2 (tie): expected ck_file_attachment_versions_schema_envelo",
+            "UP-07: "
+          ]
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-16",
+      "description": "Guard weakened: a missing migration is treated as ready",
+      "file": "src/backend/EnterpriseForms.Infrastructure/Persistence/BusinessSchemaGuard.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.Api.ContractTests",
+          "classes": [
+            "EnterpriseForms.Api.ContractTests.BusinessSchemaGuardTests",
+            "EnterpriseForms.Api.ContractTests.ReadinessFailsClosedTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.Api.ContractTests.BusinessSchemaGuardTests.AReadyDecisionIsWithdrawnWhenALaterReadFindsTheMigrationMissing",
+            "EnterpriseForms.Api.ContractTests.BusinessSchemaGuardTests.AnUnmigratedOrUnreadableDatabaseIsNotReady",
+            "EnterpriseForms.Api.ContractTests.BusinessSchemaGuardTests.TheMonitorStopsTheHostOnAMissingMigrationButNotOnAnUnreadableHistory"
+          ],
+          "totals": {
+            "total": "13",
+            "failed": "3",
+            "succeeded": "10",
+            "skipped": "0"
+          }
+        },
+        {
+          "suite": "EnterpriseForms.ArchitectureTests",
+          "classes": [
+            "EnterpriseForms.ArchitectureTests.WorkerBusinessSchemaGuardTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.ArchitectureTests.WorkerBusinessSchemaGuardTests.TheWorkerStartsOnlyOnAVerifiedSchema"
+          ],
+          "totals": {
+            "total": "2",
+            "failed": "1",
+            "succeeded": "1",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-17",
+      "description": "Worker startup guard removed: it never refuses",
+      "file": "src/backend/EnterpriseForms.Worker/Composition/BusinessSchemaStartupGuard.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.ArchitectureTests",
+          "classes": [
+            "EnterpriseForms.ArchitectureTests.WorkerBusinessSchemaGuardTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.ArchitectureTests.WorkerBusinessSchemaGuardTests.TheWorkerStartsOnlyOnAVerifiedSchema"
+          ],
+          "totals": {
+            "total": "2",
+            "failed": "1",
+            "succeeded": "1",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-18",
+      "description": "API readiness ignores the business schema guard",
+      "file": "src/backend/EnterpriseForms.Api/Features/Platform/PlatformEndpoints.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.Api.ContractTests",
+          "classes": [
+            "EnterpriseForms.Api.ContractTests.BusinessSchemaGuardTests",
+            "EnterpriseForms.Api.ContractTests.ReadinessFailsClosedTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.Api.ContractTests.BusinessSchemaGuardTests.ApiReadinessIs503UntilTheBusinessSchemaIsVerified"
+          ],
+          "totals": {
+            "total": "13",
+            "failed": "1",
+            "succeeded": "12",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-19",
+      "description": "Monitor no longer stops the host on a missing migration",
+      "file": "src/backend/EnterpriseForms.Infrastructure/Persistence/BusinessSchemaGuard.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "EnterpriseForms.Api.ContractTests",
+          "classes": [
+            "EnterpriseForms.Api.ContractTests.BusinessSchemaGuardTests",
+            "EnterpriseForms.Api.ContractTests.ReadinessFailsClosedTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "EnterpriseForms.Api.ContractTests.BusinessSchemaGuardTests.TheMonitorStopsTheHostOnAMissingMigrationButNotOnAnUnreadableHistory"
+          ],
+          "totals": {
+            "total": "13",
+            "failed": "1",
+            "succeeded": "12",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-20",
+      "description": "EnvelopeRules field schema refusal removed (schema 2 rows reach the v1 rules)",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeRules.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "AuthorizationAuthority.Tests",
+          "classes": [
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests",
+            "AuthorizationAuthority.Tests.ProtectionReconciliationTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCannotBeCreatedWithASchemaTwoEnvelopeRow(kind:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditorCannotIntroduceASchemaTwoEnvelopeRow(envelopeVersion:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCannotIntroduceASchemaTwoEnvelopeRow(kind:",
+            "AuthorizationAuthority.Tests.ProtectionReconciliationTests.AProtectionMigrationWriteCannotIntroduceASchemaTwoEnvelopeRow(envelopeVersion:"
+          ],
+          "totals": {
+            "total": "124",
+            "failed": "8",
+            "succeeded": "116",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-21",
+      "description": "EnvelopeRules document schema refusal removed",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeRules.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "AuthorizationAuthority.Tests",
+          "classes": [
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCannotBeCreatedWithASchemaTwoEnvelopeRow(kind:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditCannotIntroduceASchemaTwoEnvelopeRow(kind:"
+          ],
+          "totals": {
+            "total": "101",
+            "failed": "4",
+            "succeeded": "97",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    },
+    {
+      "mutation": "MU-22",
+      "description": "EnvelopeRules version allow-list widened to {1, 2}",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeRules.cs",
+      "applied": true,
+      "suites": [
+        {
+          "suite": "AuthorizationAuthority.Tests",
+          "classes": [
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests"
+          ],
+          "exitCode": 2,
+          "failed": [
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ARecordCreatedWithAMalformedEnvelopeIsRefusedBeforeAnythingIsSigned(variant:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AShareEditorCannotIntroduceAnEnvelopeTheRulesRefuseButAWellFormedUpdateStillCommits",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnOwnerEditIntroducingAMalformedEnvelopeIsRefusedAndTheHeadStays(variant:",
+            "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.SchemaTwoIsRegisteredForBothEnvelopeKindsWithPinnedShapesAndTheRuleVersionIsUnchanged"
+          ],
+          "totals": {
+            "total": "101",
+            "failed": "5",
+            "succeeded": "96",
+            "skipped": "0"
+          }
+        }
+      ],
+      "restoredHashMatches": true,
+      "detected": true
+    }
+  ]
+}

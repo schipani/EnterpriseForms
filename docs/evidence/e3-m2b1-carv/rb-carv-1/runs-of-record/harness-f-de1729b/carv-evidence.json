@@ -1,0 +1,221 @@
+{
+  "harness": "E3-M2b-1F CARV floor gate, harness F (real floor command \u002B real CARV build \u002B legacy agent)",
+  "carvBuild": "E3-M2b-1 Release build of the working tree (newbin-sha256.txt); ContentAcceptanceRules.CurrentVersion = 1",
+  "legacyBuild": "legacy Authority Release build de1729b (legacy-de1729b-sha256.txt), driven by the legacy agent",
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "legacyAgentCalls": 24,
+  "checksTotal": 30,
+  "checksFailed": 0,
+  "checks": [
+    {
+      "Id": "FX-01",
+      "Description": "the floor command on a pre-CARV schema is refused; nothing applied",
+      "Expected": "exit 3 \u0027not fully installed\u0027; no floor; no floor history row",
+      "Observed": "exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: the content acceptance rule fence (E3-M2b-1) is not fully installed; floor=none; history=0",
+      "Pass": true
+    },
+    {
+      "Id": "FX-02",
+      "Description": "Release A: ordinary --migrate (the build contains the floor migration) applies E3-M2b-1 and NOT the floor",
+      "Expected": "OK; CARV recorded; floor none; no floor history row",
+      "Observed": "OK; carv=1; floor=none; floorHistory=0",
+      "Pass": true
+    },
+    {
+      "Id": "FX-03",
+      "Description": "re-running the ordinary --migrate still never applies the floor",
+      "Expected": "OK; floor none; no floor history row",
+      "Observed": "OK; floor=none; floorHistory=0",
+      "Pass": true
+    },
+    {
+      "Id": "FX-04",
+      "Description": "Release A, before the floor: CARV writes commit, and a legacy instance can still commit its own operation (R-CARV-1, the exposure closed by the floor)",
+      "Expected": "OK; legacy old-\u003Eold accepted; NULL/NULL Committed",
+      "Observed": "OK; legacy=accepted; NULL/NULL Committed",
+      "Pass": true
+    },
+    {
+      "Id": "FX-05",
+      "Description": "readiness before the floor: ready without a required floor; not ready when the deployment requires floor 1",
+      "Expected": "True ...(floor none) | False ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1)",
+      "Observed": "True content acceptance rules v1 (floor none) | False ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1)",
+      "Pass": true
+    },
+    {
+      "Id": "FX-06",
+      "Description": "activation refused while an unexpired operation prepared by a pre-CARV build is in flight; nothing applied",
+      "Expected": "exit 3 \u0027in flight\u0027; floor none; no floor history row",
+      "Observed": "exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: 1 unexpired operation(s) prepared by a pre-CARV build are in flight; let them expire or abort them first; floor=none; history=0",
+      "Pass": true
+    },
+    {
+      "Id": "FX-07",
+      "Description": "reconciliation: the real CARV build aborts the in-flight legacy operation",
+      "Expected": "OPERATION_RULES_OUTDATED; NULL/NULL Aborted",
+      "Observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; NULL/NULL Aborted",
+      "Pass": true
+    },
+    {
+      "Id": "FX-08",
+      "Description": "activation refused while a session that can write operations is connected without a CARV build marker",
+      "Expected": "exit 3 \u0027without a CARV build marker\u0027; floor none",
+      "Observed": "exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: 1 session(s) able to write content operations are connected without a CARV build marker (a pre-CARV Authority instance may still run); floor=none; history=0",
+      "Pass": true
+    },
+    {
+      "Id": "FX-09",
+      "Description": "activation blocked by an open transaction times out (5 s) and applies nothing",
+      "Expected": "exit 3 55P03; floor none; no floor history row",
+      "Observed": "exit 3: content acceptance rule floor NOT applied: 55P03: canceling statement due to lock timeout; floor=none; history=0",
+      "Pass": true
+    },
+    {
+      "Id": "FX-10",
+      "Description": "an activation interrupted while waiting (backend terminated) applies nothing",
+      "Expected": "waited; killed 1; non-zero exit; floor none; no floor history row",
+      "Observed": "waited=True; killed=1; exit 3: content acceptance rule floor NOT applied: 57P01: terminating connection due to administrator command; floor=none; history=0",
+      "Pass": true
+    },
+    {
+      "Id": "FX-11",
+      "Description": "setup: a legacy operation prepared with a lagging clock is Prepared, unstamped and past its database expiry",
+      "Expected": "NULL/NULL Prepared; expired",
+      "Observed": "NULL/NULL Prepared; expired=True",
+      "Pass": true
+    },
+    {
+      "Id": "FX-12a",
+      "Description": "a legacy Prepare in progress during activation: the session check under the table lock sees it and refuses activation; the Prepare then completes pre-floor; nothing of the floor is applied",
+      "Expected": "legacy waited; exit 3 \u0027without a CARV build marker\u0027; legacy NULL/NULL Prepared; floor none",
+      "Observed": "legacy waited=True; exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: 1 session(s) able to write content operations are connected without a CARV build marker (a pre-CARV Authority instance may still run); legacy=prepared NULL/NULL Prepared; floor=none; history=0",
+      "Pass": true
+    },
+    {
+      "Id": "FX-12b",
+      "Description": "reconciliation of that operation by the real CARV build before activation",
+      "Expected": "OPERATION_RULES_OUTDATED; NULL/NULL Aborted",
+      "Observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; NULL/NULL Aborted",
+      "Pass": true
+    },
+    {
+      "Id": "FX-12",
+      "Description": "Release B: the explicit floor command activates floor 1 while 4 real CARV instances write concurrently",
+      "Expected": "exit 0; floor 1 recorded once; writers only OK or CONTENT_REVISION_CONFLICT",
+      "Observed": "exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; history=1; ok=24; conflicts=0; unexpected=0; 1127 ms",
+      "Pass": true
+    },
+    {
+      "Id": "FX-13",
+      "Description": "the installed floor is NOT VALID and covers Prepared and Committed rows with a two-valued test",
+      "Expected": "false CHECK (... \u003C\u003E ALL (Prepared, Committed) ... IS NOT NULL AND \u003E= 1) NOT VALID",
+      "Observed": "false CHECK ((((operation_state_name)::text \u003C\u003E ALL ((ARRAY[\u0027Prepared\u0027::character varying, \u0027Committed\u0027::character varying])::text[])) OR ((prepare_acceptance_rule_version IS NOT NULL) AND (prepare_acceptance_rule_version \u003E= 1)))) NOT VALID",
+      "Pass": true
+    },
+    {
+      "Id": "FX-14",
+      "Description": "a legacy Prepare after the floor is refused by the database; nothing persisted; the legacy host reports 503 (binary rollback is impossible)",
+      "Expected": "23514 ck_content_operation_rule_floor_v1; no new operation; 503",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1; 503 {\u0022errorCode\u0022:\u0022AUTHORITY_NOT_READY\u0022; ops 37-\u003E37",
+      "Pass": true
+    },
+    {
+      "Id": "FX-15",
+      "Description": "the lagging-clock legacy instance commits its pre-floor operation after the floor: refused by the database; nothing advances",
+      "Expected": "23514 ck_content_operation_rule_floor_v1; snapshot unchanged; NULL/NULL Prepared",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1; unchanged (head=1:48b26cc5430f662344f9cc9bf5b7981746f33cef621dd0fc427ab25456e9af36; commits=20; leaves=60; identities=18; checkpoints=20; journal=20; committedOps=20); NULL/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "FX-16",
+      "Description": "no legacy-prepared operation reached Committed after activation (old-\u003Eold closed)",
+      "Expected": "0",
+      "Observed": "0",
+      "Pass": true
+    },
+    {
+      "Id": "FX-17",
+      "Description": "a real CARV write after the floor commits",
+      "Expected": "1/1 Committed",
+      "Observed": "1/1 Committed",
+      "Pass": true
+    },
+    {
+      "Id": "FX-18",
+      "Description": "forged Prepared rows without an acceptable stamp, and a commit at another rule version, are refused by the database",
+      "Expected": "23514 floor_v1 | 23514 versions_positive | 23514 commit_rule_version",
+      "Observed": "23514 ck_content_operation_rule_floor_v1: new row for relation \u0022content_change_operations\u0022 violates check constraint \u0022ck_content_operation_rule_floor_v1\u0022 | 23514 ck_content_operation_rule_floor_v1: new row for relation \u0022content_change_operations\u0022 violates check constraint \u0022ck_content_operation_rule_floor_v1\u0022 | 23514 ck_content_operation_commit_rule_version: new row for relation \u0022content_change_operations\u0022 violates check constraint \u0022ck_content_operation_commit_rule_version\u0022",
+      "Pass": true
+    },
+    {
+      "Id": "FX-19",
+      "Description": "an operation stamped by a newer rule version is refused by the v1 build\u0027s Commit rule and aborted",
+      "Expected": "OK insert; OPERATION_RULES_OUTDATED; 2/NULL Aborted",
+      "Observed": "OK; AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; 2/NULL Aborted",
+      "Pass": true
+    },
+    {
+      "Id": "FX-20",
+      "Description": "historical unstamped rows: a Committed row cannot be reopened, an Aborted row cannot be revived, and even a superuser update of an unstamped Prepared row now violates the floor",
+      "Expected": "23514 state guard | 23514 state guard | 23514 floor_v1",
+      "Observed": "23514 trg_content_operation_rule_state_guard: a terminal content operation is immutable | 23514 trg_content_operation_rule_state_guard: a terminal content operation is immutable | 23514 ck_content_operation_rule_floor_v1: new row for relation \u0022content_change_operations\u0022 violates check constraint \u0022ck_content_operation_rule_floor_v1\u0022",
+      "Pass": true
+    },
+    {
+      "Id": "FX-21",
+      "Description": "an accepted operation still replays after the floor (idempotent Commit replay)",
+      "Expected": "OK",
+      "Observed": "OK",
+      "Pass": true
+    },
+    {
+      "Id": "FX-22",
+      "Description": "re-running the floor command is a no-op and the ordinary --migrate keeps the floor",
+      "Expected": "exit 0; OK; floor 1; floor history 1",
+      "Observed": "exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; OK; floor=1; history=1",
+      "Pass": true
+    },
+    {
+      "Id": "FX-23",
+      "Description": "the floor migration\u0027s Down refuses, the E3-M2b-1 Down refuses while a floor exists, and the runtime role cannot drop the floor",
+      "Expected": "P0001 never lowered | P0001 floors are never lowered | 42501",
+      "Observed": "P0001 : CARV floor down refused: content acceptance rule floors are never lowered | P0001 : CARV down refused: a content acceptance rule floor is installed; floors are never lowered | 42501 : must be owner of table content_change_operations; floor=1",
+      "Pass": true
+    },
+    {
+      "Id": "FX-24",
+      "Description": "readiness with the floor installed: ready, with or without a required floor 1",
+      "Expected": "True ...(floor 1) | True ...(floor 1); phase=ReleaseB requiredFloor=1",
+      "Observed": "True content acceptance rules v1 (floor 1) | True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1",
+      "Pass": true
+    },
+    {
+      "Id": "FX-25",
+      "Description": "a dropped floor whose history row remains: detected (not ready), the command stops (exit 4), and the explicit reinstatement re-installs it",
+      "Expected": "False FloorMissing | exit 4 | exit 0; floor 1",
+      "Observed": "False ContentAcceptanceRuleFloorMissing(recorded in the migration history, constraint absent) | exit 4: content acceptance rule floor 1 is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with --reinstate-recorded-floor | exit 0: content acceptance rule floor 1 re-installed (recorded floor reinstated)  content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; ready=True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1",
+      "Pass": true
+    },
+    {
+      "Id": "FX-26",
+      "Description": "a restore that removed floor and history: undetectable without configuration, detected with RequiredFloor = 1; the floor command re-applies it",
+      "Expected": "True ...(floor none) | False FloorBelowRequired | exit 0; floor 1; ready",
+      "Observed": "True content acceptance rules v1 (floor none) | False ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1) | exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; ready=True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1",
+      "Pass": true
+    },
+    {
+      "Id": "FX-27",
+      "Description": "after re-application, the legacy build is refused again",
+      "Expected": "23514 ck_content_operation_rule_floor_v1",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1",
+      "Pass": true
+    },
+    {
+      "Id": "FINAL",
+      "Description": "final operation table summary",
+      "Expected": "informational",
+      "Observed": "Aborted=3, Committed=35, Prepared=2; legacy agent calls=24",
+      "Pass": true
+    }
+  ]
+}

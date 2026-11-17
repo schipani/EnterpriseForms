@@ -23,7 +23,7 @@ namespace AuthorizationAuthority.Tests;
 /// catalogue and content services, real signed manifests (LocalHmacProvider) and the in-memory store; SpiceDB answers from
 /// explicit sets. The real PostgreSQL/SpiceDB/Vault path runs in the Stage B integration suite (SearchCatalogueTests).
 /// </summary>
-public sealed class SearchCatalogueTests
+public sealed partial class SearchCatalogueTests
 {
     private const string Issuer = "https://issuer.test";
 
@@ -37,10 +37,15 @@ public sealed class SearchCatalogueTests
         /// <summary>Runs once, on the first permission check after it is set.</summary>
         public Action? OnCheck { get; set; }
 
+        /// <summary>C8 M4 S1: the projection marker a consistent SpiceDB reports for the organization.</summary>
+        public Func<Guid, MarkerObservation>? Markers { get; set; }
+
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
             switch (targetMethod?.Name)
             {
+                case nameof(ISpiceDbProjection.ReadMarkerAsync):
+                    return Task.FromResult(Markers!((Guid)args![0]!));
                 case nameof(ISpiceDbProjection.CheckAsync):
                     var hook = OnCheck;
                     OnCheck = null;
@@ -84,9 +89,11 @@ public sealed class SearchCatalogueTests
             mac.ProvisionKeyAsync(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", CancellationToken.None).GetAwaiter().GetResult();
             var spice = DispatchProxy.Create<ISpiceDbProjection, SpiceDb>();
             Spice = (SpiceDb)(object)spice;
-            Content = new ContentService(Store, mac, spice, new NoOpFaultInjector(), TimeProvider.System, new ShareContributorWriteSwitch(false, testingOverrideAllowed: true));
-            Catalogue = new SearchCatalogueService(Store, spice, TimeProvider.System, Options);
-            Store.Organizations.Add(new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous });
+            Spice.Markers = org => TestProjection.MarkerFor(Store.Organizations.Single(o => o.OrganizationId == org));
+            var verifier = TestProjection.Verifier(Store, spice);
+            Content = new ContentService(Store, mac, verifier, new NoOpFaultInjector(), TimeProvider.System, new ShareContributorWriteSwitch(false, testingOverrideAllowed: true));
+            Catalogue = new SearchCatalogueService(Store, verifier, TimeProvider.System, Options);
+            Store.Organizations.Add(new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous }.WithJournalDigest());
             foreach (var user in new[] { Owner, Other })
             {
                 Store.Bindings.Add(new IdentityBinding { IdentityBindingId = Guid.CreateVersion7(), OrganizationId = Org, AuthorityUserId = user, IdentityIssuerUri = Issuer, IdentitySubjectIdentifier = user.ToString("D"), IdentityBindingEnabled = true });

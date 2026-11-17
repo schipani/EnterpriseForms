@@ -127,6 +127,24 @@ describe("MemberTable", () => {
     expect(screen.queryByRole("menuitem")).toBeNull();
   });
 
+  it("shows a Security auditor badge, both badges for a dual holder, and the auditor actions only when offered", async () => {
+    const user = userEvent.setup();
+    const auditor = { ...members[1]!, userId: "u4", displayName: "Alex Auditor", authorityRoles: ["SecurityAuditor"], availableActions: ["RemoveSecurityAuditor"] };
+    const dual = { ...members[1]!, userId: "u5", displayName: "Dana Dual", authorityRoles: ["SecurityAdministrator", "SecurityAuditor"], availableActions: [] };
+    const candidate = { ...members[1]!, userId: "u6", displayName: "Casey Candidate", authorityRoles: [], availableActions: ["AppointSecurityAuditor"] };
+    render(<MemberTable members={[auditor, dual, candidate]} rolesAvailable onAction={vi.fn()} />);
+    const rows = within(screen.getByRole("table", { name: "People" })).getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("Security auditor");
+    expect(rows[1]).toHaveTextContent("Security administrator");
+    expect(rows[1]).toHaveTextContent("Security auditor");
+    expect(screen.queryByRole("button", { name: "Actions for Dana Dual" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Actions for Alex Auditor" }));
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Remove Security Auditor"]);
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "Actions for Casey Candidate" }));
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Make Security Auditor"]);
+  });
+
   it("says roles are unavailable when the Authority roster did not answer", () => {
     render(<MemberTable members={members} rolesAvailable={false} />);
     expect(screen.getAllByText("Unavailable")).toHaveLength(3);

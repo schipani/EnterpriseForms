@@ -51,7 +51,7 @@ public sealed class ChildRecordHandlers(IBusinessStore store, IAuthorizationAuth
                     continue;
                 }
 
-                var values = child.ToValueResponses();
+                var values = await child.ToValueResponsesAsync(cancellationToken).ConfigureAwait(false);
                 var summary = summaryKeys.Count == 0 ? values : values.Where(v => summaryKeys.Contains(v.FieldKey, StringComparer.Ordinal)).ToList();
                 items.Add(new ChildRecordSummaryResponse(link.ChildFormRecordId, child.Header.RelationshipSortOrder ?? link.ListSortOrder, child.Header.RecordStatus, child.Head.CommittedContentRevision, summary, child.IsComplete ? "Verified" : "Verified(partial)"));
             }

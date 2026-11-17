@@ -38,7 +38,7 @@ public sealed record OrganizationRosterRequest(Guid OrganizationId);
 
 /// <summary>
 /// One identity binding of the organization. <c>OrganizationRoles</c> are the Authority's organization relations
-/// (organization_owner, designer, system_administrator). A disabled member keeps its roles and edges; they are unusable
+/// (organization_owner, designer, system_administrator, security_auditor). A disabled member keeps its roles and edges; they are unusable
 /// while <c>MembershipEnabled</c> is false. <c>DisplayNameHint</c> comes from the approved membership request, if any.
 /// </summary>
 public sealed record OrganizationRosterMember(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier, bool MembershipEnabled, DateTimeOffset BoundOn, DateTimeOffset? DisabledOn,

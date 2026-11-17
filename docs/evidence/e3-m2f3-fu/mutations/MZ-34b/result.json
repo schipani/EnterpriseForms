@@ -1,0 +1,83 @@
+{
+  "id": "MZ-34b",
+  "kind": "MZ",
+  "what": "the index command runs the concurrent build inside a transaction block",
+  "files": [
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceIndexCommand.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceIndexCommand.cs": "f72817169c996ab46d93aa3cf07adc5980ccd3455c82cdd22804b72593c322c5"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "results": [
+    {
+      "build": "R",
+      "exit": 0,
+      "seconds": 23.0
+    },
+    {
+      "build": "A",
+      "exit": 0,
+      "seconds": 29.5
+    },
+    {
+      "build": "X",
+      "exit": 0,
+      "seconds": 34.9
+    },
+    {
+      "letter": "A",
+      "classes": [
+        "CapabilityRefusalEvidenceIndexTests"
+      ],
+      "exit": 0,
+      "seconds": 2.9,
+      "total": 40,
+      "succeeded": 40,
+      "failed": []
+    },
+    {
+      "letter": "X",
+      "classes": [
+        "CapabilityRefusalEvidenceIndexBoundaryTests"
+      ],
+      "exit": 2,
+      "seconds": 2.4,
+      "total": 21,
+      "succeeded": 19,
+      "failed": [
+        "EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceIndexBoundaryTests.TheCommandBoundsLockWaitsAndTakesItsLockBeforeInspectingAndBuildsInItsOwnStatement",
+        "EnterpriseForms.ArchitectureTests.CapabilityRefusalEvidenceIndexBoundaryTests.TheCommandNeverReachesTheOrdinaryMigrationPathOrRepairsAnything(forbidden:"
+      ]
+    },
+    {
+      "kind": "PG3I",
+      "groups": "",
+      "exit": 1,
+      "seconds": 82.5,
+      "report": true,
+      "checks": 29,
+      "failed": [
+        "I-01",
+        "I-02",
+        "I-03",
+        "I-04",
+        "I-06",
+        "I-07",
+        "I-08",
+        "I-09",
+        "I-12",
+        "I-14",
+        "I-16",
+        "I-17",
+        "I-19",
+        "I-20",
+        "I-21",
+        "I-22",
+        "I-99"
+      ]
+    }
+  ],
+  "seconds": 175.1
+}

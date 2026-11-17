@@ -1,0 +1,6 @@
+Test run summary: Passed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 40
+  failed: 0
+  succeeded: 40
+  skipped: 0
+  duration: 1s 634ms

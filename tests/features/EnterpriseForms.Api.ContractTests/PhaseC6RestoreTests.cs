@@ -60,7 +60,7 @@ public sealed class PhaseC6RestoreTests
 
         public bool IsAvailable => true;
 
-        public FieldEncryptedValue Encrypt(FieldEncryptionContext context, string canonicalPlaintext) => new()
+        public static FieldEncryptedValue Encrypt(FieldEncryptionContext context, string canonicalPlaintext) => new()
         {
             FieldEncryptedValueId = Guid.CreateVersion7(), TenantId = context.TenantId, FormRecordId = context.FormRecordId, FieldDefinitionId = context.FieldDefinitionId, FieldValueItemId = context.FieldValueItemId,
             EncryptedValueBytes = Encoding.UTF8.GetBytes(canonicalPlaintext).Reverse().ToArray(), EncryptionNonceBytes = RandomNumberGenerator.GetBytes(12),
@@ -68,6 +68,17 @@ public sealed class PhaseC6RestoreTests
 
         public string Decrypt(FieldEncryptedValue value) =>
             lostKey?.Invoke(value) == true ? throw new CryptographicException("unknown key reference") : Encoding.UTF8.GetString(value.EncryptedValueBytes.Reverse().ToArray());
+
+        public Task<FieldEncryptedValue> EncryptAsync(FieldEncryptionContext context, string canonicalPlaintext, EnterpriseForms.Application.Features.Documents.Ports.EncryptionKeyPurpose purpose, CancellationToken cancellationToken) =>
+            Task.FromResult(Encrypt(context, canonicalPlaintext));
+
+        public Task<string> DecryptAsync(FieldEncryptedValue value, EnterpriseForms.Application.Features.Documents.Ports.EncryptionKeyPurpose purpose, CancellationToken cancellationToken) =>
+            Task.FromResult(Decrypt(value));
+
+        public Task<IReadOnlyList<string>> DecryptVerifiedAsync(Guid organizationId, IReadOnlyList<FieldEncryptedValue> values, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<string>>(values.Select(Decrypt).ToList());
+
+        public Task<byte[]> OpenCreationFingerprintKeyAsync(CreationFingerprintKeyEnvelope envelope, CancellationToken cancellationToken) => throw new NotSupportedException("not used by restore planning");
     }
 
     private static readonly FakeEncryption Crypto = new();
@@ -76,17 +87,17 @@ public sealed class PhaseC6RestoreTests
         new() { FieldStringValueId = Guid.CreateVersion7(), TenantId = Tenant, FormRecordId = Record, FieldDefinitionId = field.FieldDefinitionId, FieldValueItemId = item ?? Guid.CreateVersion7(), FormRecordGroupId = entry, StringValue = value };
 
     private static FieldEncryptedValue Sealed(FieldDefinition field, string value, Guid? item = null) =>
-        Crypto.Encrypt(new FieldEncryptionContext(Tenant, Record, field.FieldDefinitionId, item ?? Guid.CreateVersion7(), field.FieldDataType), value);
+        FakeEncryption.Encrypt(new FieldEncryptionContext(Tenant, Record, field.FieldDefinitionId, item ?? Guid.CreateVersion7(), field.FieldDataType), value);
 
     private static FormRecordGroupRevision Entry(Guid id, long order, Guid? group = null) =>
         new() { FormRecordGroupRevisionId = Guid.CreateVersion7(), TenantId = Tenant, FormRecordId = Record, FormRecordGroupId = id, GroupDefinitionId = group ?? Group, GroupSortOrder = order };
 
     private static RestorePlanner.RestorePlan Plan(RestorePlanner.Snapshot current, RestorePlanner.Snapshot source, FormLayout? layout = null, IFieldEncryptionService? encryption = null) =>
-        RestorePlanner.Build(current, source, layout ?? Layout(), Fields, Groups, new Dictionary<Guid, FieldOption>(), encryption ?? Crypto);
+        InProcessCompletion.Completed(RestorePlanner.BuildAsync(current, source, layout ?? Layout(), Fields, Groups, new Dictionary<Guid, FieldOption>(), encryption ?? Crypto, CancellationToken.None));
 
     private static CandidateBuilder.ApplyResult Apply(RestorePlanner.Snapshot current, RestorePlanner.RestorePlan plan, FormLayout? layout = null) =>
-        CandidateBuilder.ApplyValuesDetailed(current.Values, plan.Values, layout ?? Layout(), Fields, [], null, Tenant, Record, DateTimeOffset.UtcNow, Actor, new Dictionary<Guid, FieldOption>(), Crypto,
-            groups: new CandidateBuilder.GroupInput(Groups, current.Occurrences, plan.GroupWrites.Count == 0 ? null : plan.GroupWrites));
+        InProcessCompletion.Completed(CandidateBuilder.ApplyValuesDetailedAsync(current.Values, plan.Values, layout ?? Layout(), Fields, [], null, Tenant, Record, DateTimeOffset.UtcNow, Actor, new Dictionary<Guid, FieldOption>(), Crypto, CancellationToken.None,
+            groups: new CandidateBuilder.GroupInput(Groups, current.Occurrences, plan.GroupWrites.Count == 0 ? null : plan.GroupWrites)));
 
     private static string Value(IEnumerable<FieldValueRowBase> rows, FieldDefinition field, Guid? entry = null) =>
         rows.Where(r => r.FieldDefinitionId == field.FieldDefinitionId && r.FormRecordGroupId == entry).Select(r => r is FieldEncryptedValue e ? Crypto.Decrypt(e) : ((FieldStringValue)r).StringValue).SingleOrDefault() ?? "";

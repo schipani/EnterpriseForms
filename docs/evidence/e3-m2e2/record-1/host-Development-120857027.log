@@ -1,0 +1,21 @@
+info: AuthorizationAuthority.Api.Composition.ContentAcceptancePolicyStartupGuard[9213]
+      Content acceptance policy: phase=ReleaseB requiredFloor=3; this build applies rule version 3
+crit: AuthorizationAuthority.Api.Composition.ContentAcceptanceRuleGuard[9211]
+      Content acceptance rule guard: NOT READY (ContentDataKeyLedgerMigrationMissing); this build applies rule version 3
+crit: AuthorizationAuthority.Api.Composition.EnvelopeV2AcceptanceStartupGuard[9242]
+      Envelope v2 acceptance is configured on without the data-key ledger migration; the host refuses to start
+fail: Microsoft.Extensions.Hosting.Internal.Host[11]
+      Hosting failed to start
+      System.InvalidOperationException: Content:EnvelopeV2AcceptanceEnabled is enabled but the data-key ledger migration is not recorded; the Authorization Authority refuses to start.
+         at AuthorizationAuthority.Api.Composition.EnvelopeV2AcceptanceStartupGuard.StartAsync(CancellationToken cancellationToken) in <local>\src\authority\AuthorizationAuthority.Api\Composition\EnvelopeV2AcceptanceComposition.cs:line 49
+         at Microsoft.Extensions.Hosting.Internal.Host.<StartAsync>b__14_1(IHostedService service, CancellationToken token)
+         at Microsoft.Extensions.Hosting.Internal.Host.ForeachService[T](IEnumerable`1 services, CancellationToken token, Boolean concurrent, Boolean abortOnFirstException, List`1 exceptions, Func`3 operation)
+Unhandled exception. System.InvalidOperationException: Content:EnvelopeV2AcceptanceEnabled is enabled but the data-key ledger migration is not recorded; the Authorization Authority refuses to start.
+   at AuthorizationAuthority.Api.Composition.EnvelopeV2AcceptanceStartupGuard.StartAsync(CancellationToken cancellationToken) in <local>\src\authority\AuthorizationAuthority.Api\Composition\EnvelopeV2AcceptanceComposition.cs:line 49
+   at Microsoft.Extensions.Hosting.Internal.Host.<StartAsync>b__14_1(IHostedService service, CancellationToken token)
+   at Microsoft.Extensions.Hosting.Internal.Host.ForeachService[T](IEnumerable`1 services, CancellationToken token, Boolean concurrent, Boolean abortOnFirstException, List`1 exceptions, Func`3 operation)
+   at Microsoft.Extensions.Hosting.Internal.Host.StartAsync(CancellationToken cancellationToken)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync(IHost host, CancellationToken token)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync(IHost host, CancellationToken token)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.Run(IHost host)
+   at AuthorizationAuthority.Api.Program.Main(String[] args) in <local>\src\authority\AuthorizationAuthority.Api\Program.cs:line 179

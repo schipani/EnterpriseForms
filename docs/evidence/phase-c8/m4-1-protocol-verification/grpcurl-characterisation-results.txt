@@ -1,0 +1,17 @@
+# Read-only grpcurl (fullstorydev/grpcurl:v1.9.1) probes of authzed/spicedb:v1.56.2, security-test stack, 2026-11-04 (C-115).
+# Organization 01a1a69e-4a39-716e-bcfd-f409e83b5329 (marker step 16), Authority token GiQKGENPQUpJTjhKS0xDRHdzcm5sTGJ5R0E9PRIIZGM5YzFhMGE=.
+P1  ReadRelationships(marker, at_least_as_fresh(authority token)) -> 1 message, readAt GhQKCENPOFhJTzRYEghkYzljMWEwYQ== (quantized), subject step-...-16
+P1b ReadRelationships(marker, fully_consistent)                    -> readAt GhAKBENPOFgSCGRjOWMxYTBh (head)
+P2  ReadRelationships(no matching relationship, fully_consistent)   -> zero messages, exit 0 (no readAt)
+P3  CheckPermission(at_exact_snapshot(GhQKCENPOFhJTzRY...))         -> checkedAt GhQKCENPOFhJTzRYEghkYzljMWEwYQ== (identical)
+P3  CheckPermission(at_exact_snapshot(GhAKBENPOFgSCGRjOWMxYTBh))    -> checkedAt GhAKBENPOFgSCGRjOWMxYTBh (identical)
+P3  CheckBulkPermissions(at_exact_snapshot(GhQKCENPOFhJTzRY...))    -> checkedAt GhQKCENPOFhJTzRYEghkYzljMWEwYQ== (identical)
+    CheckBulkPermissions(at_least_as_fresh(GhQKCENPOFhJTzRY...))    -> checkedAt GhQKCENQTVhJUElYEghkYzljMWEwYQ== (newer)
+# Constructed tokens (zedtoken-probe-tok.py.txt): same revision other datastore id; future xid 9,000,000; xid 3 (expired); malformed.
+P4  at_least_as_fresh(other datastore id GhAKBENPOFgSCDAwMDAwMDAw)  -> accepted, readAt GhAKBENQY1gSCGRjOWMxYTBh, current data
+P5  at_least_as_fresh(future GhQKCENNQ29wUVE9EghkYzljMWEwYQ==)      -> accepted, readAt echoes the future token, current data
+P6  at_exact_snapshot(other datastore id)                           -> Code Unknown, "ZedToken specified references a different datastore instance but at-exact-snapshot was requested"
+P6  at_exact_snapshot(future)                                       -> Code OutOfRange, "invalid revision: revision was invalid"
+P6  at_exact_snapshot(expired)                                      -> Code OutOfRange, "invalid revision: revision has expired"
+P6  at_least_as_fresh(expired)                                      -> accepted, readAt head
+P6  malformed (both modes)                                          -> Code InvalidArgument, "invalid revision requested"

@@ -51,6 +51,10 @@ public static class AuditActions
     public const string SecurityAdministratorAppointed = "SECURITY_ADMINISTRATOR_APPOINTED";
     public const string SecurityAdministratorRemoved = "SECURITY_ADMINISTRATOR_REMOVED";
 
+    // C8 M4 (AC-8.1): Security Auditor appointment and removal. Metadata is the reason code only (never the note); the Authority journal is the evidence.
+    public const string SecurityAuditorAppointed = "SECURITY_AUDITOR_APPOINTED";
+    public const string SecurityAuditorRemoved = "SECURITY_AUDITOR_REMOVED";
+
     // C8 M2 (AC-7): membership and organization roles. The Authority journal is the independent evidence; these are the business timeline.
     public const string OrganizationRoleGranted = "ORGANIZATION_ROLE_GRANTED";
     public const string OrganizationRoleRevoked = "ORGANIZATION_ROLE_REVOKED";
@@ -88,6 +92,10 @@ public static class AuditActions
     public const string SecurityIncidentStatusChanged = "SECURITY_INCIDENT_STATUS_CHANGED";
     public const string SecurityIncidentAssigned = "SECURITY_INCIDENT_ASSIGNED";
     public const string SecurityIncidentNoteAdded = "SECURITY_INCIDENT_NOTE_ADDED";
+
+    // E0-4: an encrypted field value or document could not be decrypted (authentication failure, key mismatch or key
+    // unavailability); the request failed closed. Reason code and identifiers only — never plaintext, keys, wrapped keys or ciphertext.
+    public const string DecryptionFailed = "DECRYPTION_FAILED";
 }
 
 /// <summary>

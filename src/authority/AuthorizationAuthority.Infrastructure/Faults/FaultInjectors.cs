@@ -70,9 +70,11 @@ public sealed class ProcessCrashFaultInjector : IFaultInjector
         }
     }
 
+    public bool IsArmed(string faultName) => armed.Length > 0 && string.Equals(armed, faultName, StringComparison.Ordinal);
+
     public void CrashIfArmed(string faultName)
     {
-        if (armed.Length == 0 || !string.Equals(armed, faultName, StringComparison.Ordinal))
+        if (!IsArmed(faultName))
         {
             return;
         }

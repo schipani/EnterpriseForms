@@ -1,0 +1,9 @@
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceIndexTests.AnApprovedButUnusableIndexWithoutAVisibleBuildIsInvalid(valid: False, ready: True, live: True) (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Invalid
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 40
+  failed: 1
+  succeeded: 39
+  skipped: 0
+  duration: 1s 358ms

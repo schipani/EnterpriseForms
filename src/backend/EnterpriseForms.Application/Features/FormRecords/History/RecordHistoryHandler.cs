@@ -91,7 +91,7 @@ public sealed class RecordHistoryHandler(VerifiedRecordReader reader, IBusinessS
 
         // Values are formatted (and protected values decrypted) only now, after verification and for a full reader; a key that is
         // unavailable fails the whole request rather than showing part of the version.
-        var record = verified.ToRecordResponse(context.OrganizationId);
+        var record = await verified.ToRecordResponseAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false);
         var options = verified.Options.GroupBy(o => o.FieldDefinitionId).ToDictionary(g => g.Key, g => g.Select(o => new FieldOptionResponse(o.FieldOptionId, o.OptionKey, o.OptionDisplayText, o.OptionSortOrder, o.IsActive)).ToList());
         var fields = verified.Fields
             .Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, options.GetValueOrDefault(f.FieldDefinitionId, []), f.FieldDefinitionRevision, f.FieldProtectionMode, f.ProtectionPolicyRevision, f.OptionSelectionMode, GroupDefinitionId: f.GroupDefinitionId))

@@ -59,7 +59,7 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     }
     expect(await tileNames(page, "Personal Information")).toEqual(["Last Name", "First Name", "Reference Number"]);
 
-    // UX-04: "+ Add Section" creates a titled section with an empty "+ Add Field" cell, ready to rename (not a line break).
+    // UX-04: "+ Add Section" creates a titled section with one empty row of four "+ Add Field" cells, ready to rename (not a line break).
     await page.getByRole("button", { name: "Add Section" }).click();
     const rename = page.getByRole("textbox", { name: "Rename section" });
     await expect(rename).toBeFocused();
@@ -68,7 +68,7 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     await rename.press("Enter");
     const contact = section(page, "Contact Information");
     await expect(contact).toBeVisible();
-    await expect(contact.getByRole("button", { name: /^Add Field to Contact Information/ })).toHaveCount(1);
+    await expect(contact.getByRole("button", { name: /^Add Field to Contact Information, row 1, column [1-4]$/ })).toHaveCount(4);
     await expect(contact.locator("button[aria-keyshortcuts]")).toHaveCount(0);
 
     // UX-05: two fields placed into that section's own cells, with spans.

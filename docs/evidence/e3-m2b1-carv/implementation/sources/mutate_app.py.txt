@@ -1,0 +1,117 @@
+"""E3-M2b-1 enforcement-removal checks (application level). For each mutation: back up the file (scratchpad), apply exactly
+one removal, rebuild the test project, run the focused test classes, record the failing tests, restore the file and verify
+its SHA-256. Usage: python -I mutate_app.py <repo> <out.json>"""
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+repo, out = sys.argv[1], sys.argv[2]
+backup_dir = os.path.join(os.path.dirname(os.path.abspath(out)), "mutation-backups")
+os.makedirs(backup_dir, exist_ok=True)
+
+AUTH = "tests/authority/AuthorizationAuthority.Tests"
+AUTH_EXE = os.path.join(repo, AUTH, "bin/Debug/net10.0/AuthorizationAuthority.Tests.exe")
+CONTRACT = "tests/features/EnterpriseForms.Api.ContractTests"
+CONTRACT_EXE = os.path.join(repo, CONTRACT, "bin/Debug/net10.0/EnterpriseForms.Api.ContractTests.exe")
+AUTH_CLASSES = ["AuthorizationAuthority.Tests.ContributorWriteProtocolTests", "AuthorizationAuthority.Tests.ContentAcceptanceRuleGuardTests"]
+CONTRACT_CLASSES = ["EnterpriseForms.Api.ContractTests.ContentAcceptanceRuleBusinessMappingTests"]
+
+SERVICE = "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs"
+RULES = "src/authority/AuthorizationAuthority.Application/Features/Content/ContentAcceptanceRules.cs"
+REFUSALS = "src/authority/AuthorizationAuthority.Infrastructure/Persistence/ContentAcceptanceRuleRefusals.cs"
+CREATE = "src/backend/EnterpriseForms.Application/Features/FormRecords/CreateFormRecord/CreateFormRecordHandler.cs"
+MIGRATION = "src/backend/EnterpriseForms.Application/Features/FormDesigner/ProtectionMigration/FieldProtectionMigrationService.cs"
+
+MUTATIONS = [
+    ("MA-1", "remove the CARV Commit rule (abort of an operation prepared under other rules)", SERVICE,
+     "        if (!ContentAcceptanceRules.IsCommittableByThisBuild(operation.PrepareAcceptanceRuleVersion))\n        {\n            operation.OperationStateName = ContentOperationStates.Aborted;",
+     "        if (operation.PrepareAcceptanceRuleVersion == int.MinValue)\n        {\n            operation.OperationStateName = ContentOperationStates.Aborted;", "auth"),
+    ("MA-2", "remove the CARV Prepare replay rule", SERVICE,
+     "if (existing.OperationStateName == ContentOperationStates.Prepared && !ContentAcceptanceRules.IsCommittableByThisBuild(existing.PrepareAcceptanceRuleVersion))",
+     "if (existing.OperationStateName == \"never\")", "auth"),
+    ("MA-3", "remove the Prepare stamp (P = V)", SERVICE,
+     "            PrepareAcceptanceRuleVersion = ContentAcceptanceRules.CurrentVersion,\n", "", "auth"),
+    ("MA-4", "remove the Commit stamp (C = V)", SERVICE,
+     "        operation.CommitAcceptanceRuleVersion = ContentAcceptanceRules.CurrentVersion; // CARV: C = V (= P, checked above and by the database)\n", "", "auth"),
+    ("MA-5", "the store adapter no longer recognises CARV database refusals", REFUSALS,
+     "            if (e is PostgresException { SqlState: CheckViolation } pg && ContentAcceptanceRules.DatabaseObjects.IsFenceObject(pg.ConstraintName))",
+     "            if (e is PostgresException { SqlState: CheckViolation } pg && pg.ConstraintName == \"never-a-fence-object\")", "auth"),
+    ("MA-6", "the readiness decision ignores a floor above the build", RULES,
+     "        if (facts.InstalledFloor is { } floor && floor > compiledVersion)",
+     "        if (facts.InstalledFloor is { } floor && floor > compiledVersion + 1000)", "auth"),
+    ("MA-7", "the readiness decision ignores a missing migration", RULES,
+     "        if (!facts.MigrationApplied)\n", "        if (!facts.MigrationApplied && facts.ColumnsPresent && !facts.ColumnsPresent)\n", "auth"),
+    ("MA-8", "record creation step 1 no longer recovers from OPERATION_RULES_OUTDATED", CREATE,
+     'public static bool IsAbandonedOperation(string errorCode) => errorCode is "OPERATION_EXPIRED" or "OPERATION_STATE_INVALID" or "OPERATION_RULES_OUTDATED";',
+     'public static bool IsAbandonedOperation(string errorCode) => errorCode is "OPERATION_EXPIRED" or "OPERATION_STATE_INVALID";', "contract"),
+    ("MA-9", "record creation step 2 no longer recovers from OPERATION_RULES_OUTDATED", CREATE,
+     'public static bool IsUnusableOperationKey(string errorCode) => errorCode is "IDEMPOTENCY_CONFLICT" or "OPERATION_RULES_OUTDATED";',
+     'public static bool IsUnusableOperationKey(string errorCode) => errorCode is "IDEMPOTENCY_CONFLICT";', "contract"),
+    ("MA-10", "the protection migration no longer retries OPERATION_RULES_OUTDATED", MIGRATION,
+     'or "OPERATION_EXPIRED" or "OPERATION_RULES_OUTDATED";', 'or "OPERATION_EXPIRED";', "contract"),
+]
+
+
+def sha(path):
+    return hashlib.sha256(open(path, "rb").read()).hexdigest()
+
+
+def run(args, cwd=None):
+    return subprocess.run(args, cwd=cwd or repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+
+def build(project):
+    r = run(["dotnet", "build", project, "-c", "Debug", "-nologo", "-v", "q"])
+    return r.returncode == 0, (r.stdout + r.stderr)[-1500:]
+
+
+def tests(kind):
+    exe, classes = (AUTH_EXE, AUTH_CLASSES) if kind == "auth" else (CONTRACT_EXE, CONTRACT_CLASSES)
+    args = [exe]
+    for c in classes:
+        args += ["--filter-class", c]
+    r = run(args)
+    text = r.stdout + r.stderr
+    total = re.search(r"total: (\d+)", text)
+    failed = re.search(r"failed: (\d+)", text)
+    names = sorted(set(re.findall(r"failed ([A-Za-z0-9_.]+(?:\([^)]*\))?)", text)))
+    return int(total.group(1)) if total else None, int(failed.group(1)) if failed else None, names
+
+
+results = []
+for mid, description, rel, old, new, kind in MUTATIONS:
+    path = os.path.join(repo, rel)
+    original = sha(path)
+    backup = os.path.join(backup_dir, f"{mid}-{os.path.basename(path)}")
+    shutil.copyfile(path, backup)
+    text = open(path, encoding="utf-8").read()
+    occurrences = text.count(old)
+    entry = {"id": mid, "removal": description, "file": rel, "occurrences": occurrences}
+    try:
+        if occurrences != 1:
+            entry["error"] = "mutation anchor not found exactly once"
+            continue
+        open(path, "w", encoding="utf-8", newline="").write(text.replace(old, new))
+        ok, log = build(AUTH if kind == "auth" else CONTRACT)
+        if not ok:
+            entry["build"] = "FAILED"
+            entry["buildLog"] = log
+            continue
+        total, failed, names = tests(kind)
+        entry.update({"testsRun": total, "testsFailed": failed, "failingTests": names, "detected": bool(failed)})
+    finally:
+        shutil.copyfile(backup, path)
+        entry["restoredSha256Matches"] = sha(path) == original
+        results.append(entry)
+        print(json.dumps({k: entry[k] for k in entry if k != "failingTests"}), flush=True)
+
+# rebuild the unmutated projects
+for project in (AUTH, CONTRACT):
+    ok, log = build(project)
+    results.append({"id": "REBUILD", "project": project, "ok": ok})
+json.dump(results, open(out, "w", encoding="utf-8"), indent=2)
+print("done")

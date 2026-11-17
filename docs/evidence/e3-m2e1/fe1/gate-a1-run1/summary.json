@@ -1,0 +1,8 @@
+{
+    "ExitCode":  0,
+    "Checks":  44,
+    "Failed":  0,
+    "ContainerRemoved":  true,
+    "Mode":  "gate",
+    "DeadlockLinesInServerLog":  0
+}

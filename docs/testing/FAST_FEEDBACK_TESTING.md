@@ -1,14 +1,16 @@
 # Fast-feedback testing and CI speed
 
-Three levels. Only Level 3 (and its CI equivalent) gates a merge; Levels 1–2 exist for quick feedback and never replace it.
+> **Stage B is release-only (permanent owner policy C-131, [STAGE_B_RELEASE_ONLY_POLICY.md](STAGE_B_RELEASE_ONLY_POLICY.md)).** Stage B runs only for release testing, only on the owner's explicit authorization, and only when started by hand. Nothing below runs it automatically. Where this document describes Stage B runs, they need `-ReleaseAuthorization` / `-StageBReleaseAuthorization` or the manually dispatched `stage-b-integration` workflow.
+
+Three levels. Levels 1–2 exist for quick feedback. Level 3 is the full development verification; without a release authorization it skips the Stage B steps and reports them as not run.
 
 | Level | Command | Typical time | Docker | Scope |
 |---|---|---|---|---|
 | 1 | `scripts/dev/test.ps1 -Level 1` | ~1.5 min (measured 84 s warm; vitest on changed files only) | none | .NET build + unit/architecture/contract tests, ESLint, typecheck, changed vitest files |
-| 2 | `scripts/dev/test.ps1 -Level 2 [-Class X] [-Spec y] [-Browser] [-NoRebuild]` | seconds to a few min | security-test stack, **kept running** | Real stack (two PostgreSQL, SpiceDB, Vault, ClamAV, authority, API, worker): impacted integration class and/or Playwright spec |
-| 3 | `scripts/dev/test.ps1 -Level 3` | full | clean volumes, twice | Everything CI runs: specs, vectors, .NET + floor, frontend, SEC-P01..P12 (Stage A gate), Stage B integration, full Playwright |
+| 2 | `scripts/dev/test.ps1 -Level 2 -Class X` or `-Spec y` `[-NoRebuild]` | seconds to a few min | security-test stack, **kept running** | Real stack (two PostgreSQL, SpiceDB, Vault, ClamAV, authority, API, worker): the impacted integration class and/or Playwright spec. Without `-Class`/`-Spec`, or with `-Browser`, Level 2 is a Stage B run and requires `-StageBReleaseAuthorization` |
+| 3 | `scripts/dev/test.ps1 -Level 3 [-StageBReleaseAuthorization ref]` | full | clean volumes | Specs, vectors, .NET + floor, frontend, SEC-P01..P12 (Stage A gate); the Stage B integration and full Playwright steps only with a release authorization (C-131) |
 
-Level 3 has no filter parameters: nothing can be skipped, every `--minimum-expected-tests` floor still applies, and a non-zero exit from any step fails the run.
+Level 3 has no test filter parameters: every `--minimum-expected-tests` floor still applies, and a non-zero exit from any step fails the run. Its Stage B steps are skipped only by the release-only policy, and the skip is printed as "not run".
 
 Notes:
 - Level 2 uses the `enterpriseforms-sectest` compose project, which pins the same subnets as the dev project (`compose.dev.yaml`). Stop the dev stack (`docker compose -f compose.yaml -f compose.dev.yaml down`) before using it.
@@ -30,13 +32,19 @@ scripts/dev/stage-b.ps1 -Group records-lifecycle -Fresh   # recreate the sectest
 
 The script reuses a running `enterpriseforms-sectest` stack (starting it only when absent; `-Rebuild` after code changes). `-Fresh` runs `down -v` on that disposable project only; the script never touches the dev stack, its volumes or Vite servers. Level 3 is unchanged and still runs the unfiltered suite.
 
+**Benchmarks inside a class (C-133, R-29).** Tests marked `[Trait("Category", "Benchmark")]` (the 480-record verified-search benchmarks of `FieldSearchExecutionTests` and `SearchCatalogueTests` — the latter is the P-S1-1 measurement — and the IX-4 local benchmark class, the C-135 R-33 diagnostics class `IndexedSearchTimeoutDiagnosticsTests`, the C-136 measurement class `SealSweepLockMeasurementTests` and the C-137 R-37 measurement class `RecordRegistrationThroughputMeasurementTests`) run in their Stage B group as before. For a focused functional run, `scripts/dev/stage-b.ps1 -Class FieldSearchExecutionTests -ExcludeBenchmarks` (or `test.ps1 -Level 2 -Class … -ExcludeBenchmarks`) skips them; the switch is refused for group and release runs, which keep every test.
+
+**Run evidence (C-133, R-28).** Every `stage-b.ps1` run and every `test.ps1` .NET step writes an xUnit TRX report (each failing test's name, message and stack trace) under `artifacts/test-runs/<run id>/` and prints the run id. `stage-b.ps1` also writes `run.json` (selection, exit, elapsed, `-RetryOf <run id>` when a run repeats another) and, on failure, the authority, api and worker logs. The scripts never retry; a rerun has a new run id and should name the run it repeats. `artifacts/` is not committed: copy the directory of a run you cite into the evidence you hand over.
+
 Adding a test class: add its name to exactly one group in the manifest. An unassigned class fails `-List`, the CI `plan` job and `scripts/ci/test_stage_b_groups.py` (offline source-file check).
 
 CI (`stage-b-integration.yml`): `plan` builds once, runs `--list-tests` and fails when any class is unassigned, doubly assigned, stale, or a group would be empty, then emits the matrix. `integration-shard` runs one matrix job per group (`fail-fast: false`), each on its own runner and clean stack, saving `<group>.trx`, logs and its test list as artifact `stage-b-evidence-<group>`, and verifies the executed per-class counts equal the discovered counts. The aggregate `Stage B integration tests (real stack)` (name preserved) needs `plan` and all shards and fails unless both succeeded and `verify-all` proves every discovered test ran exactly once, passed, in its assigned group, with the total at least the 270 baseline; it does not rely on exit codes. `Designer, parent-child, documents (real ClamAV), …` still needs the integration aggregate and the browser job, unchanged.
 
 ### Merge protection
 
-`Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e` (the final Stage B aggregate, which needs the integration aggregate and the browser job) is a required status check in `.github/rulesets/main-branch-protection.json` and, since 2026-11-04, in live ruleset 25341169 (updated through the GitHub API by the repository owner's credentials and read back; enforcement active, no bypass actors, strict status checks on). Before this change none of the Stage B checks was required. The job runs on every pull request to `main` and fails when either the integration aggregate or the browser job is not `success`.
+**C-131 (2026-11-07):** the Stage B aggregate `Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e` is **no longer a required pull-request check**: Stage B no longer runs on pull requests. It was removed from `.github/rulesets/main-branch-protection.json`. It was also removed from live ruleset 25341169 on 2026-11-07 (C-132; read back, only that check changed). The four `ci` checks remain required.
+
+History: from 2026-11-04 to C-131 the aggregate was a required check in the ruleset file and in live ruleset 25341169, and ran on every pull request to `main`.
 
 ### Exact-once verification
 
@@ -77,5 +85,5 @@ Expected after (not yet measured): wall clock ≈ max(integration job, browser j
 A full local Level 3 run takes two to three hours on a developer laptop and is no longer the routine check for every change. For ordinary development and UI refinements:
 
 - **While implementing:** targeted component tests, frontend lint and TypeScript checks, the frontend build, the Playwright specs that cover the change, targeted .NET tests (and contract tests for changed request schemas), and the specification manifest and integrity validation when tracked documents change.
-- **After pushing:** GitHub Actions runs the required workflows. All four mandatory contexts, CodeQL, Stage B integration and Stage B browser tests must pass; hosted failures are investigated and fixed, never worked around by loosening assertions or thresholds.
-- **Still required:** comprehensive security verification (the Level 3 script, SEC-P01..SEC-P12, Stage B integration, the PB-03/PB-12 evidence gates) remains required at security-relevant changes and at release gates. This policy does not disable or bypass any CI protection.
+- **After pushing:** GitHub Actions runs the required workflows. All four mandatory contexts and CodeQL must pass; hosted failures are investigated and fixed, never worked around by loosening assertions or thresholds. Stage B does not run on pushes or pull requests (C-131).
+- **Still required:** comprehensive security verification (SEC-P01..SEC-P12 and the PB-03/PB-12 evidence gates) remains required at security-relevant changes and at release gates, together with the focused Stage B classes of the changed area (policy §6). **Stage B itself is release-only (C-131):** it runs only when the owner explicitly authorizes release testing, and is never a prerequisite for development-stage acceptance.

@@ -1,0 +1,277 @@
+﻿[
+  {
+    "id": "MU-1",
+    "removal": "the Prepare entry call of the write fence removed (ContentService)",
+    "kind": "unit",
+    "restoredSha256Matches": true,
+    "testsRun": 181,
+    "testsFailed": 3,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AReleaseBInstanceWhoseFloorIsNotEnforcedRefusesPrepareAndWritesNothing",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnInFlightOperationCannotBeReplayedOrCommittedWhileTheFloorIsNotEnforcedAndCommitsOnceItIs",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.EveryContentWriteEntryChecksTheFenceExactlyOnce"
+    ],
+    "detected": true
+  },
+  {
+    "id": "MU-2",
+    "removal": "the Commit entry call of the write fence removed (ContentService)",
+    "kind": "unit",
+    "restoredSha256Matches": true,
+    "testsRun": 181,
+    "testsFailed": 3,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.ACommitReplayIsRefusedWhileTheFloorIsNotEnforced",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.AnInFlightOperationCannotBeReplayedOrCommittedWhileTheFloorIsNotEnforcedAndCommitsOnceItIs",
+      "AuthorizationAuthority.Tests.ContributorWriteProtocolTests.EveryContentWriteEntryChecksTheFenceExactlyOnce"
+    ],
+    "detected": true
+  },
+  {
+    "id": "MU-3",
+    "removal": "the record-registration entry call removed (SecurityCommandService, a secondary content path)",
+    "kind": "unit",
+    "restoredSha256Matches": true,
+    "testsRun": 181,
+    "testsFailed": 2,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContentAcceptanceRegistrationTests.AReleaseBRegistrationIsRefusedBeforeThePlanIsStagedAndRecordedAsARejectedCommand",
+      "AuthorizationAuthority.Tests.ContentAcceptanceRegistrationTests.RegisteringARecordChecksTheFenceAndCreatesItsHeadInReleaseA"
+    ],
+    "detected": true
+  },
+  {
+    "id": "MU-4",
+    "removal": "required-floor configuration validation removed: a missing phase falls back to Release A",
+    "kind": "unit",
+    "restoredSha256Matches": true,
+    "testsRun": 181,
+    "testsFailed": 4,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContentAcceptancePolicyTests.AnInvalidConfigurationIsNeverReleaseAAndGuardsEveryContentWrite(phase: \"\", floor: null, reason: \"EnforcementPhaseUnconfigured\")",
+      "AuthorizationAuthority.Tests.ContentAcceptancePolicyTests.AnInvalidConfigurationIsNeverReleaseAAndGuardsEveryContentWrite(phase: \"Unconfigured\", floor: null, reason: \"EnforcementPhaseUnconfigured\")",
+      "AuthorizationAuthority.Tests.ContentAcceptancePolicyTests.AnInvalidConfigurationIsNeverReleaseAAndGuardsEveryContentWrite(phase: null, floor: \"1\", reason: \"EnforcementPhaseUnconfigured\")",
+      "AuthorizationAuthority.Tests.ContentAcceptancePolicyTests.AnInvalidConfigurationIsNeverReleaseAAndGuardsEveryContentWrite(phase: null, floor: null, reason: \"EnforcementPhaseUnconfigured\")"
+    ],
+    "detected": true
+  },
+  {
+    "id": "MU-5",
+    "removal": "required-floor configuration validation removed: a lower required floor (downgrade) is accepted",
+    "kind": "unit",
+    "restoredSha256Matches": true,
+    "testsRun": 181,
+    "testsFailed": 1,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContentAcceptancePolicyTests.AnInvalidConfigurationIsNeverReleaseAAndGuardsEveryContentWrite(phase: \"ReleaseB\", floor: \"0\", reason: \"RequiredFloorBelowMinimum\")"
+    ],
+    "detected": true
+  },
+  {
+    "id": "MU-6",
+    "removal": "floor-integrity verification removed: a replaced floor definition is accepted",
+    "kind": "unit",
+    "restoredSha256Matches": true,
+    "testsRun": 181,
+    "testsFailed": 2,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContentAcceptancePolicyTests.TheWriteFenceAcceptsOnlyTheExactlyInstalledFloorAndFence(scenario: \"floor replaced by a Prepared-only floor\", expected: \"FloorDefinitionMismatch\")",
+      "AuthorizationAuthority.Tests.ContentAcceptancePolicyTests.TheWriteFenceAcceptsOnlyTheExactlyInstalledFloorAndFence(scenario: \"floor replaced without the IS NOT NULL term\", expected: \"FloorDefinitionMismatch\")"
+    ],
+    "detected": true
+  },
+  {
+    "id": "MU-7",
+    "removal": "fence verification removed: a default on the Prepare stamp is accepted",
+    "kind": "unit",
+    "restoredSha256Matches": true,
+    "testsRun": 181,
+    "testsFailed": 1,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContentAcceptancePolicyTests.TheWriteFenceAcceptsOnlyTheExactlyInstalledFloorAndFence(scenario: \"a default on the Prepare stamp\", expected: \"FenceStampDefaultPresent\")"
+    ],
+    "detected": true
+  },
+  {
+    "id": "MP-1",
+    "removal": "the write-path guard removed: the store fence is a no-op",
+    "kind": "pg",
+    "restoredSha256Matches": true,
+    "checksTotal": 37,
+    "checksFailed": 20,
+    "failedChecks": [
+      {
+        "id": "RX-A3",
+        "observed": "OK; ops 12->13; CHANGED; alert []"
+      },
+      {
+        "id": "RX-G1",
+        "observed": "cached True content acceptance rules v1 (floor 1); phase=ReleaseB requiredFloor=1 / True; OK; ops 17->18; CHANGED; alert []"
+      },
+      {
+        "id": "RX-C1",
+        "observed": "OK | OK | OK; CHANGED head=1:bfc8acc7150bea25e2397deb8842fbe2257731392530fa8843bc8c140b4c8b99; commits=14; leaves=42; identities=24; checkpoints=14; journal=14; committedOps=14 -> head=2:17854ae51c8d1c7407afa14d43dc6928bcdd10f62e52e4c0374ecaf65d5249c0; commits=15; leaves=45; identities=24; checkpoin"
+      },
+      {
+        "id": "RX-C6",
+        "observed": "weakened OK; OK; ops 19->20; CHANGED; alert []; live verdict FloorDefinitionMismatch; restored OK; resumed OK"
+      },
+      {
+        "id": "RX-C7",
+        "observed": "weakened OK; OK; ops 21->22; CHANGED; alert []; live verdict FloorDefinitionMismatch; restored OK; resumed OK"
+      },
+      {
+        "id": "RX-C8",
+        "observed": "weakened OK; OK; ops 23->24; CHANGED; alert []; live verdict FenceStateGuardMismatch; restored OK; resumed OK"
+      },
+      {
+        "id": "RX-C9",
+        "observed": "weakened OK; OK; ops 25->26; CHANGED; alert []; live verdict FenceStateGuardMismatch; restored OK; resumed OK"
+      },
+      {
+        "id": "RX-C10",
+        "observed": "weakened OK; OK; ops 27->28; CHANGED; alert []; live verdict FenceCommitCheckMismatch; restored OK; resumed OK"
+      },
+      {
+        "id": "RX-C11",
+        "observed": "weakened OK; OK; ops 29->30; CHANGED; alert []; live verdict FenceUnexpectedTableObject; restored OK; resumed OK"
+      },
+      {
+        "id": "RX-C12",
+        "observed": "weakened OK; OK; ops 31->32; CHANGED; alert []; live verdict FenceUnexpectedTableObject; restored OK; resumed OK"
+      },
+      {
+        "id": "RX-C13",
+        "observed": "legacy 1/NULL Prepared | OK; ops 34->35; CHANGED; alert [] | OK"
+      },
+      {
+        "id": "RX-F1",
+        "observed": "weakened OK; OK; ops 36->37; CHANGED; alert []; live verdict none; restored OK; resumed OK"
+      },
+      {
+        "id": "RX-F2",
+        "observed": "weakened OK; OK; ops 38->39; CHANGED; alert []; live verdict none; restored OK; resumed OK"
+      },
+      {
+        "id": "RX-F3",
+        "observed": "weakened OK; OK; ops 40->41; CHANGED; alert []; live verdict FloorNotRecorded; restored OK; resumed OK"
+      },
+      {
+        "id": "RX-F4",
+        "observed": "weakened OK; OK; ops 42->43; CHANGED; alert []; live verdict FenceMigrationNotRecorded; restored OK; resumed OK"
+      },
+      {
+        "id": "RX-E1",
+        "observed": "<absent>/<absent> -> EnforcementPhaseUnconfigured NOT REFUSED OK; ops 45->46; CHANGED; alert []; Unconfigured/<absent> -> EnforcementPhaseUnconfigured NOT REFUSED OK; ops 46->47; CHANGED; alert []; ReleaseB/<absent> -> RequiredFloorMissing NOT REFUSED OK; ops 47->48; CHANGED; alert []; ReleaseB/0 ->"
+      },
+      {
+        "id": "RX-S1",
+        "observed": "OK; heads=1"
+      },
+      {
+        "id": "RX-S2",
+        "observed": "OK; revision 1->2"
+      },
+      {
+        "id": "RX-H1",
+        "observed": "held none; drop OK; floor=none"
+      },
+      {
+        "id": "HARNESS",
+        "observed": "PostgresException 42704 "
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MP-2",
+    "removal": "secondary-path coverage removed: the store catch-all never runs",
+    "kind": "pg",
+    "restoredSha256Matches": true,
+    "checksTotal": 42,
+    "checksFailed": 2,
+    "failedChecks": [
+      {
+        "id": "RX-S1",
+        "observed": "OK; heads=1"
+      },
+      {
+        "id": "RX-S2",
+        "observed": "OK; revision 1->2"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MP-3",
+    "removal": "transactional protection against concurrent removal removed: no table lock before the verification",
+    "kind": "pg",
+    "restoredSha256Matches": true,
+    "checksTotal": 37,
+    "checksFailed": 2,
+    "failedChecks": [
+      {
+        "id": "RX-H1",
+        "observed": "held none; drop OK; floor=none"
+      },
+      {
+        "id": "HARNESS",
+        "observed": "PostgresException 42704 "
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MP-4",
+    "removal": "floor-integrity verification removed: a replaced floor definition is accepted",
+    "kind": "pg",
+    "restoredSha256Matches": true,
+    "checksTotal": 42,
+    "checksFailed": 2,
+    "failedChecks": [
+      {
+        "id": "RX-C6",
+        "observed": "weakened OK; OK; ops 17->18; CHANGED; alert []; live verdict none; restored OK; resumed OK"
+      },
+      {
+        "id": "RX-C7",
+        "observed": "weakened OK; OK; ops 19->20; CHANGED; alert []; live verdict none; restored OK; resumed OK"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MP-5",
+    "removal": "the Prepare entry call removed (the catch-all alone remains)",
+    "kind": "pg",
+    "restoredSha256Matches": true,
+    "checksTotal": 42,
+    "checksFailed": 1,
+    "failedChecks": [
+      {
+        "id": "RX-C1",
+        "observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False | OK | AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; unchanged (head=1:04737c412aeea3dac1eeb00cafdb47745a6c10f1d7aa645a6fd0a164090a8e66; commits=12; leaves=36; identities=24; checkpoints=12; "
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MP-6",
+    "removal": "required-floor configuration validation removed: a missing phase falls back to Release A",
+    "kind": "pg",
+    "restoredSha256Matches": true,
+    "checksTotal": 42,
+    "checksFailed": 1,
+    "failedChecks": [
+      {
+        "id": "RX-E1",
+        "observed": "<absent>/<absent> ->  NOT REFUSED OK; ops 31->32; CHANGED; alert []; Unconfigured/<absent> ->  NOT REFUSED OK; ops 32->33; CHANGED; alert []; ReleaseB/<absent> -> RequiredFloorMissing refused; ReleaseB/0 -> RequiredFloorBelowMinimum refused; ReleaseB/2 -> RequiredFloorUnsupported refused; releaseb/1"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "REBUILD",
+    "authorityTestsBuildOk": true
+  }
+]

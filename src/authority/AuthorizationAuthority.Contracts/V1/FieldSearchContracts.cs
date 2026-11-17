@@ -74,6 +74,56 @@ public sealed record FieldSearchAdministrationResponse(bool PlaintextSearchPermi
 /// <summary>Payload of GrantSystemRole / RevokeSystemRole. <c>RoleName</c> must be <c>system_administrator</c>.</summary>
 public sealed record SecurityAdministratorPayload(Guid AuthorityUserId, string RoleName, string Reason, string? StepUpEvidence = null);
 
+/// <summary>
+/// C8 M4 (AC-8.1, C-110): payload of GrantSystemRole / RevokeSystemRole when <c>RoleName</c> is <c>security_auditor</c>.
+/// <c>ReasonCode</c> is required and must be one of <see cref="SecurityAuditorReasonCodes"/> for the command's direction
+/// (exact, case-sensitive). A plaintext <c>ReasonNote</c> is refused permanently (<c>REASON_NOTE_NOT_ACCEPTED</c>, D8-72);
+/// an optional note arrives only as <c>ReasonNoteEnvelope</c>, sealed by the business API (C8 M4 M1, Design A revision 2):
+/// the Authority validates its structure and stores ciphertext only, holding no key. Free-text <c>reason</c> is not accepted
+/// for this role (strict binding rejects it).
+/// </summary>
+public sealed record SecurityAuditorPayload(Guid AuthorityUserId, string RoleName, string ReasonCode, string? ReasonNote = null, string? StepUpEvidence = null, AuditorReasonNoteEnvelope? ReasonNoteEnvelope = null);
+
+/// <summary>
+/// C8 M4 M1 (Design A revision 2 §1.4): a Security Auditor reason note sealed with AES-256-GCM by the business API. The
+/// authenticated context (organization, target, role, direction, note id) is bound in the AAD; organization, target, role and
+/// direction come from the command, only the note id from the envelope. Nothing in the product decrypts it (D8-73).
+/// </summary>
+public sealed record AuditorReasonNoteEnvelope(
+    string EnvelopeFormat,
+    int EnvelopeVersion,
+    string AlgorithmName,
+    string KeyReference,
+    string NoteId,
+    string NonceB64,
+    string CiphertextB64,
+    string TagB64,
+    string WrappedDataKeyB64);
+
+/// <summary>C8 M4 (C-110): the owner-approved, closed reason codes for Security Auditor appointment and removal. No "Other".</summary>
+public static class SecurityAuditorReasonCodes
+{
+    public const string AuditCoverageAssignment = "AuditCoverageAssignment";
+    public const string InvestigationSupport = "InvestigationSupport";
+    public const string ReplacementOfDepartingAuditor = "ReplacementOfDepartingAuditor";
+    public const string ComplianceReview = "ComplianceReview";
+
+    public const string AssignmentEnded = "AssignmentEnded";
+    public const string RoleChange = "RoleChange";
+    public const string MembershipEnding = "MembershipEnding";
+    public const string ConflictOfInterest = "ConflictOfInterest";
+    public const string SecurityConcern = "SecurityConcern";
+
+    public const int MaximumNoteLength = 500;
+
+    public static readonly IReadOnlyList<string> Appointment = [AuditCoverageAssignment, InvestigationSupport, ReplacementOfDepartingAuditor, ComplianceReview];
+
+    public static readonly IReadOnlyList<string> Removal = [AssignmentEnded, RoleChange, MembershipEnding, ConflictOfInterest, SecurityConcern];
+
+    /// <summary>Exact ordinal match against the list for the direction (appointment or removal).</summary>
+    public static bool IsValid(string? code, bool appointment) => code is not null && (appointment ? Appointment : Removal).Contains(code, StringComparer.Ordinal);
+}
+
 public sealed record SecurityAdministratorRosterRequest(Guid OrganizationId);
 
 /// <summary>A current Security Administrator: verified identity binding and the command that appointed them.</summary>

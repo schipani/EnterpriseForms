@@ -1,0 +1,1 @@
+head 4a71dbc6a436ec812ae0db059bd1acc4860cad6a; scratch copy = git archive of that commit; mutations applied only to the scratch copy (MX-*) or to the run's disposable database (MD-*). Parts: MX-01..MX-09 and MX-10..MD-04, run 2026-11-16 with the final harness.

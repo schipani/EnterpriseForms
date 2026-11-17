@@ -1,0 +1,12 @@
+E3-M2f-2G PostgreSQL diagnostics (disposable cluster of this run; read-only queries)
+settings: deadlock_timeout=1000, default_transaction_isolation=read committed, lock_timeout=0, log_lock_waits=on, max_connections=100, server_version=18.0 (Debian 18.0-1.pgdg13+3)
+database m2e2_floor2: commits 5, rollbacks 0, deadlocks 0, conflicts 0, temp files 0
+database m2e2gate: commits 4262, rollbacks 37, deadlocks 0, conflicts 0, temp files 0
+database m2f2gbase: commits 391, rollbacks 3, deadlocks 0, conflicts 0, temp files 0
+database m2f2gcf: commits 142, rollbacks 2, deadlocks 0, conflicts 0, temp files 0
+database postgres: commits 33, rollbacks 0, deadlocks 0, conflicts 0, temp files 0
+database template0: commits 0, rollbacks 0, deadlocks 0, conflicts 0, temp files 0
+database template1: commits 905, rollbacks 0, deadlocks 0, conflicts 0, temp files 0
+locks held or awaited at the end by harness sessions (application_name m2e2-*/m2f2g-*): 0
+harness sessions idle in transaction at the end: 0
+data-key bindings per database are listed in the check evidence; existence-query plans are in m2e2-log.txt (DIAGNOSTIC lines)

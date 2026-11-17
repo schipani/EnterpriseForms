@@ -1,0 +1,1019 @@
+{
+  "harness": "E3-M2e-2 controlled Envelope v2 acceptance verification (real Authority build in-process; real E3-M1 core; business signed-column registry; disposable PostgreSQL 18.0 and Vault 1.20.4)",
+  "build": "ContentAcceptanceRules.CurrentVersion = 3; RecognizedFloors = 1,2,3; EnvelopeRules.AllowedEnvelopeVersions = 1",
+  "groups": "G,GS",
+  "isolation": {
+    "databases": [
+      "m2e2_floor2",
+      "m2e2gate",
+      "m2f2gbase",
+      "m2f2gcf",
+      "postgres"
+    ],
+    "scrubbedEnvironmentVariables": [],
+    "stopped": false
+  },
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "checksTotal": 73,
+  "checksFailed": 0,
+  "byKind": {
+    "Control": {
+      "total": 9,
+      "passed": 9,
+      "failed": 0
+    },
+    "Database": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    "Negative": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "Premise": {
+      "total": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    "Security": {
+      "total": 28,
+      "passed": 28,
+      "failed": 0
+    },
+    "Setup": {
+      "total": 19,
+      "passed": 19,
+      "failed": 0
+    }
+  },
+  "byGroup": {
+    "G": {
+      "total": 48,
+      "passed": 48,
+      "failed": 0
+    },
+    "GS": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    "L": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    "S": {
+      "total": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    "setup": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    "teardown": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "m2e2Regression": {
+    "total": 20,
+    "failed": 0
+  },
+  "m2f2g": {
+    "total": 53,
+    "failed": 0,
+    "byKind": {
+      "Control": {
+        "total": 9,
+        "passed": 9,
+        "failed": 0
+      },
+      "Premise": {
+        "total": 11,
+        "passed": 11,
+        "failed": 0
+      },
+      "Security": {
+        "total": 28,
+        "passed": 28,
+        "failed": 0
+      },
+      "Setup": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0
+      }
+    },
+    "gapDemonstrations": {
+      "EXPECTED_GAP_INVENTORY": {
+        "total": 1,
+        "asExpected": 1
+      },
+      "EXPECTED_GAP_G2": {
+        "total": 7,
+        "asExpected": 7
+      }
+    }
+  },
+  "expectedGapDemonstrations": 8,
+  "checks": [
+    {
+      "Id": "S-00",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "target identity: the primary and maintenance databases carry this run\u0027s nonce, the cluster\u0027s system identifier and port 5432 behind the run\u0027s loopback port",
+      "Expected": "admitted m2e2gate, postgres",
+      "Observed": "m2e2gate,postgres",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-01",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "inherited connection strings, content settings, Azure settings and environment overrides are removed from the harness process (and so from every child)",
+      "Expected": "none remaining",
+      "Observed": "removed []; remaining []",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-02",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "the ordinary --migrate runs before any runtime connection: it applies the ledger migration and never a floor",
+      "Expected": "runtime sessions 0; exit 0; floors none; ledger 20261116031706_AuthorityContentDataKeyBindings",
+      "Observed": "runtime sessions 0; exit 0; floors none; ledger 20261116031706_AuthorityContentDataKeyBindings",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-03",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "runtime role on the ledger: SELECT and INSERT only (L-8); the role is ordinary",
+      "Expected": "select=true insert=true update=false delete=false truncate=false; false false",
+      "Observed": "select=true insert=true update=false delete=false truncate=false; false false",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-04",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "floors 1 -\u003E 2 -\u003E 3 applied in order (focused run without group F)",
+      "Expected": "0 0 0; floors 3",
+      "Observed": "0 0 0; floors 3",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-10",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "target identity re-verified for every admitted database immediately before acceptance is enabled",
+      "Expected": "all admitted",
+      "Observed": "m2e2_floor2,m2e2gate,postgres",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-11",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "Release B with RequiredFloor = 3: the readiness guard is ready on floor 3 with the ledger migration",
+      "Expected": "True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3",
+      "Observed": "True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-12",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "the switch refuses to be configured on outside Development/Testing (Staging, Production) and without Release B RequiredFloor 3 (floor 2, Release A)",
+      "Expected": "refused: environment x2; refused: policy x2",
+      "Observed": "refused: environment; refused: environment; refused: policy; refused: policy",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-13",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "the Testing switch is configured on with its static prerequisites; acceptance is NOT effective before the exact policy is recorded",
+      "Expected": "configured True; prerequisites True; enabled False",
+      "Observed": "configured True; prerequisites True; enabled False",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-14",
+      "Kind": "Negative",
+      "Group": "S",
+      "Description": "missing policy observation: with the switch configured on but the policy unrecorded, a New v2 group is refused at Prepare (nothing signed, no operation, no binding)",
+      "Expected": "ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; unchanged",
+      "Observed": "ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; signatures 0-\u003E0; bindings 0-\u003E0; ops 0-\u003E0",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-15",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "the effective policy is recorded on the disposable platform journal (in-memory archive); acceptance becomes effective only then",
+      "Expected": "Recorded; body records the exact digest and acceptance requested; enabled True",
+      "Observed": "Recorded; body has the digest, requested on; enabled True",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-after-activation",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "F-E2 sentinel (after-activation): the runtime role\u0027s table grants equal the setup baseline",
+      "Expected": "unchanged",
+      "Observed": "unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-01",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "raw SQL positive control: the runtime role inserts a binding for a Prepared operation stamped 3 of the same organization and record (P-1 admits it)",
+      "Expected": "setup write OK; seed OK; insert OK",
+      "Observed": "setup OK; seed OK; insert OK",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-02",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "P-1 (database): a binding for a Committed operation is refused by the binding guard trigger",
+      "Expected": "23514 trg_content_data_key_binding_guard",
+      "Observed": "23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-03",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "global uniqueness (database): a second binding of an identifier is refused by the unique index",
+      "Expected": "23505 uq_content_data_key_binding_identifier",
+      "Observed": "23505 uq_content_data_key_binding_identifier: duplicate key value violates unique constraint \u0022uq_content_data_key_binding_identifier\u0022",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-04",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "L-8 (database): the runtime role has no UPDATE, DELETE or TRUNCATE privilege on the ledger",
+      "Expected": "42501 x3 (labelled expected)",
+      "Observed": "42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-05",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "P-2 (database): even the superuser is refused UPDATE, DELETE and TRUNCATE by the immutability triggers; the binding is intact",
+      "Expected": "23514 trg_content_data_key_binding_permanent x3; 1/1",
+      "Observed": "23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated; 1/1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-00",
+      "Kind": "Setup",
+      "Group": "G",
+      "Description": "setup: 8 schema-2 heads in a bound organization (real M1 core; field batches and one document), 8 v1-only heads in an unbound organization, a Prepared operation of the current build, an effective protection decision with a migration-verification snapshot, two search approvals and one backfilled entry; every content entry anchored",
+      "Expected": "writes OK x16; pending Prepared; census seeded; approvals 2; backfill Indexed; bindings \u003E 0 / 0; chains verified",
+      "Observed": "writes OK; pending OK; census OK 01a1e802-c7ca-7bed-94fb-ad5d73494e3d; approvals 2; backfill OK: backfill Indexed quarantined False; bindings 9/0; 8 content entries; archived all; chain verified / 8 content entries; archived all; chain verified",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-01",
+      "Kind": "Premise",
+      "Group": "G",
+      "Description": "encoder fidelity: this tree\u0027s business build (E3-M2f-1\u002B, BusinessAgent) re-encodes every stored row of a schema-2 head (field batch and document) byte-identically",
+      "Expected": "4/4 identical",
+      "Observed": "4/4 identical",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-02",
+      "Kind": "Premise",
+      "Group": "G",
+      "Description": "encoder fidelity: the 0be5f52 business build (E3-M2e-2; faithful schema-2 encoding, no capability header) re-encodes every stored row byte-identically",
+      "Expected": "4/4 identical",
+      "Observed": "4/4 identical",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-03",
+      "Kind": "Premise",
+      "Group": "G",
+      "Description": "finding G-2 is real in the historical code: the 11e15ee business build (before E3-M2b-2) re-encodes exactly the schema-2 rows differently (it does not know the v2 columns and always uses signed schema 1); the other rows are identical",
+      "Expected": "differing rows = the v2 rows (\u003E= 2); unknown columns include DataKeyIdentifier, DataKeyCommitmentBytes, KeyWrapAlgorithmCode",
+      "Observed": "v2 rows 2; differing 2; same set True; ignored [FieldStringValue: | FieldEncryptedValue:DataKeyCommitmentBytes,DataKeyIdentifier,KeyWrapAlgorithmCode | FileAttachmentVersion:DataKeyCommitmentBytes,DataKeyIdentifier,KeyWrapAlgorithmCode]",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-10",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-10 G-2 (Prepare, real PostgreSQL): the request of the 11e15ee business build (no header, and the same bytes declaring level 1) in an organization with a binding and a schema-2 head is refused with the fixed 409 BEFORE any signed-content verification: no HMAC verification or signing ran, the transaction executed nothing after the boolean existence query and committed nothing, no lock lingers, the head is not quarantined, no incident is journaled, the content-integrity revision is unchanged, and every Authority row of the organization is unchanged",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False x2 (removal shape) and once more for the carry shape; MAC verify/sign 0/0; 0 statements after the existence query; no commit; 0 locks; head unchanged; incidents unchanged; integrity unchanged; organization rows unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; carry shape AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False (no MAC verification); MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0-\u003E0; integrity 8-\u003E8; pending unchanged; rows unchanged; alerts \u002B0; shape [tx-begin \u003E org-lock \u003E fence \u003E fence \u003E ledger-exists \u003E tx-rollback]",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-10c",
+      "Kind": "Control",
+      "Group": "G",
+      "Description": "Prepare: the current build\u0027s request (level 2, faithful bytes) proceeds through the normal authorized path and never queries the ledger for the capability decision",
+      "Expected": "OK: prepared...; ledger statements: DK rules only (no EXISTS)",
+      "Observed": "OK: prepared 4; ledger statements []",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-11",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-11 G-2 (Commit, real PostgreSQL): the request of the 11e15ee business build (no header, and the same bytes declaring level 1) in an organization with a binding and a schema-2 head is refused with the fixed 409 BEFORE any signed-content verification: no HMAC verification or signing ran, the transaction executed nothing after the boolean existence query and committed nothing, no lock lingers, the head is not quarantined, no incident is journaled, the content-integrity revision is unchanged, the pending operation is still Prepared, and every Authority row of the organization is unchanged",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False x2; MAC verify/sign 0/0; 0 statements after the existence query; no commit; 0 locks; head unchanged; incidents unchanged; integrity unchanged; organization rows unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0-\u003E0; integrity 8-\u003E8; pending unchanged; rows unchanged; alerts \u002B0; shape [tx-begin \u003E org-lock \u003E fence \u003E fence \u003E ledger-exists \u003E tx-rollback]",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-11c",
+      "Kind": "Control",
+      "Group": "G",
+      "Description": "Commit: the current build\u0027s request (level 2, faithful bytes) proceeds through the normal authorized path and never queries the ledger for the capability decision",
+      "Expected": "OK: committed...; ledger statements: none",
+      "Observed": "OK: committed {\u0022FormRecordId\u0022:\u002201a1e802-beba-7ae2-aabb-09295bc3ff77\u0022,\u0022CommittedContentRevision\u0022:2,\u0022CommittedOperationId\u0022:\u002201a1e802-c71d-71b7-a20a-ec372f71a425\u0022,\u0022CommittedManifestRootBase64\u0022:\u0022DbtPf\\u002BOZ/P14j3WrMWtiub4tTKOO/pjzmbopZPSOYhM=\u0022,\u0022AuthorizationRevision\u0022:7,\u0022IntegrityKeyVersion\u0022:1,\u0022CurrentSigningKeyVersion\u0022:1,\u0022ArchiveState\u0022:\u0022Pending\u0022,\u0022CorrelationId\u0022:\u002201a1e802-e6b0-7c0f-96c2-59ba39383b9b\u0022}; ledger statements [SELECT c.content_data_key_binding_id, c.binding_content_change_operation_id, c.binding_item_count, c.data_key_bound_on, c.data_key_commitment_bytes, c.data_key_identifier, c.envelope_payload_kind_code, c.form_record_id, c.organization_id FROM authority.content_data_key_bindings AS c WHERE c.binding_content_change_operation_id = @contentChangeOperationId [params 1] | LOCK TABLE authority.content_data_key_bindings IN ROW EXCLUSIVE MODE [params 0] | SELECT c.content_data_key_binding_id, c.binding_content_change_operation_id, c.binding_item_count, c.data_key_bound_on, c.data_key_commitment_bytes, c.data_key_identifier, c.envelope_payload_kind_code, c.form_record_id, c.organization_id FROM authority.content_data_key_bindings AS c WHERE c.data_key_identifier = ANY (@dataKeyIdentifiers) [params 1]]",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-12",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-12 G-2 (Verify, real PostgreSQL): the request of the 11e15ee business build (no header, and the same bytes declaring level 1) in an organization with a binding and a schema-2 head is refused with the fixed 409 BEFORE any signed-content verification: no HMAC verification or signing ran, the transaction executed nothing after the boolean existence query and committed nothing, no lock lingers, the head is not quarantined, no incident is journaled, the content-integrity revision is unchanged, and every Authority row of the organization is unchanged",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False x2; MAC verify/sign 0/0; 0 statements after the existence query; no commit; 0 locks; head unchanged; incidents unchanged; integrity unchanged; organization rows unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0-\u003E0; integrity 9-\u003E9; pending unchanged; rows unchanged; alerts \u002B0; shape [tx-begin \u003E org-lock \u003E ledger-exists \u003E tx-rollback]",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-12c",
+      "Kind": "Control",
+      "Group": "G",
+      "Description": "Verify: the current build\u0027s request (level 2, faithful bytes) proceeds through the normal authorized path and never queries the ledger for the capability decision",
+      "Expected": "OK: verified True...; ledger statements: none",
+      "Observed": "OK: verified True ; ledger statements []",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-13",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-13 G-2 (BatchVerify, real PostgreSQL): the request of the 11e15ee business build (no header, and the same bytes declaring level 1) in an organization with a binding and a schema-2 head is refused with the fixed 409 BEFORE any signed-content verification: no HMAC verification or signing ran, the transaction executed nothing after the boolean existence query and committed nothing, no lock lingers, the head is not quarantined, no incident is journaled, the content-integrity revision is unchanged, and every Authority row of the organization is unchanged",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False x2; MAC verify/sign 0/0; 0 statements after the existence query; no commit; 0 locks; head unchanged; incidents unchanged; integrity unchanged; organization rows unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0-\u003E0; integrity 9-\u003E9; pending unchanged; rows unchanged; alerts \u002B0; shape [tx-begin \u003E org-lock \u003E ledger-exists \u003E tx-rollback]",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-13c",
+      "Kind": "Control",
+      "Group": "G",
+      "Description": "BatchVerify: the current build\u0027s request (level 2, faithful bytes) proceeds through the normal authorized path and never queries the ledger for the capability decision",
+      "Expected": "OK: verified True...; ledger statements: none",
+      "Observed": "OK: verified True ; ledger statements []",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-14",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-14 G-2 (Census, real PostgreSQL): the request of the 11e15ee business build (no header, and the same bytes declaring level 1) in an organization with a binding and a schema-2 head is refused with the fixed 409 BEFORE any signed-content verification: no HMAC verification or signing ran, the transaction executed nothing after the boolean existence query and committed nothing, no lock lingers, the head is not quarantined, no incident is journaled, the content-integrity revision is unchanged, and every Authority row of the organization is unchanged",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False x2; MAC verify/sign 0/0; 0 statements after the existence query; no commit; 0 locks; head unchanged; incidents unchanged; integrity unchanged; organization rows unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0-\u003E0; integrity 9-\u003E9; pending unchanged; rows unchanged; alerts \u002B0; shape [tx-begin \u003E read:search_catalogue_snapshots \u003E org-lock \u003E ledger-exists \u003E tx-rollback]",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-14c",
+      "Kind": "Control",
+      "Group": "G",
+      "Description": "Census: the current build\u0027s request (level 2, faithful bytes) proceeds through the normal authorized path and never queries the ledger for the capability decision",
+      "Expected": "OK: census Verified...; ledger statements: none",
+      "Observed": "OK: census Verified; ledger statements []",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-15",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-15 G-2 (Backfill, real PostgreSQL): the request of the 11e15ee business build (no header, and the same bytes declaring level 1) in an organization with a binding and a schema-2 head is refused with the fixed 409 BEFORE any signed-content verification: no HMAC verification or signing ran, the transaction executed nothing after the boolean existence query and committed nothing, no lock lingers, the head is not quarantined, no incident is journaled, the content-integrity revision is unchanged, and every Authority row of the organization is unchanged",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False x2; MAC verify/sign 0/0; 0 statements after the existence query; no commit; 0 locks; head unchanged; incidents unchanged; integrity unchanged; organization rows unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0-\u003E0; integrity 9-\u003E9; pending unchanged; rows unchanged; alerts \u002B0; shape [tx-begin \u003E org-lock \u003E ledger-exists \u003E tx-rollback]",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-15c",
+      "Kind": "Control",
+      "Group": "G",
+      "Description": "Backfill: the current build\u0027s request (level 2, faithful bytes) proceeds through the normal authorized path and never queries the ledger for the capability decision",
+      "Expected": "OK: backfill Indexed quarantined False...; ledger statements: none",
+      "Observed": "OK: backfill Indexed quarantined False; ledger statements []",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-16",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-16 G-2 (DeepVerify, real PostgreSQL): the request of the 11e15ee business build (no header, and the same bytes declaring level 1) in an organization with a binding and a schema-2 head is refused with the fixed 409 BEFORE any signed-content verification: no HMAC verification or signing ran, the transaction executed nothing after the boolean existence query and committed nothing, no lock lingers, the head is not quarantined, no incident is journaled, the content-integrity revision is unchanged, and every Authority row of the organization is unchanged",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False x2; MAC verify/sign 0/0; 0 statements after the existence query; no commit; 0 locks; head unchanged; incidents unchanged; integrity unchanged; organization rows unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0-\u003E0; integrity 9-\u003E9; pending unchanged; rows unchanged; alerts \u002B0; shape [tx-begin \u003E org-lock \u003E ledger-exists \u003E tx-rollback]",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-16c",
+      "Kind": "Control",
+      "Group": "G",
+      "Description": "DeepVerify: the current build\u0027s request (level 2, faithful bytes) proceeds through the normal authorized path and never queries the ledger for the capability decision",
+      "Expected": "OK: deep Pass...; ledger statements: none",
+      "Observed": "OK: deep Pass MATCH quarantined False; ledger statements []",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-20",
+      "Kind": "Premise",
+      "Group": "G",
+      "Description": "Prepare counterfactual (disposable copy only): the same 11e15ee request declared as level 2 passes the floor and reaches signed-content verification: CurrentSnapshotMismatch journaled and the content-integrity revision advanced (removal shape: valid candidate, re-encoded observed head). This is what the refusal of G-10 runs ahead of",
+      "Expected": "CurrentSnapshotMismatch journaled and the content-integrity revision advanced (removal shape: valid candidate, re-encoded observed head)",
+      "Observed": "AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False; MAC verifications 0; head 1:false-\u003E1:false; incidents 0-\u003E1; integrity 8-\u003E9; pending --\u003E-",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-20a",
+      "Kind": "Premise",
+      "Group": "G",
+      "Description": "Prepare counterfactual, carry shape (disposable copy only): every carried row re-staged by the 11e15ee registry is refused by candidate validation (S-4 ENVELOPE_SCHEMA_MISMATCH, 422) before snapshot binding: no incident. Only the removal shape (G-20) reaches the snapshot-mismatch journal",
+      "Expected": "INVALID_COMMAND 422; incidents unchanged",
+      "Observed": "AuthorityException INVALID_COMMAND 422 retryable=False; incidents 1-\u003E1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-21",
+      "Kind": "Premise",
+      "Group": "G",
+      "Description": "Commit counterfactual (disposable copy only): the same 11e15ee request declared as level 2 passes the floor and reaches signed-content verification: rejected by staged verification (CANDIDATE_MISMATCH 409); the operation stays Prepared; no incident (no false integrity outcome at Commit). This is what the refusal of G-11 runs ahead of",
+      "Expected": "rejected by staged verification (CANDIDATE_MISMATCH 409); the operation stays Prepared; no incident (no false integrity outcome at Commit)",
+      "Observed": "AuthorityException CANDIDATE_MISMATCH 409 retryable=False; MAC verifications 2; head 1:false-\u003E1:false; incidents 1-\u003E1; integrity 9-\u003E9; pending 3/NULL Prepared --\u003E3/NULL Prepared -",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-22",
+      "Kind": "Premise",
+      "Group": "G",
+      "Description": "Verify counterfactual (disposable copy only): the same 11e15ee request declared as level 2 passes the floor and reaches signed-content verification: the head is falsely quarantined and IntegrityVerificationFailed is journaled. This is what the refusal of G-12 runs ahead of",
+      "Expected": "the head is falsely quarantined and IntegrityVerificationFailed is journaled",
+      "Observed": "OK: verified False ITEM_DIGEST_MISMATCH; MAC verifications 2; head 1:false-\u003E1:true; incidents 1-\u003E2; integrity 9-\u003E10; pending --\u003E-",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-23",
+      "Kind": "Premise",
+      "Group": "G",
+      "Description": "BatchVerify counterfactual (disposable copy only): the same 11e15ee request declared as level 2 passes the floor and reaches signed-content verification: the head is falsely quarantined and IntegrityVerificationFailed is journaled. This is what the refusal of G-13 runs ahead of",
+      "Expected": "the head is falsely quarantined and IntegrityVerificationFailed is journaled",
+      "Observed": "OK: verified False ITEM_DIGEST_MISMATCH; MAC verifications 2; head 1:false-\u003E1:true; incidents 2-\u003E3; integrity 10-\u003E11; pending --\u003E-",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-24",
+      "Kind": "Premise",
+      "Group": "G",
+      "Description": "Census counterfactual (disposable copy only): the same 11e15ee request declared as level 2 passes the floor and reaches signed-content verification: the head is falsely quarantined and IntegrityVerificationFailed is journaled. This is what the refusal of G-14 runs ahead of",
+      "Expected": "the head is falsely quarantined and IntegrityVerificationFailed is journaled",
+      "Observed": "OK: census ITEM_DIGEST_MISMATCH; MAC verifications 2; head 1:false-\u003E1:true; incidents 3-\u003E4; integrity 11-\u003E12; pending --\u003E-",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-25",
+      "Kind": "Premise",
+      "Group": "G",
+      "Description": "Backfill counterfactual (disposable copy only): the same 11e15ee request declared as level 2 passes the floor and reaches signed-content verification: the head is falsely quarantined and IntegrityVerificationFailed is journaled. This is what the refusal of G-15 runs ahead of",
+      "Expected": "the head is falsely quarantined and IntegrityVerificationFailed is journaled",
+      "Observed": "OK: backfill ITEM_DIGEST_MISMATCH quarantined True; MAC verifications 2; head 1:false-\u003E1:true; incidents 4-\u003E5; integrity 12-\u003E13; pending --\u003E-",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-26",
+      "Kind": "Premise",
+      "Group": "G",
+      "Description": "DeepVerify counterfactual (disposable copy only): the same 11e15ee request declared as level 2 passes the floor and reaches signed-content verification: the head is falsely quarantined and IntegrityVerificationFailed is journaled. This is what the refusal of G-16 runs ahead of",
+      "Expected": "the head is falsely quarantined and IntegrityVerificationFailed is journaled",
+      "Observed": "OK: deep Inconclusive BUSINESS_BYTES_MISMATCH quarantined True; MAC verifications 2; head 1:false-\u003E1:true; incidents 5-\u003E6; integrity 13-\u003E14; pending --\u003E-",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-30",
+      "Kind": "Control",
+      "Group": "G",
+      "Description": "the AuthorityAgent source compiled against this tree (no capability argument: level 1) is refused on the same bound copy: the demonstrations below differ only in the Authority build",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; copy unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; copy unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-40",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-07/38 CAP-F1/F3 on real PostgreSQL: Verify with C = none, D = 1, O = 2 (bound organization): refused; ledger existence queries 1 (short-circuit)",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 1; organization rows unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 1; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-41",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-07/38 CAP-F1/F3 on real PostgreSQL: Verify with C = 1, D = 1, O = 2 (bound organization): refused; ledger existence queries 1 (short-circuit)",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 1; organization rows unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 1; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-42",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-07/38 CAP-F1/F3 on real PostgreSQL: Verify with C = 2, D = 1, O = 2 (bound organization): admitted and verified; ledger existence queries 0 (short-circuit)",
+      "Expected": "OK: verified True; existence queries 0",
+      "Observed": "OK: verified True ; existence queries 0; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-43",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-07/38 CAP-F1/F3 on real PostgreSQL: Verify with C = none, D = 1, O = 1 (unbound organization): admitted and verified; ledger existence queries 1 (short-circuit)",
+      "Expected": "OK: verified True; existence queries 1",
+      "Observed": "OK: verified True ; existence queries 1; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-44",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-07/38 CAP-F1/F3 on real PostgreSQL: Verify with C = 1, D = 1, O = 1 (unbound organization): admitted and verified; ledger existence queries 1 (short-circuit)",
+      "Expected": "OK: verified True; existence queries 1",
+      "Observed": "OK: verified True ; existence queries 1; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-45",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-07/38 CAP-F1/F3 on real PostgreSQL: Verify with C = 2, D = 1, O = 1 (unbound organization): admitted and verified; ledger existence queries 0 (short-circuit)",
+      "Expected": "OK: verified True; existence queries 0",
+      "Observed": "OK: verified True ; existence queries 0; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-46",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-07/38 CAP-F1/F3 on real PostgreSQL: Verify with C = none, D = 2, O = 2 (bound organization): refused; ledger existence queries 0 (short-circuit)",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 0; organization rows unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 0; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-47",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-07/38 CAP-F1/F3 on real PostgreSQL: Verify with C = 1, D = 2, O = 2 (bound organization): refused; ledger existence queries 0 (short-circuit)",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 0; organization rows unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 0; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-48",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-07/38 CAP-F1/F3 on real PostgreSQL: Verify with C = 2, D = 2, O = 2 (bound organization): admitted and verified; ledger existence queries 0 (short-circuit)",
+      "Expected": "OK: verified True; existence queries 0",
+      "Observed": "OK: verified True ; existence queries 0; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-49",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-07/38 CAP-F1/F3 on real PostgreSQL: Verify with C = none, D = 2, O = 1 (unbound organization): refused; ledger existence queries 0 (short-circuit)",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 0; organization rows unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 0; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-50",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-07/38 CAP-F1/F3 on real PostgreSQL: Verify with C = 1, D = 2, O = 1 (unbound organization): refused; ledger existence queries 0 (short-circuit)",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 0; organization rows unchanged",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 0; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-51",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-07/38 CAP-F1/F3 on real PostgreSQL: Verify with C = 2, D = 2, O = 1 (unbound organization): admitted and verified; ledger existence queries 0 (short-circuit)",
+      "Expected": "OK: verified True; existence queries 0",
+      "Observed": "OK: verified True ; existence queries 0; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-39",
+      "Kind": "Setup",
+      "Group": "G",
+      "Description": "matrix setup: one more schema-2 head in the bound organization",
+      "Expected": "OK",
+      "Observed": "OK",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-55",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-08 CAP-F2 on real PostgreSQL: a binding whose operation is Prepared (never committed) raises the organization floor: a level-1 Verify of an untouched v1 record, admitted before the reservation, is refused after it",
+      "Expected": "before OK: verified True; operation Prepared; after AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; binding 1",
+      "Observed": "before OK: verified True ; setup OK; prepare OK; settle left Prepared; operation 3/NULL Prepared -; after AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; bindings 1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-56",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-08 CAP-F2 on real PostgreSQL: a binding whose operation is Aborted (never committed) raises the organization floor: a level-1 Verify of an untouched v1 record, admitted before the reservation, is refused after it",
+      "Expected": "before OK: verified True; operation Aborted; after AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; binding 1",
+      "Observed": "before OK: verified True ; setup OK; prepare OK; settle AuthorityException INVALID_COMMAND 422 retryable=False; operation 3/NULL Aborted ENVELOPE_VERSION_NOT_ENABLED_AT_COMMIT; after AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; bindings 1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-57",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-08 CAP-F2 on real PostgreSQL: a binding whose operation is Expired (never committed) raises the organization floor: a level-1 Verify of an untouched v1 record, admitted before the reservation, is refused after it",
+      "Expected": "before OK: verified True; operation Expired; after AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; binding 1",
+      "Observed": "before OK: verified True ; setup OK; prepare OK; settle AuthorityException OPERATION_EXPIRED 409 retryable=False; operation 3/NULL Aborted -; after AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; bindings 1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-60",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "AM-F1 #1 on real PostgreSQL: an admitted level-1 Verify in an unbound organization ran exactly ONE ledger statement: a parameterized boolean EXISTS keyed on the organization (no binding column selected), after the organization lock, and continued to verification",
+      "Expected": "OK: verified True; 1 ledger statement: SELECT EXISTS ... content_data_key_bindings ... organization_id = @p ... [params 1]; lock before it",
+      "Observed": "OK: verified True ; 1 ledger statement(s): SELECT EXISTS ( SELECT 1 FROM authority.content_data_key_bindings AS c WHERE c.organization_id = @organizationId) [params 1]; order [tx-begin \u003E org-lock \u003E ledger-exists \u003E read:identity_bindings \u003E read:authority_resources \u003E read:record_content_heads \u003E read:security_journal_entries \u003E read:record_manifest_leaves \u003E read:integrity_key_registrations \u003E read:organization_authorization_states \u003E read:organization_authorization_states \u003E tx-rollback]",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-61",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "AM-F1 #5 index: with sequential scans disabled the planner answers the existence query from ix_content_data_key_bindings_record (organization_id leading); the default plan is recorded as a diagnostic (a small table may be scanned)",
+      "Expected": "an index scan on ix_content_data_key_bindings_record",
+      "Observed": "seqscan off: Result / InitPlan 1 / -\u003E  Index Only Scan using ix_content_data_key_bindings_record on content_data_key_bindings c / Index Cond: (organization_id = \u002701a1e802-beb9-7eec-bd3e-a29c99bc24f4\u0027::uuid) | default: Result / InitPlan 1 / -\u003E  Index Only Scan using ix_content_data_key_bindings_record on content_data_key_bindings c / Index Cond: (organization_id = \u002701a1e802-beb9-7eec-bd3e-a29c99bc24f4\u0027::uuid)",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-62",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "AM-F1 #8: no grant change: the runtime role keeps exactly SELECT and INSERT on the ledger (closure L-8)",
+      "Expected": "true,true,false,false,false",
+      "Observed": "true,true,false,false,false",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-63",
+      "Kind": "Security",
+      "Group": "G",
+      "Description": "M2F-24 / CAP-F5 on real PostgreSQL: with the runtime role\u0027s SELECT on the ledger revoked (superuser, restored at once), a level-1 Verify in an unbound organization is REFUSED as not ready (42501 -\u003E fail closed), never admitted; a level-2 Verify is unaffected (it never reads the ledger)",
+      "Expected": "revoke OK; level 1 AUTHORITY_NOT_READY 503; level 2 OK: verified True; grant OK",
+      "Observed": "revoke OK; level 1 AuthorityException AUTHORITY_NOT_READY 503 retryable=True; level 2 OK: verified True ; grant OK",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-after-capability",
+      "Kind": "Setup",
+      "Group": "G",
+      "Description": "F-E2 sentinel (after-capability): the runtime role\u0027s table grants equal the setup baseline",
+      "Expected": "unchanged",
+      "Observed": "unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GS-00",
+      "Kind": "Setup",
+      "Group": "GS",
+      "Description": "setup (self-contained, no level-2 Commit in a bound organization): a v1 head written while the organization is unbound and anchored; then a level-2 Prepare of a New v2 group left Prepared, whose binding makes the organization bound (CAP-F2)",
+      "Expected": "write OK; chain verified; Prepare OK; 1 binding; 3/NULL Prepared",
+      "Observed": "write OK; 1 content entries; archived all; chain verified; Prepare OK ; bindings 1; operation 3/NULL Prepared -",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GS-03",
+      "Kind": "Control",
+      "Group": "GS",
+      "Description": "control: in this organization a level-1 Verify is refused after exactly one boolean existence query (the organization is bound, and the existence query is observable in the trace)",
+      "Expected": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; ledger statements 1 (ledger-exists)",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; ledger statements 1 [SELECT EXISTS ( SELECT 1 FROM authority.content_data_key_bindings AS c WHERE c.organization_id = @organizationId) [params 1]]; shape [tx-begin \u003E org-lock \u003E ledger-exists \u003E tx-rollback]",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GS-01",
+      "Kind": "Security",
+      "Group": "GS",
+      "Description": "M2F-22 / CAP-F3 / AM-F1 #4 on real PostgreSQL (MG-17 detector, statement evidence): in an organization WITH a binding, a level-2 Verify and a level-2 batch Verify execute no statement at all on authority.content_data_key_bindings (the level-2 short-circuit admits without the existence query) and verify",
+      "Expected": "Verify and BatchVerify: OK: verified True; ledger statements 0",
+      "Observed": "Verify: OK: verified True ; ledger statements 0; shape [tx-begin \u003E org-lock \u003E read:identity_bindings \u003E read:authority_resources \u003E read:record_content_heads \u003E read:security_journal_entries \u003E read:record_manifest_leaves \u003E read:integrity_key_registrations \u003E read:organization_authorization_states \u003E read:organization_authorization_states \u003E tx-rollback] || BatchVerify: OK: verified True ; ledger statements 0; shape [tx-begin \u003E org-lock \u003E read:identity_bindings \u003E read:authority_resources \u003E read:record_content_heads \u003E read:security_journal_entries \u003E read:record_manifest_leaves \u003E read:integrity_key_registrations \u003E read:organization_authorization_states \u003E read:organization_authorization_states \u003E tx-rollback]",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GS-02",
+      "Kind": "Security",
+      "Group": "GS",
+      "Description": "M2F-22 server-enforced (MG-17 detector): with SELECT on the ledger revoked from the runtime role (superuser, restored at once; the 42501 is labelled expected), level-2 Verify and batch Verify in the bound organization still verify, so they read nothing from the ledger; the level-1 Verify on the same node is refused as not ready (the revocation is in force on this path)",
+      "Expected": "revoke OK; level-2 Verify and BatchVerify OK: verified True; level 1 AUTHORITY_NOT_READY 503; grant OK",
+      "Observed": "revoke OK; level-2 Verify OK: verified True ; level-2 BatchVerify OK: verified True ; level 1 AuthorityException AUTHORITY_NOT_READY 503 retryable=True; grant OK",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-after-capability-short-circuit",
+      "Kind": "Setup",
+      "Group": "GS",
+      "Description": "F-E2 sentinel (after-capability-short-circuit): the runtime role\u0027s table grants equal the setup baseline",
+      "Expected": "unchanged",
+      "Observed": "unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "T-01",
+      "Kind": "Setup",
+      "Group": "teardown",
+      "Description": "teardown: the Testing override disables acceptance on the in-process switch (instances are discarded with the process)",
+      "Expected": "enabled False",
+      "Observed": "enabled False",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-end",
+      "Kind": "Setup",
+      "Group": "teardown",
+      "Description": "F-E2 sentinel (end): the runtime role\u0027s table grants equal the setup baseline",
+      "Expected": "unchanged",
+      "Observed": "unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "T-02",
+      "Kind": "Setup",
+      "Group": "teardown",
+      "Description": "end: every admitted database still carries this run\u0027s nonce and system identifier; the runtime role is ordinary",
+      "Expected": "verified; false false",
+      "Observed": "verified 5; false false",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    }
+  ],
+  "gapDemonstrations": [
+    {
+      "Id": "GG-INV",
+      "Kind": "Recovery",
+      "Group": "G",
+      "Description": "M2F-40 / R-M2f-3 (disposable copy): the baseline Authority 0be5f52 (CARV 3, floor 3 admits it) has no capability floor: the level-1 request of the 0be5f52 business build is ADMITTED in an organization with a binding and verifies. Floor 3 and CARV markers cannot tell it from an E3-M2f-2 build (INV-3): only the deployment inventory (INV-1/INV-2) can",
+      "Expected": "admitted: verified True (rule version 3)",
+      "Observed": "OK: verified True (rule version 3)",
+      "Pass": true,
+      "Gap": "EXPECTED_GAP_INVENTORY",
+      "Result": "EXPECTED_GAP_INVENTORY"
+    },
+    {
+      "Id": "GG-01",
+      "Kind": "Recovery",
+      "Group": "G",
+      "Description": "Prepare on the baseline Authority 0be5f52 (disposable copy): the 11e15ee business build\u0027s request is ADMITTED (no capability floor) and reaches signed-content verification: CurrentSnapshotMismatch journaled and the content-integrity revision advanced (removal shape: valid candidate, re-encoded observed head). This is finding G-2 on a build without E3-M2f-2; it is not a passing property",
+      "Expected": "CurrentSnapshotMismatch journaled and the content-integrity revision advanced (removal shape: valid candidate, re-encoded observed head)",
+      "Observed": "AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False; MAC verifications 0; head 1:false-\u003E1:false; incidents 0-\u003E1; integrity 8-\u003E9; pending --\u003E-",
+      "Pass": true,
+      "Gap": "EXPECTED_GAP_G2",
+      "Result": "EXPECTED_GAP_G2"
+    },
+    {
+      "Id": "GG-02",
+      "Kind": "Recovery",
+      "Group": "G",
+      "Description": "Commit on the baseline Authority 0be5f52 (disposable copy): the 11e15ee business build\u0027s request is ADMITTED (no capability floor) and reaches signed-content verification: rejected by staged verification (CANDIDATE_MISMATCH 409); the operation stays Prepared; no incident (no false integrity outcome at Commit). This is finding G-2 on a build without E3-M2f-2; it is not a passing property",
+      "Expected": "rejected by staged verification (CANDIDATE_MISMATCH 409); the operation stays Prepared; no incident (no false integrity outcome at Commit)",
+      "Observed": "AuthorityException CANDIDATE_MISMATCH 409 retryable=False; MAC verifications 2; head 1:false-\u003E1:false; incidents 1-\u003E1; integrity 9-\u003E9; pending 3/NULL Prepared --\u003E3/NULL Prepared -",
+      "Pass": true,
+      "Gap": "EXPECTED_GAP_G2",
+      "Result": "EXPECTED_GAP_G2"
+    },
+    {
+      "Id": "GG-03",
+      "Kind": "Recovery",
+      "Group": "G",
+      "Description": "Verify on the baseline Authority 0be5f52 (disposable copy): the 11e15ee business build\u0027s request is ADMITTED (no capability floor) and reaches signed-content verification: the head is falsely quarantined and IntegrityVerificationFailed is journaled. This is finding G-2 on a build without E3-M2f-2; it is not a passing property",
+      "Expected": "the head is falsely quarantined and IntegrityVerificationFailed is journaled",
+      "Observed": "OK: verified False; MAC verifications 2; head 1:false-\u003E1:true; incidents 1-\u003E2; integrity 9-\u003E10; pending --\u003E-",
+      "Pass": true,
+      "Gap": "EXPECTED_GAP_G2",
+      "Result": "EXPECTED_GAP_G2"
+    },
+    {
+      "Id": "GG-04",
+      "Kind": "Recovery",
+      "Group": "G",
+      "Description": "BatchVerify on the baseline Authority 0be5f52 (disposable copy): the 11e15ee business build\u0027s request is ADMITTED (no capability floor) and reaches signed-content verification: the head is falsely quarantined and IntegrityVerificationFailed is journaled. This is finding G-2 on a build without E3-M2f-2; it is not a passing property",
+      "Expected": "the head is falsely quarantined and IntegrityVerificationFailed is journaled",
+      "Observed": "OK: verified False; MAC verifications 2; head 1:false-\u003E1:true; incidents 2-\u003E3; integrity 10-\u003E11; pending --\u003E-",
+      "Pass": true,
+      "Gap": "EXPECTED_GAP_G2",
+      "Result": "EXPECTED_GAP_G2"
+    },
+    {
+      "Id": "GG-05",
+      "Kind": "Recovery",
+      "Group": "G",
+      "Description": "Census on the baseline Authority 0be5f52 (disposable copy): the 11e15ee business build\u0027s request is ADMITTED (no capability floor) and reaches signed-content verification: the head is falsely quarantined and IntegrityVerificationFailed is journaled. This is finding G-2 on a build without E3-M2f-2; it is not a passing property",
+      "Expected": "the head is falsely quarantined and IntegrityVerificationFailed is journaled",
+      "Observed": "OK: ITEM_DIGEST_MISMATCH; MAC verifications 2; head 1:false-\u003E1:true; incidents 3-\u003E4; integrity 11-\u003E12; pending --\u003E-",
+      "Pass": true,
+      "Gap": "EXPECTED_GAP_G2",
+      "Result": "EXPECTED_GAP_G2"
+    },
+    {
+      "Id": "GG-06",
+      "Kind": "Recovery",
+      "Group": "G",
+      "Description": "Backfill on the baseline Authority 0be5f52 (disposable copy): the 11e15ee business build\u0027s request is ADMITTED (no capability floor) and reaches signed-content verification: the head is falsely quarantined and IntegrityVerificationFailed is journaled. This is finding G-2 on a build without E3-M2f-2; it is not a passing property",
+      "Expected": "the head is falsely quarantined and IntegrityVerificationFailed is journaled",
+      "Observed": "OK: ITEM_DIGEST_MISMATCH; MAC verifications 2; head 1:false-\u003E1:true; incidents 4-\u003E5; integrity 12-\u003E13; pending --\u003E-",
+      "Pass": true,
+      "Gap": "EXPECTED_GAP_G2",
+      "Result": "EXPECTED_GAP_G2"
+    },
+    {
+      "Id": "GG-07",
+      "Kind": "Recovery",
+      "Group": "G",
+      "Description": "DeepVerify on the baseline Authority 0be5f52 (disposable copy): the 11e15ee business build\u0027s request is ADMITTED (no capability floor) and reaches signed-content verification: the head is falsely quarantined and IntegrityVerificationFailed is journaled. This is finding G-2 on a build without E3-M2f-2; it is not a passing property",
+      "Expected": "the head is falsely quarantined and IntegrityVerificationFailed is journaled",
+      "Observed": "OK: deep Inconclusive BUSINESS_BYTES_MISMATCH; MAC verifications 2; head 1:false-\u003E1:true; incidents 5-\u003E6; integrity 13-\u003E14; pending --\u003E-",
+      "Pass": true,
+      "Gap": "EXPECTED_GAP_G2",
+      "Result": "EXPECTED_GAP_G2"
+    }
+  ]
+}

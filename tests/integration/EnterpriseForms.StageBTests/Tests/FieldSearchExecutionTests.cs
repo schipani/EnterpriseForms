@@ -474,7 +474,11 @@ END $$;", throwOnError: false);
         return parts.Length == 2 && long.TryParse(parts[0], System.Globalization.CultureInfo.InvariantCulture, out var x) && long.TryParse(parts[1], System.Globalization.CultureInfo.InvariantCulture, out var y) ? (x, y) : (0, 0);
     }
 
+    /// <remarks>C-133 R-29: categorized as a benchmark so the functional tests of this class can run alone
+    /// (<c>stage-b.ps1 -Class FieldSearchExecutionTests -ExcludeBenchmarks</c>). It is unchanged and still runs in its Stage B
+    /// group and in any run without that switch (performance and release validation).</remarks>
     [Fact]
+    [Trait("Category", "Benchmark")]
     public async Task BenchmarkTheCompleteVerifiedSearchAt50To480RecordsUnderConcurrencyWritesAndRevocations()
     {
         var w = await WorkspaceAsync("m3-bench", withAdditionalOwners: true); // an organization owner cannot join a team alone (OB-F8)

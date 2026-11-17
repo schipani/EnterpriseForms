@@ -1,0 +1,916 @@
+// E3-M2b-1 CARV design-gate evidence harness. Scratchpad only; never part of the repository.
+//
+// Runs the REAL pre-CARV Authority code (frozen Release binaries of commit 66f0aa7, loaded from this folder) — ContentService
+// Prepare/Commit and the EF Core AuthorityStore — against a disposable PostgreSQL 18 container whose schema was created by the
+// same binary's own `--migrate` command, then has the proposed CARV SQL applied. Transactions are held open at chosen points
+// through the binary's own ports (IFaultInjector, IIntegrityMacProvider), never by modifying it.
+//
+// "LB" = legacy (pre-CARV) binary session. "CE" = CARV-build emulation: the same binary on a connection with
+// carv.emulate_version set, so a test-only trigger writes the stamps a CARV build would write (sql/emulation.sql).
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
+using AuthorizationAuthority.Api.Composition;
+using AuthorizationAuthority.Application.Common;
+using AuthorizationAuthority.Application.Common.Ports;
+using AuthorizationAuthority.Application.Features.Content;
+using AuthorizationAuthority.Contracts.V1;
+using AuthorizationAuthority.Domain.Features.Content;
+using AuthorizationAuthority.Domain.Features.Keys;
+using AuthorizationAuthority.Domain.Features.Organizations;
+using AuthorizationAuthority.Domain.Features.SecurityCommands;
+using AuthorizationAuthority.Infrastructure.Persistence;
+using AuthorizationAuthority.Infrastructure.Signing;
+using EnterpriseForms.Integrity.Canonical;
+using EnterpriseForms.Integrity.Merkle;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+
+var lab = new Lab(
+    Environment.GetEnvironmentVariable("CARV_ADMIN") ?? throw new InvalidOperationException("CARV_ADMIN"),
+    Environment.GetEnvironmentVariable("CARV_RUNTIME") ?? throw new InvalidOperationException("CARV_RUNTIME"),
+    Environment.GetEnvironmentVariable("CARV_SQL") ?? throw new InvalidOperationException("CARV_SQL"),
+    Environment.GetEnvironmentVariable("CARV_EVIDENCE") ?? throw new InvalidOperationException("CARV_EVIDENCE"));
+return await lab.RunAsync();
+
+internal sealed class Lab(string adminCs, string runtimeCs, string sqlDir, string evidenceDir)
+{
+    private const string Issuer = "https://carv-harness.invalid/";
+    private readonly List<Check> checks = [];
+    private readonly List<string> log = [];
+    private readonly LocalHmacProvider mac = new();
+    private readonly Dictionary<Guid, Org> orgs = [];
+
+    public async Task<int> RunAsync()
+    {
+        try
+        {
+            await ScenariosAsync();
+        }
+        catch (Exception ex)
+        {
+            Log("HARNESS ABORTED: " + Describe(ex));
+            checks.Add(new Check("HARNESS", "harness completed", "no unexpected exception", Describe(ex), false));
+        }
+
+        var failed = checks.Count(c => !c.Pass);
+        var json = JsonSerializer.Serialize(new
+        {
+            harness = "E3-M2b-1 CARV design gate",
+            binary = "pre-CARV Authority Release build of 66f0aa7 (see oldbin-sha256.txt)",
+            postgres = await ScalarAsync(adminCs, "SELECT version()"),
+            checksTotal = checks.Count,
+            checksFailed = failed,
+            checks,
+        }, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(Path.Combine(evidenceDir, "carv-evidence.json"), json);
+        await File.WriteAllLinesAsync(Path.Combine(evidenceDir, "carv-log.txt"), log);
+        Console.WriteLine($"checks: {checks.Count}, failed: {failed}");
+        foreach (var c in checks)
+        {
+            Console.WriteLine($"{(c.Pass ? "PASS" : "FAIL")} {c.Id}: {c.Description} | observed: {c.Observed}");
+        }
+
+        return failed == 0 ? 0 : 1;
+    }
+
+    // ------------------------------------------------------------------------------------------------ scenarios
+    private async Task ScenariosAsync()
+    {
+        var orgA = await SeedOrgAsync("A", 7);
+        var orgB = await SeedOrgAsync("B", 2);
+        var lb = Instance("LB", runtimeCs);
+        var lbLate = Instance("LB-late", runtimeCs, clockOffset: TimeSpan.FromMinutes(11)); // a legacy instance whose clock is past the 10-minute lifetime
+
+        // ---------- P0: before the CARV migration, the legacy binary only
+        foreach (var record in orgA.Records.Concat(orgB.Records))
+        {
+            await WriteAsync(lb, record);
+        }
+
+        await WriteAsync(lb, orgA.Records[0]);
+        var x0 = await PrepareAsync(lb, orgA.Records[3]); // left Prepared across the migration and the floor
+        Record("P0-01", "legacy binary writes before the migration", "10 commits, 1 Prepared", await OpsSummaryAsync(), (await CountAsync("SELECT count(*) FROM authority.content_change_operations WHERE operation_state_name='Committed'")) == 10);
+
+        // ---------- P1: applying the CARV migration while legacy instances are active
+        // MG-01: a legacy commit transaction is open; the migration with a short lock timeout fails cleanly and changes nothing.
+        {
+            var r = orgA.Records[1];
+            var (op, rows) = await PrepareWithRowsAsync(lb, r);
+            var held = lb.Faults.BlockAt(FaultNames.CrashAfterContentHeadCommit + ":before");
+            var commit = Task.Run(() => CommitAsync(lb, r, op, rows));
+            await held.Reached.WaitAsync(TimeSpan.FromSeconds(20));
+            var migration = await ExecFileAsync(adminCs, "carv_up.sql", lockTimeout: "2s", application: "carv-migration");
+            var columns = await CountAsync("SELECT count(*) FROM information_schema.columns WHERE table_schema='authority' AND table_name='content_change_operations' AND column_name LIKE '%acceptance_rule_version'");
+            Record("MG-01", "migration while a legacy commit transaction holds the table: lock timeout, nothing applied", "SQLSTATE 55P03; 0 new columns", $"{migration}; columns={columns}", migration.StartsWith("55P03", StringComparison.Ordinal) && columns == 0);
+            held.Release.Release();
+            var outcome = await Outcome(commit);
+            Record("MG-01b", "the held legacy commit then completes", "Committed", outcome, outcome == "OK");
+        }
+
+        // MG-02: a legacy Prepare transaction is open when the migration starts (long lock timeout): the migration waits, the
+        // legacy Prepare completes first, then the migration applies. Linearized: the Prepare is before the migration.
+        Prepared mg02;
+        {
+            var r = orgA.Records[2];
+            var gate = lb.Mac.BlockNextSign();
+            var prepare = Task.Run(() => PrepareWithRowsAsync(lb, r));
+            await gate.Reached.WaitAsync(TimeSpan.FromSeconds(20));
+            var migration = Task.Run(() => ExecFileAsync(adminCs, "carv_up.sql", lockTimeout: "30s", application: "carv-migration"));
+            var waited = await WaitForLockWaitAsync("carv-migration");
+            gate.Release.Release();
+            var prepared = await prepare;
+            var migrated = await migration;
+            mg02 = new Prepared(r, prepared.Prepared, prepared.Rows);
+            Record("MG-02", "migration waits for an open legacy Prepare, then applies", "migration waited on a lock; Prepare OK; migration OK", $"waited={waited}; migration={migrated}", waited && migrated == "OK");
+        }
+
+        Record("MG-03", "every existing row satisfies the new constraints (validated by ADD CONSTRAINT) and carries no stamp",
+            "all stamps NULL", await OpsSummaryAsync(), await CountAsync("SELECT count(*) FROM authority.content_change_operations WHERE prepare_acceptance_rule_version IS NOT NULL OR commit_acceptance_rule_version IS NOT NULL") == 0);
+
+        // MG-04: the unmodified legacy binary keeps working after the migration (its EF model does not map the new columns).
+        {
+            var commit = await Outcome(CommitAsync(lb, mg02.Record, mg02.Op, mg02.Rows));
+            var write = await Outcome(WriteAsync(lb, orgA.Records[0]));
+            var stamps = await ScalarAsync(adminCs, $"SELECT coalesce(prepare_acceptance_rule_version::text,'NULL')||'/'||coalesce(commit_acceptance_rule_version::text,'NULL')||' '||operation_state_name FROM authority.content_change_operations WHERE content_change_operation_id='{mg02.Op.OperationId}'");
+            Record("MG-04", "legacy Prepare (before the migration) + legacy Commit (after) and a full legacy write succeed; stamps stay NULL", "OK, OK, NULL/NULL Committed", $"{commit}, {write}, {stamps}", commit == "OK" && write == "OK" && stamps == "NULL/NULL Committed");
+        }
+
+        {
+            var before = await SnapshotAsync(orgA, orgA.Records[0]);
+            var replay = await Outcome(lb.Service.CommitAsync(Actor(orgA), orgA.Records[0].LastOperation!.Value, new CommitContentChangeRequest(orgA.Id, orgA.Records[0].Id, orgA.Records[0].AcceptedStaged()), Guid.CreateVersion7(), CancellationToken.None));
+            var after = await SnapshotAsync(orgA, orgA.Records[0]);
+            Record("MG-05", "legacy Commit replay of a historical (unstamped) Committed operation returns the head and writes nothing", "OK; snapshot unchanged", $"{replay}; {Diff(before, after)}", replay == "OK" && before == after);
+        }
+
+        // MG-06: the guarded Down refuses while stamped work is in flight (checked later); without it, Down and Up round-trip.
+        {
+            var down = await ExecFileAsync(adminCs, "carv_down.sql", application: "carv-down");
+            var up = await ExecFileAsync(adminCs, "carv_up.sql", application: "carv-migration");
+            Record("MG-06", "guarded Down then Up round-trip with no floor and no stamped Prepared rows", "OK, OK", $"{down}, {up}", down == "OK" && up == "OK");
+        }
+
+        // MG-07: direct runtime-role SQL cannot forge or move the CARV metadata.
+        {
+            var opId = (await PrepareAsync(lb, orgA.Records[4])).Op.OperationId;
+            var stamp = await ExecAsync(runtimeCs, $"UPDATE authority.content_change_operations SET prepare_acceptance_rule_version = 1 WHERE content_change_operation_id = '{opId}'");
+            var commitStampOnPrepared = await ExecAsync(runtimeCs, $"UPDATE authority.content_change_operations SET commit_acceptance_rule_version = 1 WHERE content_change_operation_id = '{opId}'");
+            var forgedCommitted = await ExecAsync(runtimeCs, $"UPDATE authority.content_change_operations SET operation_state_name = 'Committed', commit_acceptance_rule_version = 1 WHERE content_change_operation_id = '{opId}'");
+            var committedId = orgA.Records[0].LastOperation!.Value;
+            var reopen = await ExecAsync(runtimeCs, $"UPDATE authority.content_change_operations SET operation_state_name = 'Prepared' WHERE content_change_operation_id = '{committedId}'");
+            Record("MG-07a", "runtime role cannot add a Prepare stamp to a legacy-prepared operation", "23514 trg_content_operation_rule_state_guard", stamp, stamp.Contains("trg_content_operation_rule_state_guard", StringComparison.Ordinal));
+            Record("MG-07b", "runtime role cannot put a commit stamp on a Prepared row", "23514 ck_content_operation_commit_rule_version", commitStampOnPrepared, commitStampOnPrepared.Contains("ck_content_operation_commit_rule_version", StringComparison.Ordinal));
+            Record("MG-07c", "runtime role cannot mark an unstamped Prepare as a CARV commit", "23514 ck_content_operation_commit_rule_version", forgedCommitted, forgedCommitted.Contains("ck_content_operation_commit_rule_version", StringComparison.Ordinal));
+            Record("MG-07d", "a Committed (terminal) operation cannot be changed", "23514 trg_content_operation_rule_state_guard", reopen, reopen.Contains("trg_content_operation_rule_state_guard", StringComparison.Ordinal));
+            var directInsert = await ExecAsync(runtimeCs, $"INSERT INTO authority.content_change_operations (content_change_operation_id, organization_id, form_record_id, actor_identity_binding_id, operation_idempotency_key, operation_request_digest, expected_authorization_revision, expected_content_revision, candidate_content_revision, candidate_key_version, candidate_manifest_root, candidate_leaf_index_digest, candidate_leaf_count, operation_state_name, correlation_identifier, operation_created_on, operation_expires_on) SELECT '{Guid.CreateVersion7()}', organization_id, form_record_id, actor_identity_binding_id, 'forged-'||gen_random_uuid(), operation_request_digest, expected_authorization_revision, expected_content_revision, candidate_content_revision, candidate_key_version, candidate_manifest_root, candidate_leaf_index_digest, candidate_leaf_count, 'Committed', correlation_identifier, now(), now() FROM authority.content_change_operations WHERE content_change_operation_id = '{opId}'");
+            Record("MG-07e", "an operation cannot be inserted directly as Committed", "23514 trg_content_operation_rule_state_guard", directInsert, directInsert.Contains("trg_content_operation_rule_state_guard", StringComparison.Ordinal));
+        }
+
+        // ---------- P2: mixed builds before the floor (test-only CARV-build emulation installed)
+        Record("SETUP-EMU", "test-only CARV build emulation installed", "OK", await ExecFileAsync(adminCs, "emulation.sql", application: "carv-test-setup"), true);
+        var ce = Instance("CE", runtimeCs + ";Options=-c carv.emulate_version=1");
+
+        // MX-01: CARV Prepare -> legacy Commit: refused by the database, nothing advances; the CARV commit then completes.
+        {
+            var r = orgA.Records[0];
+            var (op, rows) = await PrepareWithRowsAsync(ce, r);
+            var stamp = await StampsAsync(op.OperationId);
+            var before = await SnapshotAsync(orgA, r);
+            var legacy = await Outcome(CommitAsync(lb, r, op, rows));
+            var legacyAgain = await Outcome(CommitAsync(lb, r, op, rows));
+            var after = await SnapshotAsync(orgA, r);
+            var mapped = await HostMappingAsync(lb, r, op, rows);
+            Record("MX-01a", "CARV-prepared operation stamped at Prepare", "1/NULL Prepared", stamp, stamp == "1/NULL Prepared");
+            Record("MX-01b", "legacy binary cannot commit a CARV-prepared operation; retry identical", "23514 ck_content_operation_commit_rule_version (twice)", $"{legacy} | {legacyAgain}", legacy.Contains("ck_content_operation_commit_rule_version", StringComparison.Ordinal) && legacyAgain == legacy);
+            Record("MX-01c", "no head, manifest, leaf, identity, checkpoint or journal advance; operation still Prepared", "snapshot unchanged", Diff(before, after) + "; " + await StampsAsync(op.OperationId), before == after && (await StampsAsync(op.OperationId)) == "1/NULL Prepared");
+            Record("MX-01d", "legacy host classification of that refusal (actual AuthorityExceptionHandler of the old binary)", "503 AUTHORITY_NOT_READY retryable (fail closed, transient class)", mapped, mapped.StartsWith("503", StringComparison.Ordinal));
+            var carv = await Outcome(CommitAsync(ce, r, op, rows));
+            Record("MX-01e", "the same CARV-prepared operation commits through a CARV commit", "OK; 1/1 Committed", $"{carv}; {await StampsAsync(op.OperationId)}", carv == "OK" && (await StampsAsync(op.OperationId)) == "1/1 Committed");
+        }
+
+        // MX-02: legacy Prepare -> CARV Commit: refused by the database even if the CARV application rule were missing.
+        {
+            var r = orgA.Records[0];
+            var (op, rows) = await PrepareWithRowsAsync(lb, r);
+            var before = await SnapshotAsync(orgA, r);
+            var carv = await Outcome(CommitAsync(ce, r, op, rows));
+            var after = await SnapshotAsync(orgA, r);
+            Record("MX-02a", "CARV commit of a legacy-prepared (unstamped) operation is refused by the database", "23514 ck_content_operation_commit_rule_version", carv, carv.Contains("ck_content_operation_commit_rule_version", StringComparison.Ordinal));
+            Record("MX-02b", "nothing advances", "snapshot unchanged", Diff(before, after), before == after);
+            var expired = await Outcome(CommitAsync(lbLate, r, op, rows));
+            Record("MX-02c", "after the lifetime, the legacy binary aborts it with a classified, recoverable error", "AuthorityException OPERATION_EXPIRED 409; Aborted NULL/NULL", $"{expired}; {await StampsAsync(op.OperationId)}", expired.Contains("OPERATION_EXPIRED", StringComparison.Ordinal) && (await StampsAsync(op.OperationId)) == "NULL/NULL Aborted");
+            var fresh = await Outcome(WriteAsync(ce, r));
+            Record("MX-02d", "recovery: a fresh operation (new idempotency key) completes", "OK", fresh, fresh == "OK");
+        }
+
+        // MX-03: several CARV instances, two organizations, concurrent Prepare/Commit on shared records.
+        {
+            var result = await ConcurrentCarvAsync(6, 4, [orgA.Records[5], orgA.Records[6], orgB.Records[0], orgB.Records[1]], "1");
+            Record("MX-03", "6 concurrent CARV instances x 4 rounds on 4 records in 2 organizations", "only OK or CONTENT_REVISION_CONFLICT; no CARV refusal; every commit 1/1",
+                result.Summary, result.Unexpected == 0 && result.Ok > 0 && await CountAsync("SELECT count(*) FROM authority.content_change_operations WHERE operation_state_name='Committed' AND prepare_acceptance_rule_version IS NOT NULL AND commit_acceptance_rule_version IS DISTINCT FROM prepare_acceptance_rule_version") == 0);
+        }
+
+        // ---------- P3: the floor transition and its serialization point (ACCESS EXCLUSIVE on content_change_operations)
+        // FL-01: a legacy COMMIT transaction is open when the floor starts: the floor waits; the commit is linearized before it.
+        {
+            var r = orgA.Records[1];
+            var (op, rows) = await PrepareWithRowsAsync(lb, r);
+            var held = lb.Faults.BlockAt(FaultNames.CrashAfterContentHeadCommit + ":before");
+            var commit = Task.Run(() => CommitAsync(lb, r, op, rows));
+            await held.Reached.WaitAsync(TimeSpan.FromSeconds(20));
+            var floor = Task.Run(() => ExecFileAsync(adminCs, "floor_v1.sql", lockTimeout: "30s", application: "carv-floor"));
+            var waited = await WaitForLockWaitAsync("carv-floor");
+            held.Release.Release();
+            var committed = await Outcome(commit);
+            var floored = await floor;
+            Record("FL-01", "legacy commit in flight when the floor starts: floor waits, commit completes first, then the floor applies", "waited; OK; OK; NULL/NULL Committed", $"waited={waited}; commit={committed}; floor={floored}; {await StampsAsync(op.OperationId)}", waited && committed == "OK" && floored == "OK" && (await StampsAsync(op.OperationId)) == "NULL/NULL Committed");
+            await ResetFloorAsync();
+        }
+
+        // FL-02: a legacy PREPARE transaction began before the floor and completes after it: its row is pre-floor and can
+        // never be committed (by either build) once the floor exists.
+        {
+            var r = orgA.Records[1];
+            var gate = lb.Mac.BlockNextSign();
+            var prepare = Task.Run(() => PrepareWithRowsAsync(lb, r));
+            await gate.Reached.WaitAsync(TimeSpan.FromSeconds(20));
+            var floor = Task.Run(() => ExecFileAsync(adminCs, "floor_v1.sql", lockTimeout: "30s", application: "carv-floor"));
+            var waited = await WaitForLockWaitAsync("carv-floor");
+            gate.Release.Release();
+            var (op, rows) = await prepare;
+            var floored = await floor;
+            var before = await SnapshotAsync(orgA, r);
+            var legacy = await Outcome(CommitAsync(lb, r, op, rows));
+            var carv = await Outcome(CommitAsync(ce, r, op, rows));
+            var after = await SnapshotAsync(orgA, r);
+            Record("FL-02a", "legacy Prepare spanning the floor start completes before the floor (its insert precedes the ACCESS EXCLUSIVE lock)", "waited; floor OK; NULL/NULL Prepared", $"waited={waited}; floor={floored}; {await StampsAsync(op.OperationId)}", waited && floored == "OK" && (await StampsAsync(op.OperationId)) == "NULL/NULL Prepared");
+            Record("FL-02b", "after the floor, the legacy binary cannot commit it", "23514 ck_content_operation_rule_floor_v1", legacy, legacy.Contains("ck_content_operation_rule_floor_v1", StringComparison.Ordinal));
+            Record("FL-02c", "after the floor, a CARV commit cannot commit it either", "23514 (commit rule version)", carv, carv.Contains("23514", StringComparison.Ordinal));
+            Record("FL-02d", "nothing advances", "snapshot unchanged", Diff(before, after), before == after);
+            var expired = await Outcome(CommitAsync(lbLate, r, op, rows));
+            Record("FL-02e", "it can still be aborted after expiry (Prepared -> Aborted is unrestricted by the floor)", "OPERATION_EXPIRED; NULL/NULL Aborted", $"{expired}; {await StampsAsync(op.OperationId)}", expired.Contains("OPERATION_EXPIRED", StringComparison.Ordinal) && (await StampsAsync(op.OperationId)) == "NULL/NULL Aborted");
+            await ResetFloorAsync();
+        }
+
+        // FL-03: the floor transaction holds ACCESS EXCLUSIVE; a legacy PREPARE starts, blocks, and is refused when the floor commits.
+        {
+            var r = orgA.Records[1];
+            var opsBefore = await CountAsync("SELECT count(*) FROM authority.content_change_operations");
+            await using var floorTx = await HoldFloorAsync();
+            var prepare = Task.Run(() => PrepareWithRowsAsync(lb, r));
+            var waited = await WaitForLockWaitAsync("carv-runtime-LB");
+            await floorTx.CommitAsync();
+            var outcome = await Outcome(prepare);
+            var opsAfter = await CountAsync("SELECT count(*) FROM authority.content_change_operations");
+            var leaves = await CountAsync("SELECT count(*) FROM authority.content_candidate_leaves l WHERE NOT EXISTS (SELECT 1 FROM authority.content_change_operations o WHERE o.content_change_operation_id = l.content_change_operation_id)");
+            Record("FL-03", "legacy Prepare starting during the floor transaction blocks, then is refused; nothing persisted", "waited; 23514 ck_content_operation_rule_floor_v1; no new operation or leaf", $"waited={waited}; {outcome}; ops {opsBefore}->{opsAfter}; orphan leaves {leaves}", waited && outcome.Contains("ck_content_operation_rule_floor_v1", StringComparison.Ordinal) && opsBefore == opsAfter && leaves == 0);
+            await ResetFloorAsync();
+        }
+
+        // FL-04: a legacy COMMIT starts while the floor transaction holds the lock; refused when the floor commits.
+        {
+            var r = orgA.Records[1];
+            var (op, rows) = await PrepareWithRowsAsync(lb, r);
+            var before = await SnapshotAsync(orgA, r);
+            await using var floorTx = await HoldFloorAsync();
+            var commit = Task.Run(() => CommitAsync(lb, r, op, rows));
+            var waited = await WaitForLockWaitAsync("carv-runtime-LB");
+            await floorTx.CommitAsync();
+            var outcome = await Outcome(commit);
+            var after = await SnapshotAsync(orgA, r);
+            Record("FL-04", "legacy Commit starting during the floor transaction blocks, then is refused; nothing advances", "waited; 23514 ck_content_operation_rule_floor_v1; snapshot unchanged", $"waited={waited}; {outcome}; {Diff(before, after)}", waited && outcome.Contains("ck_content_operation_rule_floor_v1", StringComparison.Ordinal) && before == after);
+            await ResetFloorAsync();
+        }
+
+        // FL-05: CARV instances keep writing concurrently while the floor is applied (held 1.5 s): they wait, then succeed.
+        {
+            var cts = new CancellationTokenSource();
+            var work = ConcurrentCarvAsync(4, 6, [orgA.Records[5], orgA.Records[6], orgB.Records[0], orgB.Records[1]], "1");
+            await Task.Delay(300);
+            await using (var floorTx = await HoldFloorAsync())
+            {
+                await Task.Delay(1500);
+                await floorTx.CommitAsync();
+            }
+
+            var result = await work;
+            Record("FL-05", "4 concurrent CARV instances during the floor transition", "only OK or CONTENT_REVISION_CONFLICT; floor installed", result.Summary + "; floors=" + await ScalarAsync(adminCs, FloorQuery),
+                result.Unexpected == 0 && result.Ok > 0 && await ScalarAsync(adminCs, FloorQuery) == "1");
+        }
+
+        // FL-06: a floor raise with a short lock timeout while a CARV commit transaction is open fails cleanly; floor unchanged.
+        {
+            var r = orgA.Records[0];
+            var (op, rows) = await PrepareWithRowsAsync(ce, r);
+            var held = ce.Faults.BlockAt(FaultNames.CrashAfterContentHeadCommit + ":before");
+            var commit = Task.Run(() => CommitAsync(ce, r, op, rows));
+            await held.Reached.WaitAsync(TimeSpan.FromSeconds(20));
+            var raise = await ExecFileAsync(adminCs, "floor_v2.sql", lockTimeout: "2s", application: "carv-floor");
+            held.Release.Release();
+            var committed = await Outcome(commit);
+            Record("FL-06", "floor raise blocked by an open transaction times out and changes nothing; the commit completes", "55P03; floor still 1; OK", $"{raise}; floor={await ScalarAsync(adminCs, FloorQuery)}; {committed}", raise.StartsWith("55P03", StringComparison.Ordinal) && await ScalarAsync(adminCs, FloorQuery) == "1" && committed == "OK");
+        }
+
+        // ---------- P4: after the floor
+        {
+            var r = orgA.Records[0];
+            var opsBefore = await CountAsync("SELECT count(*) FROM authority.content_change_operations");
+            var legacy = await Outcome(PrepareWithRowsAsync(lb, r));
+            var mapped = await HostMappingForPrepareAsync(lb, r);
+            Record("PF-01", "legacy Prepare after the floor is refused; nothing persisted", "23514 ck_content_operation_rule_floor_v1; no new operation", $"{legacy}; ops {opsBefore}->{await CountAsync("SELECT count(*) FROM authority.content_change_operations")}", legacy.Contains("ck_content_operation_rule_floor_v1", StringComparison.Ordinal) && opsBefore == await CountAsync("SELECT count(*) FROM authority.content_change_operations"));
+            Record("PF-01b", "legacy host classification of that refusal", "503 AUTHORITY_NOT_READY retryable", mapped, mapped.StartsWith("503", StringComparison.Ordinal));
+
+            var x0Record = orgA.Records[3];
+            var before = await SnapshotAsync(orgA, x0Record);
+            var x0Legacy = await Outcome(CommitAsync(lb, x0Record, x0.Op, x0.Rows));
+            var x0Carv = await Outcome(CommitAsync(ce, x0Record, x0.Op, x0.Rows));
+            var after = await SnapshotAsync(orgA, x0Record);
+            Record("PF-02", "an operation prepared before the migration cannot be committed after the floor by either build", "both 23514; snapshot unchanged", $"{x0Legacy} | {x0Carv} | {Diff(before, after)}", x0Legacy.Contains("ck_content_operation_rule_floor_v1", StringComparison.Ordinal) && x0Carv.Contains("23514", StringComparison.Ordinal) && before == after);
+
+            var carv = await Outcome(WriteAsync(ce, r));
+            Record("PF-03", "a CARV-build write after the floor succeeds", "OK", carv, carv == "OK");
+
+            var drop = await ExecAsync(runtimeCs, "ALTER TABLE authority.content_change_operations DROP CONSTRAINT ck_content_operation_rule_floor_v1");
+            var disable = await ExecAsync(runtimeCs, "ALTER TABLE authority.content_change_operations DISABLE TRIGGER trg_content_operation_rule_state_guard");
+            var dropTrigger = await ExecAsync(runtimeCs, "DROP TRIGGER trg_content_operation_rule_state_guard ON authority.content_change_operations");
+            var replication = await ExecAsync(runtimeCs, "SET session_replication_role = replica");
+            Record("PF-04", "the runtime role cannot drop the floor, disable or drop the guard, or switch off triggers", "42501 x4", $"{drop} | {disable} | {dropTrigger} | {replication}", new[] { drop, disable, dropTrigger, replication }.All(e => e.StartsWith("42501", StringComparison.Ordinal)));
+
+            var floorAsRuntime = await ScalarAsync(runtimeCs, FloorQuery);
+            Record("PF-05", "the runtime role can read the installed floor (startup and readiness guard query)", "1", floorAsRuntime, floorAsRuntime == "1");
+
+            var down = await ExecFileAsync(adminCs, "carv_down.sql", application: "carv-down");
+            Record("PF-06", "the guarded Down refuses once a floor exists", "refused (floors are never lowered)", down, down.Contains("floors are never lowered", StringComparison.Ordinal));
+
+            var validate = await ExecAsync(adminCs, "ALTER TABLE authority.content_change_operations VALIDATE CONSTRAINT ck_content_operation_rule_floor_v1");
+            Record("PF-07", "the floor stays NOT VALID by design: historical unstamped rows would fail VALIDATE", "23514 on VALIDATE (expected)", validate, validate.StartsWith("23514", StringComparison.Ordinal));
+
+            var raise = await ExecFileAsync(adminCs, "floor_v2.sql", lockTimeout: "5s", application: "carv-floor");
+            var v1After = await Outcome(WriteAsync(ce, r));
+            var ce2 = Instance("CE2", runtimeCs + ";Options=-c carv.emulate_version=2");
+            var v2After = await Outcome(WriteAsync(ce2, r));
+            Record("PF-08", "an atomic floor raise to 2 refuses rule-version-1 builds and admits version-2 builds", "OK; 23514 floor_v2; OK; floor=2", $"{raise}; {v1After}; {v2After}; floor={await ScalarAsync(adminCs, FloorQuery)}", raise == "OK" && v1After.Contains("ck_content_operation_rule_floor_v2", StringComparison.Ordinal) && v2After == "OK" && await ScalarAsync(adminCs, FloorQuery) == "2");
+        }
+
+        Record("FINAL", "final operation table summary", "informational", await OpsSummaryAsync(), true);
+    }
+
+    // ------------------------------------------------------------------------------------------------ model
+    private sealed record Check(string Id, string Description, string Expected, string Observed, bool Pass);
+
+    private sealed record Prepared(RecordModel Record, PreparedContentOperation Op, List<Staged> Rows);
+
+    private sealed class Org(Guid id, Guid owner, string label)
+    {
+        public Guid Id { get; } = id;
+        public Guid Owner { get; } = owner;
+        public string Label { get; } = label;
+        public List<RecordModel> Records { get; } = [];
+    }
+
+    private sealed class RecordModel(Org org, Guid id)
+    {
+        public Org Org { get; } = org;
+        public Guid Id { get; } = id;
+        public Guid TextField { get; } = Guid.CreateVersion7();
+        public Guid TextItem { get; } = Guid.CreateVersion7();
+        public Guid SealedField { get; } = Guid.CreateVersion7();
+        public Guid SealedItem { get; } = Guid.CreateVersion7();
+        public List<(Staged Row, byte[] Signature)> Accepted { get; set; } = [];
+        public Guid? LastOperation { get; set; }
+        public SemaphoreSlim Lock { get; } = new(1, 1);
+        private int writes;
+
+        public int NextSeed() => Interlocked.Increment(ref writes) % 200 + 10;
+
+        public List<StagedContentItem> AcceptedStaged() => Accepted.Select(a => new StagedContentItem(a.Row.Kind, a.Row.ItemId, a.Row.Base64, Convert.ToBase64String(a.Signature))).ToList();
+    }
+
+    private sealed record AuthorityNode(string Name, ContentService Service, GatedFaults Faults, GatedMac Mac);
+
+    private AuthorityNode Instance(string name, string connectionString, TimeSpan? clockOffset = null)
+    {
+        var cs = new NpgsqlConnectionStringBuilder(connectionString) { ApplicationName = "carv-runtime-" + name }.ConnectionString;
+        var options = new DbContextOptionsBuilder<AuthorityDbContext>().UseNpgsql(cs, n => n.MigrationsHistoryTable("ef_migrations_history", AuthorityDbContext.SchemaName)).Options;
+        var store = new AuthorityStore(new Factory(options));
+        var clock = new OffsetClock(clockOffset ?? TimeSpan.Zero);
+        var faults = new GatedFaults();
+        var gatedMac = new GatedMac(mac);
+        var verifier = new ProjectionIntegrityVerifier(store, ThrowingProxy.Create<ISpiceDbProjection>(), new ProjectionMarkerTransitionState(), new NoAlerts(), new ProjectionIntegrityMetrics(), clock);
+        var service = new ContentService(store, gatedMac, verifier, faults, clock, new ShareContributorWriteSwitch(false, false));
+        return new AuthorityNode(name, service, faults, gatedMac);
+    }
+
+    private async Task<Org> SeedOrgAsync(string label, int records)
+    {
+        var org = new Org(Guid.CreateVersion7(), Guid.CreateVersion7(), label);
+        var keyName = "carv-key-" + org.Id.ToString("N");
+        await mac.ProvisionKeyAsync(org.Id, IntegrityKeyPurposes.RowIntegrityV1, keyName, CancellationToken.None);
+        var seedCs = new NpgsqlConnectionStringBuilder(adminCs) { Options = "-c session_replication_role=replica", ApplicationName = "carv-seed" }.ConnectionString;
+        await using var context = new AuthorityDbContext(new DbContextOptionsBuilder<AuthorityDbContext>().UseNpgsql(seedCs).Options);
+        var now = DateTimeOffset.UtcNow;
+        context.OrganizationStates.Add(new OrganizationAuthorizationState { OrganizationAuthorizationStateId = Guid.CreateVersion7(), OrganizationId = org.Id, OrganizationDisplayName = "CARV " + label, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous, StateModifiedOn = now });
+        context.IdentityBindings.Add(new IdentityBinding { IdentityBindingId = Guid.CreateVersion7(), OrganizationId = org.Id, AuthorityUserId = org.Owner, IdentityIssuerUri = Issuer, IdentitySubjectIdentifier = org.Owner.ToString("D"), IdentityBindingEnabled = true, IdentityCreatedOn = now });
+        context.KeyRegistrations.Add(new IntegrityKeyRegistration { IntegrityKeyRegistrationId = Guid.CreateVersion7(), OrganizationId = org.Id, ProviderName = "LocalDevelopment", ProviderKeyName = keyName, CurrentSigningKeyVersion = 1, MinimumVerificationKeyVersion = 1, KeyRegisteredOn = now, KeyModifiedOn = now });
+        for (var i = 0; i < records; i++)
+        {
+            var record = new RecordModel(org, Guid.CreateVersion7());
+            org.Records.Add(record);
+            context.Resources.Add(new AuthorityResource { AuthorityResourceId = Guid.CreateVersion7(), OrganizationId = org.Id, ResourceTypeName = ResourceTypeNames.FormRecord, ResourceEntityId = record.Id, ParentResourceEntityId = Fixtures.Form, RegisteredBySecurityCommandId = Guid.CreateVersion7(), ResourceRegisteredOn = now });
+            context.ContentHeads.Add(new RecordContentHead { RecordContentHeadId = Guid.CreateVersion7(), OrganizationId = org.Id, FormRecordId = record.Id, CommittedManifestRoot = MerkleManifestV1.EmptyRoot(), SignatureKeyVersion = 1, ContentHeadModifiedOn = now });
+            context.RelationshipEdges.Add(new AuthorityRelationshipEdge { AuthorityRelationshipEdgeId = Guid.CreateVersion7(), OrganizationId = org.Id, ResourceTypeName = ResourceTypeNames.FormRecord, ResourceEntityId = record.Id, RelationshipName = "owner", SubjectTypeName = ResourceTypeNames.User, SubjectEntityId = org.Owner, SubjectRelationName = string.Empty, CreatedBySecurityCommandId = Guid.CreateVersion7(), RelationshipCreatedOn = now });
+        }
+
+        await context.SaveChangesAsync();
+        orgs[org.Id] = org;
+        return org;
+    }
+
+    // ------------------------------------------------------------------------------------------------ protocol drivers
+    private static VerifiedActor Actor(Org org) => new(Issuer, org.Owner.ToString("D"), "carv-harness");
+
+    private List<Fixtures.Row> RowsFor(RecordModel record)
+    {
+        var seed = (byte)record.NextSeed();
+        return
+        [
+            Fixtures.Header(record.Org.Id, record.Id),
+            Fixtures.Text(record.Org.Id, record.Id, record.TextField, record.TextItem, "value-" + seed),
+            Fixtures.Sealed(record.Org.Id, record.Id, record.SealedField, record.SealedItem, seed),
+        ];
+    }
+
+    private async Task<(PreparedContentOperation Prepared, List<Staged> Rows)> PrepareWithRowsAsync(AuthorityNode instance, RecordModel record)
+    {
+        // The head and the accepted rows are read together under the record lock (the business reads one verified snapshot).
+        (long Revision, byte[] Root) head;
+        List<StagedContentItem>? current;
+        await record.Lock.WaitAsync();
+        try
+        {
+            head = await HeadAsync(record);
+            current = record.Accepted.Count == 0 ? null : record.AcceptedStaged();
+        }
+        finally
+        {
+            record.Lock.Release();
+        }
+
+        var operation = Guid.CreateVersion7();
+        var rows = RowsFor(record).Select(r => Fixtures.Encode(r, record.Org.Id, operation, head.Revision + 1)).ToList();
+        var request = new PrepareContentChangeRequest(record.Org.Id, record.Id, operation, 7, head.Revision, Convert.ToBase64String(head.Root),
+            rows.Select(c => new CandidateContentItem(c.Kind, c.ItemId, c.Base64)).ToList(), CurrentItems: current);
+        var prepared = await instance.Service.PrepareAsync(Actor(record.Org), request, "carv-" + operation.ToString("N"), Guid.CreateVersion7(), CancellationToken.None);
+        return (prepared, rows);
+    }
+
+    private async Task<Prepared> PrepareAsync(AuthorityNode instance, RecordModel record)
+    {
+        var (prepared, rows) = await PrepareWithRowsAsync(instance, record);
+        return new Prepared(record, prepared, rows);
+    }
+
+    private static async Task CommitAsync(AuthorityNode instance, RecordModel record, PreparedContentOperation prepared, List<Staged> rows)
+    {
+        var signatures = prepared.SignedItems.ToDictionary(s => (s.ItemKind, s.ItemId), s => Convert.FromBase64String(s.RowSignatureBase64));
+        var staged = rows.Select(c => new StagedContentItem(c.Kind, c.ItemId, c.Base64, Convert.ToBase64String(signatures[(c.Kind, c.ItemId)]))).ToList();
+        await instance.Service.CommitAsync(Actor(record.Org), prepared.OperationId, new CommitContentChangeRequest(record.Org.Id, record.Id, staged), Guid.CreateVersion7(), CancellationToken.None);
+        record.Accepted = rows.Select(c => (c, signatures[(c.Kind, c.ItemId)])).ToList();
+        record.LastOperation = prepared.OperationId;
+    }
+
+    private async Task WriteAsync(AuthorityNode instance, RecordModel record)
+    {
+        var (prepared, rows) = await PrepareWithRowsAsync(instance, record);
+        await CommitAsync(instance, record, prepared, rows);
+    }
+
+    private sealed record ConcurrentResult(int Ok, int Conflicts, int Unexpected, string Summary);
+
+    private async Task<ConcurrentResult> ConcurrentCarvAsync(int instances, int rounds, RecordModel[] records, string version)
+    {
+        var pool = Enumerable.Range(0, instances).Select(i => Instance($"CE-par{i}", runtimeCs + $";Options=-c carv.emulate_version={version}")).ToArray();
+        int ok = 0, conflicts = 0, unexpected = 0;
+        var unexpectedText = new ConcurrentBag<string>();
+        var stopwatch = Stopwatch.StartNew();
+        await Parallel.ForEachAsync(Enumerable.Range(0, instances), async (i, _) =>
+        {
+            for (var round = 0; round < rounds; round++)
+            {
+                var record = records[(i + round) % records.Length];
+                try
+                {
+                    // The business serializes nothing here: concurrent writers race on the head CAS, as in production.
+                    var (prepared, rows) = await PrepareWithRowsAsync(pool[i], record);
+                    await record.Lock.WaitAsync();
+                    try
+                    {
+                        await CommitAsync(pool[i], record, prepared, rows);
+                    }
+                    finally
+                    {
+                        record.Lock.Release();
+                    }
+
+                    Interlocked.Increment(ref ok);
+                }
+                catch (AuthorityException ex) when (ex.ErrorCode is AuthorityErrorCodes.ContentRevisionConflict or AuthorityErrorCodes.IdempotencyConflict)
+                {
+                    Interlocked.Increment(ref conflicts);
+                }
+                catch (Exception ex)
+                {
+                    Interlocked.Increment(ref unexpected);
+                    unexpectedText.Add(Describe(ex));
+                }
+            }
+        });
+        var summary = $"ok={ok}; conflicts={conflicts}; unexpected={unexpected}{(unexpected > 0 ? " [" + string.Join(" | ", unexpectedText.Take(3)) + "]" : string.Empty)}; {stopwatch.ElapsedMilliseconds} ms";
+        Log("concurrent: " + summary);
+        return new ConcurrentResult(ok, conflicts, unexpected, summary);
+    }
+
+    // ------------------------------------------------------------------------------------------------ evidence helpers
+    private const string FloorQuery = "SELECT coalesce(max(substring(conname FROM 'ck_content_operation_rule_floor_v([0-9]+)$')::int)::text, 'none') FROM pg_catalog.pg_constraint WHERE conrelid = 'authority.content_change_operations'::regclass";
+
+    private async Task<(long Revision, byte[] Root)> HeadAsync(RecordModel record)
+    {
+        await using var connection = new NpgsqlConnection(adminCs);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("SELECT committed_content_revision, committed_manifest_root FROM authority.record_content_heads WHERE organization_id = @o AND form_record_id = @r", connection);
+        command.Parameters.AddWithValue("o", record.Org.Id);
+        command.Parameters.AddWithValue("r", record.Id);
+        await using var reader = await command.ExecuteReaderAsync();
+        await reader.ReadAsync();
+        return (reader.GetInt64(0), (byte[])reader[1]);
+    }
+
+    private async Task<string> SnapshotAsync(Org org, RecordModel record) => await ScalarAsync(adminCs, $"""
+        SELECT concat_ws('; ',
+          'head='||(SELECT committed_content_revision||':'||encode(committed_manifest_root,'hex') FROM authority.record_content_heads WHERE form_record_id='{record.Id}'),
+          'commits='||(SELECT count(*) FROM authority.record_manifest_commits WHERE organization_id='{org.Id}'),
+          'leaves='||(SELECT count(*) FROM authority.record_manifest_leaves l JOIN authority.record_manifest_commits c ON c.record_manifest_commit_id=l.record_manifest_commit_id WHERE c.organization_id='{org.Id}'),
+          'identities='||(SELECT count(*) FROM authority.content_item_identities WHERE organization_id='{org.Id}'),
+          'checkpoints='||(SELECT count(*) FROM authority.content_integrity_checkpoints WHERE organization_id='{org.Id}'),
+          'journal='||(SELECT count(*) FROM authority.security_journal_entries WHERE organization_id='{org.Id}'),
+          'committedOps='||(SELECT count(*) FROM authority.content_change_operations WHERE organization_id='{org.Id}' AND operation_state_name='Committed'))
+        """);
+
+    private static string Diff(string before, string after) => before == after ? "unchanged (" + before + ")" : "CHANGED " + before + " -> " + after;
+
+    private async Task<string> StampsAsync(Guid operationId) => await ScalarAsync(adminCs, $"SELECT coalesce(prepare_acceptance_rule_version::text,'NULL')||'/'||coalesce(commit_acceptance_rule_version::text,'NULL')||' '||operation_state_name FROM authority.content_change_operations WHERE content_change_operation_id='{operationId}'");
+
+    private async Task<string> OpsSummaryAsync() => await ScalarAsync(adminCs, "SELECT coalesce(string_agg(s, ', ' ORDER BY s), 'none') FROM (SELECT operation_state_name||'='||count(*) AS s FROM authority.content_change_operations GROUP BY operation_state_name) q");
+
+    private async Task<long> CountAsync(string sql) => long.Parse(await ScalarAsync(adminCs, sql), System.Globalization.CultureInfo.InvariantCulture);
+
+    private static async Task<string> ScalarAsync(string cs, string sql)
+    {
+        await using var connection = new NpgsqlConnection(cs);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        return Convert.ToString(await command.ExecuteScalarAsync(), System.Globalization.CultureInfo.InvariantCulture) ?? "NULL";
+    }
+
+    /// <summary>Executes a statement; returns "OK" or "SQLSTATE constraint: message".</summary>
+    private static async Task<string> ExecAsync(string cs, string sql)
+    {
+        try
+        {
+            await using var connection = new NpgsqlConnection(cs);
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand(sql, connection);
+            await command.ExecuteNonQueryAsync();
+            return "OK";
+        }
+        catch (PostgresException ex)
+        {
+            return $"{ex.SqlState} {ex.ConstraintName}: {ex.MessageText}";
+        }
+    }
+
+    /// <summary>Runs one migration-style SQL file in a single transaction (as EF does), optionally with a lock timeout.</summary>
+    private async Task<string> ExecFileAsync(string cs, string file, string? lockTimeout = null, string application = "carv")
+    {
+        var sql = await File.ReadAllTextAsync(Path.Combine(sqlDir, file));
+        if (lockTimeout is not null)
+        {
+            sql = sql.Replace("SET LOCAL lock_timeout = '5s';", $"SET LOCAL lock_timeout = '{lockTimeout}';", StringComparison.Ordinal);
+        }
+
+        var builder = new NpgsqlConnectionStringBuilder(cs) { ApplicationName = application };
+        try
+        {
+            await using var connection = new NpgsqlConnection(builder.ConnectionString);
+            await connection.OpenAsync();
+            await using var tx = await connection.BeginTransactionAsync();
+            var started = Stopwatch.StartNew();
+            await using (var command = new NpgsqlCommand(sql, connection, tx))
+            {
+                await command.ExecuteNonQueryAsync();
+            }
+
+            await tx.CommitAsync();
+            Log($"{file} applied in {started.ElapsedMilliseconds} ms ({application})");
+            return "OK";
+        }
+        catch (PostgresException ex)
+        {
+            Log($"{file} failed: {ex.SqlState} {ex.MessageText}");
+            return $"{ex.SqlState} {ex.ConstraintName}: {ex.MessageText}";
+        }
+    }
+
+    /// <summary>Begins the floor migration and returns with its ACCESS EXCLUSIVE lock held (the transaction is still open).</summary>
+    private async Task<NpgsqlTransaction> HoldFloorAsync()
+    {
+        var connection = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(adminCs) { ApplicationName = "carv-floor" }.ConnectionString);
+        await connection.OpenAsync();
+        var tx = await connection.BeginTransactionAsync();
+        await using var command = new NpgsqlCommand(await File.ReadAllTextAsync(Path.Combine(sqlDir, "floor_v1.sql")), connection, tx);
+        await command.ExecuteNonQueryAsync();
+        var mode = await ScalarAsync(adminCs, "SELECT string_agg(l.mode, ',') FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid WHERE a.application_name = 'carv-floor' AND l.relation = 'authority.content_change_operations'::regclass AND l.granted");
+        Log("floor transaction holds: " + mode);
+        Record("LOCK", "the floor migration holds ACCESS EXCLUSIVE on content_change_operations while open", "AccessExclusiveLock", mode, mode.Contains("AccessExclusiveLock", StringComparison.Ordinal));
+        return tx;
+    }
+
+    private async Task ResetFloorAsync()
+    {
+        // TEST-ONLY reset between serialization scenarios (superuser in the disposable database); production never lowers a floor.
+        var result = await ExecAsync(adminCs, "ALTER TABLE authority.content_change_operations DROP CONSTRAINT IF EXISTS ck_content_operation_rule_floor_v1");
+        Log("test-only floor reset: " + result);
+    }
+
+    private async Task<bool> WaitForLockWaitAsync(string application)
+    {
+        for (var i = 0; i < 200; i++)
+        {
+            var waiting = await CountAsync($"SELECT count(*) FROM pg_stat_activity WHERE application_name = '{application}' AND wait_event_type = 'Lock'");
+            if (waiting > 0)
+            {
+                Log($"{application} observed waiting on a lock");
+                return true;
+            }
+
+            await Task.Delay(50);
+        }
+
+        return false;
+    }
+
+    private async Task<string> Outcome(Task task)
+    {
+        try
+        {
+            await task;
+            return "OK";
+        }
+        catch (Exception ex)
+        {
+            return Describe(ex);
+        }
+    }
+
+    private async Task<string> Outcome<T>(Task<T> task)
+    {
+        try
+        {
+            await task;
+            return "OK";
+        }
+        catch (Exception ex)
+        {
+            return Describe(ex);
+        }
+    }
+
+    /// <summary>The old binary's own HTTP error mapping for the exception the commit raised (actual AuthorityExceptionHandler).</summary>
+    private async Task<string> HostMappingAsync(AuthorityNode instance, RecordModel record, PreparedContentOperation prepared, List<Staged> rows)
+    {
+        try
+        {
+            await CommitAsync(instance, record, prepared, rows);
+            return "no exception";
+        }
+        catch (Exception ex)
+        {
+            return await MapAsync(ex);
+        }
+    }
+
+    private async Task<string> HostMappingForPrepareAsync(AuthorityNode instance, RecordModel record)
+    {
+        try
+        {
+            await PrepareWithRowsAsync(instance, record);
+            return "no exception";
+        }
+        catch (Exception ex)
+        {
+            return await MapAsync(ex);
+        }
+    }
+
+    private static async Task<string> MapAsync(Exception ex)
+    {
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+        var handled = await new AuthorityExceptionHandler().TryHandleAsync(context, ex, CancellationToken.None);
+        context.Response.Body.Position = 0;
+        var body = await new StreamReader(context.Response.Body).ReadToEndAsync();
+        return handled ? $"{context.Response.StatusCode} {body}" : "unhandled (500 by the default pipeline)";
+    }
+
+    private static string Describe(Exception ex)
+    {
+        var parts = new List<string>();
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            parts.Add(e switch
+            {
+                PostgresException pg => $"PostgresException {pg.SqlState} {pg.ConstraintName}",
+                AuthorityException a => $"AuthorityException {a.ErrorCode} {a.HttpStatusCode} retryable={a.Retryable}",
+                _ => e.GetType().Name,
+            });
+        }
+
+        return string.Join(" <- ", parts);
+    }
+
+    private void Record(string id, string description, string expected, string observed, bool pass)
+    {
+        checks.Add(new Check(id, description, expected, observed, pass));
+        Log($"{(pass ? "PASS" : "FAIL")} {id}: {observed}");
+    }
+
+    private void Log(string line)
+    {
+        lock (log)
+        {
+            log.Add(DateTimeOffset.UtcNow.ToString("HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture) + " " + line);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------- ports and fixtures
+internal sealed class Factory(DbContextOptions<AuthorityDbContext> options) : IDbContextFactory<AuthorityDbContext>
+{
+    public AuthorityDbContext CreateDbContext() => new(options);
+}
+
+internal sealed class OffsetClock(TimeSpan offset) : TimeProvider
+{
+    public override DateTimeOffset GetUtcNow() => base.GetUtcNow().Add(offset);
+}
+
+internal sealed class NoAlerts : ISecurityAlertSink
+{
+    public void Raise(SecurityAlert alert)
+    {
+    }
+}
+
+internal sealed class Gate
+{
+    public SemaphoreSlim Reached { get; } = new(0);
+    public SemaphoreSlim Release { get; } = new(0);
+}
+
+/// <summary>The binary's fault port: blocks the calling transaction at a named point (inside Commit, after every check).</summary>
+internal sealed class GatedFaults : IFaultInjector
+{
+    private string? armed;
+    private Gate? gate;
+
+    public Gate BlockAt(string faultName)
+    {
+        var g = new Gate();
+        gate = g;
+        Volatile.Write(ref armed, faultName);
+        return g;
+    }
+
+    public void CrashIfArmed(string faultName)
+    {
+        if (Interlocked.CompareExchange(ref armed, null, faultName) == faultName && gate is { } g)
+        {
+            g.Reached.Release();
+            g.Release.Wait(TimeSpan.FromSeconds(60));
+        }
+    }
+}
+
+/// <summary>The binary's signing port wrapped: blocks inside the Prepare transaction (signing runs before SaveChanges).</summary>
+internal sealed class GatedMac(IIntegrityMacProvider inner) : IIntegrityMacProvider
+{
+    private Gate? next;
+
+    public string ProviderName => inner.ProviderName;
+
+    public Gate BlockNextSign()
+    {
+        var g = new Gate();
+        Volatile.Write(ref next, g);
+        return g;
+    }
+
+    public async Task<IntegrityMacResult> SignAsync(IntegrityKeyReference keyReference, ReadOnlyMemory<byte> canonicalPayload, CancellationToken cancellationToken)
+    {
+        if (Interlocked.Exchange(ref next, null) is { } g)
+        {
+            g.Reached.Release();
+            await g.Release.WaitAsync(TimeSpan.FromSeconds(60), cancellationToken);
+        }
+
+        return await inner.SignAsync(keyReference, canonicalPayload, cancellationToken);
+    }
+
+    public Task<bool> VerifyAsync(IntegrityKeyReference keyReference, ReadOnlyMemory<byte> canonicalPayload, ReadOnlyMemory<byte> expectedMac, CancellationToken cancellationToken) => inner.VerifyAsync(keyReference, canonicalPayload, expectedMac, cancellationToken);
+
+    public Task<int> ProvisionKeyAsync(Guid organizationId, string keyPurpose, string providerKeyName, CancellationToken cancellationToken) => inner.ProvisionKeyAsync(organizationId, keyPurpose, providerKeyName, cancellationToken);
+
+    public Task<(bool Ready, string Detail)> ProbeAsync(CancellationToken cancellationToken) => inner.ProbeAsync(cancellationToken);
+
+    public Task<IntegrityKeyInspection> InspectKeyAsync(string providerKeyName, CancellationToken cancellationToken) => inner.InspectKeyAsync(providerKeyName, cancellationToken);
+}
+
+public class ThrowingProxy : System.Reflection.DispatchProxy
+{
+    public static T Create<T>()
+        where T : class => Create<T, ThrowingProxy>();
+
+    protected override object? Invoke(System.Reflection.MethodInfo? targetMethod, object?[]? args) => throw new NotSupportedException(targetMethod?.Name + " is not used by the content protocol");
+}
+
+internal sealed record Staged(Fixtures.Row Row, Guid StorageKey, byte[] Bytes, ManifestItemKind Kind, Guid ItemId)
+{
+    public string Base64 => Convert.ToBase64String(Bytes);
+}
+
+/// <summary>Canonical rows shaped like the business registry (copied from tests/authority ContributorWriteFixtures).</summary>
+internal static class Fixtures
+{
+    public static readonly Guid Form = Guid.CreateVersion7();
+    private static readonly Guid Creator = Guid.CreateVersion7();
+    private static readonly Guid Version = Guid.CreateVersion7();
+
+    private static readonly RowSchemaDefinition HeaderV3 = new("form_records", 3,
+    [
+        new("content_change_operation_id", RowColumnType.Uuid, false), new("created_by_user_id", RowColumnType.Uuid, false), new("created_form_version_id", RowColumnType.Uuid, false),
+        new("form_definition_id", RowColumnType.Uuid, false), new("form_relationship_definition_id", RowColumnType.Uuid, true), new("parent_form_record_id", RowColumnType.Uuid, true),
+        new("record_status", RowColumnType.Text, false), new("relationship_sort_order", RowColumnType.Int64, true), new("submitted_on", RowColumnType.TimestampUtc, true), new("tenant_id", RowColumnType.Uuid, false),
+    ]);
+
+    private static readonly RowSchemaDefinition StringValues = new("field_string_values", 1, new[]
+    {
+        new RowSignedColumn("content_change_operation_id", RowColumnType.Uuid, false), new RowSignedColumn("field_definition_id", RowColumnType.Uuid, false),
+        new RowSignedColumn("field_value_item_id", RowColumnType.Uuid, false), new RowSignedColumn("form_record_group_id", RowColumnType.Uuid, true),
+        new RowSignedColumn("form_record_id", RowColumnType.Uuid, false), new RowSignedColumn("tenant_id", RowColumnType.Uuid, false), new RowSignedColumn("string_value", RowColumnType.Text, false),
+    }.OrderBy(c => c.ColumnName, StringComparer.Ordinal).ToList());
+
+    private static readonly RowSchemaDefinition EncryptedValues = new("field_encrypted_values", 1,
+    [
+        new("content_change_operation_id", RowColumnType.Uuid, false), new("encrypted_logical_type", RowColumnType.Text, false), new("encrypted_value_bytes", RowColumnType.Bytes, false),
+        new("encryption_algorithm_name", RowColumnType.Text, false), new("encryption_auth_tag_bytes", RowColumnType.Bytes, false), new("encryption_envelope_version", RowColumnType.Int32, false),
+        new("encryption_key_reference", RowColumnType.Text, false), new("encryption_nonce_bytes", RowColumnType.Bytes, false), new("field_definition_id", RowColumnType.Uuid, false),
+        new("field_value_item_id", RowColumnType.Uuid, false), new("form_record_group_id", RowColumnType.Uuid, true), new("form_record_id", RowColumnType.Uuid, false),
+        new("tenant_id", RowColumnType.Uuid, false), new("wrapped_data_key_bytes", RowColumnType.Bytes, false),
+    ]);
+
+    public sealed record Row(ManifestItemKind Kind, Guid ItemId, RowSchemaDefinition Schema, Dictionary<string, RowValue?> Values, bool IdentityPrimaryKey);
+
+    public static Staged Encode(Row row, Guid organizationId, Guid operation, long revision)
+    {
+        var values = new Dictionary<string, RowValue?>(row.Values, StringComparer.Ordinal) { ["content_change_operation_id"] = RowValue.Uuid(operation) };
+        var primaryKey = row.IdentityPrimaryKey ? row.ItemId : Guid.CreateVersion7();
+        var bytes = RowCanonicalizerV1.Encode(row.Schema, new RowSigningContext(1, organizationId, primaryKey, (ulong)revision), values);
+        return new Staged(row, primaryKey, bytes, row.Kind, row.ItemId);
+    }
+
+    public static Row Header(Guid org, Guid record) => new(ManifestItemKind.RecordHeader, record, HeaderV3, new Dictionary<string, RowValue?>(StringComparer.Ordinal)
+    {
+        ["created_by_user_id"] = RowValue.Uuid(Creator), ["created_form_version_id"] = RowValue.Uuid(Version), ["form_definition_id"] = RowValue.Uuid(Form),
+        ["form_relationship_definition_id"] = null, ["parent_form_record_id"] = null, ["record_status"] = RowValue.Text("Draft"),
+        ["relationship_sort_order"] = null, ["submitted_on"] = null, ["tenant_id"] = RowValue.Uuid(org),
+    }, IdentityPrimaryKey: true);
+
+    public static Row Text(Guid org, Guid record, Guid field, Guid item, string value) => new(ManifestItemKind.FieldValue, item, StringValues, new Dictionary<string, RowValue?>(StringComparer.Ordinal)
+    {
+        ["field_definition_id"] = RowValue.Uuid(field), ["field_value_item_id"] = RowValue.Uuid(item), ["form_record_group_id"] = null,
+        ["form_record_id"] = RowValue.Uuid(record), ["tenant_id"] = RowValue.Uuid(org), ["string_value"] = RowValue.Text(value),
+    }, IdentityPrimaryKey: false);
+
+    /// <summary>A well-formed v1 envelope; every seed yields a distinct nonce and wrapped key (no M2a reuse refusal).</summary>
+    public static Row Sealed(Guid org, Guid record, Guid field, Guid item, byte seed) => new(ManifestItemKind.FieldValue, item, EncryptedValues, new Dictionary<string, RowValue?>(StringComparer.Ordinal)
+    {
+        ["encrypted_logical_type"] = RowValue.Text("String"), ["encrypted_value_bytes"] = RowValue.Bytes(Fill(24, seed)), ["encryption_algorithm_name"] = RowValue.Text("AES-256-GCM"),
+        ["encryption_auth_tag_bytes"] = RowValue.Bytes(Fill(16, (byte)(seed + 1))), ["encryption_envelope_version"] = RowValue.Int32(1), ["encryption_key_reference"] = RowValue.Text("local-dev-kek-v1"),
+        ["encryption_nonce_bytes"] = RowValue.Bytes(Fill(12, (byte)(seed + 2))), ["field_definition_id"] = RowValue.Uuid(field), ["field_value_item_id"] = RowValue.Uuid(item),
+        ["form_record_group_id"] = null, ["form_record_id"] = RowValue.Uuid(record), ["tenant_id"] = RowValue.Uuid(org), ["wrapped_data_key_bytes"] = RowValue.Bytes(Fill(60, (byte)(seed + 3))),
+    }, IdentityPrimaryKey: false);
+
+    private static byte[] Fill(int length, byte value) => Enumerable.Repeat(value, length).ToArray();
+}

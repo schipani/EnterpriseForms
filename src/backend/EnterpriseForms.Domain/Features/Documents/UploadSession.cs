@@ -162,6 +162,15 @@ public sealed class FileAttachmentVersion : ISignedContentRow
 
     public int EncryptionSegmentSizeBytes { get; set; }
 
+    /// <summary>E3-M2b-2: Envelope v2 data-key identifier (UUIDv7). NULL for every envelope-1 row; required for envelope 2 (database CHECK, signed schema 2). No product writer sets it before E3-M4.</summary>
+    public Guid? DataKeyIdentifier { get; set; }
+
+    /// <summary>E3-M2b-2: Envelope v2 key commitment (32 bytes). NULL for every envelope-1 row; required for envelope 2.</summary>
+    public byte[]? DataKeyCommitmentBytes { get; set; }
+
+    /// <summary>E3-M2b-2: Envelope v2 wrap-algorithm registry code (1 or 2). NULL for every envelope-1 row; required for envelope 2.</summary>
+    public int? KeyWrapAlgorithmCode { get; set; }
+
     public string ScanVerdict { get; set; } = ScanVerdicts.ScanError;
 
     public string ScannerName { get; set; } = string.Empty;

@@ -58,7 +58,7 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
         var header = CandidateBuilder.CloneHeader(verified.Header);
         var currentValues = verified.AllRows.OfType<FieldValueRowBase>().ToList();
         var groupInput = new CandidateBuilder.GroupInput(verified.Groups, verified.AllRows.OfType<FormRecordGroupRevision>().ToList(), RecordGroupWrites.From(request.Groups));
-        var applied = CandidateBuilder.ApplyValuesDetailed(currentValues, request.Values, verified.Layout, verified.Fields, verified.Options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, verified.OptionsById, verified.Encryption, groups: groupInput);
+        var applied = await CandidateBuilder.ApplyValuesDetailedAsync(currentValues, request.Values, verified.Layout, verified.Fields, verified.Options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, verified.OptionsById, verified.Encryption, cancellationToken, groups: groupInput).ConfigureAwait(false);
         var candidateValues = applied.Rows;
         var rows = new List<ISignedContentRow>(candidateValues);
         rows.AddRange(applied.Occurrences);
@@ -71,8 +71,12 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
 
         var fieldsById = verified.FieldsById;
         var optionsById = verified.OptionsById;
+        // E3-M2c OD-M2c-02a path D: every encrypted candidate row is a fresh seal of this operation (CandidateBuilder re-creates each
+        // carried or edited value as a typed row and ProtectAsync seals it), also on an idempotent replay; no stored ciphertext is in
+        // candidateValues. Self-sealed mode enforces that at run time.
+        var decrypted = await Values.DecryptedFieldValues.DecryptSelfSealedAsync(verified.Encryption, candidateValues, cancellationToken).ConfigureAwait(false);
         return new FormRecordResponse(formRecordId, context.OrganizationId, header.FormDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true,
-            candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, Values.FieldValueCodec.Format(v, optionsById, verified.Encryption), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue, FormRecordGroupId: v.FormRecordGroupId)).ToList(),
+            candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, Values.FieldValueCodec.Format(v, optionsById, decrypted), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue, FormRecordGroupId: v.FormRecordGroupId)).ToList(),
             "Committed(" + accepted.ArchiveState + ")",
             RecordGroupProjection.Build(verified.Groups, verified.Layout, applied.Occurrences));
     }
@@ -86,7 +90,7 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
         }
 
         var now = clock.GetUtcNow();
-        var built = SharedFieldWriteBuilder.Build(verified, request.Values, request.Groups, context.OrganizationId, formRecordId, now, context.LocalUserId);
+        var built = await SharedFieldWriteBuilder.BuildAsync(verified, request.Values, request.Groups, context.OrganizationId, formRecordId, now, context.LocalUserId, cancellationToken).ConfigureAwait(false);
         AcceptedContentRevision accepted;
         try
         {
@@ -114,10 +118,28 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
         var fieldsById = verified.FieldsById;
         var readableItems = SharedFieldWriteBuilder.ReadableRows(verified).Select(r => r.FieldValueItemId).ToHashSet();
         var released = built.Rows.OfType<FieldValueRowBase>().Where(v => v.FormRecordGroupId is null && readableItems.Contains(v.FieldValueItemId) && fieldsById.ContainsKey(v.FieldDefinitionId)).ToList();
+        var releasedDecrypted = await DecryptSharedResponseAsync(verified.Encryption, released, built.EditedRows, cancellationToken).ConfigureAwait(false);
         return new FormRecordResponse(formRecordId, context.OrganizationId, built.Header.FormDefinitionId, "(partial)", accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, false,
-            released.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, Values.FieldValueCodec.Format(v, verified.OptionsById, verified.Encryption), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue)).ToList(),
+            released.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, Values.FieldValueCodec.Format(v, verified.OptionsById, releasedDecrypted), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue)).ToList(),
             "Committed(" + accepted.ArchiveState + ")",
             []);
+    }
+
+    /// <summary>
+    /// E3-M2c OD-M2c-02a path E: the released rows of a shared-edit response (first answer and idempotent replay alike) mix two
+    /// provenances. The builder's <paramref name="editedRows"/> are this request's fresh seals (self-sealed mode); every other
+    /// released row is a byte-identical copy of a row of the Authority-verified snapshot, i.e. stored ciphertext (verified mode).
+    /// The split is by reference to the builder's own list, never by inspecting a row, and the self-sealed step itself refuses any
+    /// row this process did not freshly seal.
+    /// </summary>
+    public static async Task<Values.DecryptedFieldValues> DecryptSharedResponseAsync(Encryption.IFieldEncryptionService encryption, IReadOnlyList<FieldValueRowBase> released, IReadOnlyList<FieldValueRowBase> editedRows, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(released);
+        ArgumentNullException.ThrowIfNull(editedRows);
+        var freshlySealed = new HashSet<FieldValueRowBase>(editedRows, ReferenceEqualityComparer.Instance);
+        return Values.DecryptedFieldValues.Combine(
+            await Values.DecryptedFieldValues.DecryptAsync(encryption, released.Where(v => !freshlySealed.Contains(v)), cancellationToken).ConfigureAwait(false),
+            await Values.DecryptedFieldValues.DecryptSelfSealedAsync(encryption, released.Where(freshlySealed.Contains), cancellationToken).ConfigureAwait(false));
     }
 
     private async Task RecordAcceptedAsync(RequestContext context, Guid formRecordId, VerifiedRecord verified, AcceptedContentRevision accepted, DateTimeOffset now, IReadOnlyList<string> changedFieldKeys, string editBasis, object? extra, CancellationToken cancellationToken)

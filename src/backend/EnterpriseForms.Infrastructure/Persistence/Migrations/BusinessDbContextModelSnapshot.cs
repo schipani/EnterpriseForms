@@ -291,6 +291,14 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("content_revision");
 
+                    b.Property<byte[]>("DataKeyCommitmentBytes")
+                        .HasColumnType("bytea")
+                        .HasColumnName("data_key_commitment_bytes");
+
+                    b.Property<Guid?>("DataKeyIdentifier")
+                        .HasColumnType("uuid")
+                        .HasColumnName("data_key_identifier");
+
                     b.Property<string>("DetectedContentType")
                         .IsRequired()
                         .HasMaxLength(127)
@@ -333,6 +341,10 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("FormRecordId")
                         .HasColumnType("uuid")
                         .HasColumnName("form_record_id");
+
+                    b.Property<int?>("KeyWrapAlgorithmCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("key_wrap_algorithm_code");
 
                     b.Property<string>("OriginalFileName")
                         .IsRequired()
@@ -443,7 +455,13 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_file_attachment_versions_digests", "octet_length(plaintext_sha256) = 32 AND octet_length(ciphertext_sha256) = 32");
 
+                            t.HasCheckConstraint("ck_file_attachment_versions_envelope_metadata", "(encryption_envelope_version = 1 AND data_key_identifier IS NULL AND data_key_commitment_bytes IS NULL AND key_wrap_algorithm_code IS NULL) OR (encryption_envelope_version = 2 AND data_key_identifier IS NOT NULL AND data_key_commitment_bytes IS NOT NULL AND octet_length(data_key_commitment_bytes) = 32 AND key_wrap_algorithm_code IS NOT NULL AND key_wrap_algorithm_code IN (1, 2))");
+
+                            t.HasCheckConstraint("ck_file_attachment_versions_envelope_version", "encryption_envelope_version IN (1, 2)");
+
                             t.HasCheckConstraint("ck_file_attachment_versions_scan", "scan_verdict IN ('Clean','Infected','ScanError')");
+
+                            t.HasCheckConstraint("ck_file_attachment_versions_schema_envelope_tie", "row_signature_schema_version = encryption_envelope_version");
 
                             t.HasCheckConstraint("ck_file_attachment_versions_signature_length", "(content_change_operation_id = '00000000-0000-0000-0000-000000000000' AND octet_length(row_signature) = 0) OR octet_length(row_signature) = 32");
 
@@ -1990,6 +2008,14 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on");
 
+                    b.Property<byte[]>("DataKeyCommitmentBytes")
+                        .HasColumnType("bytea")
+                        .HasColumnName("data_key_commitment_bytes");
+
+                    b.Property<Guid?>("DataKeyIdentifier")
+                        .HasColumnType("uuid")
+                        .HasColumnName("data_key_identifier");
+
                     b.Property<string>("EncryptedLogicalType")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -2043,6 +2069,10 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("form_record_id");
 
+                    b.Property<int?>("KeyWrapAlgorithmCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("key_wrap_algorithm_code");
+
                     b.Property<long>("RowRevision")
                         .HasColumnType("bigint")
                         .HasColumnName("row_revision");
@@ -2086,11 +2116,15 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
 
                     b.ToTable("field_encrypted_values", null, t =>
                         {
-                            t.HasCheckConstraint("ck_field_encrypted_values_envelope_positive", "encryption_envelope_version >= 1");
+                            t.HasCheckConstraint("ck_field_encrypted_values_envelope_metadata", "(encryption_envelope_version = 1 AND data_key_identifier IS NULL AND data_key_commitment_bytes IS NULL AND key_wrap_algorithm_code IS NULL) OR (encryption_envelope_version = 2 AND data_key_identifier IS NOT NULL AND data_key_commitment_bytes IS NOT NULL AND octet_length(data_key_commitment_bytes) = 32 AND key_wrap_algorithm_code IS NOT NULL AND key_wrap_algorithm_code IN (1, 2))");
+
+                            t.HasCheckConstraint("ck_field_encrypted_values_envelope_version", "encryption_envelope_version IN (1, 2)");
 
                             t.HasCheckConstraint("ck_field_encrypted_values_logical_type", "encrypted_logical_type IN ('String','Integer','Decimal','Date','DateTime','Boolean','Guid','Option')");
 
                             t.HasCheckConstraint("ck_field_encrypted_values_nonce_length", "octet_length(encryption_nonce_bytes) = 12");
+
+                            t.HasCheckConstraint("ck_field_encrypted_values_schema_envelope_tie", "row_signature_schema_version = encryption_envelope_version");
 
                             t.HasCheckConstraint("ck_field_encrypted_values_signature_length", "octet_length(row_signature) = 32");
 

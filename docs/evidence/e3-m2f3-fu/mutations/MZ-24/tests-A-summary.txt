@@ -1,0 +1,12 @@
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ConcurrentInstancesNeverExceedOnePerKeyOrSevenPerBucket (33ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 7
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AFirstRefusalCommitsOneEntryWithTheExactFootprint (12ms)
+  Assert.Equal() Failure: Collections differ at index 2
+              (pos 0)
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 28
+  failed: 2
+  succeeded: 26
+  skipped: 0
+  duration: 1s 621ms

@@ -1,0 +1,328 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-11-16 04:30:21.227 UTC [57] LOG:  starting PostgreSQL 18.0 (Debian 18.0-1.pgdg13+3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-16 04:30:21.242 UTC [57] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-16 04:30:21.245 UTC [63] LOG:  database system was shut down at 2026-11-16 04:30:21 UTC
+2026-11-16 04:30:21.248 UTC [57] LOG:  database system is ready to accept connections
+ done
+server started
+2026-11-16 04:30:21.416 UTC [78] FATAL:  database "m2e1gate" does not exist
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-11-16 04:30:21.443 UTC [57] LOG:  received fast shutdown request
+.2026-11-16 04:30:21.443 UTC [57] LOG:  aborting any active transactions
+2026-11-16 04:30:21.445 UTC [57] LOG:  background worker "logical replication launcher" (PID 66) exited with exit code 1
+2026-11-16 04:30:21.446 UTC [61] LOG:  shutting down
+2026-11-16 04:30:21.446 UTC [61] LOG:  checkpoint starting: shutdown immediate
+2026-11-16 04:30:21.454 UTC [61] LOG:  checkpoint complete: wrote 943 buffers (5.8%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.008 s, sync=0.001 s, total=0.009 s; sync files=303, longest=0.001 s, average=0.000 s; distance=4352 kB, estimate=4352 kB; lsn=0/1B9FBB0, redo lsn=0/1B9FBB0
+2026-11-16 04:30:21.469 UTC [57] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+2026-11-16 04:30:21.565 UTC [1] LOG:  starting PostgreSQL 18.0 (Debian 18.0-1.pgdg13+3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-16 04:30:21.565 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-16 04:30:21.565 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-11-16 04:30:21.575 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-16 04:30:21.578 UTC [86] LOG:  database system was shut down at 2026-11-16 04:30:21 UTC
+2026-11-16 04:30:21.581 UTC [1] LOG:  database system is ready to accept connections
+2026-11-16 04:30:26.117 UTC [104] ERROR:  relation "authority.ef_migrations_history" does not exist at character 46
+2026-11-16 04:30:26.117 UTC [104] STATEMENT:  SELECT "MigrationId", "ProductVersion"
+	FROM authority.ef_migrations_history
+	ORDER BY "MigrationId"
+2026-11-16 04:30:32.731 UTC [223] ERROR:  permission denied for table content_data_key_bindings
+2026-11-16 04:30:32.731 UTC [223] STATEMENT:  UPDATE authority.content_data_key_bindings SET binding_item_count = 2 WHERE data_key_identifier = '01a1e29e-fce2-7b43-9466-d14c4dcbf02e'
+2026-11-16 04:30:32.748 UTC [224] ERROR:  permission denied for table content_data_key_bindings
+2026-11-16 04:30:32.748 UTC [224] STATEMENT:  DELETE FROM authority.content_data_key_bindings WHERE data_key_identifier = '01a1e29e-fce2-7b43-9466-d14c4dcbf02e'
+2026-11-16 04:30:32.762 UTC [225] ERROR:  permission denied for table content_data_key_bindings
+2026-11-16 04:30:32.762 UTC [225] STATEMENT:  TRUNCATE authority.content_data_key_bindings
+2026-11-16 04:30:32.775 UTC [226] ERROR:  content data-key bindings are permanent: they are never updated, deleted or truncated
+2026-11-16 04:30:32.775 UTC [226] CONTEXT:  PL/pgSQL function authority.content_data_key_binding_is_permanent() line 3 at RAISE
+2026-11-16 04:30:32.775 UTC [226] STATEMENT:  UPDATE authority.content_data_key_bindings SET binding_item_count = 2 WHERE data_key_identifier = '01a1e29e-fce2-7b43-9466-d14c4dcbf02e'
+2026-11-16 04:30:32.788 UTC [227] ERROR:  content data-key bindings are permanent: they are never updated, deleted or truncated
+2026-11-16 04:30:32.788 UTC [227] CONTEXT:  PL/pgSQL function authority.content_data_key_binding_is_permanent() line 3 at RAISE
+2026-11-16 04:30:32.788 UTC [227] STATEMENT:  DELETE FROM authority.content_data_key_bindings WHERE data_key_identifier = '01a1e29e-fce2-7b43-9466-d14c4dcbf02e'
+2026-11-16 04:30:32.803 UTC [228] ERROR:  content data-key bindings are permanent: they are never updated, deleted or truncated
+2026-11-16 04:30:32.803 UTC [228] CONTEXT:  PL/pgSQL function authority.content_data_key_binding_is_permanent() line 3 at RAISE
+2026-11-16 04:30:32.803 UTC [228] STATEMENT:  TRUNCATE authority.content_data_key_bindings
+2026-11-16 04:30:33.891 UTC [239] ERROR:  a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later
+2026-11-16 04:30:33.891 UTC [239] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e29f-0194-77e9-b4e8-cbfce69fb349', '01a1e29f-0194-7546-90e9-d1e2624751d0', '01a1e29e-f519-78d1-84c6-e84271b0a2be', '01a1e29e-fa96-78e7-8fdf-65f298102ff8', 1, '\xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', 1, '01a1e29e-fd80-7a0d-a7d5-62fd4983f15a', now())
+2026-11-16 04:30:33.906 UTC [240] ERROR:  a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later
+2026-11-16 04:30:33.906 UTC [240] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e29f-01a3-7bae-8e0d-c0595f5d38fe', '01a1e29f-01a3-7305-9cbc-f35c39908847', '01a1e29e-f519-78d1-84c6-e84271b0a2be', '01a1e29e-fa97-7350-82db-ee4ac44e6571', 1, '\xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', 1, '01a1e29f-0165-7005-844a-e98aeab9f60d', now())
+2026-11-16 04:30:33.921 UTC [241] ERROR:  a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later
+2026-11-16 04:30:33.921 UTC [241] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e29f-01b2-7d8e-b7a8-4324d7b46964', '01a1e29f-01b2-7583-adde-14df87492dad', '01a1e29e-f519-78d1-84c6-e84271b0a2be', '01a1e29e-fa97-7caf-9955-799b6d86af36', 1, '\xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', 1, '01a1e29f-0145-7e8b-93b7-ba7413977bcc', now())
+2026-11-16 04:30:33.935 UTC [242] ERROR:  a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later
+2026-11-16 04:30:33.935 UTC [242] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e29f-01c0-7307-acfc-081984074acb', '01a1e29f-01c0-7966-82c7-301a683416dd', '01a1e29e-fbd5-78ea-8c1b-7b6f193c3649', '01a1e29e-fa57-7451-a45c-58e0f662b946', 1, '\xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', 1, '01a1e29e-fc3f-708b-8585-3771bb7a43bc', now())
+2026-11-16 04:30:33.950 UTC [243] ERROR:  a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later
+2026-11-16 04:30:33.950 UTC [243] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e29f-01d0-75b6-9fbb-9f8b7856ce04', '01a1e29f-01d0-726c-9a48-009e6ddee382', '01a1e29e-f519-78d1-84c6-e84271b0a2be', '01a1e29e-fa97-77b6-9646-1fbdb77064c8', 1, '\xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', 1, '01a1e29e-fc3f-708b-8585-3771bb7a43bc', now())
+2026-11-16 04:30:33.976 UTC [244] ERROR:  a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later
+2026-11-16 04:30:33.976 UTC [244] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e29f-01df-7a3c-bb32-396daf2b2b74', '01a1e29f-01df-7d84-bb6c-291a8046f731', '01a1e29e-f519-78d1-84c6-e84271b0a2be', '01a1e29e-fa57-7451-a45c-58e0f662b946', 1, '\xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', 1, '01a1e29f-01df-786b-aa24-f6f57cfe92ee', now())
+2026-11-16 04:30:33.993 UTC [245] ERROR:  new row for relation "content_data_key_bindings" violates check constraint "ck_content_data_key_binding_identifier_v7"
+2026-11-16 04:30:33.993 UTC [245] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e29f-01fa-7f52-b31d-7edaa49eeae1', '6a54b183-3b36-40db-adcc-84175f7c6b43', '01a1e29e-f519-78d1-84c6-e84271b0a2be', '01a1e29e-fa57-7451-a45c-58e0f662b946', 1, '\xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', 1, '01a1e29e-fc3f-708b-8585-3771bb7a43bc', now())
+2026-11-16 04:30:34.008 UTC [246] ERROR:  new row for relation "content_data_key_bindings" violates check constraint "ck_content_data_key_binding_commitment"
+2026-11-16 04:30:34.008 UTC [246] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e29f-0209-7af8-a3ac-31f9075e1c26', '01a1e29f-0209-73d0-855f-5fade61def84', '01a1e29e-f519-78d1-84c6-e84271b0a2be', '01a1e29e-fa57-7451-a45c-58e0f662b946', 1, '\xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', 1, '01a1e29e-fc3f-708b-8585-3771bb7a43bc', now())
+2026-11-16 04:30:34.023 UTC [247] ERROR:  new row for relation "content_data_key_bindings" violates check constraint "ck_content_data_key_binding_kind"
+2026-11-16 04:30:34.023 UTC [247] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e29f-0218-7e6c-8e3e-e2d597e53b58', '01a1e29f-0218-73e0-b916-6745cb6afe36', '01a1e29e-f519-78d1-84c6-e84271b0a2be', '01a1e29e-fa57-7451-a45c-58e0f662b946', 3, '\xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', 1, '01a1e29e-fc3f-708b-8585-3771bb7a43bc', now())
+2026-11-16 04:30:34.037 UTC [248] ERROR:  new row for relation "content_data_key_bindings" violates check constraint "ck_content_data_key_binding_count"
+2026-11-16 04:30:34.037 UTC [248] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e29f-0228-7245-a7a4-0fb6621e50d8', '01a1e29f-0228-7c91-b6ce-27c97d430dec', '01a1e29e-f519-78d1-84c6-e84271b0a2be', '01a1e29e-fa57-7451-a45c-58e0f662b946', 2, '\xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', 2, '01a1e29e-fc3f-708b-8585-3771bb7a43bc', now())
+2026-11-16 04:30:34.052 UTC [249] ERROR:  new row for relation "content_data_key_bindings" violates check constraint "ck_content_data_key_binding_count"
+2026-11-16 04:30:34.052 UTC [249] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e29f-0236-7440-988a-159ff5344294', '01a1e29f-0236-75fd-9e26-4a3064ed39be', '01a1e29e-f519-78d1-84c6-e84271b0a2be', '01a1e29e-fa57-7451-a45c-58e0f662b946', 1, '\xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', 0, '01a1e29e-fc3f-708b-8585-3771bb7a43bc', now())
+2026-11-16 04:30:34.098 UTC [252] ERROR:  duplicate key value violates unique constraint "uq_content_data_key_binding_identifier"
+2026-11-16 04:30:34.098 UTC [252] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, data_key_identifier, organization_id, form_record_id, envelope_payload_kind_code, data_key_commitment_bytes, binding_item_count, binding_content_change_operation_id, data_key_bound_on) VALUES ('01a1e29f-0264-7b98-8960-0da235d9bcde', '01a1e29e-fce2-7b43-9466-d14c4dcbf02e', '01a1e29e-fbd5-78ea-8c1b-7b6f193c3649', '01a1e29e-fc11-784d-a730-35a8710c763b', 1, '\xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', 1, '01a1e29f-0244-7d26-9bd7-80ab9695e6cc', now())
+2026-11-16 04:30:34.254 UTC [254] ERROR:  duplicate key value violates unique constraint "uq_content_data_key_binding_identifier"
+2026-11-16 04:30:34.254 UTC [254] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, binding_content_change_operation_id, binding_item_count, data_key_bound_on, data_key_commitment_bytes, data_key_identifier, envelope_payload_kind_code, form_record_id, organization_id)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+2026-11-16 04:30:35.850 UTC [254] ERROR:  duplicate key value violates unique constraint "uq_content_data_key_binding_identifier"
+2026-11-16 04:30:35.850 UTC [254] STATEMENT:  INSERT INTO authority.content_data_key_bindings (content_data_key_binding_id, binding_content_change_operation_id, binding_item_count, data_key_bound_on, data_key_commitment_bytes, data_key_identifier, envelope_payload_kind_code, form_record_id, organization_id)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+2026-11-16 04:30:37.348 UTC [287] ERROR:  canceling statement due to lock timeout
+2026-11-16 04:30:37.348 UTC [287] STATEMENT:  ALTER TABLE authority.content_data_key_bindings DISABLE TRIGGER trg_content_data_key_binding_guard
+2026-11-16 04:30:38.611 UTC [343] ERROR:  the data-key ledger migration cannot be reverted while any binding exists
+2026-11-16 04:30:38.611 UTC [343] CONTEXT:  PL/pgSQL function inline_code_block line 4 at RAISE
+2026-11-16 04:30:38.611 UTC [343] STATEMENT:  DO $$
+	BEGIN
+	    IF EXISTS (SELECT 1 FROM authority.content_data_key_bindings) THEN
+	        RAISE EXCEPTION 'the data-key ledger migration cannot be reverted while any binding exists';
+	    END IF;
+	END $$
+2026-11-16 04:30:51.236 UTC [390] ERROR:  new row for relation "content_change_operations" violates check constraint "ck_content_operation_rule_floor_v2"
+2026-11-16 04:30:51.236 UTC [390] STATEMENT:  INSERT INTO authority.content_change_operations (content_change_operation_id, actor_identity_binding_id, candidate_content_revision, candidate_key_version, candidate_leaf_count, candidate_leaf_index_digest, candidate_manifest_root, commit_acceptance_rule_version, correlation_identifier, expected_authorization_revision, expected_content_revision, form_record_id, operation_committed_on, operation_created_on, operation_expires_on, operation_idempotency_key, operation_quarantine_reason_code, operation_request_digest, operation_state_name, organization_id, prepare_acceptance_rule_version, reprotection_command_id)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+2026-11-16 04:30:55.479 UTC [507] ERROR:  CARV floor 3 refused: 1 session(s) able to write content operations are connected without a CARV build marker of version 3 or later (an older Authority instance may still run)
+2026-11-16 04:30:55.479 UTC [507] CONTEXT:  PL/pgSQL function inline_code_block line 52 at RAISE
+2026-11-16 04:30:55.479 UTC [507] STATEMENT:  DO $$
+	DECLARE
+	    blocking bigint;
+	BEGIN
+	    IF NOT EXISTS (SELECT 1 FROM authority.ef_migrations_history WHERE "MigrationId" = '20261115200000_AuthorityContentAcceptanceRuleFloor2')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = 'authority.content_change_operations'::regclass
+	                      AND conname = 'ck_content_operation_rule_floor_v2' AND contype = 'c')
+	       OR EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = 'authority.content_change_operations'::regclass
+	                  AND conname LIKE 'ck\_content\_operation\_rule\_floor\_v%' AND conname <> 'ck_content_operation_rule_floor_v2') THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: floor 2 must be installed and recorded, and be the only floor (floors are raised one step at a time)';
+	    END IF;    IF NOT EXISTS (SELECT 1 FROM authority.ef_migrations_history WHERE "MigrationId" = '20261115014221_AuthorityContentAcceptanceRuleVersion')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = 'authority.content_change_operations'::regclass
+	                      AND conname = 'ck_content_operation_commit_rule_version' AND contype = 'c' AND convalidated)
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid = 'authority.content_change_operations'::regclass
+	                      AND tgname = 'trg_content_operation_rule_state_guard' AND NOT tgisinternal AND tgenabled IN ('O', 'A')) THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: the content acceptance rule fence (E3-M2b-1) is not fully installed';
+	    END IF;    IF NOT EXISTS (SELECT 1 FROM authority.ef_migrations_history WHERE "MigrationId" = '20261116031706_AuthorityContentDataKeyBindings')
+	       OR to_regclass('authority.content_data_key_bindings') IS NULL THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: the data-key ledger migration is not applied';
+	    END IF;
+	    IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid = i.indexrelid
+	                    WHERE i.indrelid = 'authority.content_data_key_bindings'::regclass AND c.relname = 'uq_content_data_key_binding_identifier'
+	                      AND i.indisunique AND i.indisvalid AND i.indisready
+	                      AND pg_catalog.pg_get_indexdef(i.indexrelid) = 'CREATE UNIQUE INDEX uq_content_data_key_binding_identifier ON authority.content_data_key_bindings USING btree (data_key_identifier)')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger g JOIN pg_catalog.pg_proc p ON p.oid = g.tgfoid JOIN pg_catalog.pg_language l ON l.oid = p.prolang
+	                       WHERE g.tgrelid = 'authority.content_data_key_bindings'::regclass AND NOT g.tgisinternal AND g.tgenabled IN ('O', 'A')
+	                         AND l.lanname = 'plpgsql' AND NOT p.prosecdef
+	                         AND pg_catalog.pg_get_triggerdef(g.oid) = 'CREATE TRIGGER trg_content_data_key_binding_guard BEFORE INSERT ON authority.content_data_key_bindings FOR EACH ROW EXECUTE FUNCTION authority.content_data_key_binding_guard()')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger g JOIN pg_catalog.pg_proc p ON p.oid = g.tgfoid JOIN pg_catalog.pg_language l ON l.oid = p.prolang
+	                       WHERE g.tgrelid = 'authority.content_data_key_bindings'::regclass AND NOT g.tgisinternal AND g.tgenabled IN ('O', 'A')
+	                         AND l.lanname = 'plpgsql' AND NOT p.prosecdef
+	                         AND pg_catalog.pg_get_triggerdef(g.oid) = 'CREATE TRIGGER trg_content_data_key_binding_permanent BEFORE DELETE OR UPDATE ON authority.content_data_key_bindings FOR EACH ROW EXECUTE FUNCTION authority.content_data_key_binding_is_permanent()')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger g JOIN pg_catalog.pg_proc p ON p.oid = g.tgfoid JOIN pg_catalog.pg_language l ON l.oid = p.prolang
+	                       WHERE g.tgrelid = 'authority.content_data_key_bindings'::regclass AND NOT g.tgisinternal AND g.tgenabled IN ('O', 'A')
+	                         AND l.lanname = 'plpgsql' AND NOT p.prosecdef
+	                         AND pg_catalog.pg_get_triggerdef(g.oid) = 'CREATE TRIGGER trg_content_data_key_binding_no_truncate BEFORE TRUNCATE ON authority.content_data_key_bindings FOR EACH STATEMENT EXECUTE FUNCTION authority.content_data_key_binding_is_permanent()') THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: the data-key ledger index or its binding-guard and immutability triggers are not present exactly as created';
+	    END IF;    SELECT count(*) INTO blocking FROM authority.content_change_operations
+	     WHERE operation_state_name = 'Prepared' AND (prepare_acceptance_rule_version IS NULL OR prepare_acceptance_rule_version < 3)
+	       AND operation_expires_on > now();
+	    IF blocking > 0 THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: % unexpired operation(s) prepared below content acceptance rule version 3 are in flight; let them expire or abort them first', blocking;
+	    END IF;
+	    SELECT count(*) INTO blocking FROM pg_catalog.pg_stat_activity a
+	     WHERE a.backend_type = 'client backend' AND a.pid <> pg_backend_pid()
+	       AND a.usename IS NOT NULL AND a.usename <> current_user
+	       AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname = a.usename AND r.rolsuper)
+	       AND has_table_privilege(a.usename, 'authority.content_change_operations', 'UPDATE')
+	       AND coalesce(substring(coalesce(a.application_name, '') FROM 'carv-v([0-9]+)')::numeric, 0) < 3
+	       AND coalesce(a.application_name, '') <> 'authority-work-listener';
+	    IF blocking > 0 THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: % session(s) able to write content operations are connected without a CARV build marker of version 3 or later (an older Authority instance may still run)', blocking;
+	    END IF;END $$
+2026-11-16 04:30:56.735 UTC [516] ERROR:  CARV floor 3 refused: 1 unexpired operation(s) prepared below content acceptance rule version 3 are in flight; let them expire or abort them first
+2026-11-16 04:30:56.735 UTC [516] CONTEXT:  PL/pgSQL function inline_code_block line 42 at RAISE
+2026-11-16 04:30:56.735 UTC [516] STATEMENT:  DO $$
+	DECLARE
+	    blocking bigint;
+	BEGIN
+	    IF NOT EXISTS (SELECT 1 FROM authority.ef_migrations_history WHERE "MigrationId" = '20261115200000_AuthorityContentAcceptanceRuleFloor2')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = 'authority.content_change_operations'::regclass
+	                      AND conname = 'ck_content_operation_rule_floor_v2' AND contype = 'c')
+	       OR EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = 'authority.content_change_operations'::regclass
+	                  AND conname LIKE 'ck\_content\_operation\_rule\_floor\_v%' AND conname <> 'ck_content_operation_rule_floor_v2') THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: floor 2 must be installed and recorded, and be the only floor (floors are raised one step at a time)';
+	    END IF;    IF NOT EXISTS (SELECT 1 FROM authority.ef_migrations_history WHERE "MigrationId" = '20261115014221_AuthorityContentAcceptanceRuleVersion')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = 'authority.content_change_operations'::regclass
+	                      AND conname = 'ck_content_operation_commit_rule_version' AND contype = 'c' AND convalidated)
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid = 'authority.content_change_operations'::regclass
+	                      AND tgname = 'trg_content_operation_rule_state_guard' AND NOT tgisinternal AND tgenabled IN ('O', 'A')) THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: the content acceptance rule fence (E3-M2b-1) is not fully installed';
+	    END IF;    IF NOT EXISTS (SELECT 1 FROM authority.ef_migrations_history WHERE "MigrationId" = '20261116031706_AuthorityContentDataKeyBindings')
+	       OR to_regclass('authority.content_data_key_bindings') IS NULL THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: the data-key ledger migration is not applied';
+	    END IF;
+	    IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid = i.indexrelid
+	                    WHERE i.indrelid = 'authority.content_data_key_bindings'::regclass AND c.relname = 'uq_content_data_key_binding_identifier'
+	                      AND i.indisunique AND i.indisvalid AND i.indisready
+	                      AND pg_catalog.pg_get_indexdef(i.indexrelid) = 'CREATE UNIQUE INDEX uq_content_data_key_binding_identifier ON authority.content_data_key_bindings USING btree (data_key_identifier)')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger g JOIN pg_catalog.pg_proc p ON p.oid = g.tgfoid JOIN pg_catalog.pg_language l ON l.oid = p.prolang
+	                       WHERE g.tgrelid = 'authority.content_data_key_bindings'::regclass AND NOT g.tgisinternal AND g.tgenabled IN ('O', 'A')
+	                         AND l.lanname = 'plpgsql' AND NOT p.prosecdef
+	                         AND pg_catalog.pg_get_triggerdef(g.oid) = 'CREATE TRIGGER trg_content_data_key_binding_guard BEFORE INSERT ON authority.content_data_key_bindings FOR EACH ROW EXECUTE FUNCTION authority.content_data_key_binding_guard()')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger g JOIN pg_catalog.pg_proc p ON p.oid = g.tgfoid JOIN pg_catalog.pg_language l ON l.oid = p.prolang
+	                       WHERE g.tgrelid = 'authority.content_data_key_bindings'::regclass AND NOT g.tgisinternal AND g.tgenabled IN ('O', 'A')
+	                         AND l.lanname = 'plpgsql' AND NOT p.prosecdef
+	                         AND pg_catalog.pg_get_triggerdef(g.oid) = 'CREATE TRIGGER trg_content_data_key_binding_permanent BEFORE DELETE OR UPDATE ON authority.content_data_key_bindings FOR EACH ROW EXECUTE FUNCTION authority.content_data_key_binding_is_permanent()')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger g JOIN pg_catalog.pg_proc p ON p.oid = g.tgfoid JOIN pg_catalog.pg_language l ON l.oid = p.prolang
+	                       WHERE g.tgrelid = 'authority.content_data_key_bindings'::regclass AND NOT g.tgisinternal AND g.tgenabled IN ('O', 'A')
+	                         AND l.lanname = 'plpgsql' AND NOT p.prosecdef
+	                         AND pg_catalog.pg_get_triggerdef(g.oid) = 'CREATE TRIGGER trg_content_data_key_binding_no_truncate BEFORE TRUNCATE ON authority.content_data_key_bindings FOR EACH STATEMENT EXECUTE FUNCTION authority.content_data_key_binding_is_permanent()') THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: the data-key ledger index or its binding-guard and immutability triggers are not present exactly as created';
+	    END IF;    SELECT count(*) INTO blocking FROM authority.content_change_operations
+	     WHERE operation_state_name = 'Prepared' AND (prepare_acceptance_rule_version IS NULL OR prepare_acceptance_rule_version < 3)
+	       AND operation_expires_on > now();
+	    IF blocking > 0 THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: % unexpired operation(s) prepared below content acceptance rule version 3 are in flight; let them expire or abort them first', blocking;
+	    END IF;
+	    SELECT count(*) INTO blocking FROM pg_catalog.pg_stat_activity a
+	     WHERE a.backend_type = 'client backend' AND a.pid <> pg_backend_pid()
+	       AND a.usename IS NOT NULL AND a.usename <> current_user
+	       AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname = a.usename AND r.rolsuper)
+	       AND has_table_privilege(a.usename, 'authority.content_change_operations', 'UPDATE')
+	       AND coalesce(substring(coalesce(a.application_name, '') FROM 'carv-v([0-9]+)')::numeric, 0) < 3
+	       AND coalesce(a.application_name, '') <> 'authority-work-listener';
+	    IF blocking > 0 THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: % session(s) able to write content operations are connected without a CARV build marker of version 3 or later (an older Authority instance may still run)', blocking;
+	    END IF;END $$
+2026-11-16 04:30:57.953 UTC [525] ERROR:  CARV floor 3 refused: the data-key ledger index or its binding-guard and immutability triggers are not present exactly as created
+2026-11-16 04:30:57.953 UTC [525] CONTEXT:  PL/pgSQL function inline_code_block line 37 at RAISE
+2026-11-16 04:30:57.953 UTC [525] STATEMENT:  DO $$
+	DECLARE
+	    blocking bigint;
+	BEGIN
+	    IF NOT EXISTS (SELECT 1 FROM authority.ef_migrations_history WHERE "MigrationId" = '20261115200000_AuthorityContentAcceptanceRuleFloor2')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = 'authority.content_change_operations'::regclass
+	                      AND conname = 'ck_content_operation_rule_floor_v2' AND contype = 'c')
+	       OR EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = 'authority.content_change_operations'::regclass
+	                  AND conname LIKE 'ck\_content\_operation\_rule\_floor\_v%' AND conname <> 'ck_content_operation_rule_floor_v2') THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: floor 2 must be installed and recorded, and be the only floor (floors are raised one step at a time)';
+	    END IF;    IF NOT EXISTS (SELECT 1 FROM authority.ef_migrations_history WHERE "MigrationId" = '20261115014221_AuthorityContentAcceptanceRuleVersion')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = 'authority.content_change_operations'::regclass
+	                      AND conname = 'ck_content_operation_commit_rule_version' AND contype = 'c' AND convalidated)
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid = 'authority.content_change_operations'::regclass
+	                      AND tgname = 'trg_content_operation_rule_state_guard' AND NOT tgisinternal AND tgenabled IN ('O', 'A')) THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: the content acceptance rule fence (E3-M2b-1) is not fully installed';
+	    END IF;    IF NOT EXISTS (SELECT 1 FROM authority.ef_migrations_history WHERE "MigrationId" = '20261116031706_AuthorityContentDataKeyBindings')
+	       OR to_regclass('authority.content_data_key_bindings') IS NULL THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: the data-key ledger migration is not applied';
+	    END IF;
+	    IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid = i.indexrelid
+	                    WHERE i.indrelid = 'authority.content_data_key_bindings'::regclass AND c.relname = 'uq_content_data_key_binding_identifier'
+	                      AND i.indisunique AND i.indisvalid AND i.indisready
+	                      AND pg_catalog.pg_get_indexdef(i.indexrelid) = 'CREATE UNIQUE INDEX uq_content_data_key_binding_identifier ON authority.content_data_key_bindings USING btree (data_key_identifier)')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger g JOIN pg_catalog.pg_proc p ON p.oid = g.tgfoid JOIN pg_catalog.pg_language l ON l.oid = p.prolang
+	                       WHERE g.tgrelid = 'authority.content_data_key_bindings'::regclass AND NOT g.tgisinternal AND g.tgenabled IN ('O', 'A')
+	                         AND l.lanname = 'plpgsql' AND NOT p.prosecdef
+	                         AND pg_catalog.pg_get_triggerdef(g.oid) = 'CREATE TRIGGER trg_content_data_key_binding_guard BEFORE INSERT ON authority.content_data_key_bindings FOR EACH ROW EXECUTE FUNCTION authority.content_data_key_binding_guard()')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger g JOIN pg_catalog.pg_proc p ON p.oid = g.tgfoid JOIN pg_catalog.pg_language l ON l.oid = p.prolang
+	                       WHERE g.tgrelid = 'authority.content_data_key_bindings'::regclass AND NOT g.tgisinternal AND g.tgenabled IN ('O', 'A')
+	                         AND l.lanname = 'plpgsql' AND NOT p.prosecdef
+	                         AND pg_catalog.pg_get_triggerdef(g.oid) = 'CREATE TRIGGER trg_content_data_key_binding_permanent BEFORE DELETE OR UPDATE ON authority.content_data_key_bindings FOR EACH ROW EXECUTE FUNCTION authority.content_data_key_binding_is_permanent()')
+	       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger g JOIN pg_catalog.pg_proc p ON p.oid = g.tgfoid JOIN pg_catalog.pg_language l ON l.oid = p.prolang
+	                       WHERE g.tgrelid = 'authority.content_data_key_bindings'::regclass AND NOT g.tgisinternal AND g.tgenabled IN ('O', 'A')
+	                         AND l.lanname = 'plpgsql' AND NOT p.prosecdef
+	                         AND pg_catalog.pg_get_triggerdef(g.oid) = 'CREATE TRIGGER trg_content_data_key_binding_no_truncate BEFORE TRUNCATE ON authority.content_data_key_bindings FOR EACH STATEMENT EXECUTE FUNCTION authority.content_data_key_binding_is_permanent()') THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: the data-key ledger index or its binding-guard and immutability triggers are not present exactly as created';
+	    END IF;    SELECT count(*) INTO blocking FROM authority.content_change_operations
+	     WHERE operation_state_name = 'Prepared' AND (prepare_acceptance_rule_version IS NULL OR prepare_acceptance_rule_version < 3)
+	       AND operation_expires_on > now();
+	    IF blocking > 0 THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: % unexpired operation(s) prepared below content acceptance rule version 3 are in flight; let them expire or abort them first', blocking;
+	    END IF;
+	    SELECT count(*) INTO blocking FROM pg_catalog.pg_stat_activity a
+	     WHERE a.backend_type = 'client backend' AND a.pid <> pg_backend_pid()
+	       AND a.usename IS NOT NULL AND a.usename <> current_user
+	       AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname = a.usename AND r.rolsuper)
+	       AND has_table_privilege(a.usename, 'authority.content_change_operations', 'UPDATE')
+	       AND coalesce(substring(coalesce(a.application_name, '') FROM 'carv-v([0-9]+)')::numeric, 0) < 3
+	       AND coalesce(a.application_name, '') <> 'authority-work-listener';
+	    IF blocking > 0 THEN
+	        RAISE EXCEPTION 'CARV floor 3 refused: % session(s) able to write content operations are connected without a CARV build marker of version 3 or later (an older Authority instance may still run)', blocking;
+	    END IF;END $$
+2026-11-16 04:31:00.692 UTC [533] ERROR:  deadlock detected at character 32
+2026-11-16 04:31:00.692 UTC [533] STATEMENT:  SELECT
+	  EXISTS (SELECT 1 FROM authority.ef_migrations_history h WHERE h."MigrationId" = $1) AS fence_recorded,
+	  EXISTS (SELECT 1 FROM authority.ef_migrations_history h WHERE h."MigrationId" = $2) AS floor_recorded,
+	  (SELECT pg_catalog.pg_get_constraintdef(c.oid) FROM pg_catalog.pg_constraint c
+	    WHERE c.conrelid = t.oid AND c.contype = 'c' AND c.conname ~ '^ck_content_operation_rule_floor_v[0-9]+$'
+	    ORDER BY substring(c.conname FROM '([0-9]+)$')::integer DESC LIMIT 1) AS floor_definition,
+	  (SELECT max(substring(c.conname FROM '^ck_content_operation_rule_floor_v([0-9]+)$')::integer) FROM pg_catalog.pg_constraint c
+	    WHERE c.conrelid = t.oid) AS highest_floor,
+	  (SELECT pg_catalog.pg_get_constraintdef(c.oid) FROM pg_catalog.pg_constraint c
+	    WHERE c.conrelid = t.oid AND c.contype = 'c' AND c.conname = 'ck_content_operation_commit_rule_version' AND c.convalidated) AS commit_check_definition,
+	  (SELECT pg_catalog.pg_get_constraintdef(c.oid) FROM pg_catalog.pg_constraint c
+	    WHERE c.conrelid = t.oid AND c.contype = 'c' AND c.conname = 'ck_content_operation_rule_versions_positive' AND c.convalidated) AS positive_check_definition,
+	  (SELECT pg_catalog.pg_get_triggerdef(g.oid) FROM pg_catalog.pg_trigger g
+	    WHERE g.tgrelid = t.oid AND NOT g.tgisinternal AND g.tgname = 'trg_content_operation_rule_state_guard') AS state_guard_definition,
+	  (SELECT g.tgenabled::text FROM pg_catalog.pg_trigger g
+	    WHERE g.tgrelid = t.oid AND NOT g.tgisinternal AND g.tgname = 'trg_content_operation_rule_state_guard') AS state_guard_enabled,
+	  (SELECT p.prosrc FROM pg_catalog.pg_trigger g
+	     JOIN pg_catalog.pg_proc p ON p.oid = g.tgfoid
+	     JOIN pg_catalog.pg_language l ON l.oid = p.prolang
+	    WHERE g.tgrelid = t.oid AND NOT g.tgisinternal AND g.tgname = 'trg_content_operation_rule_state_guard'
+	      AND l.lanname = 'plpgsql' AND NOT p.prosecdef) AS state_guard_source,
+	  (SELECT count(*)::integer FROM pg_catalog.pg_trigger g
+	    WHERE g.tgrelid = t.oid AND NOT g.tgisinternal AND g.tgname <> 'trg_content_operation_rule_state_guard') AS other_trigger_count,
+	  (SELECT count(*)::integer FROM pg_catalog.pg_rewrite r WHERE r.ev_class = t.oid) AS rule_count,
+	  (SELECT count(*)::integer FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = t.oid AND NOT a.attisdropped
+	      AND a.attname IN ('prepare_acceptance_rule_version', 'commit_acceptance_rule_version')
+	      AND (a.atthasdef OR a.attgenerated <> '')) AS stamp_default_count,
+	  t.relkind::text AS relation_kind,
+	  (SELECT count(*)::integer FROM pg_catalog.pg_inherits i WHERE i.inhparent = t.oid) AS child_count,
+	  (SELECT count(*)::integer FROM pg_catalog.pg_constraint c
+	    WHERE c.conrelid = t.oid AND c.conname LIKE 'ck\_content\_operation\_rule\_floor\_v%') AS floor_constraint_count,
+	  (SELECT coalesce(array_agg(h."MigrationId" ORDER BY h."MigrationId"), ARRAY[]::text[]) FROM authority.ef_migrations_history h
+	    WHERE h."MigrationId" = ANY($3)) AS recorded_floor_migrations
+	FROM pg_catalog.pg_class t
+	WHERE t.oid = 'authority.content_change_operations'::regclass
+2026-11-16 04:31:04.937 UTC [578] ERROR:  new row for relation "content_change_operations" violates check constraint "ck_content_operation_rule_floor_v3"
+2026-11-16 04:31:04.937 UTC [578] STATEMENT:  INSERT INTO authority.content_change_operations (content_change_operation_id, actor_identity_binding_id, candidate_content_revision, candidate_key_version, candidate_leaf_count, candidate_leaf_index_digest, candidate_manifest_root, commit_acceptance_rule_version, correlation_identifier, expected_authorization_revision, expected_content_revision, form_record_id, operation_committed_on, operation_created_on, operation_expires_on, operation_idempotency_key, operation_quarantine_reason_code, operation_request_digest, operation_state_name, organization_id, prepare_acceptance_rule_version, reprotection_command_id)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+2026-11-16 04:31:05.138 UTC [584] ERROR:  new row for relation "content_change_operations" violates check constraint "ck_content_operation_rule_floor_v3"
+2026-11-16 04:31:05.138 UTC [584] DETAIL:  Failing row contains (01a1e29f-7b97-7af9-824e-581f01090b8d, 01a1e29e-f519-78d1-84c6-e84271b0a2be, 01a1e29e-fa98-7485-a0c6-2216f578011b, 01a1e29e-f519-79a0-b5d1-fd147c2615ae, m2d-seeded-01a1e29f7b977af9824e581f01090b8d, \xb918e46e495d4cabe665f1b5c5fb77302385eb3451315a1fe295ddf44d9543..., 7, 0, 1, 1, \x0eab5bca4f03c831b49d3415088af173bbfbca6d5c41484b1b57b900b46500..., \xa86a40b7f7d64fcae5044734d1533b90e762767ba7efbdb4d90562eba7422c..., 4, Prepared, null, 01a1e29f-7ba5-780c-9d3b-9649cae35a95, 2026-11-16 04:31:05.124729+00, 2026-11-16 04:41:05.124729+00, null, null, 2, null).
+2026-11-16 04:31:05.138 UTC [584] STATEMENT:  INSERT INTO authority.content_change_operations (content_change_operation_id, actor_identity_binding_id, candidate_content_revision, candidate_key_version, candidate_leaf_count, candidate_leaf_index_digest, candidate_manifest_root, commit_acceptance_rule_version, correlation_identifier, expected_authorization_revision, expected_content_revision, form_record_id, operation_committed_on, operation_created_on, operation_expires_on, operation_idempotency_key, operation_quarantine_reason_code, operation_request_digest, operation_state_name, organization_id, prepare_acceptance_rule_version, reprotection_command_id)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)

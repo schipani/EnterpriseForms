@@ -13,6 +13,10 @@ public sealed class BusinessProblemHandler : IExceptionHandler
 
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(httpContext);
+        ArgumentNullException.ThrowIfNull(exception);
+        var correlation = Guid.TryParse(httpContext.Request.Headers[BusinessAuthentication.CorrelationHeader].ToString(), out var id) ? id : Guid.CreateVersion7();
+        await RecordDecryptionFailureAsync(httpContext, exception, correlation).ConfigureAwait(false);
         ProblemDetails problem;
         switch (exception)
         {
@@ -39,6 +43,11 @@ public sealed class BusinessProblemHandler : IExceptionHandler
                     problem.Extensions["field_keys"] = ex.FieldKeys;
                 }
 
+                break;
+            case AuthorityClientException ex when EnvelopeCapabilityRefusal.Is(ex):
+                // E3-M2f-2 (CAP-E3): a service-unavailable condition without the Authority's code or detail; not retryable.
+                problem = Build(StatusCodes.Status503ServiceUnavailable, "SERVICE_UNAVAILABLE", "the service cannot process this request at the moment");
+                problem.Extensions["retryable"] = false;
                 break;
             case AuthorityClientException ex:
                 problem = Build(ex.HttpStatusCode, ex.ErrorCode, ex.Message);
@@ -68,12 +77,36 @@ public sealed class BusinessProblemHandler : IExceptionHandler
                 return false;
         }
 
-        var correlation = Guid.TryParse(httpContext.Request.Headers[BusinessAuthentication.CorrelationHeader].ToString(), out var id) ? id : Guid.CreateVersion7();
         problem.Extensions["correlation_id"] = correlation;
         httpContext.Response.StatusCode = problem.Status ?? 500;
         httpContext.Response.Headers[BusinessAuthentication.CorrelationHeader] = correlation.ToString();
         await httpContext.Response.WriteAsJsonAsync(problem, cancellationToken: cancellationToken).ConfigureAwait(false);
         return true;
+    }
+
+    /// <summary>
+    /// E0-4: a field-value or document decryption failure that reached the API boundary (directly, or carried onto a typed
+    /// refusal) is recorded once as a Security audit event. The response below is unchanged; recording never throws.
+    /// </summary>
+    private static async Task RecordDecryptionFailureAsync(HttpContext httpContext, Exception exception, Guid correlation)
+    {
+        if (Application.Features.FormRecords.Encryption.DecryptionFailure.Find(exception) is null
+            || httpContext.RequestServices?.GetService(typeof(Application.Features.Audit.IDecryptionFailureRecorder)) is not Application.Features.Audit.IDecryptionFailureRecorder recorder)
+        {
+            return;
+        }
+
+        RequestContext context;
+        try
+        {
+            context = BusinessAuthentication.RequireContext(httpContext) with { CorrelationId = correlation };
+        }
+        catch (BusinessException)
+        {
+            return; // decryption happens only for authenticated requests; without a context there is no tenant to record under
+        }
+
+        await recorder.RecordOnceAsync(context, exception).ConfigureAwait(false);
     }
 
     private static ProblemDetails Build(int status, string code, string detail) => new()

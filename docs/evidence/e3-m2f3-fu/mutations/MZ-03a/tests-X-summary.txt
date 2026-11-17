@@ -1,0 +1,6 @@
+Test run summary: Passed! - <clone>\tests\architecture\EnterpriseForms.ArchitectureTests\bin\Debug\net10.0\EnterpriseForms.ArchitectureTests.dll (net10.0|x64)
+  total: 20
+  failed: 0
+  succeeded: 20
+  skipped: 0
+  duration: 1s 317ms

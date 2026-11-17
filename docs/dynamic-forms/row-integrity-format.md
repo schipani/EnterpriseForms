@@ -169,6 +169,31 @@ entity kind is allow-listed for the Merkle item kind (`ContentService.AllowedEnt
 | `field_string_values` | 1 | **production (Stage A)** — FieldValue leaf, pk = physical staged row id, item id = `field_value_item_id` | `content_change_operation_id` Uuid, `field_definition_id` Uuid, `field_value_item_id` Uuid, `form_record_group_id` Uuid?, `form_record_id` Uuid, `string_value` Text, `tenant_id` Uuid |
 | `integrity_type_coverage` | 1 | test-only | one column per type incl. nullable variants |
 
+**Complete registry (E3-M2b-2, F-19).** The table above lists the entries Phase 0 and Stage A introduced. Every
+(entity kind, schema version) the business signs is listed below; `BusinessSignedSchemas.All` and the Authority's
+`ContentDeltaRules` rule table must be equal sets (architecture test). Columns are in ordinal order; `?` = nullable.
+
+| Entity kind | Version | Status | Signed columns |
+|---|---|---|---|
+| `form_records` | 2 | historical (Stage A rows) | as above |
+| `form_records` | 3 | current header | v2 plus `form_relationship_definition_id` Uuid?, `parent_form_record_id` Uuid?, `relationship_sort_order` Int64? |
+| `field_string_values` / `field_integer_values` / `field_decimal_values` / `field_date_values` / `field_date_time_values` / `field_guid_values` / `field_boolean_values` / `field_option_values` | 1 | current | value envelope (`content_change_operation_id`, `field_definition_id`, `field_value_item_id`, `form_record_group_id`?, `form_record_id`, `tenant_id`, all Uuid) plus the typed value column (`string_value` Text, `integer_value` Int64, `decimal_value` Decimal, `date_value` Date, `date_time_value` TimestampUtc, `guid_value` Uuid, `boolean_value` Boolean, `field_option_id` Uuid) |
+| `field_encrypted_values` | 1 | current for every Envelope v1 row (permanent; S-7) | value envelope plus `encrypted_logical_type` Text, `encrypted_value_bytes` Bytes, `encryption_algorithm_name` Text, `encryption_auth_tag_bytes` Bytes, `encryption_envelope_version` Int32, `encryption_key_reference` Text, `encryption_nonce_bytes` Bytes, `wrapped_data_key_bytes` Bytes (14 columns) |
+| `field_encrypted_values` | 2 | **registered, not accepted** (E3-M2b-2): Envelope v2 rows only | schema 1 plus `data_key_commitment_bytes` Bytes, `data_key_identifier` Uuid, `key_wrap_algorithm_code` Int32, all non-nullable (17 columns) |
+| `file_attachment_versions` | 1 | current for every Envelope v1 document version (permanent) | the 26 columns of `BusinessSignedSchemas.FileAttachmentVersionsV1` (`scan_signature_name` Text? is the only nullable one) |
+| `file_attachment_versions` | 2 | **registered, not accepted** (E3-M2b-2): Envelope v2 rows only | schema 1 plus the same three non-nullable columns (29 columns) |
+| `form_record_groups` | 1 | current | `content_change_operation_id` Uuid, `form_record_id` Uuid, `group_definition_id` Uuid, `group_sort_order` Int64, `parent_form_record_group_id` Uuid?, `tenant_id` Uuid |
+
+**Envelope rows: schema follows the envelope (E3-M2b-2).** For `field_encrypted_values` and `file_attachment_versions`
+the signed schema is chosen from the row's own `encryption_envelope_version` (1 ⇒ schema 1, 2 ⇒ schema 2; any other
+version has no schema), never from the row type (S-1). A row is encoded only under its stored schema version, with no
+fallback (S-2), and the business refuses to encode a row whose stored schema disagrees with its envelope (S-10). The
+BusinessDb CHECK `row_signature_schema_version = encryption_envelope_version` is a backstop (S-11). Schema 1 can carry no
+v2 column, and schema 2 refuses a NULL in any of them. The framing (§2), RowHmac v1, Merkle v1 and every existing vector
+file are unchanged. The Authority pins each column's type and nullability for both envelope kinds and both versions
+(S-9), at Prepare and again at Commit; it still refuses every schema-2 candidate (EnvelopeRules, E3-M2a). Acceptance of
+Envelope v2 is a later, separately authorized increment.
+
 `form_records` v2 deliberately omits `owner_user_id`/`owner_team_id`: ownership is authoritative only in the
 Authorization Authority and the business columns are an untrusted projection (TRUST_AUTHORITY_ARCHITECTURE.md §2).
 Signing them would bind a stale projection into content history. The v1 entry remains for the conformance vectors.
@@ -182,6 +207,14 @@ full type coverage, NFC/decimal/offset/UUID-case equivalence, all-null, empty-st
 `row_revision = 2^64−1` and `key_version 3`), nine decimal encoding examples and eight negative cases. Each positive
 case states the exact canonical hex, length, SHA-256 digest and HMAC with the published test key.
 
+`trust_authority/row-integrity-v1-envelope-schema2.test-vectors.json` (E3-M2b-2; generated only by
+`scripts/integrity/generate_envelope_schema2_vectors.py`, which never writes the two files above) contains the four
+envelope schemas, five positive cases (field schema 1 and 2, wrap codes 1 and 2, a repeating-group occurrence, document
+schema 1 and 2) and seven negative cases (each v2 column NULL, an omitted v2 column, a v2 column on schema 1, a wrong
+type). The schema-1 and schema-2 field cases reproduce the worked example of `docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md`
+§4.5 byte for byte. The C# contract test also checks that `BusinessSignedSchemas` equals the file's schemas and that the
+business encoder reproduces every case from domain rows.
+
 Reproduction:
 
 ```sh
@@ -189,6 +222,7 @@ python scripts/integrity/verify_vectors.py      # Python reference against commi
 node scripts/integrity/verify-vectors.mjs       # independent Node implementation
 dotnet test tests/integrity                     # C# implementation (EnterpriseForms.Integrity.Tests)
 python scripts/integrity/generate_vectors.py && git diff --exit-code trust_authority/*.test-vectors.json
+python scripts/integrity/generate_envelope_schema2_vectors.py && git diff --exit-code trust_authority/row-integrity-v1-envelope-schema2.test-vectors.json
 ```
 
 ## 9. Review requirements and open items

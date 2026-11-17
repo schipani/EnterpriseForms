@@ -1,0 +1,135 @@
+05:37:22.638 PASS S-00: m2e2gate,postgres
+05:37:22.642 PASS S-01: removed []; remaining []
+05:37:28.488 --migrate (m2e2-migrate) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+05:37:28.551 PASS S-02: runtime sessions 0; exit 0; floors none; ledger 20261116031706_AuthorityContentDataKeyBindings
+05:37:28.573 runtime grants baseline: authority.authenticated_sessions:INSERT,authority.authenticated_sessions:SELECT,authority.authenticated_sessions:UPDATE,authority.authority_relationship_edges:INSERT,authority.authority_relationship_edges:SELECT,authority.authority_relationship_edges:UPDATE,authority.authority_resources:INSERT,authority.authority_resources:SELECT,authority.authority_resources:UPDATE,authority.content_candidate_leaves:INSERT,authority.content_candidate_leaves:SELECT,authority.content_candidate_leaves:UPDATE,authority.content_change_operations:INSERT,authority.content_change_operations:SELECT,authority.content_change_operations:UPDATE,authority.content_data_key_bindings:INSERT,authority.content_data_key_bindings:SELECT,authority.content_integrity_checkpoints:INSERT,authority.content_integrity_checkpoints:SELECT,authority.content_integrity_checkpoints:UPDATE,authority.content_item_identities:INSERT,authority.content_item_identities:SELECT,authority.ef_migrations_history:SELECT,authority.field_search_approvals:INSERT,authority.field_search_approvals:SELECT,authority.field_search_approvals:UPDATE,authority.identity_bindings:INSERT,authority.identity_bindings:SELECT,authority.identity_bindings:UPDATE,authority.integrity_key_registrations:INSERT,authority.integrity_key_registrations:SELECT,authority.integrity_key_registrations:UPDATE,authority.organization_authorization_states:INSERT,authority.organization_authorization_states:SELECT,authority.organization_authorization_states:UPDATE,authority.organization_membership_requests:INSERT,authority.organization_membership_requests:SELECT,authority.organization_membership_requests:UPDATE,authority.organization_onboarding_approvals:INSERT,authority.organization_onboarding_approvals:SELECT,authority.organization_onboarding_approvals:UPDATE,authority.organization_onboarding_owners:INSERT,authority.organization_onboarding_owners:SELECT,authority.organization_onboarding_owners:UPDATE,authority.organization_onboarding_requests:INSERT,authority.organization_onboarding_requests:SELECT,authority.organization_onboarding_requests:UPDATE,authority.organization_owner_recovery_approvals:INSERT,authority.organization_owner_recovery_approvals:SELECT,authority.organization_owner_recovery_approvals:UPDATE,authority.organization_owner_recovery_cases:INSERT,authority.organization_owner_recovery_cases:SELECT,authority.organization_owner_recovery_cases:UPDATE,authority.organization_owner_recovery_subjects:INSERT,authority.organization_owner_recovery_subjects:SELECT,authority.organization_owner_recovery_subjects:UPDATE,authority.organization_protection_policies:INSERT,authority.organization_protection_policies:SELECT,authority.organization_protection_policies:UPDATE,authority.organization_recovered_owner_probations:INSERT,authority.organization_recovered_owner_probations:SELECT,authority.organization_recovered_owner_probations:UPDATE,authority.organization_role_change_proposals:INSERT,authority.organization_role_change_proposals:SELECT,authority.organization_role_change_proposals:UPDATE,authority.platform_journal_entries:INSERT,authority.platform_journal_entries:SELECT,authority.platform_journal_entries:UPDATE,authority.platform_journal_heads:INSERT,authority.platform_journal_heads:SELECT,authority.platform_journal_heads:UPDATE,authority.platform_operator_approvals:INSERT,authority.platform_operator_approvals:SELECT,authority.platform_operator_approvals:UPDATE,authority.platform_operator_change_proposals:INSERT,authority.platform_operator_change_proposals:SELECT,authority.platform_operator_change_proposals:UPDATE,authority.platform_operator_evidence_uses:INSERT,authority.platform_operator_evidence_uses:SELECT,authority.platform_operator_evidence_uses:UPDATE,authority.platform_operators:INSERT,authority.platform_operators:SELECT,authority.platform_operators:UPDATE,authority.projection_outbox_events:INSERT,authority.projection_outbox_events:SELECT,authority.projection_outbox_events:UPDATE,authority.protection_census_results:INSERT,authority.protection_census_results:SELECT,authority.protection_census_results:UPDATE,authority.protection_reconciliation_attestations:INSERT,authority.protection_reconciliation_attestations:SELECT,authority.protection_reconciliation_attestations:UPDATE,authority.published_form_versions:INSERT,authority.published_form_versions:SELECT,authority.published_form_versions:UPDATE,authority.record_content_heads:INSERT,authority.record_content_heads:SELECT,authority.record_content_heads:UPDATE,authority.record_manifest_commits:INSERT,authority.record_manifest_commits:SELECT,authority.record_manifest_commits:UPDATE,authority.record_manifest_leaves:INSERT,authority.record_manifest_leaves:SELECT,authority.record_manifest_leaves:UPDATE,authority.search_catalogue_snapshot_entries:INSERT,authority.search_catalogue_snapshot_entries:SELECT,authority.search_catalogue_snapshot_entries:UPDATE,authority.search_catalogue_snapshots:INSERT,authority.search_catalogue_snapshots:SELECT,authority.search_catalogue_snapshots:UPDATE,authority.security_commands:INSERT,authority.security_commands:SELECT,authority.security_commands:UPDATE,authority.security_journal_entries:INSERT,authority.security_journal_entries:SELECT,authority.security_journal_entries:UPDATE,authority_search.search_boolean_postings:DELETE,authority_search.search_boolean_postings:INSERT,authority_search.search_boolean_postings:SELECT,authority_search.search_date_postings:DELETE,authority_search.search_date_postings:INSERT,authority_search.search_date_postings:SELECT,authority_search.search_date_time_postings:DELETE,authority_search.search_date_time_postings:INSERT,authority_search.search_date_time_postings:SELECT,authority_search.search_decimal_postings:DELETE,authority_search.search_decimal_postings:INSERT,authority_search.search_decimal_postings:SELECT,authority_search.search_field_coverages:INSERT,authority_search.search_field_coverages:SELECT,authority_search.search_field_coverages:UPDATE,authority_search.search_form_states:INSERT,authority_search.search_form_states:SELECT,authority_search.search_form_states:UPDATE,authority_search.search_integer_postings:DELETE,authority_search.search_integer_postings:INSERT,authority_search.search_integer_postings:SELECT,authority_search.search_option_postings:DELETE,authority_search.search_option_postings:INSERT,authority_search.search_option_postings:SELECT,authority_search.search_projection_states:INSERT,authority_search.search_projection_states:SELECT,authority_search.search_projection_states:UPDATE,authority_search.search_record_entries:DELETE,authority_search.search_record_entries:INSERT,authority_search.search_record_entries:SELECT,authority_search.search_record_field_anomalies:DELETE,authority_search.search_record_field_anomalies:INSERT,authority_search.search_record_field_anomalies:SELECT,authority_search.search_result_snapshot_entries:DELETE,authority_search.search_result_snapshot_entries:INSERT,authority_search.search_result_snapshot_entries:SELECT,authority_search.search_result_snapshots:DELETE,authority_search.search_result_snapshots:INSERT,authority_search.search_result_snapshots:SELECT,authority_search.search_string_postings:DELETE,authority_search.search_string_postings:INSERT,authority_search.search_string_postings:SELECT,authority_search_access.search_access_checkpoints:INSERT,authority_search_access.search_access_checkpoints:SELECT,authority_search_access.search_access_checkpoints:UPDATE,authority_search_access.search_access_edges:DELETE,authority_search_access.search_access_edges:INSERT,authority_search_access.search_access_edges:SELECT,authority_search_access.search_access_field_item_grants:DELETE,authority_search_access.search_access_field_item_grants:INSERT,authority_search_access.search_access_field_item_grants:SELECT,authority_search_access.search_access_record_grants:DELETE,authority_search_access.search_access_record_grants:INSERT,authority_search_access.search_access_record_grants:SELECT,authority_search_access.search_access_shadow_samples:DELETE,authority_search_access.search_access_shadow_samples:INSERT,authority_search_access.search_access_shadow_samples:SELECT,authority_search_access.search_access_value_postings:DELETE,authority_search_access.search_access_value_postings:INSERT,authority_search_access.search_access_value_postings:SELECT,authority_search_access.search_access_verification_states:DELETE,authority_search_access.search_access_verification_states:INSERT,authority_search_access.search_access_verification_states:SELECT,authority_search_access.search_access_verification_states:UPDATE
+05:37:28.614 PASS S-03: select=true insert=true update=false delete=false truncate=false; false false
+05:37:31.794 --apply-content-acceptance-floor 1 (m2e2-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+05:37:32.907 --apply-content-acceptance-floor 2 (m2e2-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+05:37:33.083 database copy m2e2_floor2 of m2e2gate created and admitted
+05:37:34.351 --apply-content-acceptance-floor 3 (m2e2-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+05:37:34.380 PASS S-04: 0 0 0; floors 3
+05:37:34.665 PASS S-10: m2e2_floor2,m2e2gate,postgres
+05:37:34.841 PASS S-11: True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3
+05:37:34.841 PASS S-12: refused: environment; refused: environment; refused: policy; refused: policy
+05:37:34.853 PASS S-13: configured True; prerequisites True; enabled False
+05:37:35.446 PASS S-14: ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; signatures 0->0; bindings 0->0; ops 0->0
+05:37:35.610 PASS S-15: Recorded; body has the digest, requested on; enabled True
+05:37:35.630 PASS G-after-activation: unchanged
+05:37:36.262 seed P=3 op=01a1e802-bddb-7911-bcb9-8a0c4f55174e: OK
+05:37:36.287 PASS L-01: setup OK; seed OK; insert OK
+05:37:36.304 PASS L-02: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later
+05:37:36.318 PASS L-03: 23505 uq_content_data_key_binding_identifier: duplicate key value violates unique constraint "uq_content_data_key_binding_identifier"
+05:37:36.363 PASS L-04: 42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings
+05:37:36.416 PASS L-05: 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated; 1/1
+05:37:39.524 PASS G-00: writes OK; pending OK; census OK 01a1e802-c7ca-7bed-94fb-ad5d73494e3d; approvals 2; backfill OK: backfill Indexed quarantined False; bindings 9/0; 8 content entries; archived all; chain verified / 8 content entries; archived all; chain verified
+05:37:40.273 agent net10.0 encode exit 0: ok=True 
+05:37:40.979 agent net10.0 encode exit 0: ok=True 
+05:37:41.480 agent net10.0 encode exit 0: ok=True 
+05:37:41.481 PASS G-01: 4/4 identical
+05:37:41.481 PASS G-02: 4/4 identical
+05:37:41.723 agent net10.0 encode exit 0: ok=True 
+05:37:41.725 PASS G-03: v2 rows 2; differing 2; same set True; ignored [FieldStringValue: | FieldEncryptedValue:DataKeyCommitmentBytes,DataKeyIdentifier,KeyWrapAlgorithmCode | FileAttachmentVersion:DataKeyCommitmentBytes,DataKeyIdentifier,KeyWrapAlgorithmCode]
+05:37:41.851 database copy m2f2gcf of m2e2gate created and admitted
+05:37:41.970 database copy m2f2gbase of m2e2gate created and admitted
+05:37:42.168 agent net10.0 encode exit 0: ok=True 
+05:37:42.346 agent net10.0 encode exit 0: ok=True 
+05:37:43.864 agent net10.0 encode exit 0: ok=True 
+05:37:44.121 agent net10.0 encode exit 0: ok=True 
+05:37:44.882 PASS G-10: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; carry shape AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False (no MAC verification); MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0->0; integrity 8->8; pending unchanged; rows unchanged; alerts +0; shape [tx-begin > org-lock > fence > fence > ledger-exists > tx-rollback]
+05:37:44.965 PASS G-10c: OK: prepared 4; ledger statements []
+05:37:45.167 agent net10.0 encode exit 0: ok=True 
+05:37:46.672 PASS G-11: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0->0; integrity 8->8; pending unchanged; rows unchanged; alerts +0; shape [tx-begin > org-lock > fence > fence > ledger-exists > tx-rollback]
+05:37:46.769 PASS G-11c: OK: committed {"FormRecordId":"01a1e802-beba-7ae2-aabb-09295bc3ff77","CommittedContentRevision":2,"CommittedOperationId":"01a1e802-c71d-71b7-a20a-ec372f71a425","CommittedManifestRootBase64":"DbtPf\u002BOZ/P14j3WrMWtiub4tTKOO/pjzmbopZPSOYhM=","AuthorizationRevision":7,"IntegrityKeyVersion":1,"CurrentSigningKeyVersion":1,"ArchiveState":"Pending","CorrelationId":"01a1e802-e6b0-7c0f-96c2-59ba39383b9b"}; ledger statements [SELECT c.content_data_key_binding_id, c.binding_content_change_operation_id, c.binding_item_count, c.data_key_bound_on, c.data_key_commitment_bytes, c.data_key_identifier, c.envelope_payload_kind_code, c.form_record_id, c.organization_id FROM authority.content_data_key_bindings AS c WHERE c.binding_content_change_operation_id = @contentChangeOperationId [params 1] | LOCK TABLE authority.content_data_key_bindings IN ROW EXCLUSIVE MODE [params 0] | SELECT c.content_data_key_binding_id, c.binding_content_change_operation_id, c.binding_item_count, c.data_key_bound_on, c.data_key_commitment_bytes, c.data_key_identifier, c.envelope_payload_kind_code, c.form_record_id, c.organization_id FROM authority.content_data_key_bindings AS c WHERE c.data_key_identifier = ANY (@dataKeyIdentifiers) [params 1]]
+05:37:46.951 agent net10.0 encode exit 0: ok=True 
+05:37:48.424 PASS G-12: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0->0; integrity 9->9; pending unchanged; rows unchanged; alerts +0; shape [tx-begin > org-lock > ledger-exists > tx-rollback]
+05:37:48.516 PASS G-12c: OK: verified True ; ledger statements []
+05:37:48.717 agent net10.0 encode exit 0: ok=True 
+05:37:50.013 PASS G-13: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0->0; integrity 9->9; pending unchanged; rows unchanged; alerts +0; shape [tx-begin > org-lock > ledger-exists > tx-rollback]
+05:37:50.061 PASS G-13c: OK: verified True ; ledger statements []
+05:37:50.254 agent net10.0 encode exit 0: ok=True 
+05:37:51.567 PASS G-14: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0->0; integrity 9->9; pending unchanged; rows unchanged; alerts +0; shape [tx-begin > read:search_catalogue_snapshots > org-lock > ledger-exists > tx-rollback]
+05:37:51.678 PASS G-14c: OK: census Verified; ledger statements []
+05:37:51.867 agent net10.0 encode exit 0: ok=True 
+05:37:53.168 PASS G-15: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0->0; integrity 9->9; pending unchanged; rows unchanged; alerts +0; shape [tx-begin > org-lock > ledger-exists > tx-rollback]
+05:37:53.212 PASS G-15c: OK: backfill Indexed quarantined False; ledger statements []
+05:37:53.401 agent net10.0 encode exit 0: ok=True 
+05:37:54.766 PASS G-16: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; MAC 0/0; after-existence 0; commit False; locks 0; head unchanged; incidents 0->0; integrity 9->9; pending unchanged; rows unchanged; alerts +0; shape [tx-begin > org-lock > ledger-exists > tx-rollback]
+05:37:54.904 PASS G-16c: OK: deep Pass MATCH quarantined False; ledger statements []
+05:37:55.084 agent net10.0 encode exit 0: ok=True 
+05:37:55.264 agent net10.0 encode exit 0: ok=True 
+05:37:55.415 PASS G-20: AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False; MAC verifications 0; head 1:false->1:false; incidents 0->1; integrity 8->9; pending -->-
+05:37:55.594 agent net10.0 encode exit 0: ok=True 
+05:37:55.778 agent net10.0 encode exit 0: ok=True 
+05:37:55.862 PASS G-20a: AuthorityException INVALID_COMMAND 422 retryable=False; incidents 1->1
+05:37:56.025 agent net10.0 encode exit 0: ok=True 
+05:37:56.199 PASS G-21: AuthorityException CANDIDATE_MISMATCH 409 retryable=False; MAC verifications 2; head 1:false->1:false; incidents 1->1; integrity 9->9; pending 3/NULL Prepared -->3/NULL Prepared -
+05:37:56.377 agent net10.0 encode exit 0: ok=True 
+05:37:56.525 PASS G-22: OK: verified False ITEM_DIGEST_MISMATCH; MAC verifications 2; head 1:false->1:true; incidents 1->2; integrity 9->10; pending -->-
+05:37:56.698 agent net10.0 encode exit 0: ok=True 
+05:37:56.867 PASS G-23: OK: verified False ITEM_DIGEST_MISMATCH; MAC verifications 2; head 1:false->1:true; incidents 2->3; integrity 10->11; pending -->-
+05:37:57.055 agent net10.0 encode exit 0: ok=True 
+05:37:57.209 PASS G-24: OK: census ITEM_DIGEST_MISMATCH; MAC verifications 2; head 1:false->1:true; incidents 3->4; integrity 11->12; pending -->-
+05:37:57.382 agent net10.0 encode exit 0: ok=True 
+05:37:57.520 PASS G-25: OK: backfill ITEM_DIGEST_MISMATCH quarantined True; MAC verifications 2; head 1:false->1:true; incidents 4->5; integrity 12->13; pending -->-
+05:37:57.693 agent net10.0 encode exit 0: ok=True 
+05:37:57.863 PASS G-26: OK: deep Inconclusive BUSINESS_BYTES_MISMATCH quarantined True; MAC verifications 2; head 1:false->1:true; incidents 5->6; integrity 13->14; pending -->-
+05:37:58.038 agent net10.0 encode exit 0: ok=True 
+05:38:01.423 agent net10.0 verify exit 0: ok=False AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False
+05:38:02.563 PASS G-30: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; copy unchanged
+05:38:02.822 agent net10.0 encode exit 0: ok=True 
+05:38:06.413 agent net10.0 verify exit 0: ok=True 
+05:38:06.414 EXPECTED_GAP_INVENTORY GG-INV (as expected: True): OK: verified True (rule version 3)
+05:38:06.596 agent net10.0 encode exit 0: ok=True 
+05:38:06.763 agent net10.0 encode exit 0: ok=True 
+05:38:09.468 agent net10.0 prepare exit 0: ok=False AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False
+05:38:09.507 EXPECTED_GAP_G2 GG-01 (as expected: True): AuthorityException CURRENT_SNAPSHOT_MISMATCH 409 retryable=False; MAC verifications 0; head 1:false->1:false; incidents 0->1; integrity 8->9; pending -->-
+05:38:09.661 agent net10.0 encode exit 0: ok=True 
+05:38:11.967 agent net10.0 commit exit 0: ok=False AuthorityException CANDIDATE_MISMATCH 409 retryable=False
+05:38:12.018 EXPECTED_GAP_G2 GG-02 (as expected: True): AuthorityException CANDIDATE_MISMATCH 409 retryable=False; MAC verifications 2; head 1:false->1:false; incidents 1->1; integrity 9->9; pending 3/NULL Prepared -->3/NULL Prepared -
+05:38:12.193 agent net10.0 encode exit 0: ok=True 
+05:38:14.646 agent net10.0 verify exit 0: ok=True 
+05:38:14.683 EXPECTED_GAP_G2 GG-03 (as expected: True): OK: verified False; MAC verifications 2; head 1:false->1:true; incidents 1->2; integrity 9->10; pending -->-
+05:38:14.853 agent net10.0 encode exit 0: ok=True 
+05:38:17.360 agent net10.0 batch-verify exit 0: ok=True 
+05:38:17.398 EXPECTED_GAP_G2 GG-04 (as expected: True): OK: verified False; MAC verifications 2; head 1:false->1:true; incidents 2->3; integrity 10->11; pending -->-
+05:38:17.573 agent net10.0 encode exit 0: ok=True 
+05:38:20.212 agent net10.0 census exit 0: ok=True 
+05:38:20.252 EXPECTED_GAP_G2 GG-05 (as expected: True): OK: ITEM_DIGEST_MISMATCH; MAC verifications 2; head 1:false->1:true; incidents 3->4; integrity 11->12; pending -->-
+05:38:20.419 agent net10.0 encode exit 0: ok=True 
+05:38:22.844 agent net10.0 backfill exit 0: ok=True 
+05:38:22.891 EXPECTED_GAP_G2 GG-06 (as expected: True): OK: ITEM_DIGEST_MISMATCH; MAC verifications 2; head 1:false->1:true; incidents 4->5; integrity 12->13; pending -->-
+05:38:23.067 agent net10.0 encode exit 0: ok=True 
+05:38:25.711 agent net10.0 deep-verify exit 0: ok=True 
+05:38:25.747 EXPECTED_GAP_G2 GG-07 (as expected: True): OK: deep Inconclusive BUSINESS_BYTES_MISMATCH; MAC verifications 2; head 1:false->1:true; incidents 5->6; integrity 13->14; pending -->-
+05:38:27.111 PASS G-40: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 1; rows unchanged
+05:38:28.254 PASS G-41: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 1; rows unchanged
+05:38:29.566 PASS G-42: OK: verified True ; existence queries 0; rows unchanged
+05:38:30.852 PASS G-43: OK: verified True ; existence queries 1; rows unchanged
+05:38:32.151 PASS G-44: OK: verified True ; existence queries 1; rows unchanged
+05:38:33.363 PASS G-45: OK: verified True ; existence queries 0; rows unchanged
+05:38:34.652 PASS G-46: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 0; rows unchanged
+05:38:35.800 PASS G-47: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 0; rows unchanged
+05:38:36.960 PASS G-48: OK: verified True ; existence queries 0; rows unchanged
+05:38:38.074 PASS G-49: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 0; rows unchanged
+05:38:39.245 PASS G-50: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; existence queries 0; rows unchanged
+05:38:40.387 PASS G-51: OK: verified True ; existence queries 0; rows unchanged
+05:38:40.387 PASS G-39: OK
+05:38:40.722 PASS G-55: before OK: verified True ; setup OK; prepare OK; settle left Prepared; operation 3/NULL Prepared -; after AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; bindings 1
+05:38:41.145 PASS G-56: before OK: verified True ; setup OK; prepare OK; settle AuthorityException INVALID_COMMAND 422 retryable=False; operation 3/NULL Aborted ENVELOPE_VERSION_NOT_ENABLED_AT_COMMIT; after AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; bindings 1
+05:38:41.551 PASS G-57: before OK: verified True ; setup OK; prepare OK; settle AuthorityException OPERATION_EXPIRED 409 retryable=False; operation 3/NULL Aborted -; after AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; bindings 1
+05:38:41.635 PASS G-60: OK: verified True ; 1 ledger statement(s): SELECT EXISTS ( SELECT 1 FROM authority.content_data_key_bindings AS c WHERE c.organization_id = @organizationId) [params 1]; order [tx-begin > org-lock > ledger-exists > read:identity_bindings > read:authority_resources > read:record_content_heads > read:security_journal_entries > read:record_manifest_leaves > read:integrity_key_registrations > read:organization_authorization_states > read:organization_authorization_states > tx-rollback]
+05:38:41.663 DIAGNOSTIC existence plan (default): Result / InitPlan 1 / ->  Index Only Scan using ix_content_data_key_bindings_record on content_data_key_bindings c / Index Cond: (organization_id = '01a1e802-beb9-7eec-bd3e-a29c99bc24f4'::uuid)
+05:38:41.663 DIAGNOSTIC existence plan (seqscan off): Result / InitPlan 1 / ->  Index Only Scan using ix_content_data_key_bindings_record on content_data_key_bindings c / Index Cond: (organization_id = '01a1e802-beb9-7eec-bd3e-a29c99bc24f4'::uuid)
+05:38:41.663 PASS G-61: seqscan off: Result / InitPlan 1 / ->  Index Only Scan using ix_content_data_key_bindings_record on content_data_key_bindings c / Index Cond: (organization_id = '01a1e802-beb9-7eec-bd3e-a29c99bc24f4'::uuid) | default: Result / InitPlan 1 / ->  Index Only Scan using ix_content_data_key_bindings_record on content_data_key_bindings c / Index Cond: (organization_id = '01a1e802-beb9-7eec-bd3e-a29c99bc24f4'::uuid)
+05:38:41.678 PASS G-62: true,true,false,false,false
+05:38:41.785 PASS G-63: revoke OK; level 1 AuthorityException AUTHORITY_NOT_READY 503 retryable=True; level 2 OK: verified True ; grant OK
+05:38:41.802 PASS G-after-capability: unchanged
+05:38:42.049 PASS GS-00: write OK; 1 content entries; archived all; chain verified; Prepare OK ; bindings 1; operation 3/NULL Prepared -
+05:38:42.086 PASS GS-03: AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; ledger statements 1 [SELECT EXISTS ( SELECT 1 FROM authority.content_data_key_bindings AS c WHERE c.organization_id = @organizationId) [params 1]]; shape [tx-begin > org-lock > ledger-exists > tx-rollback]
+05:38:42.215 PASS GS-01: Verify: OK: verified True ; ledger statements 0; shape [tx-begin > org-lock > read:identity_bindings > read:authority_resources > read:record_content_heads > read:security_journal_entries > read:record_manifest_leaves > read:integrity_key_registrations > read:organization_authorization_states > read:organization_authorization_states > tx-rollback] || BatchVerify: OK: verified True ; ledger statements 0; shape [tx-begin > org-lock > read:identity_bindings > read:authority_resources > read:record_content_heads > read:security_journal_entries > read:record_manifest_leaves > read:integrity_key_registrations > read:organization_authorization_states > read:organization_authorization_states > tx-rollback]
+05:38:42.364 PASS GS-02: revoke OK; level-2 Verify OK: verified True ; level-2 BatchVerify OK: verified True ; level 1 AuthorityException AUTHORITY_NOT_READY 503 retryable=True; grant OK
+05:38:42.382 PASS G-after-capability-short-circuit: unchanged
+05:38:42.446 PASS T-01: enabled False
+05:38:42.464 PASS G-end: unchanged
+05:38:42.551 PASS T-02: verified 5; false false

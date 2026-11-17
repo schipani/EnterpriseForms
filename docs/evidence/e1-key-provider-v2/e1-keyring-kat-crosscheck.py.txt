@@ -1,0 +1,34 @@
+# E-1: independent reproduction of the local development keyring vectors with Python 'cryptography' (HKDF, AESGCM).
+# Written from the documented construction (LocalDevelopmentKeyProvider summary), not from the C# code.
+#   root PRK  = HKDF-Extract(salt = "DynamicForms/LocalKeyring/Root/v1", ikm = KEK)          (no separate root configured)
+#   scope ctx = organization(16, RFC 4122) || Int32BE(len(token)) || token || Int32BE(version)
+#   KEK_scope = HKDF-Expand(PRK, info = "DynamicForms/LocalKeyring/Kek/v1" || ctx, L = 32)
+#   wrap      = nonce(12) || AES-256-GCM(KEK_scope, nonce, DEK, AAD = "DynamicForms/LocalKeyring/DekWrap/v1" || ctx)
+#   reference = "localdev:{organization D}:{token}:{version}"
+import hashlib, hmac, struct, uuid
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
+
+seq = lambda s, n: bytes((s + i) % 256 for i in range(n))
+KEK, DEK, WRAP_NONCE = seq(0x00, 32), seq(0x20, 32), seq(0x40, 12)
+PRK = hmac.new(b"DynamicForms/LocalKeyring/Root/v1", KEK, hashlib.sha256).digest()
+
+def ctx(org, token, version):
+    t = token.encode("ascii")
+    return uuid.UUID(org).bytes + struct.pack(">i", len(t)) + t + struct.pack(">i", version)
+
+def vector(name, org, token, version):
+    c = ctx(org, token, version)
+    kek = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b"DynamicForms/LocalKeyring/Kek/v1" + c).derive(PRK)
+    aad = b"DynamicForms/LocalKeyring/DekWrap/v1" + c
+    wrapped = WRAP_NONCE + AESGCM(kek).encrypt(WRAP_NONCE, DEK, aad)
+    print(f"{name}.reference=localdev:{org}:{token}:{version}")
+    print(f"{name}.wrap_aad_hex={aad.hex()}")
+    print(f"{name}.wrapped_data_key_hex={wrapped.hex()}")
+
+print(f"root_prk_sha256={hashlib.sha256(PRK).hexdigest()}")
+vector("K1", "019a5b2c-e001-7000-8000-000000000001", "field-value", 1)
+vector("K2", "019a5b2c-e001-7000-8000-000000000001", "field-value", 2)
+vector("K3", "019a5b2c-e001-7000-8000-000000000001", "document", 1)
+vector("K4", "019a5b2c-e0ff-7000-8000-0000000000ff", "field-value", 1)

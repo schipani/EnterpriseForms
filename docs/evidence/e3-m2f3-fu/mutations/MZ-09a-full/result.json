@@ -1,0 +1,44 @@
+{
+  "id": "MZ-09a-full",
+  "kind": "MZ",
+  "what": "MZ-09a re-run against the FULL Authority and contract suites (does anything outside the declared tests detect it?)",
+  "files": [
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs": "3898d8967194ab22cb844f0875603a06aefeb98df66c4d838f5808b83d33fc97"
+  },
+  "restored": true,
+  "verdict": "SURVIVED",
+  "results": [
+    {
+      "build": "A",
+      "exit": 0,
+      "seconds": 29.0
+    },
+    {
+      "build": "H",
+      "exit": 0,
+      "seconds": 37.3
+    },
+    {
+      "letter": "A",
+      "classes": [],
+      "exit": 0,
+      "seconds": 11.1,
+      "total": 1216,
+      "succeeded": 1212,
+      "failed": []
+    },
+    {
+      "letter": "H",
+      "classes": [],
+      "exit": 0,
+      "seconds": 65.9,
+      "total": 953,
+      "succeeded": 941,
+      "failed": []
+    }
+  ],
+  "seconds": 143.4
+}

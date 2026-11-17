@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    C8 M4 S1 SpiceDB behavioural contract probe (Design B revision 2 §2.11, CT-1..CT-6). A console program the Stage B tests run
+    in a throwaway container on the security-test stack's authority network (SpiceDB has no host port). It uses the Authority's
+    own vendored authzed protos and writes only relationships of a random probe organization the Authority does not know.
+    Security-test stack only; never deployed, never part of the product.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>EnterpriseForms.SpiceDbContractProbe</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CA1812;CA2007;CA1303;CA1305;CA1515;CA1031</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="Grpc.Tools">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos/authzed/api/v1/core.proto" ProtoRoot="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos/authzed/api/v1/debug.proto" ProtoRoot="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos/authzed/api/v1/error_reason.proto" ProtoRoot="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos/authzed/api/v1/openapi.proto" ProtoRoot="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos/authzed/api/v1/permission_service.proto" ProtoRoot="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos" GrpcServices="Client" />
+    <Protobuf Include="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos/buf/validate/validate.proto" ProtoRoot="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos/google/api/annotations.proto" ProtoRoot="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos/google/api/http.proto" ProtoRoot="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos/google/rpc/status.proto" ProtoRoot="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos/validate/validate.proto" ProtoRoot="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos/protoc-gen-openapiv2/options/annotations.proto" ProtoRoot="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos/protoc-gen-openapiv2/options/openapiv2.proto" ProtoRoot="../../../src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/Protos" GrpcServices="None" />
+  </ItemGroup>
+</Project>

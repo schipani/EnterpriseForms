@@ -1,0 +1,74 @@
+06:51:35.207 --migrate (m2e-migrate) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+06:51:35.468 PASS E-00: exit 0; floors none; floor history none; ledger history 20261116031706_AuthorityContentDataKeyBindings
+06:51:35.536 PASS E-01: renderings equal; verdict none
+06:51:35.548 PASS E-02: select=true insert=true update=false delete=false truncate=false
+06:51:37.717 seed Valid P=3 op=01a1e320-26e1-7a81-bb2a-d16fdee916d1: OK
+06:51:37.765 PASS E-03: OK
+06:51:37.804 PASS E-04: 42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings
+06:51:37.870 PASS E-05: 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated; bindings for the id 1
+06:51:38.790 seed Valid P=2 op=01a1e320-2b86-7879-a2c3-2cebd26cde07: OK
+06:51:38.822 seed Valid P=3 op=01a1e320-2ba6-7359-8f2f-e6f1cff9c202: OK
+06:51:38.936 PASS E-06: a Committed operation: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later | an Aborted operation: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later | a Prepared operation stamped 2: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later | another organization: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later | another record: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later | a nonexistent operation: 23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later
+06:51:39.009 PASS E-07: UUIDv4 identifier: 23514 ck_content_data_key_binding_identifier_v7: new row for relation "content_data_key_bindings" violates check constraint "ck_content_data_key_binding_identifier_v7" | 31-byte commitment: 23514 ck_content_data_key_binding_commitment: new row for relation "content_data_key_bindings" violates check constraint "ck_content_data_key_binding_commitment" | kind 3: 23514 ck_content_data_key_binding_kind: new row for relation "content_data_key_bindings" violates check constraint "ck_content_data_key_binding_kind" | document with 2 items: 23514 ck_content_data_key_binding_count: new row for relation "content_data_key_bindings" violates check constraint "ck_content_data_key_binding_count" | item count 0: 23514 ck_content_data_key_binding_count: new row for relation "content_data_key_bindings" violates check constraint "ck_content_data_key_binding_count"
+06:51:39.043 seed Valid P=3 op=01a1e320-2c81-7c8c-94f1-769adccc52f8: OK
+06:51:39.058 PASS E-08: 23505 uq_content_data_key_binding_identifier: duplicate key value violates unique constraint "uq_content_data_key_binding_identifier"
+06:51:39.191 PASS E-09: OK; ops 5->6; binding 1
+06:51:39.254 PASS E-10: AuthorityException INVALID_COMMAND 422 retryable=False; ops 6->6
+06:51:40.841 PASS E-11: blocked True; second AuthorityException INVALID_COMMAND 422 retryable=False; bindings 1
+06:51:40.886 PASS E-12: OK
+06:51:41.248 PASS E-13: guard disabled: OK -> DataKeyLedgerGuardMismatch, AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; restored OK -> none | guard body replaced: OK -> DataKeyLedgerGuardMismatch, AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; restored OK -> none | truncate trigger dropped: OK -> DataKeyLedgerPermanenceMismatch, AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; restored OK -> none | unique index replaced by a plain one: OK -> DataKeyLedgerUniqueIndexMismatch, AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; restored OK -> none | an extra trigger: OK -> DataKeyLedgerUnexpectedTableObject, AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; restored OK -> none
+06:51:42.324 PASS E-14: 55P03 ProcessInterrupts: canceling statement due to lock timeout; verdict none
+06:51:42.463 PASS E-15: 3/3; new_data_key_bindings []; marker carv-v3
+06:51:42.570 PASS E-16: ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; signatures 24->24; bindings 4->4; unchanged
+06:51:42.641 seed NewV2Field P=3 op=01a1e320-3a92-79f4-a3f2-baed275f8260: OK
+06:51:42.830 PASS E-17: AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; 3/NULL Aborted DATA_KEY_BINDING_MISMATCH; incidents 0->1; integrity 2->3; unchanged
+06:51:42.884 seed NewV2Field P=3 op=01a1e320-3b87-72b5-bc94-30c3d8b496a4: OK
+06:51:43.037 PASS E-18: binding OK; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; 3/NULL Aborted ENVELOPE_VERSION_NOT_ENABLED_AT_COMMIT; incidents 1->1; binding 1; unchanged
+06:51:43.081 seed NewV2Field P=3 op=01a1e320-3c4b-7f9c-a8fa-3ee89fa05f54: OK
+06:51:43.163 PASS E-19: binding OK; AuthorityException DATA_KEY_BINDING_MISMATCH 409 retryable=False; unchanged
+06:51:43.196 seed NewV2Field P=3 op=01a1e320-3cbb-7f9d-8a35-cd1e6494d1ee: OK
+06:51:43.290 PASS E-20: AuthorityException CONTENT_DATA_KEY_LEDGER_NOT_ENFORCED 503 retryable=False; 3/NULL Prepared
+06:51:43.621 PASS E-21: PostgresException P0001 ; ledger history 20261116031706_AuthorityContentDataKeyBindings; bindings 6
+06:51:44.434 --apply-content-acceptance-floor 3 (m2e-floor3-early) exit 2: content acceptance rule floor 3 requires every lower floor to be applied first (floors are raised one step at a time)
+06:51:44.465 PASS E-22: exit 2; floors none
+06:51:45.612 --apply-content-acceptance-floor 1 (m2e-floor1) exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it
+06:51:45.638 PASS E-23: exit 0; floors 1
+06:51:45.766 PASS E-24: OK OK; head revisions 1 1
+06:51:49.204 legacy net10.0 prepare exit 0: ok=True error= mapped= build=1 
+06:51:52.066 legacy net10.0 commit exit 0: ok=True error= mapped= build=1 
+06:51:52.094 PASS E-25: Prepare OK; Commit OK; head revision 2
+06:51:52.209 PASS E-26: ENVELOPE_INVALID: ENVELOPE_DOWNGRADE; unchanged
+06:51:53.847 --apply-content-acceptance-floor 2 (m2e-floor2) exit 0: content acceptance rule floor 2 installed (ck_content_operation_rule_floor_v2, NOT VALID); ordinary --migrate never applies or removes it
+06:51:53.876 PASS E-27: exit 0; floors 2
+06:51:56.631 legacy net10.0 prepare exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False mapped=409 {"errorCode":"OPERATION_RULES_OUTDATED","correlationId":"01a1e320-712a-73e6-8799-990745f3640c","retryable":false,"detail":"the operation crosses content acceptance rule versions and was refused; start a fresh operation"} build=1 
+06:51:56.685 PASS E-28: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v2) refused a content operation write; this build applies rule version 1 (mixed-version fleet or a newer floor); ops 15->15; unchanged
+06:51:59.848 --migrate (m2e-migrate-2) exit 0: Authority migrations applied; runtime grants applied to role 'authority_runtime'.
+06:51:59.879 PASS E-29: exit 0; floors 2
+06:52:01.005 --apply-content-acceptance-floor 3 (m2e-floor3-session) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor 3 refused: 1 session(s) able to write content operations are connected without a CARV build marker of version 3 or later (an older Authority instance may still run)
+06:52:01.030 PASS E-30: exit 3; floors 2; names the sessions
+06:52:01.058 seed Valid P=2 op=01a1e320-8286-7e06-9ceb-45348cde42d1: OK
+06:52:02.149 --apply-content-acceptance-floor 3 (m2e-floor3-inflight) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor 3 refused: 1 unexpired operation(s) prepared below content acceptance rule version 3 are in flight; let them expire or abort them first
+06:52:02.190 PASS E-31: seed OK; exit 3; floors 2; names the operations
+06:52:03.407 --apply-content-acceptance-floor 3 (m2e-floor3-ledger) exit 3: content acceptance rule floor NOT applied: P0001: CARV floor 3 refused: the data-key ledger index or its binding-guard and immutability triggers are not present exactly as created
+06:52:03.443 PASS E-32: exit 3; floors 2; names the ledger
+06:52:05.191 --apply-content-acceptance-floor 3 (m2e-floor3) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+06:52:05.379 E-33 alerts during the raise: 
+06:52:05.441 PASS E-33: exit 0; floors 3; definition exact; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2,20261116040000_AuthorityContentAcceptanceRuleFloor3; outcomes OK x22; committed P<>C: 0
+06:52:05.441 PASS E-33b: OK 22 of 22; refusal reasons none
+06:52:05.739 PASS E-34: True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3 | none | OK
+06:52:09.294 legacy net10.0 prepare exit 0: ok=False error=AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False mapped=409 {"errorCode":"OPERATION_RULES_OUTDATED","correlationId":"01a1e320-a2a3-7519-aea1-cc58387fee6b","retryable":false,"detail":"the operation crosses content acceptance rule versions and was refused; start a fresh operation"} build=2 
+06:52:09.346 PASS E-35: AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v3) refused a content operation write; this build applies rule version 2 (mixed-version fleet or a newer floor); ops 40->40; unchanged
+06:52:09.375 seed Valid P=2 op=01a1e320-a302-7bc3-b011-e55c9d7f1281: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v3
+06:52:09.405 seed Valid P=3 op=01a1e320-a31f-7e8a-aff2-9e6b9f228729: OK
+06:52:09.405 PASS E-36: DbUpdateException <- PostgresException 23514 ck_content_operation_rule_floor_v3; OK
+06:52:10.488 --apply-content-acceptance-floor 3 (m2e-floor3-again) exit 0: content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+06:52:11.265 --apply-content-acceptance-floor 2 (m2e-floor2-after-3) exit 2: content acceptance rule floor 3 is already recorded; floors are never lowered, so floor 2 is not applied
+06:52:11.304 PASS E-37: exit 0, floors 3; exit 2, floors 3
+06:52:11.472 PASS E-38: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e320-1f58-76b0-9a07-0dbf7a7ef554, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorRecordedButMissing category=MissingFloor recovery=RecoveryRequired:ReinstateRecordedFloor phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 41->41; unchanged | unchanged
+06:52:12.602 --apply-content-acceptance-floor 3 (m2e-floor3-missing) exit 4: content acceptance rule floor 3 is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with --reinstate-recorded-floor
+06:52:13.763 --apply-content-acceptance-floor 3 --reinstate-recorded-floor (m2e-floor3-reinstate) exit 0: content acceptance rule floor 3 re-installed (recorded floor reinstated)  content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+06:52:13.968 PASS E-39: exit 4; exit 0; floors 3; write OK
+06:52:14.127 PASS E-40: AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e320-1f58-76b0-9a07-0dbf7a7ef554, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorLowered category=LoweredFloor recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=3 build=3, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 43->43; unchanged | unchanged
+06:52:15.265 --apply-content-acceptance-floor 3 --reinstate-recorded-floor (m2e-floor3-reinstate-2) exit 0: content acceptance rule floor 3 re-installed (recorded floor reinstated)  content acceptance rule floor 3 installed (ck_content_operation_rule_floor_v3, NOT VALID); ordinary --migrate never applies or removes it
+06:52:15.289 PASS E-41: exit 0; floors 3
+06:52:15.383 PASS E-42: false false false | none | none

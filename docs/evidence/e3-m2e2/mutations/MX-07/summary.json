@@ -1,0 +1,17 @@
+{
+    "Label":  "MX-07",
+    "Groups":  "P,R",
+    "ExitCode":  1,
+    "Checks":  43,
+    "Failed":  9,
+    "ExpectedGapDemonstrations":  3,
+    "ContainersRemoved":  true,
+    "ContainerListUnchanged":  true,
+    "DeadlocksInServerLog":  0,
+    "LockTimeoutsInServerLog":  0,
+    "ExpectedPermissionDenied":  3,
+    "UnexpectedPermissionDenied":  0,
+    "ConfigEnablersBefore":  0,
+    "ConfigEnablersAfter":  0,
+    "EvidenceLeaksAfterScrub":  0
+}

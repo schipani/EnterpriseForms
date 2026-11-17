@@ -1,0 +1,9 @@
+2026-11-17 15:06:06.780 UTC [588] g3_l1 g3l06 carv-v3 LOG:  duration: 0.035 ms  plan:
+	Query Text: SELECT security_journal_entry_id, journal_stream_revision, journal_event_body_json, journal_event_digest FROM authority.security_journal_entries WHERE organization_id = $1 AND journal_stream_name = 'audit' AND journal_event_kind = 'EnvelopeCapabilityRefused' ORDER BY journal_stream_revision DESC LIMIT 8
+	Query Parameters: $1 = '01a1ea0b-38fb-7145-a17a-1531d3e79b35'
+	Limit  (cost=0.12..5.89 rows=1 width=79) (actual time=0.023..0.028 rows=8.00 loops=1)
+	  Buffers: shared hit=3
+	  ->  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.12..5.89 rows=1 width=79) (actual time=0.022..0.026 rows=8.00 loops=1)
+	        Index Cond: (organization_id = '01a1ea0b-38fb-7145-a17a-1531d3e79b35'::uuid)
+	        Index Searches: 1
+	        Buffers: shared hit=3

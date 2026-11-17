@@ -1,0 +1,6 @@
+# EF Core generated migrations: reviewed as generated artifacts, excluded from style/quality analyzers.
+[*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
+dotnet_diagnostic.IDE0161.severity = none
+dotnet_diagnostic.CA1861.severity = none

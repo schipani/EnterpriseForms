@@ -1,0 +1,42 @@
+Gate                           Variant   Probe                                                               Expected   Hit   Ok
+----                           -------   -----                                                               --------   ---   --
+e3-m2e2-acceptance-pg-gate.ps1 HEAD      src/authority/AuthorizationAuthority.Api/appsettings.HC12Probe.json     True  True True
+e3-m2e2-acceptance-pg-gate.ps1 HEAD      infra/hc12-probe.bicepparam                                             True  True True
+e3-m2e2-acceptance-pg-gate.ps1 HEAD      deploy/hc12-probe.yaml                                                  True  True True
+e3-m2e2-acceptance-pg-gate.ps1 HEAD      hc12-probe.env                                                          True  True True
+e3-m2e2-acceptance-pg-gate.ps1 HEAD      docs/hc12-probe.yml                                                     True  True True
+e3-m2e2-acceptance-pg-gate.ps1 HEAD      tools/experiments/hc12-probe/appsettings.json                           True  True True
+e3-m2e2-acceptance-pg-gate.ps1 HEAD      docs/evidence/hc12-probe/report.json                                    True  True True
+e3-m2e2-acceptance-pg-gate.ps1 HEAD      (repository at HEAD + working tree)                                     True  True True
+e3-m2e2-acceptance-pg-gate.ps1 HEAD      (committed 3G evidence in the probe clone)                              True  True True
+e3-m2e2-acceptance-pg-gate.ps1 corrected src/authority/AuthorizationAuthority.Api/appsettings.HC12Probe.json     True  True True
+e3-m2e2-acceptance-pg-gate.ps1 corrected infra/hc12-probe.bicepparam                                             True  True True
+e3-m2e2-acceptance-pg-gate.ps1 corrected deploy/hc12-probe.yaml                                                  True  True True
+e3-m2e2-acceptance-pg-gate.ps1 corrected hc12-probe.env                                                          True  True True
+e3-m2e2-acceptance-pg-gate.ps1 corrected docs/hc12-probe.yml                                                     True  True True
+e3-m2e2-acceptance-pg-gate.ps1 corrected tools/experiments/hc12-probe/appsettings.json                           True  True True
+e3-m2e2-acceptance-pg-gate.ps1 corrected docs/evidence/hc12-probe/report.json                                   False False True
+e3-m2e2-acceptance-pg-gate.ps1 corrected (repository at HEAD + working tree)                                    False False True
+e3-m2e2-acceptance-pg-gate.ps1 corrected (committed 3G evidence in the probe clone)                             False False True
+e3-m2f3g-evidence-pg-gate.ps1  HEAD      src/authority/AuthorizationAuthority.Api/appsettings.HC12Probe.json     True  True True
+e3-m2f3g-evidence-pg-gate.ps1  HEAD      infra/hc12-probe.bicepparam                                             True  True True
+e3-m2f3g-evidence-pg-gate.ps1  HEAD      deploy/hc12-probe.yaml                                                  True  True True
+e3-m2f3g-evidence-pg-gate.ps1  HEAD      hc12-probe.env                                                          True  True True
+e3-m2f3g-evidence-pg-gate.ps1  HEAD      docs/hc12-probe.yml                                                     True  True True
+e3-m2f3g-evidence-pg-gate.ps1  HEAD      tools/experiments/hc12-probe/appsettings.json                           True  True True
+e3-m2f3g-evidence-pg-gate.ps1  HEAD      docs/evidence/hc12-probe/report.json                                    True  True True
+e3-m2f3g-evidence-pg-gate.ps1  HEAD      (repository at HEAD + working tree)                                     True  True True
+e3-m2f3g-evidence-pg-gate.ps1  HEAD      (committed 3G evidence in the probe clone)                              True  True True
+e3-m2f3g-evidence-pg-gate.ps1  corrected src/authority/AuthorizationAuthority.Api/appsettings.HC12Probe.json     True  True True
+e3-m2f3g-evidence-pg-gate.ps1  corrected infra/hc12-probe.bicepparam                                             True  True True
+e3-m2f3g-evidence-pg-gate.ps1  corrected deploy/hc12-probe.yaml                                                  True  True True
+e3-m2f3g-evidence-pg-gate.ps1  corrected hc12-probe.env                                                          True  True True
+e3-m2f3g-evidence-pg-gate.ps1  corrected docs/hc12-probe.yml                                                     True  True True
+e3-m2f3g-evidence-pg-gate.ps1  corrected tools/experiments/hc12-probe/appsettings.json                           True  True True
+e3-m2f3g-evidence-pg-gate.ps1  corrected docs/evidence/hc12-probe/report.json                                   False False True
+e3-m2f3g-evidence-pg-gate.ps1  corrected (repository at HEAD + working tree)                                    False False True
+e3-m2f3g-evidence-pg-gate.ps1  corrected (committed 3G evidence in the probe clone)                             False False True
+
+
+
+checks: 36; failed: 0

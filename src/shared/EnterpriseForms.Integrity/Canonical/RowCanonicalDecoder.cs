@@ -18,6 +18,64 @@ public sealed record RowCanonicalColumn(string Name, RowColumnType? Type, ReadOn
     public ReadOnlyMemory<byte>? AsBytes() => Type == RowColumnType.Bytes ? FramedValue[5..] : null;
 
     public bool FramedValueEquals(RowCanonicalColumn other) => other is not null && FramedValue.Span.SequenceEqual(other.FramedValue.Span);
+
+    /// <summary>IX-1: the 64-bit integer value, or null when the column is NULL or not Int64.</summary>
+    public long? AsInt64() => Type == RowColumnType.Int64 ? BinaryPrimitives.ReadInt64BigEndian(FramedValue.Span[1..]) : null;
+
+    /// <summary>IX-1: the boolean value, or null when the column is NULL or not Boolean. Any byte other than 0 or 1 is a format error.</summary>
+    public bool? AsBoolean() => Type != RowColumnType.Boolean ? null : FramedValue.Span[1] switch
+    {
+        0 => false,
+        1 => true,
+        _ => throw new IntegrityFormatException(IntegrityFormatErrorCode.TypeMismatch, Name + ": boolean byte out of range"),
+    };
+
+    /// <summary>IX-1: the date value (days since 1970-01-01), or null when the column is NULL or not Date.</summary>
+    public DateOnly? AsDate() => Type == RowColumnType.Date ? DateOnly.FromDayNumber(new DateOnly(1970, 1, 1).DayNumber + BinaryPrimitives.ReadInt32BigEndian(FramedValue.Span[1..])) : null;
+
+    /// <summary>IX-1: the UTC instant (microseconds since the Unix epoch), or null when the column is NULL or not TimestampUtc.</summary>
+    public DateTimeOffset? AsTimestamp() => Type == RowColumnType.TimestampUtc ? DateTimeOffset.UnixEpoch.AddTicks(checked(BinaryPrimitives.ReadInt64BigEndian(FramedValue.Span[1..]) * 10)) : null;
+
+    /// <summary>
+    /// IX-1: the normalized decimal (scale, big-endian two's-complement coefficient), or null when the column is NULL or not
+    /// Decimal. Returned as the encoded pair so no precision is lost; <see cref="AsDecimalValue"/> converts when it fits.
+    /// </summary>
+    public (int Scale, System.Numerics.BigInteger Coefficient)? AsDecimalParts()
+    {
+        if (Type != RowColumnType.Decimal)
+        {
+            return null;
+        }
+
+        var span = FramedValue.Span[1..];
+        var scale = BinaryPrimitives.ReadInt32BigEndian(span);
+        var length = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(4, 2));
+        return (scale, new System.Numerics.BigInteger(span.Slice(6, length), isUnsigned: false, isBigEndian: true));
+    }
+
+    /// <summary>IX-1: the decimal value; a value outside <see cref="decimal"/> range is a format error (fail closed).</summary>
+    public decimal? AsDecimalValue()
+    {
+        if (AsDecimalParts() is not { } parts)
+        {
+            return null;
+        }
+
+        if (parts.Scale is < 0 or > 28 || System.Numerics.BigInteger.Abs(parts.Coefficient) > new System.Numerics.BigInteger(decimal.MaxValue))
+        {
+            throw new IntegrityFormatException(IntegrityFormatErrorCode.DecimalRange, Name + ": decimal out of range");
+        }
+
+        // Exact construction from the 96-bit magnitude and the scale (no division, no rounding).
+        var magnitude = System.Numerics.BigInteger.Abs(parts.Coefficient);
+        var mask = new System.Numerics.BigInteger(uint.MaxValue);
+        return new decimal(
+            unchecked((int)(uint)(magnitude & mask)),
+            unchecked((int)(uint)((magnitude >> 32) & mask)),
+            unchecked((int)(uint)((magnitude >> 64) & mask)),
+            parts.Coefficient.Sign < 0,
+            (byte)parts.Scale);
+    }
 }
 
 /// <summary>A fully decoded canonical row: header plus columns in registry order.</summary>

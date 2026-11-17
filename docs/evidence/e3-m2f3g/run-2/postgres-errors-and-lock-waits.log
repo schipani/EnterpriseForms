@@ -1,0 +1,1531 @@
+2026-11-17 14:15:20.405 UTC [74] postgres psql LOG:  statement: SELECT 1 FROM pg_database WHERE datname = 'm2f3ggate' ;
+2026-11-17 14:15:20.444 UTC [76] postgres psql LOG:  statement: CREATE DATABASE "m2f3ggate" ;
+2026-11-17 14:15:23.094 UTC [100] m2f3ggate psql LOG:  statement: CREATE ROLE authority_runtime LOGIN PASSWORD '<redacted>' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS
+2026-11-17 14:15:23.243 UTC [107] m2f3ggate psql LOG:  statement: COMMENT ON DATABASE m2f3ggate IS 'm2e2-nonce:<redacted>'
+2026-11-17 14:15:23.394 UTC [114] m2f3ggate psql LOG:  statement: SELECT system_identifier FROM pg_control_system()
+2026-11-17 14:15:23.540 UTC [121] m2f3ggate psql LOG:  statement: SELECT version()
+2026-11-17 14:15:26.040 UTC [122] m2f3ggate [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:15:26.139 UTC [123] m2f3ggate g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:15:26.161 UTC [123] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:26.237 UTC [124] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:26.250 UTC [125] g3_base [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:15:27.614 UTC [126] g3_base g3-migrate LOG:  statement: SELECT version();
+2026-11-17 14:15:27.657 UTC [126] g3_base g3-migrate ERROR:  relation "authority.ef_migrations_history" does not exist at character 46
+2026-11-17 14:15:27.657 UTC [126] g3_base g3-migrate STATEMENT:  SELECT "MigrationId", "ProductVersion"
+2026-11-17 14:15:28.023 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:28.088 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:28.089 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.095 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.101 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.251 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.287 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.293 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.311 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.315 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.333 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.341 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.363 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.381 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.402 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.407 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.430 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.443 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.475 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.508 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.532 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.537 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.566 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.584 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.615 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.643 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.671 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.677 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.706 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.724 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.769 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.827 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.873 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:28.927 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:28.978 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:29.026 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:29.071 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:29.080 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:29.156 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:29.301 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:29.366 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:29.381 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:29.440 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:29.446 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:29.553 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:29.588 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:29.649 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:29.653 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:29.708 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:29.722 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:29.795 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:29.828 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:29.884 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:29.890 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:29.957 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:30.004 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:30.068 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:30.078 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:30.144 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:30.176 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:30.248 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:30.278 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:30.374 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:30.381 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:30.497 UTC [126] g3_base g3-migrate LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:30.522 UTC [126] g3_base g3-migrate LOG:  statement: COMMIT
+2026-11-17 14:15:30.602 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.604 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.608 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.614 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.618 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.620 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.622 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.625 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.627 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.629 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.631 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.633 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.635 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.637 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.638 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.640 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.642 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.643 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.645 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.646 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.648 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.650 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.652 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.653 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.655 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.657 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.659 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.661 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.662 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.664 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.666 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.668 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.669 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.672 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.674 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.676 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.678 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.679 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.681 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.683 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.685 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.686 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.688 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.689 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.691 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.692 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.695 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.697 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.699 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.700 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.702 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.703 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.705 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.706 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.708 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.709 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.711 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.712 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.714 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.716 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.727 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.729 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.731 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.733 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.735 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.737 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.740 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.741 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.743 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.745 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.747 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.750 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.752 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.753 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.755 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.757 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.758 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.760 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.761 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.763 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.764 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.766 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.768 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.769 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.770 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.772 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.773 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.774 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.776 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.777 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.780 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.782 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.783 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.785 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.786 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.788 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.789 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.791 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.792 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.793 UTC [126] g3_base g3-migrate LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.851 UTC [127] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.928 UTC [127] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:30.942 UTC [128] g3_prefloor [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:15:31.518 UTC [129] g3_base g3-floor1 LOG:  statement: SELECT version();
+2026-11-17 14:15:32.025 UTC [129] g3_base g3-floor1 LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:32.032 UTC [129] g3_base g3-floor1 LOG:  statement: COMMIT
+2026-11-17 14:15:32.038 UTC [129] g3_base g3-floor1 LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:32.063 UTC [129] g3_base g3-floor1 LOG:  statement: COMMIT
+2026-11-17 14:15:32.649 UTC [130] g3_base g3-floor2 LOG:  statement: SELECT version();
+2026-11-17 14:15:33.195 UTC [130] g3_base g3-floor2 LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:33.202 UTC [130] g3_base g3-floor2 LOG:  statement: COMMIT
+2026-11-17 14:15:33.207 UTC [130] g3_base g3-floor2 LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:33.233 UTC [130] g3_base g3-floor2 LOG:  statement: COMMIT
+2026-11-17 14:15:33.804 UTC [131] g3_base g3-floor3 LOG:  statement: SELECT version();
+2026-11-17 14:15:34.306 UTC [131] g3_base g3-floor3 LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:34.313 UTC [131] g3_base g3-floor3 LOG:  statement: COMMIT
+2026-11-17 14:15:34.319 UTC [131] g3_base g3-floor3 LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:34.351 UTC [131] g3_base g3-floor3 LOG:  statement: COMMIT
+2026-11-17 14:15:34.462 UTC [132] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:34.521 UTC [132] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:34.550 UTC [133] g3_noindex [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:15:34.600 UTC [134] g3_base g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:15:34.957 UTC [135] g3_base authority-capability-evidence-index LOG:  statement: SELECT version();
+2026-11-17 14:15:35.485 UTC [136] g3_base authority-capability-evidence-index LOG:  statement: SELECT version();
+2026-11-17 14:15:35.722 UTC [134] g3_base g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:35.737 UTC [137] g3_noindex g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:15:35.758 UTC [138] g3_prefloor g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:15:35.770 UTC [138] g3_prefloor g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:35.773 UTC [137] g3_noindex g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:35.775 UTC [138] g3_prefloor g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:35.778 UTC [138] g3_prefloor g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:35.781 UTC [134] g3_base g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:36.051 UTC [139] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:36.107 UTC [139] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:36.122 UTC [140] g3_h1 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:15:38.014 UTC [141] g3_h1 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:15:38.061 UTC [141] g3_h1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:38.080 UTC [141] g3_h1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:15:38.572 UTC [143] g3_h1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:38.577 UTC [143] g3_h1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:15:38.617 UTC [144] g3_h1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:38.622 UTC [144] g3_h1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:15:38.656 UTC [145] g3_h1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:38.660 UTC [145] g3_h1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:15:38.683 UTC [146] g3_h1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:38.688 UTC [146] g3_h1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:15:38.723 UTC [147] g3_h1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:38.728 UTC [147] g3_h1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:15:40.128 UTC [149] g3_h1 g3-fingerprint LOG:  statement: SELECT version();
+2026-11-17 14:15:40.280 UTC [150] g3_h1 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:15:40.297 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:41.881 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:41.902 UTC [149] g3_h1 g3-fingerprint LOG:  statement: DISCARD ALL
+2026-11-17 14:15:42.003 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:42.023 UTC [154] g3_h1 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:15:42.046 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:42.048 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:42.244 UTC [154] g3_h1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:15:42.333 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:42.698 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:42.702 UTC [149] g3_h1 g3-fingerprint LOG:  statement: DISCARD ALL
+2026-11-17 14:15:46.535 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:46.537 UTC [154] g3_h1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:15:46.542 UTC [149] g3_h1 g3-fingerprint LOG:  statement: DISCARD ALL
+2026-11-17 14:15:46.631 UTC [149] g3_h1 g3-fingerprint LOG:  statement: DISCARD ALL
+2026-11-17 14:15:46.725 UTC [149] g3_h1 g3-fingerprint LOG:  statement: DISCARD ALL
+2026-11-17 14:15:49.665 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:49.668 UTC [154] g3_h1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:15:49.674 UTC [149] g3_h1 g3-fingerprint LOG:  statement: DISCARD ALL
+2026-11-17 14:15:49.762 UTC [149] g3_h1 g3-fingerprint LOG:  statement: DISCARD ALL
+2026-11-17 14:15:49.844 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:50.051 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:50.053 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:50.055 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:52.760 UTC [154] g3_h1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:15:52.775 UTC [161] g3_h1 g3-lock-holder LOG:  statement: SELECT version();
+2026-11-17 14:15:52.786 UTC [161] g3_h1 g3-lock-holder LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:53.312 UTC [160] g3_h1 g3-host-h1-restart carv-v3 ERROR:  canceling statement due to statement timeout
+2026-11-17 14:15:53.312 UTC [160] g3_h1 g3-host-h1-restart carv-v3 STATEMENT:  SELECT c.oid::bigint AS relation_oid, c.relkind::text AS relation_kind, coalesce(i.indrelid = to_regclass('authority.security_journal_entries'), false) AS on_target_table, am.amname::text AS access_method, coalesce(i.indisunique, false) AS is_unique, coalesce(i.indisprimary, false) AS is_primary, coalesce(i.indisexclusion, false) AS is_exclusion, coalesce(i.indisvalid, false) AS is_valid, coalesce(i.indisready, false) AS is_ready, coalesce(i.indislive, false) AS is_live, coalesce(i.indnatts, 0)::integer AS attribute_count, coalesce(i.indnkeyatts, 0)::integer AS key_attribute_count, (i.indexprs IS NOT NULL) AS has_expressions, coalesce(ARRAY(SELECT a.attname::text FROM unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord) JOIN pg_catalog.pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum ORDER BY k.ord), ARRAY[]::text[]) AS key_columns, i.indoption::text AS key_options, coalesce(ARRAY(SELECT oc.opcname::text FROM unnest(i.indclass::oid[]) WITH ORDINALITY AS k(opc, ord) JOIN pg_catalog.pg_opclass oc ON oc.oid = k.opc ORDER BY k.ord), ARRAY[]::text[]) AS operator_classes, CASE WHEN i.indrelid = to_regclass('authority.security_journal_entries') THEN pg_catalog.pg_get_expr(i.indpred, i.indrelid) END AS predicate, CASE WHEN i.indrelid = to_regclass('authority.security_journal_entries') THEN pg_catalog.pg_get_indexdef(c.oid) END AS definition, coalesce(c.relowner = t.relowner, false) AS owned_by_table_owner, (c.relacl IS NOT NULL) AS has_privileges, (EXISTS (SELECT 1 FROM pg_catalog.pg_stat_progress_create_index p WHERE p.index_relid = c.oid) OR EXISTS (SELECT 1 FROM pg_catalog.pg_locks l WHERE l.locktype = 'relation' AND l.relation = i.indrelid AND l.granted AND l.mode = 'ShareUpdateExclusiveLock' AND l.pid <> pg_catalog.pg_backend_pid())) AS build_visibly_in_progress FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace LEFT JOIN pg_catalog.pg_index i ON i.indexrelid = c.oid LEFT JOIN pg_catalog.pg_class t ON t.oid = i.indrelid LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam WHERE n.nspname = 'authority' AND c.relname = 'ix_journal_capability_refusal_evidence'
+2026-11-17 14:15:53.349 UTC [161] g3_h1 g3-lock-holder LOG:  statement: ROLLBACK
+2026-11-17 14:15:53.351 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:55.953 UTC [150] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:55.955 UTC [154] g3_h1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:15:56.006 UTC [167] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:56.046 UTC [167] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:15:56.060 UTC [168] g3_h2 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:15:56.085 UTC [169] g3_h2 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:15:56.094 UTC [169] g3_h2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:15:56.099 UTC [169] g3_h2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:15:58.741 UTC [176] g3_h2 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:15:58.771 UTC [177] g3_h2 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:15:59.092 UTC [178] g3_h2 authority-capability-evidence-index LOG:  statement: SELECT version();
+2026-11-17 14:15:59.391 UTC [176] g3_h2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:00.396 UTC [176] g3_h2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:01.409 UTC [176] g3_h2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:02.423 UTC [176] g3_h2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:03.437 UTC [176] g3_h2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:04.444 UTC [176] g3_h2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:05.448 UTC [176] g3_h2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:05.546 UTC [177] g3_h2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:05.592 UTC [179] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:05.632 UTC [179] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:05.646 UTC [180] g3_m1 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:16:05.680 UTC [181] g3_m1 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:16:05.690 UTC [181] g3_m1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:05.696 UTC [181] g3_m1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:05.744 UTC [183] g3_m1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:05.749 UTC [183] g3_m1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:05.774 UTC [184] g3_m1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:05.780 UTC [184] g3_m1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:05.803 UTC [185] g3_m1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:05.809 UTC [185] g3_m1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:05.832 UTC [186] g3_m1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:05.837 UTC [186] g3_m1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:05.860 UTC [187] g3_m1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:05.866 UTC [187] g3_m1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:05.890 UTC [188] g3_m1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:05.895 UTC [188] g3_m1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:05.918 UTC [189] g3_m1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:05.924 UTC [189] g3_m1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:05.947 UTC [190] g3_m1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:05.952 UTC [190] g3_m1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:05.976 UTC [191] g3_m1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:05.981 UTC [191] g3_m1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:06.004 UTC [192] g3_m1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:06.010 UTC [192] g3_m1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:06.033 UTC [193] g3_m1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:06.039 UTC [193] g3_m1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:13.407 UTC [256] g3_m1 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:16:14.699 UTC [256] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:15.755 UTC [196] g3_m1 g3-host-m0 carv-v3 LOG:  process 196 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1000.276 ms
+2026-11-17 14:16:15.755 UTC [196] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.755 UTC [215] g3_m1 g3-host-m1 carv-v3 LOG:  process 215 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1000.190 ms
+2026-11-17 14:16:15.755 UTC [215] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.755 UTC [279] g3_m1 g3-host-m2 carv-v3 LOG:  process 279 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1000.486 ms
+2026-11-17 14:16:15.755 UTC [279] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.756 UTC [219] g3_m1 g3-host-m1 carv-v3 LOG:  process 219 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1000.517 ms
+2026-11-17 14:16:15.756 UTC [219] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.758 UTC [277] g3_m1 g3-host-m2 carv-v3 LOG:  process 277 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1000.278 ms
+2026-11-17 14:16:15.758 UTC [277] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.759 UTC [197] g3_m1 g3-host-m0 carv-v3 LOG:  process 197 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1000.666 ms
+2026-11-17 14:16:15.759 UTC [197] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.760 UTC [244] g3_m1 g3-host-m1 carv-v3 ERROR:  canceling statement due to lock timeout
+2026-11-17 14:16:15.760 UTC [244] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.761 UTC [200] g3_m1 g3-host-m1 carv-v3 LOG:  process 200 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1000.283 ms
+2026-11-17 14:16:15.761 UTC [200] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.761 UTC [280] g3_m1 g3-host-m2 carv-v3 LOG:  process 280 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1000.334 ms
+2026-11-17 14:16:15.761 UTC [280] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.762 UTC [225] g3_m1 g3-host-m0 carv-v3 LOG:  process 225 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1000.300 ms
+2026-11-17 14:16:15.762 UTC [225] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.768 UTC [278] g3_m1 g3-host-m2 carv-v3 LOG:  process 278 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1006.207 ms
+2026-11-17 14:16:15.768 UTC [278] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.768 UTC [237] g3_m1 g3-host-m1 carv-v3 LOG:  process 237 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1010.196 ms
+2026-11-17 14:16:15.768 UTC [237] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.769 UTC [272] g3_m1 g3-host-m2 carv-v3 LOG:  process 272 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1011.901 ms
+2026-11-17 14:16:15.769 UTC [272] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.770 UTC [230] g3_m1 g3-host-m0 carv-v3 LOG:  process 230 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1005.895 ms
+2026-11-17 14:16:15.770 UTC [230] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.771 UTC [205] g3_m1 g3-host-m2 carv-v3 LOG:  process 205 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1000.198 ms
+2026-11-17 14:16:15.771 UTC [205] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.773 UTC [275] g3_m1 g3-host-m2 carv-v3 LOG:  process 275 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1008.421 ms
+2026-11-17 14:16:15.773 UTC [275] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.776 UTC [241] g3_m1 g3-host-m1 carv-v3 LOG:  process 241 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1000.340 ms
+2026-11-17 14:16:15.776 UTC [241] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.779 UTC [196] g3_m1 g3-host-m0 carv-v3 LOG:  process 196 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1024.603 ms
+2026-11-17 14:16:15.779 UTC [196] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.781 UTC [222] g3_m1 g3-host-m0 carv-v3 LOG:  process 222 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1000.225 ms
+2026-11-17 14:16:15.781 UTC [222] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.783 UTC [281] g3_m1 g3-host-m2 carv-v3 LOG:  process 281 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1000.304 ms
+2026-11-17 14:16:15.783 UTC [281] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.783 UTC [255] g3_m1 g3-host-m0 carv-v3 LOG:  process 255 still waiting for AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1000.266 ms
+2026-11-17 14:16:15.783 UTC [255] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.783 UTC [250] g3_m1 g3-host-m0 carv-v3 LOG:  process 250 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1000.309 ms
+2026-11-17 14:16:15.783 UTC [250] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.786 UTC [248] g3_m1 g3-host-m0 carv-v3 LOG:  process 248 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1002.282 ms
+2026-11-17 14:16:15.786 UTC [248] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.786 UTC [206] g3_m1 g3-host-m1 carv-v3 LOG:  process 206 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1000.227 ms
+2026-11-17 14:16:15.786 UTC [206] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.787 UTC [254] g3_m1 g3-host-m0 carv-v3 LOG:  process 254 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1004.058 ms
+2026-11-17 14:16:15.787 UTC [254] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.801 UTC [222] g3_m1 g3-host-m0 carv-v3 LOG:  process 222 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1019.472 ms
+2026-11-17 14:16:15.801 UTC [222] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.802 UTC [220] g3_m1 g3-host-m0 carv-v3 LOG:  process 220 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1001.259 ms
+2026-11-17 14:16:15.802 UTC [220] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.802 UTC [210] g3_m1 g3-host-m1 carv-v3 LOG:  process 210 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1000.228 ms
+2026-11-17 14:16:15.802 UTC [210] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.803 UTC [265] g3_m1 g3-host-m2 carv-v3 LOG:  process 265 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1000.743 ms
+2026-11-17 14:16:15.803 UTC [265] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.816 UTC [279] g3_m1 g3-host-m2 carv-v3 LOG:  process 279 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1061.057 ms
+2026-11-17 14:16:15.816 UTC [279] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.838 UTC [215] g3_m1 g3-host-m1 carv-v3 LOG:  process 215 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1083.111 ms
+2026-11-17 14:16:15.838 UTC [215] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.847 UTC [219] g3_m1 g3-host-m1 carv-v3 LOG:  process 219 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1091.807 ms
+2026-11-17 14:16:15.847 UTC [219] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.853 UTC [272] g3_m1 g3-host-m2 carv-v3 LOG:  process 272 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1095.407 ms
+2026-11-17 14:16:15.853 UTC [272] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.855 UTC [250] g3_m1 g3-host-m0 carv-v3 LOG:  process 250 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1071.848 ms
+2026-11-17 14:16:15.855 UTC [250] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.860 UTC [197] g3_m1 g3-host-m0 carv-v3 LOG:  process 197 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1101.638 ms
+2026-11-17 14:16:15.860 UTC [197] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.867 UTC [237] g3_m1 g3-host-m1 carv-v3 LOG:  process 237 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1108.939 ms
+2026-11-17 14:16:15.867 UTC [237] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.871 UTC [277] g3_m1 g3-host-m2 carv-v3 LOG:  process 277 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1113.161 ms
+2026-11-17 14:16:15.871 UTC [277] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.876 UTC [200] g3_m1 g3-host-m1 carv-v3 LOG:  process 200 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1114.895 ms
+2026-11-17 14:16:15.876 UTC [200] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.889 UTC [248] g3_m1 g3-host-m0 carv-v3 LOG:  process 248 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1105.351 ms
+2026-11-17 14:16:15.889 UTC [248] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.895 UTC [284] g3_m1 g3-host-m1 carv-v3 LOG:  process 284 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1000.393 ms
+2026-11-17 14:16:15.895 UTC [284] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.895 UTC [283] g3_m1 g3-host-m1 carv-v3 LOG:  process 283 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1000.412 ms
+2026-11-17 14:16:15.895 UTC [283] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.896 UTC [254] g3_m1 g3-host-m0 carv-v3 LOG:  process 254 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1113.096 ms
+2026-11-17 14:16:15.896 UTC [254] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.905 UTC [206] g3_m1 g3-host-m1 carv-v3 LOG:  process 206 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1119.558 ms
+2026-11-17 14:16:15.905 UTC [206] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.911 UTC [220] g3_m1 g3-host-m0 carv-v3 LOG:  process 220 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1110.823 ms
+2026-11-17 14:16:15.911 UTC [220] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.914 UTC [282] g3_m1 g3-host-m2 carv-v3 LOG:  process 282 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1000.682 ms
+2026-11-17 14:16:15.914 UTC [282] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.914 UTC [209] g3_m1 g3-host-m1 carv-v3 ERROR:  canceling statement due to lock timeout
+2026-11-17 14:16:15.914 UTC [209] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.915 UTC [286] g3_m1 g3-host-m2 carv-v3 LOG:  process 286 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1000.633 ms
+2026-11-17 14:16:15.915 UTC [286] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.917 UTC [285] g3_m1 g3-host-m2 carv-v3 LOG:  process 285 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1000.327 ms
+2026-11-17 14:16:15.917 UTC [285] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.920 UTC [265] g3_m1 g3-host-m2 carv-v3 LOG:  process 265 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1117.614 ms
+2026-11-17 14:16:15.920 UTC [265] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.926 UTC [288] g3_m1 g3-host-m2 carv-v3 LOG:  process 288 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1001.346 ms
+2026-11-17 14:16:15.926 UTC [288] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.930 UTC [210] g3_m1 g3-host-m1 carv-v3 LOG:  process 210 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1128.301 ms
+2026-11-17 14:16:15.930 UTC [210] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.932 UTC [225] g3_m1 g3-host-m0 carv-v3 LOG:  process 225 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1171.726 ms
+2026-11-17 14:16:15.932 UTC [225] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.939 UTC [284] g3_m1 g3-host-m1 carv-v3 LOG:  process 284 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1043.976 ms
+2026-11-17 14:16:15.939 UTC [284] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.939 UTC [290] g3_m1 g3-host-m1 carv-v3 LOG:  process 290 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1001.771 ms
+2026-11-17 14:16:15.939 UTC [290] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.941 UTC [218] g3_m1 g3-host-m1 carv-v3 ERROR:  canceling statement due to lock timeout
+2026-11-17 14:16:15.941 UTC [218] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.945 UTC [280] g3_m1 g3-host-m2 carv-v3 LOG:  process 280 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1184.304 ms
+2026-11-17 14:16:15.945 UTC [280] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.948 UTC [283] g3_m1 g3-host-m1 carv-v3 LOG:  process 283 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1053.311 ms
+2026-11-17 14:16:15.948 UTC [283] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.954 UTC [278] g3_m1 g3-host-m2 carv-v3 LOG:  process 278 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1193.356 ms
+2026-11-17 14:16:15.954 UTC [278] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.954 UTC [282] g3_m1 g3-host-m2 carv-v3 LOG:  process 282 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1040.711 ms
+2026-11-17 14:16:15.954 UTC [282] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.958 UTC [230] g3_m1 g3-host-m0 carv-v3 LOG:  process 230 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1193.446 ms
+2026-11-17 14:16:15.958 UTC [230] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.965 UTC [286] g3_m1 g3-host-m2 carv-v3 LOG:  process 286 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1050.885 ms
+2026-11-17 14:16:15.965 UTC [286] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.973 UTC [285] g3_m1 g3-host-m2 carv-v3 LOG:  process 285 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1056.931 ms
+2026-11-17 14:16:15.973 UTC [285] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.978 UTC [242] g3_m1 g3-host-m1 carv-v3 ERROR:  canceling statement due to lock timeout
+2026-11-17 14:16:15.978 UTC [242] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.978 UTC [207] g3_m1 g3-host-m1 carv-v3 ERROR:  canceling statement due to lock timeout
+2026-11-17 14:16:15.978 UTC [207] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:15.993 UTC [243] g3_m1 g3-host-m1 carv-v3 ERROR:  canceling statement due to lock timeout
+2026-11-17 14:16:15.993 UTC [243] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:16.010 UTC [275] g3_m1 g3-host-m2 carv-v3 LOG:  process 275 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1245.982 ms
+2026-11-17 14:16:16.010 UTC [275] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:16.015 UTC [205] g3_m1 g3-host-m2 carv-v3 LOG:  process 205 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1244.688 ms
+2026-11-17 14:16:16.015 UTC [205] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:16.020 UTC [288] g3_m1 g3-host-m2 carv-v3 LOG:  process 288 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1094.627 ms
+2026-11-17 14:16:16.020 UTC [288] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:16.021 UTC [241] g3_m1 g3-host-m1 carv-v3 LOG:  process 241 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1245.813 ms
+2026-11-17 14:16:16.021 UTC [241] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:16.025 UTC [281] g3_m1 g3-host-m2 carv-v3 LOG:  process 281 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1242.562 ms
+2026-11-17 14:16:16.025 UTC [281] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:16.031 UTC [255] g3_m1 g3-host-m0 carv-v3 LOG:  process 255 acquired AccessExclusiveLock on tuple (0,3) of relation 16395 of database 18366 after 1247.658 ms
+2026-11-17 14:16:16.031 UTC [255] g3_m1 g3-host-m0 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:16.058 UTC [290] g3_m1 g3-host-m1 carv-v3 LOG:  process 290 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1121.330 ms
+2026-11-17 14:16:16.058 UTC [290] g3_m1 g3-host-m1 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:16.060 UTC [307] g3_m1 g3-host-m2 carv-v3 LOG:  process 307 still waiting for AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1000.368 ms
+2026-11-17 14:16:16.060 UTC [307] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:16.063 UTC [307] g3_m1 g3-host-m2 carv-v3 LOG:  process 307 acquired AccessExclusiveLock on tuple (0,4) of relation 16395 of database 18366 after 1003.861 ms
+2026-11-17 14:16:16.063 UTC [307] g3_m1 g3-host-m2 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:16.873 UTC [256] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:16.985 UTC [256] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.093 UTC [256] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.136 UTC [256] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.162 UTC [256] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.182 UTC [256] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.211 UTC [537] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.223 UTC [538] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.233 UTC [256] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.241 UTC [539] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.250 UTC [537] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.260 UTC [538] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.269 UTC [256] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.278 UTC [539] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.290 UTC [537] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.297 UTC [538] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.304 UTC [256] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.314 UTC [539] g3_m1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.595 UTC [540] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.657 UTC [540] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.676 UTC [541] g3_t1 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:16:17.694 UTC [540] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.696 UTC [540] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.699 UTC [540] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.701 UTC [540] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:17.720 UTC [542] g3_t1 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:16:17.734 UTC [542] g3_t1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:17.741 UTC [542] g3_t1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:17.755 UTC [543] g3_t1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:17.763 UTC [543] g3_t1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:17.778 UTC [544] g3_t1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:17.785 UTC [544] g3_t1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:19.066 UTC [546] g3_t1 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:16:19.094 UTC [547] g3_t1 g3-fingerprint LOG:  statement: SELECT version();
+2026-11-17 14:16:19.211 UTC [546] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:19.214 UTC [546] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:19.215 UTC [547] g3_t1 g3-fingerprint LOG:  statement: DISCARD ALL
+2026-11-17 14:16:19.295 UTC [546] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:19.297 UTC [547] g3_t1 g3-fingerprint LOG:  statement: DISCARD ALL
+2026-11-17 14:16:21.314 UTC [549] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:21.429 UTC [549] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:21.431 UTC [550] g3_t1 g3-fingerprint LOG:  statement: DISCARD ALL
+2026-11-17 14:16:21.519 UTC [549] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:21.521 UTC [550] g3_t1 g3-fingerprint LOG:  statement: DISCARD ALL
+2026-11-17 14:16:21.634 UTC [552] g3_t1 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:16:22.250 UTC [549] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:22.253 UTC [549] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:22.267 UTC [554] g3_t1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:22.272 UTC [554] g3_t1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:22.379 UTC [556] g3_t1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:22.384 UTC [556] g3_t1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:22.396 UTC [557] g3_t1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:22.401 UTC [557] g3_t1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:23.647 UTC [552] g3_t1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:23.653 UTC [552] g3_t1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:23.659 UTC [552] g3_t1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:23.664 UTC [552] g3_t1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:23.690 UTC [579] g3_t1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:23.696 UTC [579] g3_t1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:24.379 UTC [552] g3_t1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:24.402 UTC [581] g3_t1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:24.410 UTC [581] g3_t1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:29.599 UTC [552] g3_t1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:29.621 UTC [624] g3_t1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:29.626 UTC [624] g3_t1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:29.639 UTC [625] g3_t1 g3-row-holder LOG:  statement: SELECT version();
+2026-11-17 14:16:29.649 UTC [625] g3_t1 g3-row-holder LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:30.675 UTC [626] g3_t1 g3t09 carv-v3 ERROR:  canceling statement due to lock timeout
+2026-11-17 14:16:30.675 UTC [626] g3_t1 g3t09 carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:30.684 UTC [549] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:30.686 UTC [625] g3_t1 g3-row-holder LOG:  statement: ROLLBACK
+2026-11-17 14:16:31.438 UTC [549] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:31.452 UTC [627] g3_t1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:31.458 UTC [627] g3_t1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:31.609 UTC [630] g3_t1 g3-row-holder-2 LOG:  statement: SELECT version();
+2026-11-17 14:16:31.620 UTC [630] g3_t1 g3-row-holder-2 LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:32.629 UTC [629] g3_t1 g3t09b carv-v3 ERROR:  canceling statement due to lock timeout
+2026-11-17 14:16:32.629 UTC [629] g3_t1 g3t09b carv-v3 STATEMENT:  SELECT a.organization_authorization_state_id, a.audit_journal_revision, a.authorization_revision, a.checkpoint_enforcement_mode_name, a.content_integrity_revision, a.integrity_quarantine_enabled, a.integrity_quarantine_reason_code, a.latest_audit_journal_digest, a.latest_content_journal_digest, a.latest_security_journal_digest, a.projection_zed_token, a.organization_display_name, a.organization_id, a.organization_onboarding_request_id, a.projection_applied_revision, a.projection_worker_fencing_epoch, a.projection_snapshot_zed_token, a.state_modified_on
+2026-11-17 14:16:32.634 UTC [549] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:32.636 UTC [630] g3_t1 g3-row-holder-2 LOG:  statement: ROLLBACK
+2026-11-17 14:16:32.651 UTC [631] g3_t1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:32.656 UTC [631] g3_t1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:32.670 UTC [632] g3_t1 g3-table-holder LOG:  statement: SELECT version();
+2026-11-17 14:16:32.680 UTC [632] g3_t1 g3-table-holder LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:33.213 UTC [633] g3_t1 g3t10 carv-v3 ERROR:  canceling statement due to statement timeout
+2026-11-17 14:16:33.213 UTC [633] g3_t1 g3t10 carv-v3 STATEMENT:  SELECT c.oid::bigint AS relation_oid, c.relkind::text AS relation_kind, coalesce(i.indrelid = to_regclass('authority.security_journal_entries'), false) AS on_target_table, am.amname::text AS access_method, coalesce(i.indisunique, false) AS is_unique, coalesce(i.indisprimary, false) AS is_primary, coalesce(i.indisexclusion, false) AS is_exclusion, coalesce(i.indisvalid, false) AS is_valid, coalesce(i.indisready, false) AS is_ready, coalesce(i.indislive, false) AS is_live, coalesce(i.indnatts, 0)::integer AS attribute_count, coalesce(i.indnkeyatts, 0)::integer AS key_attribute_count, (i.indexprs IS NOT NULL) AS has_expressions, coalesce(ARRAY(SELECT a.attname::text FROM unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord) JOIN pg_catalog.pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum ORDER BY k.ord), ARRAY[]::text[]) AS key_columns, i.indoption::text AS key_options, coalesce(ARRAY(SELECT oc.opcname::text FROM unnest(i.indclass::oid[]) WITH ORDINALITY AS k(opc, ord) JOIN pg_catalog.pg_opclass oc ON oc.oid = k.opc ORDER BY k.ord), ARRAY[]::text[]) AS operator_classes, CASE WHEN i.indrelid = to_regclass('authority.security_journal_entries') THEN pg_catalog.pg_get_expr(i.indpred, i.indrelid) END AS predicate, CASE WHEN i.indrelid = to_regclass('authority.security_journal_entries') THEN pg_catalog.pg_get_indexdef(c.oid) END AS definition, coalesce(c.relowner = t.relowner, false) AS owned_by_table_owner, (c.relacl IS NOT NULL) AS has_privileges, (EXISTS (SELECT 1 FROM pg_catalog.pg_stat_progress_create_index p WHERE p.index_relid = c.oid) OR EXISTS (SELECT 1 FROM pg_catalog.pg_locks l WHERE l.locktype = 'relation' AND l.relation = i.indrelid AND l.granted AND l.mode = 'ShareUpdateExclusiveLock' AND l.pid <> pg_catalog.pg_backend_pid())) AS build_visibly_in_progress FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace LEFT JOIN pg_catalog.pg_index i ON i.indexrelid = c.oid LEFT JOIN pg_catalog.pg_class t ON t.oid = i.indrelid LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam WHERE n.nspname = 'authority' AND c.relname = 'ix_journal_capability_refusal_evidence'
+2026-11-17 14:16:33.216 UTC [632] g3_t1 g3-table-holder LOG:  statement: ROLLBACK
+2026-11-17 14:16:33.864 UTC [549] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:33.879 UTC [634] g3_t1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:33.886 UTC [634] g3_t1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:33.900 UTC [635] g3_t1 g3-index-holder LOG:  statement: SELECT version();
+2026-11-17 14:16:33.913 UTC [635] g3_t1 g3-index-holder LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:34.458 UTC [636] g3_t1 g3t11 carv-v3 ERROR:  canceling statement due to statement timeout
+2026-11-17 14:16:34.458 UTC [636] g3_t1 g3t11 carv-v3 STATEMENT:  SELECT security_journal_entry_id, journal_stream_revision, journal_event_body_json, journal_event_digest FROM authority.security_journal_entries WHERE organization_id = $1 AND journal_stream_name = 'audit' AND journal_event_kind = 'EnvelopeCapabilityRefused' ORDER BY journal_stream_revision DESC LIMIT 8
+2026-11-17 14:16:34.467 UTC [635] g3_t1 g3-index-holder LOG:  statement: ROLLBACK
+2026-11-17 14:16:34.471 UTC [549] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.188 UTC [549] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.190 UTC [552] g3_t1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.209 UTC [637] g3_t1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:35.217 UTC [637] g3_t1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:35.326 UTC [549] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.346 UTC [549] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.348 UTC [552] g3_t1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.424 UTC [640] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.484 UTC [640] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.501 UTC [641] g3_f1 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:16:35.517 UTC [640] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.519 UTC [640] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.521 UTC [640] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.523 UTC [640] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.539 UTC [642] g3_f1 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:16:35.552 UTC [642] g3_f1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:35.559 UTC [642] g3_f1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:35.575 UTC [643] g3_f1 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:16:35.592 UTC [643] g3_f1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.638 UTC [644] g3_f1 g3f01 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:35.638 UTC [644] g3_f1 g3f01 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:35.653 UTC [643] g3_f1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.656 UTC [643] g3_f1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.658 UTC [643] g3_f1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.687 UTC [643] g3_f1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.701 UTC [645] g3_f1 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:16:35.744 UTC [646] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.795 UTC [646] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.811 UTC [647] g3_f2 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:16:35.824 UTC [646] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.826 UTC [646] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.828 UTC [646] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.830 UTC [646] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.844 UTC [648] g3_f2 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:16:35.857 UTC [648] g3_f2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:35.866 UTC [648] g3_f2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:35.880 UTC [649] g3_f2 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:16:35.895 UTC [649] g3_f2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.948 UTC [650] g3_f2 g3f02 carv-v3 ERROR:  new row for relation "organization_authorization_states" violates check constraint "g3_fault_update"
+2026-11-17 14:16:35.948 UTC [650] g3_f2 g3f02 carv-v3 STATEMENT:  UPDATE authority.organization_authorization_states SET audit_journal_revision = $1, latest_audit_journal_digest = $2, state_modified_on = $3
+2026-11-17 14:16:35.955 UTC [649] g3_f2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.957 UTC [649] g3_f2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.959 UTC [649] g3_f2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.983 UTC [649] g3_f2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:35.997 UTC [651] g3_f2 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:16:36.035 UTC [652] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.078 UTC [652] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.092 UTC [653] g3_f3 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:16:36.104 UTC [652] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.106 UTC [652] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.107 UTC [652] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.109 UTC [652] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.123 UTC [654] g3_f3 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:16:36.136 UTC [654] g3_f3 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:36.143 UTC [654] g3_f3 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:36.156 UTC [655] g3_f3 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:16:36.171 UTC [655] g3_f3 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.173 UTC [655] g3_f3 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.227 UTC [656] g3_f3 g3f03 carv-v3 ERROR:  g3 commit fault
+2026-11-17 14:16:36.227 UTC [656] g3_f3 g3f03 carv-v3 STATEMENT:  COMMIT
+2026-11-17 14:16:36.231 UTC [655] g3_f3 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.233 UTC [655] g3_f3 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.236 UTC [655] g3_f3 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.259 UTC [655] g3_f3 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.274 UTC [657] g3_f3 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:16:36.309 UTC [658] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.349 UTC [658] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.364 UTC [659] g3_f4 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:16:36.377 UTC [658] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.379 UTC [658] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.381 UTC [658] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.382 UTC [658] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.396 UTC [660] g3_f4 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:16:36.409 UTC [660] g3_f4 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:36.416 UTC [660] g3_f4 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:36.428 UTC [661] g3_f4 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:16:36.505 UTC [661] g3_f4 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.508 UTC [661] g3_f4 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.527 UTC [661] g3_f4 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.541 UTC [663] g3_f4 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:16:36.617 UTC [663] g3_f4 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.640 UTC [665] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.686 UTC [665] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.701 UTC [666] g3_f5 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:16:36.715 UTC [665] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.717 UTC [665] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.719 UTC [665] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.720 UTC [665] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.735 UTC [667] g3_f5 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:16:36.748 UTC [667] g3_f5 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:36.757 UTC [667] g3_f5 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:36.771 UTC [668] g3_f5 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:16:36.838 UTC [668] g3_f5 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:36.838 UTC [669] g3_f5 g3f05 carv-v3 FATAL:  terminating connection due to administrator command
+2026-11-17 14:16:37.153 UTC [668] g3_f5 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:37.156 UTC [668] g3_f5 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:37.194 UTC [668] g3_f5 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:37.206 UTC [671] g3_f5 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:16:37.244 UTC [672] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:37.282 UTC [672] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:37.296 UTC [673] g3_f6 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:16:37.309 UTC [672] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:37.311 UTC [672] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:37.313 UTC [672] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:37.315 UTC [672] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:37.328 UTC [674] g3_f6 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:16:37.340 UTC [674] g3_f6 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:37.347 UTC [674] g3_f6 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:37.358 UTC [675] g3_f6 g3-fingerprint LOG:  statement: SELECT version();
+2026-11-17 14:16:37.517 UTC [677] g3_f6 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:16:37.529 UTC [675] g3_f6 g3-fingerprint LOG:  statement: DISCARD ALL
+2026-11-17 14:16:37.716 UTC [680] g3_f6 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:16:37.745 UTC [681] g3_f6 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:37.750 UTC [681] g3_f6 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:37.752 UTC [677] g3_f6 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:37.826 UTC [677] g3_f6 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:42.847 UTC [680] g3_f6 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:42.863 UTC [684] g3_f6 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:42.868 UTC [684] g3_f6 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:42.869 UTC [677] g3_f6 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:42.909 UTC [685] g3_f6 g3f10 carv-v3 ERROR:  duplicate key value violates unique constraint "uq_journal_stream_revision"
+2026-11-17 14:16:42.909 UTC [685] g3_f6 g3f10 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:42.915 UTC [677] g3_f6 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:42.916 UTC [677] g3_f6 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:42.929 UTC [686] g3_f6 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:42.934 UTC [686] g3_f6 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:42.935 UTC [677] g3_f6 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:42.993 UTC [688] g3_f6 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:42.998 UTC [688] g3_f6 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:42.999 UTC [677] g3_f6 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:43.017 UTC [689] g3_f6 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:16:43.069 UTC [680] g3_f6 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:43.073 UTC [680] g3_f6 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:43.091 UTC [691] g3_f6 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:43.095 UTC [691] g3_f6 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:43.096 UTC [677] g3_f6 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:43.197 UTC [680] g3_f6 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:43.222 UTC [693] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:43.264 UTC [693] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:43.277 UTC [694] g3_q1 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:16:43.288 UTC [693] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:43.290 UTC [693] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:43.292 UTC [693] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:43.293 UTC [693] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:43.306 UTC [695] g3_q1 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:16:43.316 UTC [695] g3_q1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:43.321 UTC [695] g3_q1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:44.070 UTC [697] g3_q1 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:16:44.112 UTC [698] g3_q1 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:16:44.141 UTC [699] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:44.176 UTC [699] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:44.190 UTC [700] g3_q2 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:16:44.200 UTC [699] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:44.202 UTC [699] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:44.204 UTC [699] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:44.206 UTC [699] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:44.218 UTC [701] g3_q2 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:16:44.229 UTC [701] g3_q2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:44.235 UTC [701] g3_q2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:44.247 UTC [702] g3_q2 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:16:44.300 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.300 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.318 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.318 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.339 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.339 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.346 UTC [702] g3_q2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:44.350 UTC [702] g3_q2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:44.366 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.366 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.385 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.385 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.406 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.406 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.433 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.433 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.460 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.460 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.482 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.482 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.508 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.508 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.530 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.530 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.551 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.551 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.573 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.573 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.606 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.606 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.636 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.636 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.663 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.663 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.685 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.685 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.705 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.705 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.723 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.723 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.742 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.742 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.762 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.762 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.779 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.779 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.797 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.797 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.817 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.817 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.836 UTC [703] g3_q2 g3q02 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.836 UTC [703] g3_q2 g3q02 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.855 UTC [704] g3_q2 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:16:44.943 UTC [705] g3_q2 g3q04 carv-v3 ERROR:  new row for relation "security_journal_entries" violates check constraint "g3_fault_insert"
+2026-11-17 14:16:44.943 UTC [705] g3_q2 g3q04 carv-v3 STATEMENT:  INSERT INTO authority.security_journal_entries (security_journal_entry_id, archive_attempt_count, archive_delivery_state, archive_receipt_digest, archive_receipt_reference, content_change_operation_id, journal_archived_on, journal_created_on, journal_event_body_json, journal_event_digest, journal_event_kind, journal_previous_digest, journal_stream_name, journal_stream_revision, last_archive_error_code, organization_id, security_command_id)
+2026-11-17 14:16:44.951 UTC [702] g3_q2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:44.954 UTC [702] g3_q2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:44.998 UTC [704] g3_q2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:16:45.024 UTC [707] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:45.060 UTC [707] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:45.073 UTC [708] g3_l1 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:16:45.084 UTC [707] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:45.086 UTC [707] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:45.087 UTC [707] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:45.089 UTC [707] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:16:45.101 UTC [709] g3_l1 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:16:45.120 UTC [709] g3_l1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:45.127 UTC [709] g3_l1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:45.140 UTC [710] g3_l1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:45.146 UTC [710] g3_l1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:45.171 UTC [711] g3_l1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:45.177 UTC [711] g3_l1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:45.188 UTC [712] g3_l1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:45.193 UTC [712] g3_l1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:45.205 UTC [713] g3_l1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:16:45.210 UTC [713] g3_l1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:16:45.223 UTC [714] g3_l1 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:17:21.165 UTC [714] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:21.169 UTC [714] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:23.223 UTC [714] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:23.226 UTC [714] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:25.615 UTC [714] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:25.618 UTC [714] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:28.059 UTC [714] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:28.062 UTC [714] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:30.296 UTC [714] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:30.298 UTC [714] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:31.008 UTC [707] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:31.010 UTC [707] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:31.012 UTC [707] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:31.013 UTC [707] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:31.015 UTC [707] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:31.017 UTC [707] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:32.158 UTC [719] g3_l1 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:17:39.071 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:39.074 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:40.517 UTC [719] g3_l1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:17:46.245 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:47.775 UTC [734] g3_l1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:17:47.781 UTC [734] g3_l1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:17:47.782 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:49.242 UTC [719] g3_l1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:17:49.417 UTC [739] g3_l1 g3-l-index-holder LOG:  statement: SELECT version();
+2026-11-17 14:17:49.429 UTC [739] g3_l1 g3-l-index-holder LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:17:50.272 UTC [741] g3_l1 g3l07 carv-v3 ERROR:  canceling statement due to statement timeout
+2026-11-17 14:17:50.272 UTC [741] g3_l1 g3l07 carv-v3 STATEMENT:  SELECT security_journal_entry_id, journal_stream_revision, journal_event_body_json, journal_event_digest FROM authority.security_journal_entries WHERE organization_id = $1 AND journal_stream_name = 'audit' AND journal_event_kind = 'EnvelopeCapabilityRefused' ORDER BY journal_stream_revision DESC LIMIT 8
+2026-11-17 14:17:51.425 UTC [739] g3_l1 g3-l-index-holder LOG:  statement: ROLLBACK
+2026-11-17 14:17:51.427 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:51.442 UTC [742] g3_l1 g3-l-table-holder LOG:  statement: SELECT version();
+2026-11-17 14:17:51.456 UTC [742] g3_l1 g3-l-table-holder LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:17:51.994 UTC [743] g3_l1 g3l08 carv-v3 ERROR:  canceling statement due to statement timeout
+2026-11-17 14:17:51.994 UTC [743] g3_l1 g3l08 carv-v3 STATEMENT:  SELECT c.oid::bigint AS relation_oid, c.relkind::text AS relation_kind, coalesce(i.indrelid = to_regclass('authority.security_journal_entries'), false) AS on_target_table, am.amname::text AS access_method, coalesce(i.indisunique, false) AS is_unique, coalesce(i.indisprimary, false) AS is_primary, coalesce(i.indisexclusion, false) AS is_exclusion, coalesce(i.indisvalid, false) AS is_valid, coalesce(i.indisready, false) AS is_ready, coalesce(i.indislive, false) AS is_live, coalesce(i.indnatts, 0)::integer AS attribute_count, coalesce(i.indnkeyatts, 0)::integer AS key_attribute_count, (i.indexprs IS NOT NULL) AS has_expressions, coalesce(ARRAY(SELECT a.attname::text FROM unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord) JOIN pg_catalog.pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum ORDER BY k.ord), ARRAY[]::text[]) AS key_columns, i.indoption::text AS key_options, coalesce(ARRAY(SELECT oc.opcname::text FROM unnest(i.indclass::oid[]) WITH ORDINALITY AS k(opc, ord) JOIN pg_catalog.pg_opclass oc ON oc.oid = k.opc ORDER BY k.ord), ARRAY[]::text[]) AS operator_classes, CASE WHEN i.indrelid = to_regclass('authority.security_journal_entries') THEN pg_catalog.pg_get_expr(i.indpred, i.indrelid) END AS predicate, CASE WHEN i.indrelid = to_regclass('authority.security_journal_entries') THEN pg_catalog.pg_get_indexdef(c.oid) END AS definition, coalesce(c.relowner = t.relowner, false) AS owned_by_table_owner, (c.relacl IS NOT NULL) AS has_privileges, (EXISTS (SELECT 1 FROM pg_catalog.pg_stat_progress_create_index p WHERE p.index_relid = c.oid) OR EXISTS (SELECT 1 FROM pg_catalog.pg_locks l WHERE l.locktype = 'relation' AND l.relation = i.indrelid AND l.granted AND l.mode = 'ShareUpdateExclusiveLock' AND l.pid <> pg_catalog.pg_backend_pid())) AS build_visibly_in_progress FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace LEFT JOIN pg_catalog.pg_index i ON i.indexrelid = c.oid LEFT JOIN pg_catalog.pg_class t ON t.oid = i.indrelid LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam WHERE n.nspname = 'authority' AND c.relname = 'ix_journal_capability_refusal_evidence'
+2026-11-17 14:17:53.194 UTC [742] g3_l1 g3-l-table-holder LOG:  statement: ROLLBACK
+2026-11-17 14:17:53.196 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:53.198 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:53.200 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:53.980 UTC [719] g3_l1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:17:54.800 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:54.803 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:54.806 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:56.831 UTC [719] g3_l1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:17:57.351 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:57.353 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:57.356 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:57.387 UTC [751] g3_l1 g3-snapshot-holder LOG:  statement: SELECT version();
+2026-11-17 14:17:57.397 UTC [751] g3_l1 g3-snapshot-holder LOG:  statement: BEGIN ISOLATION LEVEL REPEATABLE READ
+2026-11-17 14:17:57.401 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:57.634 UTC [753] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:57.742 UTC [753] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:57.850 UTC [753] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:57.960 UTC [753] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:58.067 UTC [753] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:58.070 UTC [753] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:58.071 UTC [717] g3_l1 g3-admin ERROR:  canceling statement due to user request
+2026-11-17 14:17:58.071 UTC [717] g3_l1 g3-admin STATEMENT:  CREATE INDEX CONCURRENTLY ix_journal_capability_refusal_evidence ON authority.security_journal_entries (organization_id, journal_stream_revision) WHERE journal_stream_name = 'audit' AND journal_event_kind = 'EnvelopeCapabilityRefused'
+2026-11-17 14:17:58.073 UTC [751] g3_l1 g3-snapshot-holder LOG:  statement: ROLLBACK
+2026-11-17 14:17:58.075 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:58.838 UTC [719] g3_l1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:17:59.329 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:59.332 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:59.333 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:17:59.577 UTC [757] g3_l1 authority-capability-evidence-index LOG:  statement: SELECT version();
+2026-11-17 14:18:01.648 UTC [719] g3_l1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:18:02.259 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:02.263 UTC [717] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:02.300 UTC [762] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:02.455 UTC [762] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:02.472 UTC [763] g3_w1 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:18:02.487 UTC [762] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:02.489 UTC [762] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:02.490 UTC [762] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:02.492 UTC [762] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:02.755 UTC [764] g3_w1 authority-capability-evidence-index LOG:  statement: SELECT version();
+2026-11-17 14:18:03.066 UTC [765] g3_w1 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:18:03.080 UTC [765] g3_w1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:03.087 UTC [765] g3_w1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:03.102 UTC [766] g3_w1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:03.110 UTC [766] g3_w1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:03.125 UTC [767] g3_w1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:03.133 UTC [767] g3_w1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:03.148 UTC [768] g3_w1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:03.155 UTC [768] g3_w1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:05.346 UTC [825] g3_w1 g3w-floor1 LOG:  statement: SELECT version();
+2026-11-17 14:18:05.988 UTC [825] g3_w1 g3w-floor1 LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:05.998 UTC [825] g3_w1 g3w-floor1 LOG:  statement: COMMIT
+2026-11-17 14:18:06.005 UTC [825] g3_w1 g3w-floor1 LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:06.035 UTC [825] g3_w1 g3w-floor1 LOG:  statement: COMMIT
+2026-11-17 14:18:06.679 UTC [854] g3_w1 g3w-floor2 LOG:  statement: SELECT version();
+2026-11-17 14:18:07.276 UTC [854] g3_w1 g3w-floor2 LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:07.283 UTC [854] g3_w1 g3w-floor2 LOG:  statement: COMMIT
+2026-11-17 14:18:07.289 UTC [854] g3_w1 g3w-floor2 LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:07.317 UTC [854] g3_w1 g3w-floor2 LOG:  statement: COMMIT
+2026-11-17 14:18:07.911 UTC [855] g3_w1 g3w-floor3 LOG:  statement: SELECT version();
+2026-11-17 14:18:08.500 UTC [855] g3_w1 g3w-floor3 LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:08.506 UTC [855] g3_w1 g3w-floor3 LOG:  statement: COMMIT
+2026-11-17 14:18:08.512 UTC [855] g3_w1 g3w-floor3 LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:08.542 UTC [855] g3_w1 g3w-floor3 LOG:  statement: COMMIT
+2026-11-17 14:18:10.363 UTC [856] g3_w1 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 14:18:10.381 UTC [856] g3_w1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:18:10.387 UTC [856] g3_w1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:18:10.392 UTC [856] g3_w1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:18:10.396 UTC [856] g3_w1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:18:10.411 UTC [857] g3_w1 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:18:10.425 UTC [857] g3_w1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:10.559 UTC [868] g3_w1 g3-head LOG:  statement: SELECT version();
+2026-11-17 14:18:11.387 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.387 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.387 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.387 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.428 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.428 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.429 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.449 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.638 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.638 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.638 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.638 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.689 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.689 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.689 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.689 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.871 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.873 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.873 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.873 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.930 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.930 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.930 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:11.943 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.122 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.143 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.143 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.152 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.203 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.203 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.204 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.215 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.415 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.430 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.430 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.447 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.493 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.493 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.496 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.516 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.679 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.694 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.702 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.710 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.757 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.757 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.771 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.778 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.940 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.960 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.976 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:12.987 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.030 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.030 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.053 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.063 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.243 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.268 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.277 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.287 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.332 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.338 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.342 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.354 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.541 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.559 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.572 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.577 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.620 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.622 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.637 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.643 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.811 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.824 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.837 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.842 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.878 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.881 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.893 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:13.898 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.052 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.060 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.077 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.077 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.117 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.125 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.135 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.138 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.303 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.303 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.325 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.325 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.361 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.377 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.381 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.381 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.570 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.571 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.630 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.632 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.679 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.705 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.705 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.709 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.912 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.921 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.943 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.943 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.974 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:14.996 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.006 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.006 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.198 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.209 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.225 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.225 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.257 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.283 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.283 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.283 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.452 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.460 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.472 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.479 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.512 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.538 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.539 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.544 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.707 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.716 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.730 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.737 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.767 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.793 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.794 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.799 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.956 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.962 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.979 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:15.987 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.013 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.037 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.040 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.049 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.194 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.205 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.222 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.231 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.256 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.277 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.280 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.289 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.440 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.447 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.461 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.471 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.499 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.520 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.524 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.531 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.716 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.724 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.738 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.754 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.775 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.803 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.806 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.821 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.977 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:16.993 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.007 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.023 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.042 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.066 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.072 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.085 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.242 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.253 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.261 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.279 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.305 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.326 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.336 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.349 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.523 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.535 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.550 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.568 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.585 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.610 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.621 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.632 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.782 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.795 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.806 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.827 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.848 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.876 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.881 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:17.898 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.060 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.072 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.090 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.105 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.123 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.151 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.153 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.169 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.324 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.332 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.345 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.363 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.385 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.410 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.412 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.425 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.575 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.590 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.603 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.618 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.633 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.660 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.663 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.672 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.811 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.828 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.838 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.852 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.866 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.891 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.896 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:18.906 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.052 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.071 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.084 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.095 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.106 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.138 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.139 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.154 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.294 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.304 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.328 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.338 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.344 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.372 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.384 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.390 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.520 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.533 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.563 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.569 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.577 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.607 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.625 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.629 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.784 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.793 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.826 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.827 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.840 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.864 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.881 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:19.881 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.015 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.023 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.057 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.057 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.074 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.100 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.117 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.117 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.274 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.280 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.315 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.315 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.328 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.347 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.372 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.372 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.519 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.524 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.569 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.571 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.581 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.597 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.623 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.623 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.759 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.765 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.813 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.815 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.836 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.850 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.874 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:20.878 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.004 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.019 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.062 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.062 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.081 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.088 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.118 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.118 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.250 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.251 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.298 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.298 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.327 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.327 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.360 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.361 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.499 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.499 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.543 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.543 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.568 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.568 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.600 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.600 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.733 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.733 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.781 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.783 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.815 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.816 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.851 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.851 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.988 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:21.988 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.037 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.037 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.056 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.056 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.093 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.095 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.225 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.225 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.275 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.282 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.295 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.295 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.332 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.341 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.460 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.462 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.520 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.520 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.530 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.530 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.581 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.581 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.700 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.700 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.764 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.767 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.770 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.771 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.819 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.824 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.937 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:22.938 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.003 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.003 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.008 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.013 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.067 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.069 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.191 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.191 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.258 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.259 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.260 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.260 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.314 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.319 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.440 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.441 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.508 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.508 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.511 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.517 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.568 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.574 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.695 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.695 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.767 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.767 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.773 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.773 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.823 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.824 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.938 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:23.938 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.006 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.010 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.013 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.014 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.065 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.071 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.183 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.183 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.248 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.251 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.252 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.252 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.295 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.305 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.405 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.405 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.466 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.476 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.479 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.483 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.520 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.536 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.682 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.694 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.767 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.788 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.809 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.811 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.843 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.865 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.968 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:24.985 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.057 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.081 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.094 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.110 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.138 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.163 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.262 UTC [871] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.281 UTC [872] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.321 UTC [868] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.336 UTC [867] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.343 UTC [866] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.352 UTC [873] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.373 UTC [869] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.394 UTC [870] g3_w1 g3-head LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.692 UTC [857] g3_w1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.695 UTC [856] g3_w1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.701 UTC [856] g3_w1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.706 UTC [856] g3_w1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.711 UTC [856] g3_w1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.717 UTC [856] g3_w1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.792 UTC [882] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.906 UTC [882] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.921 UTC [883] g3_g_live [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:18:25.933 UTC [882] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.935 UTC [882] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.937 UTC [882] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.938 UTC [882] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:25.955 UTC [884] g3_g_live g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:18:25.967 UTC [884] g3_g_live g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:25.974 UTC [884] g3_g_live g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:25.988 UTC [885] g3_g_live g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:25.996 UTC [885] g3_g_live g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:26.010 UTC [886] g3_g_live g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:26.016 UTC [886] g3_g_live g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:26.033 UTC [887] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.073 UTC [887] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.089 UTC [888] g3_g_t0 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:18:26.243 UTC [891] g3_g_live g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:18:26.257 UTC [891] g3_g_live g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.329 UTC [893] g3_g_t0 g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:18:26.397 UTC [893] g3_g_t0 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.398 UTC [893] g3_g_t0 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.400 UTC [893] g3_g_t0 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.402 UTC [893] g3_g_t0 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.404 UTC [893] g3_g_t0 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.407 UTC [891] g3_g_live g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.409 UTC [893] g3_g_t0 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.411 UTC [893] g3_g_t0 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.428 UTC [895] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.527 UTC [895] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.541 UTC [896] g3_g_live2 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:18:26.552 UTC [895] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.554 UTC [895] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.555 UTC [895] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.557 UTC [895] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.570 UTC [897] g3_g_live2 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:18:26.580 UTC [897] g3_g_live2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:26.586 UTC [897] g3_g_live2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:26.601 UTC [898] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.661 UTC [898] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:26.678 UTC [899] g3_g_t0b [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:18:26.950 UTC [900] g3_g_live2 authority-capability-evidence-index LOG:  statement: SELECT version();
+2026-11-17 14:18:27.307 UTC [903] g3_g_t0b g3-admin LOG:  statement: SELECT version();
+2026-11-17 14:18:27.353 UTC [903] g3_g_t0b g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:27.383 UTC [903] g3_g_t0b g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:27.629 UTC [906] g3_g_t0b authority-capability-evidence-index LOG:  statement: SELECT version();
+2026-11-17 14:18:27.892 UTC [903] g3_g_t0b g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:27.970 UTC [903] g3_g_t0b g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:27.979 UTC [898] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:27.983 UTC [898] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:27.986 UTC [898] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:27.987 UTC [898] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:27.989 UTC [898] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:27.990 UTC [898] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:28.011 UTC [909] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:28.061 UTC [909] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:28.075 UTC [910] g3_b1 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:18:28.086 UTC [909] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:28.088 UTC [909] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:28.091 UTC [909] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:28.092 UTC [909] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:28.111 UTC [911] g3_b1 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:18:28.123 UTC [911] g3_b1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.129 UTC [911] g3_b1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.142 UTC [912] g3_b1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.147 UTC [912] g3_b1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.159 UTC [913] g3_b1 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.165 UTC [913] g3_b1 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.179 UTC [914] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:28.245 UTC [914] m2f3ggate g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 14:18:28.260 UTC [915] g3_b2 [unknown] LOG:  statement: SELECT version();
+2026-11-17 14:18:28.284 UTC [916] g3_b2 g3-seed LOG:  statement: SELECT version();
+2026-11-17 14:18:28.294 UTC [916] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.298 UTC [916] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.346 UTC [918] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.354 UTC [918] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.383 UTC [919] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.391 UTC [919] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.419 UTC [920] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.424 UTC [920] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.447 UTC [921] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.452 UTC [921] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.474 UTC [922] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.479 UTC [922] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.502 UTC [923] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.507 UTC [923] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.533 UTC [924] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.537 UTC [924] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.559 UTC [925] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.566 UTC [925] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.586 UTC [926] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.591 UTC [926] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.611 UTC [927] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.615 UTC [927] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.636 UTC [928] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.641 UTC [928] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.660 UTC [929] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.664 UTC [929] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.684 UTC [930] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.689 UTC [930] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.710 UTC [931] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.715 UTC [931] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.737 UTC [932] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.742 UTC [932] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.765 UTC [933] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.770 UTC [933] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.792 UTC [934] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.797 UTC [934] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.819 UTC [935] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.824 UTC [935] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.847 UTC [936] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.852 UTC [936] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.875 UTC [937] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.879 UTC [937] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.900 UTC [938] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.905 UTC [938] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.927 UTC [939] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.932 UTC [939] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.954 UTC [940] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.961 UTC [940] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:18:28.983 UTC [941] g3_b2 g3-seed LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 14:18:28.989 UTC [941] g3_b2 g3-seed LOG:  statement: COMMIT
+2026-11-17 14:59:59.026 UTC [991] g3_b1 g3b-demo-c LOG:  statement: SELECT version();
+2026-11-17 14:59:59.036 UTC [991] g3_b1 g3b-demo-c LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 15:00:00.219 UTC [994] g3_b1 g3b-demo-e LOG:  statement: SELECT version();
+2026-11-17 15:00:00.233 UTC [994] g3_b1 g3b-demo-e LOG:  statement: BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+2026-11-17 15:00:00.236 UTC [994] g3_b1 g3b-demo-e LOG:  statement: COMMIT
+2026-11-17 15:00:00.240 UTC [991] g3_b1 g3b-demo-c LOG:  statement: COMMIT
+2026-11-17 15:00:00.254 UTC [995] g3_b1 g3-admin LOG:  statement: SELECT version();
+2026-11-17 15:00:00.296 UTC [996] g3_b1 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 15:00:02.164 UTC [996] g3_b1 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:42.940 UTC [998] g3_b2 g3-oracle LOG:  statement: SELECT version();
+2026-11-17 15:00:42.961 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:42.969 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:42.975 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:42.980 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:42.985 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:42.990 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:42.996 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.001 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.006 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.011 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.017 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.022 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.027 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.032 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.037 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.041 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.046 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.050 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.054 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.059 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.064 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.069 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.073 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.078 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.083 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.088 UTC [998] g3_b2 g3-oracle LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.216 UTC [995] g3_b1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.234 UTC [1000] g3_b2 g3-admin LOG:  statement: SELECT version();
+2026-11-17 15:00:43.249 UTC [999] g3_base g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.473 UTC [1008] g3_g_live2 g3-admin LOG:  statement: SELECT version();
+2026-11-17 15:00:43.640 UTC [1014] g3_m1 g3-admin LOG:  statement: SELECT version();
+2026-11-17 15:00:43.836 UTC [995] g3_b1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.838 UTC [1000] g3_b2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.841 UTC [999] g3_base g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.844 UTC [1001] g3_f1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.848 UTC [1002] g3_f2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.853 UTC [1003] g3_f3 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.858 UTC [1004] g3_f4 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.863 UTC [1005] g3_f5 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.867 UTC [1006] g3_f6 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.872 UTC [1007] g3_g_live g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.876 UTC [1008] g3_g_live2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.878 UTC [1009] g3_g_t0 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.882 UTC [1010] g3_g_t0b g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.885 UTC [1011] g3_h1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.890 UTC [1012] g3_h2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.894 UTC [1013] g3_l1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.898 UTC [1014] g3_m1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.902 UTC [1015] g3_noindex g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.905 UTC [1016] g3_prefloor g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.909 UTC [1017] g3_q1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.913 UTC [1018] g3_q2 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.917 UTC [1019] g3_t1 g3-admin LOG:  statement: DISCARD ALL
+2026-11-17 15:00:43.923 UTC [1020] g3_w1 g3-admin LOG:  statement: DISCARD ALL

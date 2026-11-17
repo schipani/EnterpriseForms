@@ -96,6 +96,7 @@ public sealed class ProtectionVerifierHttpClient(IHttpClientFactory httpClientFa
         using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", MintToken(settings));
         request.Headers.Add("X-Correlation-Id", Guid.CreateVersion7().ToString("D"));
+        EnvelopeCapability.Declare(request); // E3-M2f-1: every request of this build declares its fixed capability (CAP-S2)
         if (body is not null)
         {
             request.Content = JsonContent.Create(body, options: Json);

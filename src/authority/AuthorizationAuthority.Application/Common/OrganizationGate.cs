@@ -46,3 +46,23 @@ public static class OrganizationGate
         }
     }
 }
+
+/// <summary>
+/// The only way Authority code sets an organization's integrity quarantine. It is permanent under normal operation
+/// (C8 M4 S1, B-Q7): the first reason is kept, and the AuthorityDb trigger refuses any UPDATE that clears it or changes its
+/// reason. Lifting it is reserved for a separately reviewed G14 recovery process.
+/// </summary>
+public static class OrganizationQuarantine
+{
+    public static void Set(OrganizationAuthorizationState state, string reasonCode)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (state.IntegrityQuarantineEnabled)
+        {
+            return;
+        }
+
+        state.IntegrityQuarantineEnabled = true;
+        state.IntegrityQuarantineReasonCode = reasonCode;
+    }
+}

@@ -1,0 +1,17 @@
+af320fc4e9d3f95c640f40dea31c60e3c44ccc77 plus the working tree below
+ M scripts/dev/e3-m2e2-acceptance-pg-gate.ps1
+ M tools/experiments/e3-m2e2-acceptance-gate/HarnessE2/Program.cs
+ M tools/experiments/e3-m2e2-acceptance-gate/HarnessE2/Rows.cs
+ M tools/experiments/e3-m2e2-acceptance-gate/HarnessE2/ScenariosConcurrency.cs
+ M tools/experiments/e3-m2e2-acceptance-gate/HarnessE2/ScenariosNegative.cs
+ M tools/experiments/e3-m2e2-acceptance-gate/HarnessE2/ScenariosPositive.cs
+ M tools/experiments/e3-m2e2-acceptance-gate/HarnessE2/Support.cs
+ M tools/experiments/e3-m2e2-acceptance-gate/README.md
+?? scripts/dev/e3-m2f2g-mutations.ps1
+?? tools/experiments/e3-m2e2-acceptance-gate/HarnessE2/CapabilityDiagnostics.cs
+?? tools/experiments/e3-m2e2-acceptance-gate/HarnessE2/CapabilitySupport.cs
+?? tools/experiments/e3-m2e2-acceptance-gate/HarnessE2/ScenariosCapability.cs
+?? tools/experiments/e3-m2e2-acceptance-gate/HarnessE2/ScenariosCapabilityConcurrency.cs
+?? tools/experiments/e3-m2e2-acceptance-gate/HarnessE2/ScenariosCapabilityHost.cs
+?? tools/experiments/e3-m2e2-acceptance-gate/HarnessE2/ScenariosCapabilityRecovery.cs
+?? tools/experiments/e3-m2f2g-capability-gate/

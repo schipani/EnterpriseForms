@@ -15,6 +15,7 @@ import { signIn } from "./support";
  *  5. With replaced server responses (the real server cannot produce results in M0): a typed failure is never shown as
  *     "no records", and a verified result renders in the same My Records table.
  *  6. Keyboard operation and axe WCAG 2.2 AA.
+ *  7. IX-37: an indexed result (resultBasis AuthorityAcceptedContent) is never labelled as verified.
  */
 const sentinel = "Zq7SentinelValueX";
 const someForm = "0199a2b3-c4d5-7e6f-8123-456789abcdf9";
@@ -249,6 +250,43 @@ test.describe("Phase C7 M0 Advanced Field Search", () => {
     await page.getByRole("button", { name: "Clear advanced search" }).click();
     await expect(page.getByText(/^Complete for records of Synthetic form/)).toHaveCount(0);
     expect(page.url()).not.toContain(sentinel);
+  });
+
+  // IX-37 (indexed search design §6.6): an indexed result (resultBasis AuthorityAcceptedContent) is never labelled as verified —
+  // not in the empty state, not as a badge; its scope statement says what was checked (the business copy is verified on open).
+  test("an indexed result is never labelled as verified, with or without matches (replaced responses)", async ({ page }) => {
+    await signIn(page, "owner");
+    const fieldId = "0199a2b3-c4d5-7e6f-8123-456789abcde1";
+    await page.context().route("**/api/v1/form-records/search-capabilities**", (route) =>
+      route.fulfill({ json: { formDefinitionId: someForm, fieldValueSearchAvailable: true, unavailableReasonCode: null, maximumConditions: 5, conditionJoin: "And", policyRevision: 1, notSearchableFields: [], fields: [{ fieldDefinitionId: fieldId, displayLabel: "Surname", valueType: "String", operators: ["equals"], options: [], minimumTextLength: 3, maximumTextLength: 200 }] } }),
+    );
+    const statement = "Complete: all 3 records of this form that you can find were searched at one Authority snapshot. Conditions are evaluated only on values you can read; repeating sections, related records, documents and encrypted fields are not searched. Results reflect the content the Authorization Authority last accepted for each record, at one Authority snapshot. Each returned record's searched values were checked against that accepted content. The business database copy is not checked by search; it is fully verified when you open a record.";
+    let matches = 1;
+    await page.context().route("**/api/v1/form-records/field-search", async (route) => {
+      const now = new Date().toISOString();
+      const items = matches === 0 ? [] : [{ formRecordId: "0199a2b3-c4d5-7e6f-8123-4567017ef771", formDefinitionId: someForm, formDefinitionName: "Synthetic form", recordStatus: "Draft", createdOn: now, modifiedOn: now, parentFormRecordId: null, projectionVerified: false, recordReference: "REC-017EF771", createdByDisplayName: null, createdByCurrentUser: true, canEdit: false }];
+      await route.fulfill({ json: { items, totalCount: matches, pageStart: matches === 0 ? 0 : 1, pageSize: 25, snapshotReference: "s2", authorizationRevision: 9, completeness: "Complete", scopeStatement: statement, continuationToken: null, previousToken: null, resultBasis: "AuthorityAcceptedContent" } });
+    });
+    await page.goto(`/app/records?form=${someForm}`);
+    const first = condition(page, 1);
+    await choose(page, first, "Field", "Surname");
+    await first.getByRole("textbox", { name: "Value" }).fill(sentinel);
+    await page.getByRole("button", { name: "Search records" }).click();
+    const table = page.getByRole("table", { name: "My Records" });
+    await expect(table.getByRole("rowheader")).toContainText("REC-017EF771");
+    const shown = page.locator("[data-result-basis]");
+    await expect(shown).toHaveAttribute("data-result-basis", "AuthorityAcceptedContent");
+    await expect(shown).toContainText("last accepted for each record");
+    await expect(shown).toContainText("The business database copy is not checked by search");
+    // No "verified" wording anywhere except the statement's explanation that opening a record verifies it.
+    await expect(table.getByText(/verif/i)).toHaveCount(0);
+    await expect(page.getByText(/verified result|results? (are|were) verified|complete and verified/i)).toHaveCount(0);
+
+    matches = 0;
+    await page.getByRole("button", { name: "Search records" }).click();
+    await expect(page.getByText("No records match these conditions")).toBeVisible();
+    await expect(page.getByText("The search was complete for the records you can access, evaluated on the content the Authorization Authority last accepted for each record.")).toBeVisible();
+    await expect(page.getByText(/complete and verified/i)).toHaveCount(0);
   });
 
   test("keyboard: the conditions are reachable and operable; axe WCAG 2.2 AA passes", async ({ page }) => {

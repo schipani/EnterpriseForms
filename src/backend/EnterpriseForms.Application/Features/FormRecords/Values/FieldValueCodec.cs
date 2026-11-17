@@ -78,11 +78,11 @@ public static class FieldValueCodec
     }
 
     /// <summary>Wire value of a field from its stored rows: the single value, or for a multi-select the option keys in the options' display order joined by comma.</summary>
-    public static string FormatField(FieldDefinition field, IEnumerable<FieldValueRowBase> rows, IReadOnlyDictionary<Guid, FieldOption> optionsById, Encryption.IFieldEncryptionService? encryption)
+    public static string FormatField(FieldDefinition field, IEnumerable<FieldValueRowBase> rows, IReadOnlyDictionary<Guid, FieldOption> optionsById, DecryptedFieldValues decrypted)
     {
         ArgumentNullException.ThrowIfNull(field);
         ArgumentNullException.ThrowIfNull(rows);
-        var wires = rows.Select(r => Format(r, optionsById, encryption)).ToList();
+        var wires = rows.Select(r => Format(r, optionsById, decrypted)).ToList();
         if (!IsMultiSelect(field))
         {
             return wires.FirstOrDefault() ?? string.Empty;
@@ -97,7 +97,7 @@ public static class FieldValueCodec
     /// canonical wire string as an AES-GCM envelope (no typed plaintext row is ever persisted for it); a Standard field
     /// keeps the typed row. Called on every write path after validation, so protection cannot be skipped by a client.
     /// </summary>
-    public static FieldValueRowBase Protect(FieldValueRowBase typedRow, FieldDefinition field, IReadOnlyDictionary<Guid, FieldOption> optionsById, Encryption.IFieldEncryptionService encryption)
+    public static async Task<FieldValueRowBase> ProtectAsync(FieldValueRowBase typedRow, FieldDefinition field, IReadOnlyDictionary<Guid, FieldOption> optionsById, Encryption.IFieldEncryptionService encryption, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(typedRow);
         ArgumentNullException.ThrowIfNull(field);
@@ -107,22 +107,59 @@ public static class FieldValueCodec
             return typedRow;
         }
 
-        var sealedRow = encryption.Encrypt(new Encryption.FieldEncryptionContext(typedRow.TenantId, typedRow.FormRecordId, typedRow.FieldDefinitionId, typedRow.FieldValueItemId, field.FieldDataType), Format(typedRow, optionsById));
+        var sealedRow = await encryption.EncryptAsync(new Encryption.FieldEncryptionContext(typedRow.TenantId, typedRow.FormRecordId, typedRow.FieldDefinitionId, typedRow.FieldValueItemId, field.FieldDataType), Format(typedRow, optionsById), Documents.Ports.EncryptionKeyPurpose.FieldValue, cancellationToken).ConfigureAwait(false);
         sealedRow.FormRecordGroupId = typedRow.FormRecordGroupId;
         sealedRow.CreatedOn = typedRow.CreatedOn;
         sealedRow.CreatedByUserId = typedRow.CreatedByUserId;
+
+        // E3-M2c OD-M2c-02a: only an envelope freshly sealed here, from this operation's own input, may later be decrypted in
+        // self-sealed mode (an already-encrypted row passed in is returned above unchanged and is never registered).
+        SelfSealedFieldValues.Register(sealedRow);
         return sealedRow;
     }
 
-    /// <summary>Invariant wire string of a stored row; encrypted rows are decrypted (authenticated) through the field encryption service.</summary>
-    public static string Format(ISignedContentRow row, IReadOnlyDictionary<Guid, FieldOption> optionsById, Encryption.IFieldEncryptionService? encryption)
+    /// <summary>
+    /// E3-M2c OD-M2c-02a Mode A: invariant wire string of a stored row of an Authority-verified read; an encrypted row is decrypted
+    /// (authenticated) through the verified reader (strict S-8 dispatch, FieldValue key of the row's tenant).
+    /// </summary>
+    public static async Task<string> FormatAsync(ISignedContentRow row, IReadOnlyDictionary<Guid, FieldOption> optionsById, Encryption.IFieldEncryptionService encryption, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(encryption);
         if (row is FieldEncryptedValue encrypted)
         {
-            return (encryption ?? throw new InvalidOperationException("an encrypted value cannot be formatted without the field encryption service")).Decrypt(encrypted);
+            var plaintexts = await encryption.DecryptVerifiedAsync(encrypted.TenantId, [encrypted], cancellationToken).ConfigureAwait(false);
+            return plaintexts.Count == 1 ? plaintexts[0] : throw new InvalidOperationException("the verified reader returned a different number of values");
         }
 
         return Format(row, optionsById);
+    }
+
+    /// <summary>
+    /// E3-M2c OD-M2c-02a Mode B: invariant wire string of a row this operation itself just sealed (<see cref="ProtectAsync"/>), for
+    /// a self-check of its own output. Any other encrypted row is refused before any key operation; stored content uses
+    /// <see cref="FormatAsync"/>.
+    /// </summary>
+    public static async Task<string> FormatSelfSealedAsync(ISignedContentRow row, IReadOnlyDictionary<Guid, FieldOption> optionsById, Encryption.IFieldEncryptionService encryption, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(encryption);
+        if (row is FieldEncryptedValue encrypted)
+        {
+            SelfSealedFieldValues.RequireAll([encrypted]);
+            return await encryption.DecryptAsync(encrypted, Documents.Ports.EncryptionKeyPurpose.FieldValue, cancellationToken).ConfigureAwait(false);
+        }
+
+        return Format(row, optionsById);
+    }
+
+    /// <summary>
+    /// Invariant wire string of a stored row for synchronous projection and validation code: an encrypted row's plaintext comes
+    /// from <paramref name="decrypted"/>, the result of the operation's asynchronous decryption step (nothing is decrypted here;
+    /// an encrypted row that was not decrypted for the operation is a programming error and fails closed).
+    /// </summary>
+    public static string Format(ISignedContentRow row, IReadOnlyDictionary<Guid, FieldOption> optionsById, DecryptedFieldValues decrypted)
+    {
+        ArgumentNullException.ThrowIfNull(decrypted);
+        return row is FieldEncryptedValue encrypted ? decrypted.WireOf(encrypted) : Format(row, optionsById);
     }
 
     /// <summary>Invariant wire string of a stored plaintext row. Encrypted rows are never formatted here (no accidental plaintext path).</summary>

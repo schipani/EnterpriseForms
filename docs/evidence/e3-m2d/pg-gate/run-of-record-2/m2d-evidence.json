@@ -1,0 +1,338 @@
+{
+  "harness": "E3-M2d CARV 2 / floor 2 focused real-PostgreSQL gate (real Authority build in-process; version-1 build 8915f77 through V1Agent)",
+  "build": "Release build of the working tree (new-sha256.txt); ContentAcceptanceRules.CurrentVersion = 2; RecognizedFloors = 1,2; EnvelopeRules.AllowedEnvelopeVersions = 1",
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "checksTotal": 47,
+  "checksFailed": 0,
+  "checks": [
+    {
+      "Id": "D-00",
+      "Description": "setup: this build\u0027s ordinary --migrate applies the CARV fence and never a floor",
+      "Expected": "exit 0; floors none; floor history none",
+      "Observed": "exit 0; floors none; floor history none",
+      "Pass": true
+    },
+    {
+      "Id": "D-00b",
+      "Description": "the floor command with 1 applies exactly floor 1: the later floor-2 migration of this build is NOT applied implicitly",
+      "Expected": "exit 0; floors 1; history 20261115032228_AuthorityContentAcceptanceRuleFloor1",
+      "Observed": "exit 0; floors 1; history 20261115032228_AuthorityContentAcceptanceRuleFloor1",
+      "Pass": true
+    },
+    {
+      "Id": "D-A1",
+      "Description": "Release B (required floor 1) readiness of the version-2 build on floor 1; live fence verdicts",
+      "Expected": "True content acceptance rules v2 (floor 1); phase=ReleaseB requiredFloor=1 | required 1: none | required 2: FloorLowered",
+      "Observed": "True content acceptance rules v2 (floor 1); phase=ReleaseB requiredFloor=1 | required 1: none | required 2: FloorLowered",
+      "Pass": true
+    },
+    {
+      "Id": "D-A2",
+      "Description": "the runtime role is an ordinary role (no superuser, no BYPASSRLS, not the table owner)",
+      "Expected": "false false false",
+      "Observed": "false false false",
+      "Pass": true
+    },
+    {
+      "Id": "D-A3",
+      "Description": "version-2 Release B (floor 1) writes through the real Prepare \u002B Commit; every committed operation P = C = 2",
+      "Expected": "10 x OK; committed 2/2: 10",
+      "Observed": "OK; committed 2/2: 10",
+      "Pass": true
+    },
+    {
+      "Id": "D-A4",
+      "Description": "a Release B instance requiring floor 2 refuses every write while only floor 1 is installed (minimum not met), transactionally",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorLowered; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e221-1aa6-7878-801c-b2700e326347, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorLowered category=LoweredFloor recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=2 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 10-\u003E10; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-A5",
+      "Description": "its readiness is not ready",
+      "Expected": "False ContentAcceptanceRuleFloorBelowRequired(installed=1, required=2)",
+      "Observed": "False ContentAcceptanceRuleFloorBelowRequired(installed=1, required=2)",
+      "Pass": true
+    },
+    {
+      "Id": "D-X1a",
+      "Description": "version-1 build (8915f77) Prepare under floor 1: accepted, stamped P = 1",
+      "Expected": "OK; 1/NULL Prepared",
+      "Observed": "OK; 1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "D-X1b",
+      "Description": "version-2 Commit of the version-1-prepared operation: refused (P = 1 \u003C\u003E V = 2) and aborted before any verification; nothing advances",
+      "Expected": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; 1/NULL Aborted OPERATION_RULES_OUTDATED; snapshot unchanged",
+      "Observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; 1/NULL Aborted OPERATION_RULES_OUTDATED; unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-X2",
+      "Description": "version-1 Commit of a version-2-prepared operation: refused by the version-1 rule (P = 2 \u003C\u003E V = 1); nothing advances",
+      "Expected": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; 2/NULL Aborted; snapshot unchanged",
+      "Observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; 2/NULL Aborted; unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-X2b",
+      "Description": "database fence independent of either build: a P = 2 operation cannot be marked Committed with C = 1 (exact equality C = P)",
+      "Expected": "seed OK; 23514 ck_content_operation_commit_rule_version; still 2/NULL Prepared",
+      "Observed": "OK; 23514 ck_content_operation_commit_rule_version: new row for relation \u0022content_change_operations\u0022 violates check constraint \u0022ck_content_operation_commit_rule_version\u0022; 2/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "D-X3",
+      "Description": "version-1 Prepare \u002B Commit end to end under floor 1 (a mixed fleet before floor 2 is compatible)",
+      "Expected": "OK OK; 1/1 Committed",
+      "Observed": "OK OK; 1/1 Committed",
+      "Pass": true
+    },
+    {
+      "Id": "D-X4",
+      "Description": "version-2 Prepare replay (same key and request) of a version-1-prepared operation: refused, nothing written",
+      "Expected": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; operations unchanged; 1/NULL Prepared",
+      "Observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False; operations 15-\u003E15; 1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "D-X5",
+      "Description": "version-2 Commit replay of the committed version-1 operation returns the head and writes nothing (finished operations replay first)",
+      "Expected": "OK; snapshots unchanged",
+      "Observed": "OK; unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-V1",
+      "Description": "real Prepare of a well-formed new NewV2Field candidate: refused (no v2 acceptance); nothing signed or stored",
+      "Expected": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; no signature, operation or leaf",
+      "Observed": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; signatures 0; ops 15-\u003E15; leaves 60-\u003E60",
+      "Pass": true
+    },
+    {
+      "Id": "D-V2",
+      "Description": "real Prepare of a well-formed new NewV2Document candidate: refused (no v2 acceptance); nothing signed or stored",
+      "Expected": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; no signature, operation or leaf",
+      "Observed": "AuthorityException INVALID_COMMAND 422 retryable=False; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; signatures 0; ops 15-\u003E15; leaves 60-\u003E60",
+      "Pass": true
+    },
+    {
+      "Id": "D-V3",
+      "Description": "Release B Commit of an otherwise valid Prepared operation (P = 2) holding NewV2Field: signatures verify, then refused and aborted; nothing advances",
+      "Expected": "seed OK; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; 2/NULL Aborted ENVELOPE_VERSION_NOT_ENABLED_AT_COMMIT; signatures verified \u003E 0; snapshots unchanged",
+      "Observed": "OK; ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; 2/NULL Aborted ENVELOPE_VERSION_NOT_ENABLED_AT_COMMIT; verified 4; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-V4",
+      "Description": "Release B Commit of an otherwise valid Prepared operation (P = 2) holding FieldSchema2Envelope1: signatures verify, then refused and aborted; nothing advances",
+      "Expected": "seed OK; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; 2/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT; signatures verified \u003E 0; snapshots unchanged",
+      "Observed": "OK; ENVELOPE_INVALID: ENVELOPE_SCHEMA_MISMATCH; 2/NULL Aborted ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT; verified 4; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-V5",
+      "Description": "control: the same seeding with a valid v1 candidate commits (the refusals above are the v2 and S-4 rules, not the fixture)",
+      "Expected": "seed OK; OK; 2/2 Committed; head \u002B1",
+      "Observed": "OK; OK; 2/2 Committed; head 0-\u003E1",
+      "Pass": true
+    },
+    {
+      "Id": "D-F0",
+      "Description": "floors are raised one step at a time: floor 2 on a database without floor 1 is refused; nothing applied",
+      "Expected": "migrate exit 0; floor 2 exit 2 \u0027requires every lower floor\u0027; floors none; floor history none",
+      "Observed": "migrate exit 0; floor 2 exit 2; floors none; floor history none",
+      "Pass": true
+    },
+    {
+      "Id": "D-F1",
+      "Description": "the command refuses floor 2 combined with --migrate, and an unrecognized floor 3; nothing applied",
+      "Expected": "exit 2 | exit 2; floors 1",
+      "Observed": "exit 2 | exit 2; floors 1",
+      "Pass": true
+    },
+    {
+      "Id": "D-F2",
+      "Description": "activation precondition: a connected session able to write operations with an older CARV marker (carv-v1) blocks floor 2; nothing applied",
+      "Expected": "exit 3 \u0027CARV build marker of version 2\u0027; floors 1; history Floor1 only",
+      "Observed": "exit 3; marker message True; floors 1; history 20261115032228_AuthorityContentAcceptanceRuleFloor1",
+      "Pass": true
+    },
+    {
+      "Id": "D-F3",
+      "Description": "activation precondition: an unexpired operation prepared below version 2 blocks floor 2; nothing applied",
+      "Expected": "prepare OK; exit 3 \u0027prepared below content acceptance rule version 2\u0027; floors 1",
+      "Observed": "prepare OK; exit 3; in-flight message True; floors 1",
+      "Pass": true
+    },
+    {
+      "Id": "D-F4",
+      "Description": "activation under a held writer lock times out (lock_timeout 5 s) and applies nothing",
+      "Expected": "exit 3 55P03; floors 1; history Floor1 only",
+      "Observed": "exit 3; 55P03 True; floors 1; history 20261115032228_AuthorityContentAcceptanceRuleFloor1",
+      "Pass": true
+    },
+    {
+      "Id": "D-F5",
+      "Description": "a lagging version-1 instance prepares an operation that is already expired by the database clock (it must not block activation)",
+      "Expected": "OK; 1/NULL Prepared; expired by the database clock",
+      "Observed": "OK; 1/NULL Prepared; expired True",
+      "Pass": true
+    },
+    {
+      "Id": "D-F6",
+      "Description": "floor 2 activation while four Release B (floor 1) version-2 writers run: applied; no writer refused (minimum semantics); floor 1 dropped in the same transaction",
+      "Expected": "exit 0; 12 x OK; floors 2; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2",
+      "Observed": "exit 0; 12 x OK; floors 2; history 20261115032228_AuthorityContentAcceptanceRuleFloor1,20261115200000_AuthorityContentAcceptanceRuleFloor2",
+      "Pass": true
+    },
+    {
+      "Id": "D-F7",
+      "Description": "the live PostgreSQL 18 rendering of floor 2 is exactly the definition the write fence recognizes (D-4); live verdicts at required 1 and 2",
+      "Expected": "definition equal; required 1: none; required 2: none",
+      "Observed": "definition equal True; required 1: none; required 2: none",
+      "Pass": true
+    },
+    {
+      "Id": "D-F8",
+      "Description": "readiness after the raise: required floor 1 (a minimum) and required floor 2 both ready",
+      "Expected": "True ...v2 (floor 2); phase=ReleaseB requiredFloor=1 | True ...v2 (floor 2); phase=ReleaseB requiredFloor=2",
+      "Observed": "True content acceptance rules v2 (floor 2); phase=ReleaseB requiredFloor=1 | True content acceptance rules v2 (floor 2); phase=ReleaseB requiredFloor=2",
+      "Pass": true
+    },
+    {
+      "Id": "D-F9",
+      "Description": "after the raise, Release B writes requiring floor 2 and floor 1 both commit (P = C = 2)",
+      "Expected": "OK | OK",
+      "Observed": "OK | OK",
+      "Pass": true
+    },
+    {
+      "Id": "D-F10",
+      "Description": "monotonic: re-applying floor 2 is a no-op; applying floor 1 after floor 2 is refused (never lowered)",
+      "Expected": "exit 0 | exit 2 \u0027never lowered\u0027; floors 2; one floor-2 history row",
+      "Observed": "exit 0 | exit 2 True; floors 2; floor-2 rows 1",
+      "Pass": true
+    },
+    {
+      "Id": "D-F11",
+      "Description": "after floor 2, a version-1 Prepare is refused by the database floor (that build maps it to its own 409); nothing persisted",
+      "Expected": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False (the version-1 store\u0027s mapping of the database refusal; its alert names ck_content_operation_rule_floor_v2); operations unchanged",
+      "Observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v2) refused a content operation write; this build applies rule version 1 (mixed-version fleet or a newer floor); operations 34-\u003E34",
+      "Pass": true
+    },
+    {
+      "Id": "D-F12",
+      "Description": "after floor 2, the lagging version-1 instance cannot commit its pre-floor operation (P = 1 \u003C floor 2); nothing advances",
+      "Expected": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False (its alert names ck_content_operation_rule_floor_v2); not Committed; snapshots unchanged",
+      "Observed": "AuthorityException OPERATION_RULES_OUTDATED 409 retryable=False ## alerts: CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE: the database content acceptance rule fence (ck_content_operation_rule_floor_v2) refused a content operation write; this build applies rule version 1 (mixed-version fleet or a newer floor); 1/NULL Prepared; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-F13",
+      "Description": "historical replay after floor 2: the committed version-1 operation (P = C = 1) still replays under Release B floor 2 and writes nothing (NOT VALID floor, immutable terminal rows)",
+      "Expected": "OK; still 1/1 Committed; snapshot unchanged",
+      "Observed": "OK; 1/1 Committed; unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-F14",
+      "Description": "database floor 2 independent of any build: a Prepared operation stamped 1 cannot be inserted; stamped 2 can",
+      "Expected": "23514 ck_content_operation_rule_floor_v2 | OK",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v2 | OK",
+      "Pass": true
+    },
+    {
+      "Id": "D-M1a",
+      "Description": "floor 2 dropped (history kept): a Release B write requiring floor 2 is refused in the write transaction",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorRecordedButMissing; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e221-1aa6-7878-801c-b2700e326347, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorRecordedButMissing category=MissingFloor recovery=RecoveryRequired:ReinstateRecordedFloor phase=ReleaseB requiredFloor=2 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 35-\u003E35; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-M1b",
+      "Description": "floor 2 dropped: a Release B write requiring only floor 1 is refused too (a recorded higher floor is missing: a lowering)",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorRecordedButMissing; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e221-1aa6-7878-801c-b2700e326347, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorRecordedButMissing category=MissingFloor recovery=RecoveryRequired:ReinstateRecordedFloor phase=ReleaseB requiredFloor=1 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 35-\u003E35; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-M1c",
+      "Description": "readiness of both Release B instances is not ready",
+      "Expected": "False ...FloorMissing | False ...FloorMissing",
+      "Observed": "False ContentAcceptanceRuleFloorMissing(recorded in the migration history, constraint absent) | False ContentAcceptanceRuleFloorMissing(recorded in the migration history, constraint absent)",
+      "Pass": true
+    },
+    {
+      "Id": "D-M1d",
+      "Description": "documented exposure R-CARV-21: an instance configured as Release A is bound only by the database floor, so it writes while the floor is missing",
+      "Expected": "OK (Release A has no write fence)",
+      "Observed": "OK",
+      "Pass": true
+    },
+    {
+      "Id": "D-M2",
+      "Description": "recovery: the command reports the recorded-but-missing floor (exit 4), reinstates it only with the explicit flag, then writes resume",
+      "Expected": "exit 4 | exit 0; floors 2; required-2 write OK",
+      "Observed": "exit 4 | exit 0; floors 2; write OK",
+      "Pass": true
+    },
+    {
+      "Id": "D-M3",
+      "Description": "floor 2 weakened in place (same name, bound \u003E= 1): refused as a definition mismatch",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorDefinitionMismatch; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e221-1aa6-7878-801c-b2700e326347, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorDefinitionMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=2 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 37-\u003E37; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-M4a",
+      "Description": "floor 2 replaced by an exact floor 1 (a lowering): a write requiring floor 1 is refused (floor 2 recorded but missing)",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorRecordedButMissing; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e221-1aa6-7878-801c-b2700e326347, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorRecordedButMissing category=MissingFloor recovery=RecoveryRequired:ReinstateRecordedFloor phase=ReleaseB requiredFloor=1 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 37-\u003E37; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-M4b",
+      "Description": "the same lowering: a write requiring floor 2 is refused (floor lowered)",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorLowered; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e221-1aa6-7878-801c-b2700e326347, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorLowered category=LoweredFloor recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=2 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 37-\u003E37; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-M4c",
+      "Description": "reinstatement restores floor 2 and drops the substituted floor 1; writes resume",
+      "Expected": "exit 0; floors 2; OK",
+      "Observed": "exit 0; floors 2; OK",
+      "Pass": true
+    },
+    {
+      "Id": "D-M5",
+      "Description": "floor 1 added beside floor 2 (two floor constraints): refused as an unexpected floor set",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorDefinitionMismatch; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e221-1aa6-7878-801c-b2700e326347, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorDefinitionMismatch category=WeakenedFence recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=1 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 38-\u003E38; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-M6",
+      "Description": "floor 2 present but its history row deleted: refused (inconsistent migration history)",
+      "Expected": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert reason=FloorNotRecorded; no operation; snapshots unchanged",
+      "Observed": "AuthorityException CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED 503 retryable=False; alert SecurityAlert { AlertKind = CONTENT_ACCEPTANCE_FLOOR_NOT_ENFORCED, Severity = Critical, OrganizationId = 01a1e221-1aa6-7878-801c-b2700e326347, OperationId = 00000000-0000-0000-0000-000000000000, SecurityCommandId = , Summary = content write refused: reason=FloorNotRecorded category=InconsistentMigrationHistory recovery=RecoveryRequired:Incident phase=ReleaseB requiredFloor=2 build=2, CorrelationId = 00000000-0000-0000-0000-000000000000 }; ops 38-\u003E38; unchanged | unchanged",
+      "Pass": true
+    },
+    {
+      "Id": "D-M7",
+      "Description": "after the catalog is put back exactly, readiness and writes recover; the live verdict is none",
+      "Expected": "OK; True ...requiredFloor=2; none",
+      "Observed": "OK; True content acceptance rules v2 (floor 2); phase=ReleaseB requiredFloor=2; none",
+      "Pass": true
+    },
+    {
+      "Id": "D-99",
+      "Description": "operation inventory of the run (for the record); no Committed operation has P \u003C\u003E C",
+      "Expected": "every Committed row P = C",
+      "Observed": "Aborted P1/CNULL OPERATION_RULES_OUTDATED=3, Aborted P2/CNULL ENVELOPE_SCHEMA_MISMATCH_AT_COMMIT=1, Aborted P2/CNULL ENVELOPE_VERSION_NOT_ENABLED_AT_COMMIT=1, Aborted P2/CNULL OPERATION_RULES_OUTDATED=1, Committed P1/C1=1, Committed P2/C2=29, Prepared P1/CNULL=1, Prepared P2/CNULL=2",
+      "Pass": true
+    }
+  ]
+}

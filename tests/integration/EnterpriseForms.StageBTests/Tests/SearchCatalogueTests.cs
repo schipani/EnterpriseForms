@@ -484,7 +484,10 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
     /// repeated runs, server-reported elapsed time, Authority calls and verified bytes. Results are written to
     /// artifacts/stage-b/c7-m1-benchmark.json and the test log. It fails only if a run fails, never on a latency number.
     /// </summary>
+    /// <remarks>C-133 R-29: categorized as a benchmark (the P-S1-1 480-record measurement) so focused runs of this class can skip
+    /// it (<c>-ExcludeBenchmarks</c>); unchanged, and still run in its Stage B group.</remarks>
     [Fact]
+    [Trait("Category", "Benchmark")]
     public async Task BenchmarkTheVerifiedScopeAt50And150And480Records()
     {
         var report = new List<object>();

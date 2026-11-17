@@ -1,0 +1,243 @@
+// Throwaway S1 protocol verification probe (C-116). Scratchpad only; never part of the product.
+// Emulates the Authority projector's marker CAS for a probe organization that the Authority does not know, and the
+// proposed pin -> decide(at_exact_snapshot) -> verify(fully_consistent) protocol, against the security-test SpiceDB.
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Globalization;
+using System.Text.Json;
+using Authzed.Api.V1;
+using Grpc.Core;
+using Grpc.Net.Client;
+
+var endpoint = Environment.GetEnvironmentVariable("SPICEDB") ?? "http://spicedb:50051";
+var key = Environment.GetEnvironmentVariable("SPICEDB_KEY") ?? "spicedb-dev-preshared-key-change-me";
+var channel = GrpcChannel.ForAddress(endpoint);
+var client = new PermissionsService.PermissionsServiceClient(channel);
+var headers = new Metadata { { "authorization", "Bearer " + key } };
+CallOptions Opt() => new(headers, DateTime.UtcNow.AddSeconds(5));
+
+var mode = args[0];
+var org = args.Length > 1 ? args[1] : Guid.CreateVersion7().ToString("D");
+var stateFile = $"/w/state-{org}.json";
+
+Relationship Marker(long step) => new()
+{
+    Resource = new ObjectReference { ObjectType = "organization", ObjectId = org },
+    Relation = "projection_cursor",
+    Subject = new SubjectReference { Object = new ObjectReference { ObjectType = "projection_step", ObjectId = $"step-{org}-{step}" } },
+};
+Relationship Auditor(string user) => new()
+{
+    Resource = new ObjectReference { ObjectType = "organization", ObjectId = org },
+    Relation = "security_auditor",
+    Subject = new SubjectReference { Object = new ObjectReference { ObjectType = "user", ObjectId = user } },
+};
+RelationshipFilter MarkerFilter(string? stepId = null) => new()
+{
+    ResourceType = "organization", OptionalResourceId = org, OptionalRelation = "projection_cursor",
+    OptionalSubjectFilter = stepId is null ? null : new SubjectFilter { SubjectType = "projection_step", OptionalSubjectId = stepId },
+};
+string U1 = $"u1-{org}", U2 = $"u2-{org}";
+
+async Task<(List<long> Steps, string? ReadAt)> ReadMarkerAsync(Consistency consistency)
+{
+    using var call = client.ReadRelationships(new ReadRelationshipsRequest { Consistency = consistency, RelationshipFilter = MarkerFilter() }, Opt());
+    var steps = new List<long>();
+    string? readAt = null;
+    await foreach (var r in call.ResponseStream.ReadAllAsync())
+    {
+        readAt ??= r.ReadAt.Token;
+        if (r.ReadAt.Token != readAt) throw new InvalidOperationException("read_at differs between messages");
+        var id = r.Relationship.Subject.Object.ObjectId;
+        var prefix = $"step-{org}-";
+        steps.Add(id.StartsWith(prefix, StringComparison.Ordinal) && long.TryParse(id[prefix.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out var s) ? s : -1);
+    }
+    return (steps, readAt);
+}
+
+async Task<(bool Allowed, string CheckedAt)> CheckAsync(Consistency consistency, string user, int items)
+{
+    var req = new CheckBulkPermissionsRequest { Consistency = consistency };
+    for (var i = 0; i < items; i++)
+    {
+        req.Items.Add(new CheckBulkPermissionsRequestItem
+        {
+            Resource = new ObjectReference { ObjectType = "organization", ObjectId = org },
+            Permission = "view_audit",
+            Subject = new SubjectReference { Object = new ObjectReference { ObjectType = "user", ObjectId = i == 0 ? user : $"x{i}-{org}" } },
+        });
+    }
+    var resp = await client.CheckBulkPermissionsAsync(req, Opt());
+    var first = resp.Pairs[0];
+    return (first.ResponseCase == CheckBulkPermissionsPair.ResponseOneofCase.Item && first.Item.Permissionship == CheckPermissionResponse.Types.Permissionship.HasPermission, resp.CheckedAt.Token);
+}
+
+static Consistency Fresh(string token) => new() { AtLeastAsFresh = new ZedToken { Token = token } };
+static Consistency Exact(string token) => new() { AtExactSnapshot = new ZedToken { Token = token } };
+static Consistency Full() => new() { FullyConsistent = true };
+
+// Returns the protocol outcome: "ALLOW", "DENY", or a failure class. Never returns ALLOW unless every step agrees.
+async Task<(string Outcome, double M1, double D, double M2)> ProtocolAsync(long p, string token, string user, int items)
+{
+    var sw = Stopwatch.StartNew();
+    var (steps1, s) = await ReadMarkerAsync(Fresh(token));
+    var m1 = sw.Elapsed.TotalMilliseconds;
+    if (s is null) return ("M1_MISSING", m1, 0, 0);
+    if (steps1.Count != 1 || steps1[0] != p) return ("M1_MISMATCH:" + string.Join("|", steps1), m1, 0, 0);
+    sw.Restart();
+    var (allowed, checkedAt) = await CheckAsync(Exact(s), user, items);
+    var d = sw.Elapsed.TotalMilliseconds;
+    if (checkedAt != s) return ("TOKEN_MISMATCH", m1, d, 0);
+    sw.Restart();
+    var (steps2, _) = await ReadMarkerAsync(Full());
+    var m2 = sw.Elapsed.TotalMilliseconds;
+    if (steps2.Count != 1 || steps2[0] != p) return ("M2_MISMATCH:" + string.Join("|", steps2), m1, d, m2);
+    return (allowed ? "ALLOW" : "DENY", m1, d, m2);
+}
+
+static double Pct(List<double> v, double q) { if (v.Count == 0) return double.NaN; v.Sort(); return v[Math.Min(v.Count - 1, (int)Math.Ceiling(q * v.Count) - 1)]; }
+static string Classify(Exception ex) => ex is RpcException r ? $"RPC_{r.StatusCode}:{r.Status.Detail.Split(':')[0]}" : ex.GetType().Name;
+
+switch (mode)
+{
+    case "setup":
+    {
+        var req = new WriteRelationshipsRequest();
+        req.OptionalPreconditions.Add(new Precondition { Operation = Precondition.Types.Operation.MustNotMatch, Filter = MarkerFilter() });
+        req.Updates.Add(new RelationshipUpdate { Operation = RelationshipUpdate.Types.Operation.Touch, Relationship = Auditor(U1) });
+        req.Updates.Add(new RelationshipUpdate { Operation = RelationshipUpdate.Types.Operation.Touch, Relationship = Auditor(U2) });
+        req.Updates.Add(new RelationshipUpdate { Operation = RelationshipUpdate.Types.Operation.Touch, Relationship = Marker(1) });
+        var w = await client.WriteRelationshipsAsync(req, Opt());
+        File.WriteAllText(stateFile, JsonSerializer.Serialize(new { p = 1, token = w.WrittenAt.Token }));
+        Console.WriteLine($"SETUP org={org} p=1 token={w.WrittenAt.Token}");
+        break;
+    }
+    case "revoke":
+    {
+        // Projector-equivalent CAS: marker 1 -> 2, revoke u1, in one WriteRelationships call.
+        var req = new WriteRelationshipsRequest();
+        req.OptionalPreconditions.Add(new Precondition { Operation = Precondition.Types.Operation.MustMatch, Filter = MarkerFilter($"step-{org}-1") });
+        req.OptionalPreconditions.Add(new Precondition { Operation = Precondition.Types.Operation.MustNotMatch, Filter = MarkerFilter($"step-{org}-2") });
+        req.Updates.Add(new RelationshipUpdate { Operation = RelationshipUpdate.Types.Operation.Delete, Relationship = Auditor(U1) });
+        req.Updates.Add(new RelationshipUpdate { Operation = RelationshipUpdate.Types.Operation.Delete, Relationship = Marker(1) });
+        req.Updates.Add(new RelationshipUpdate { Operation = RelationshipUpdate.Types.Operation.Touch, Relationship = Marker(2) });
+        var w = await client.WriteRelationshipsAsync(req, Opt());
+        File.WriteAllText(stateFile, JsonSerializer.Serialize(new { p = 2, token = w.WrittenAt.Token }));
+        Console.WriteLine($"REVOKE org={org} p=2 token={w.WrittenAt.Token}");
+        break;
+    }
+    case "once":
+    {
+        var st = JsonDocument.Parse(File.ReadAllText(stateFile)).RootElement;
+        var p = st.GetProperty("p").GetInt64(); var token = st.GetProperty("token").GetString()!;
+        foreach (var u in new[] { U1, U2 })
+        {
+            string baseline;
+            try { baseline = (await CheckAsync(Fresh(token), u, 1)).Allowed ? "ALLOW" : "DENY"; } catch (Exception ex) { baseline = Classify(ex); }
+            string proto;
+            try { proto = (await ProtocolAsync(p, token, u, 1)).Outcome; } catch (Exception ex) { proto = Classify(ex); }
+            string exactOld;
+            try { exactOld = (await CheckAsync(Exact(token), u, 1)).Allowed ? "ALLOW" : "DENY"; } catch (Exception ex) { exactOld = Classify(ex); }
+            var (fs, _) = await ReadMarkerAsync(Full());
+            Console.WriteLine($"ONCE user={(u == U1 ? "u1(revoked)" : "u2(kept)")} baseline_at_least_as_fresh={baseline} exact_at_authority_token={exactOld} protocol={proto} head_markers=[{string.Join(",", fs)}]");
+        }
+        break;
+    }
+    case "pin":
+    {
+        // M1 only, before the restore: saves the pinned snapshot S.
+        var st = JsonDocument.Parse(File.ReadAllText(stateFile)).RootElement;
+        var p = st.GetProperty("p").GetInt64(); var token = st.GetProperty("token").GetString()!;
+        var (steps, s) = await ReadMarkerAsync(Fresh(token));
+        File.WriteAllText($"/w/pin-{org}.txt", s ?? "");
+        Console.WriteLine($"PIN markers=[{string.Join(",", steps)}] expected={p} S={s}");
+        break;
+    }
+    case "afterpin":
+    {
+        // D and M2 after the restore, using the S pinned before it: does the exact snapshot see restored data, and does M2 catch it?
+        var st = JsonDocument.Parse(File.ReadAllText(stateFile)).RootElement;
+        var p = st.GetProperty("p").GetInt64();
+        var s = File.ReadAllText($"/w/pin-{org}.txt");
+        string d;
+        try { var (allowed, checkedAt) = await CheckAsync(Exact(s), U1, 1); d = (allowed ? "ALLOW" : "DENY") + (checkedAt == s ? " checked_at=S" : " checked_at!=S"); } catch (Exception ex) { d = Classify(ex); }
+        string markerAtS;
+        try { var (ms, _) = await ReadMarkerAsync(Exact(s)); markerAtS = string.Join(",", ms); } catch (Exception ex) { markerAtS = Classify(ex); }
+        var (m2, _) = await ReadMarkerAsync(Full());
+        Console.WriteLine($"AFTERPIN revoked-user check at pinned S = {d}; marker at S = [{markerAtS}]; M2 fully_consistent markers = [{string.Join(",", m2)}] expected={p} => protocol {(m2.Count == 1 && m2[0] == p ? "WOULD RETURN DECISION" : "DENIES (M2 mismatch)")}");
+        break;
+    }
+    case "race":
+    {
+        // Continuous protocol + baseline runs for the revoked user while the operator restores the datastore.
+        var st = JsonDocument.Parse(File.ReadAllText(stateFile)).RootElement;
+        var p = st.GetProperty("p").GetInt64(); var token = st.GetProperty("token").GetString()!;
+        var seconds = int.Parse(args[2], CultureInfo.InvariantCulture); var workers = int.Parse(args[3], CultureInfo.InvariantCulture);
+        var counts = new ConcurrentDictionary<string, int>();
+        var firstSeen = new ConcurrentDictionary<string, double>();
+        var start = Stopwatch.StartNew();
+        var end = DateTime.UtcNow.AddSeconds(seconds);
+        void Count(string k) { counts.AddOrUpdate(k, 1, (_, c) => c + 1); firstSeen.TryAdd(k, start.Elapsed.TotalSeconds); }
+        var tasks = Enumerable.Range(0, workers).Select(async i =>
+        {
+            while (DateTime.UtcNow < end)
+            {
+                try { Count("baseline:" + ((await CheckAsync(Fresh(token), U1, 1)).Allowed ? "ALLOW" : "DENY")); } catch (Exception ex) { Count("baseline:" + Classify(ex)); }
+                try { Count("protocol:" + (await ProtocolAsync(p, token, U1, 1)).Outcome.Split(':')[0]); } catch (Exception ex) { Count("protocol:" + Classify(ex)); }
+            }
+        }).ToArray();
+        await Task.WhenAll(tasks);
+        foreach (var kv in counts.OrderBy(k => k.Key)) Console.WriteLine($"RACE {kv.Key} count={kv.Value} first_at={firstSeen[kv.Key]:F1}s");
+        Console.WriteLine($"RACE protocol:ALLOW for revoked user = {counts.GetValueOrDefault("protocol:ALLOW")} (must be 0)");
+        break;
+    }
+    case "bench":
+    {
+        // Open-loop load: `rps` requests/s for `seconds`, each request = baseline (today) and protocol (S1), interleaved.
+        var st = JsonDocument.Parse(File.ReadAllText(stateFile)).RootElement;
+        var p = st.GetProperty("p").GetInt64(); var token = st.GetProperty("token").GetString()!;
+        var rps = int.Parse(args[2], CultureInfo.InvariantCulture); var seconds = int.Parse(args[3], CultureInfo.InvariantCulture); var items = int.Parse(args[4], CultureInfo.InvariantCulture);
+        var baseline = new ConcurrentBag<double>(); var protocol = new ConcurrentBag<double>(); var m1s = new ConcurrentBag<double>(); var ds = new ConcurrentBag<double>(); var m2s = new ConcurrentBag<double>();
+        var errors = new ConcurrentDictionary<string, int>();
+        // Warm-up.
+        for (var i = 0; i < 50; i++) { await CheckAsync(Fresh(token), U2, items); await ProtocolAsync(p, token, U2, items); }
+        var inflight = new List<Task>();
+        var interval = TimeSpan.FromSeconds(1.0 / rps);
+        var clock = Stopwatch.StartNew();
+        long n = 0;
+        while (clock.Elapsed < TimeSpan.FromSeconds(seconds))
+        {
+            var due = TimeSpan.FromTicks(interval.Ticks * n);
+            var wait = due - clock.Elapsed;
+            if (wait > TimeSpan.Zero) await Task.Delay(wait);
+            var user = n % 2 == 0 ? U2 : U1;
+            inflight.Add(Task.Run(async () =>
+            {
+                try
+                {
+                    var sw = Stopwatch.StartNew();
+                    await CheckAsync(Fresh(token), user, items);
+                    baseline.Add(sw.Elapsed.TotalMilliseconds);
+                    sw.Restart();
+                    var (outcome, m1, d, m2) = await ProtocolAsync(p, token, user, items);
+                    protocol.Add(sw.Elapsed.TotalMilliseconds);
+                    if (outcome is "ALLOW" or "DENY") { m1s.Add(m1); ds.Add(d); m2s.Add(m2); } else errors.AddOrUpdate(outcome, 1, (_, c) => c + 1);
+                }
+                catch (Exception ex) { errors.AddOrUpdate(Classify(ex), 1, (_, c) => c + 1); }
+            }));
+            n++;
+        }
+        await Task.WhenAll(inflight);
+        string Row(string name, ConcurrentBag<double> bag) { var v = bag.ToList(); return $"{name,-22} n={v.Count,6} p50={Pct(v, .50),7:F2} p95={Pct(v, .95),7:F2} p99={Pct(v, .99),7:F2} ms"; }
+        Console.WriteLine($"BENCH rps={rps} seconds={seconds} items={items} issued={n} achieved_rps={n / clock.Elapsed.TotalSeconds:F1}");
+        Console.WriteLine(Row("baseline (today)", baseline));
+        Console.WriteLine(Row("protocol (S1 total)", protocol));
+        Console.WriteLine(Row("  M1 pin read", m1s));
+        Console.WriteLine(Row("  D exact check", ds));
+        Console.WriteLine(Row("  M2 verify read", m2s));
+        var added = m1s.Zip(m2s, (a, b) => a + b).ToList();
+        Console.WriteLine($"{"  added (M1+M2)",-22} n={added.Count,6} p50={Pct(added, .50),7:F2} p95={Pct(added, .95),7:F2} p99={Pct(added, .99),7:F2} ms");
+        Console.WriteLine("BENCH errors: " + (errors.IsEmpty ? "none" : string.Join(", ", errors.Select(e => $"{e.Key}={e.Value}"))));
+        break;
+    }
+}

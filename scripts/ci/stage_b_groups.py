@@ -156,10 +156,30 @@ def cmd_plan(args: argparse.Namespace) -> int:
     for g in manifest["groups"]:
         print(f"{g['name']:36s} {sum(discovered[c] for c in g['classes']):4d} tests  ({len(g['classes'])} classes)")
     print(f"PASS  {total} tests in {len(manifest['groups'])} groups, each class in exactly one group")
+    selected, unknown = select_groups(manifest, getattr(args, "groups", "all"))
+    if unknown:
+        print("FAIL  unknown Stage B group(s): " + ", ".join(unknown) + "; groups: " + ", ".join(g["name"] for g in manifest["groups"]))
+        return 1
+    if not selected:
+        print("FAIL  no Stage B group selected")
+        return 1
+    if len(selected) != len(manifest["groups"]):
+        print(f"SELECT {len(selected)} of {len(manifest['groups'])} groups: {', '.join(g['name'] for g in selected)} (the others are not run)")
     if args.matrix_out:
-        matrix = {"include": [{"group": g["name"], "title": g["title"]} for g in manifest["groups"]]}
+        matrix = {"include": [{"group": g["name"], "title": g["title"]} for g in selected]}
         Path(args.matrix_out).write_text(json.dumps(matrix), encoding="utf-8")
     return 0
+
+
+def select_groups(manifest: dict, groups: str | None) -> tuple[list[dict], list[str]]:
+    """C-131 release runs: 'all' (or nothing) selects every group, in manifest order; otherwise a comma-separated list of names."""
+    text = (groups or "all").strip()
+    if text.lower() == "all":
+        return list(manifest["groups"]), []
+    names = [n.strip() for n in text.split(",") if n.strip()]
+    known = {g["name"] for g in manifest["groups"]}
+    unknown = [n for n in names if n not in known]
+    return [g for g in manifest["groups"] if g["name"] in names], unknown
 
 
 def cmd_filter(args: argparse.Namespace) -> int:
@@ -228,6 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     plan = sub.add_parser("plan")
     plan.add_argument("--list", required=True)
     plan.add_argument("--matrix-out")
+    plan.add_argument("--groups", default="all", help="'all' (default) or a comma-separated list of group names (release runs, C-131)")
     plan.set_defaults(fn=cmd_plan)
     flt = sub.add_parser("filter")
     flt.add_argument("group")

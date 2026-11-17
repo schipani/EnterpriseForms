@@ -1,0 +1,15 @@
+{
+    "Id":  "MA-3",
+    "File":  "src/authority/AuthorizationAuthority.Api/Composition/ContentAcceptanceFloorCommand.cs",
+    "ArchFailed":  1,
+    "PgChecks":  63,
+    "PgFailed":  3,
+    "DeadlockLines":  0,
+    "PgFailedIds":  [
+                        "fe1_lt/LT-1",
+                        "fe1_lt/LT-2",
+                        "fe1_s01/FM"
+                    ],
+    "Restored":  true,
+    "RebuiltRelease":  true
+}

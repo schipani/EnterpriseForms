@@ -2,8 +2,10 @@ using System.Reflection;
 using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Application.Features.Content;
+using AuthorizationAuthority.Application.Features.Journal;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.Content;
+using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
@@ -22,7 +24,7 @@ namespace AuthorizationAuthority.Tests;
 /// revocation and switch changes between prepare and commit (commit-time authorization), concurrent writes, replay,
 /// tampered current snapshots and staged candidates. Lock ordering against PostgreSQL is covered by the Docker tests.
 /// </summary>
-public sealed class ContributorWriteProtocolTests
+public sealed partial class ContributorWriteProtocolTests
 {
     private const string Issuer = "https://issuer.test";
 
@@ -49,12 +51,19 @@ public sealed class ContributorWriteProtocolTests
         /// <summary>The accepted rows of the head with their signatures (what the business store would hold).</summary>
         public List<(Staged Row, byte[] Signature)> Accepted { get; private set; } = [];
 
-        public Harness(bool contributorWritesEnabled = true)
+        /// <summary>The organization's in-process HMAC provider (E3-M2a: lets a test reproduce what an older Authority build signed).</summary>
+        public LocalHmacProvider Mac { get; }
+
+        /// <summary>The provider the content service signs through (E3-M2a: counts signatures, so a refusal can be shown to precede signing).</summary>
+        public CountingMacProvider Signer { get; }
+
+        public Harness(bool contributorWritesEnabled = true, EnvelopeV2AcceptanceSwitch? envelopeV2Acceptance = null)
         {
-            var mac = new LocalHmacProvider();
+            var mac = Mac = new LocalHmacProvider();
             mac.ProvisionKeyAsync(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", CancellationToken.None).GetAwaiter().GetResult();
             Switch = new ShareContributorWriteSwitch(contributorWritesEnabled, testingOverrideAllowed: true);
-            Service = new ContentService(Store, mac, ThrowingProxy.Create<ISpiceDbProjection>(), new NoOpFaultInjector(), TimeProvider.System, Switch);
+            Signer = new CountingMacProvider(mac);
+            Service = new ContentService(Store, Signer, TestProjection.Verifier(Store, ThrowingProxy.Create<ISpiceDbProjection>()), new NoOpFaultInjector(), TimeProvider.System, Switch, envelopeV2Acceptance: envelopeV2Acceptance);
             State = new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous };
             Store.Organizations.Add(State);
             foreach (var user in new[] { Owner, Contributor })
@@ -69,6 +78,9 @@ public sealed class ContributorWriteProtocolTests
         }
 
         public RecordContentHead Head => Store.Heads.Single();
+
+        /// <summary>E3-M2f-2: the envelope capability this harness's business build declares on Prepare and Commit (null: no declaration, level 1).</summary>
+        public ClientEnvelopeCapability? EnvelopeCapability { get; set; }
 
         public static VerifiedActor Actor(Guid user) => new(Issuer, user.ToString("D"), "test");
 
@@ -118,13 +130,13 @@ public sealed class ContributorWriteProtocolTests
         public List<Staged> Stage(IEnumerable<Row> rows, Guid operation) => rows.Select(r => Encode(r, Org, operation, Head.CommittedContentRevision + 1)).ToList();
 
         public async Task<PreparedContentOperation> PrepareAsync(Guid actor, Guid operation, List<Staged> candidate, bool withCurrent, string? key = null) =>
-            await Service.PrepareAsync(Actor(actor), Request(operation, candidate, withCurrent), key ?? "key-" + operation.ToString("N"), Guid.CreateVersion7(), CancellationToken.None);
+            await Service.PrepareAsync(Actor(actor), Request(operation, candidate, withCurrent), key ?? "key-" + operation.ToString("N"), Guid.CreateVersion7(), CancellationToken.None, EnvelopeCapability);
 
         public async Task<ContentRevision> CommitAsync(Guid actor, PreparedContentOperation prepared, List<Staged> candidate)
         {
             var signatures = prepared.SignedItems.ToDictionary(s => (s.ItemKind, s.ItemId), s => Convert.FromBase64String(s.RowSignatureBase64));
             var staged = candidate.Select(c => new StagedContentItem(c.Kind, c.ItemId, c.Base64, Convert.ToBase64String(signatures[(c.Kind, c.ItemId)]))).ToList();
-            var revision = await Service.CommitAsync(Actor(actor), prepared.OperationId, new CommitContentChangeRequest(Org, Record, staged), Guid.CreateVersion7(), CancellationToken.None);
+            var revision = await Service.CommitAsync(Actor(actor), prepared.OperationId, new CommitContentChangeRequest(Org, Record, staged), Guid.CreateVersion7(), CancellationToken.None, EnvelopeCapability);
             Accepted = candidate.Select(c => (c, signatures[(c.Kind, c.ItemId)])).ToList();
             return revision;
         }
@@ -139,8 +151,69 @@ public sealed class ContributorWriteProtocolTests
 
         public async Task<Harness> CreatedAsync()
         {
-            await WriteAsync(Owner, Rows(), withCurrent: false);
+            await WriteAsync(Owner, Rows(), withCurrent: true);
             return this;
+        }
+
+        /// <summary>
+        /// Test-only (E3-M2d, as ProtectionReconciliationTests.AcceptLegacyAsync): records <paramref name="rows"/> as the accepted head
+        /// without running Prepare or Commit, signed with the organization's key, with an anchored content checkpoint. It models
+        /// accepted history this build would not itself accept (an Envelope v2 head, which no build accepts before E3-M2e).
+        /// </summary>
+        public async Task AcceptDirectlyAsync(List<Row> rows)
+        {
+            var operation = Guid.CreateVersion7();
+            var revision = Head.CommittedContentRevision + 1;
+            var key = new IntegrityKeyReference(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", 1);
+            var accepted = new List<(Staged Row, byte[] Signature)>(rows.Count);
+            var inputs = new List<MerkleLeafInput>(rows.Count);
+            foreach (var row in rows)
+            {
+                var encoded = Encode(row, Org, operation, revision);
+                var signature = (await Mac.SignAsync(key, encoded.Bytes, CancellationToken.None)).Mac;
+                accepted.Add((encoded, signature));
+                inputs.Add(new MerkleLeafInput((MerkleItemKind)(byte)encoded.Kind, encoded.ItemId, signature, encoded.Digest, (ulong)revision, operation));
+            }
+
+            var manifest = MerkleManifestV1.Build(inputs);
+            var commit = new RecordManifestCommit
+            {
+                RecordManifestCommitId = Guid.CreateVersion7(),
+                OrganizationId = Org,
+                FormRecordId = Record,
+                CommittedOperationId = operation,
+                CommittedContentRevision = revision,
+                ManifestSchemaVersion = 1,
+                ManifestAlgorithmVersion = 1,
+                RowSignatureKeyVersion = 1,
+                ManifestLeafCount = (long)manifest.LeafCount,
+                ManifestRootDigest = manifest.MerkleRoot,
+                ManifestLeafIndexDigest = manifest.LeafIndexDigest,
+                ManifestCommittedOn = DateTimeOffset.UtcNow,
+            };
+            Store.Commits.Add(commit);
+            Store.ManifestLeaves.AddRange(manifest.SortedLeaves.Select((leaf, position) => new RecordManifestLeaf
+            {
+                RecordManifestLeafId = Guid.CreateVersion7(),
+                RecordManifestCommitId = commit.RecordManifestCommitId,
+                ManifestLeafPosition = position,
+                ManifestItemKey = leaf.ItemKey,
+                ManifestItemKindCode = (byte)leaf.Kind,
+                ManifestItemId = leaf.ItemId,
+                CanonicalPayloadDigest = leaf.CanonicalPayloadDigest.ToArray(),
+                RowSignature = leaf.RowSignature.ToArray(),
+                ManifestLeafDigest = manifest.LeafHashes[position],
+            }));
+            Head.CommittedContentRevision = revision;
+            Head.CommittedOperationId = operation;
+            Head.CurrentRecordManifestCommitId = commit.RecordManifestCommitId;
+            Head.CommittedManifestRoot = manifest.MerkleRoot;
+            Head.SignatureKeyVersion = 1;
+            State.AdvanceContentIntegrityRevision(ContentRevisionProjectionAction.AdvanceWithDerivation);
+            var checkpoint = JournalChain.Append(State, JournalStreamNames.Content, State.ContentIntegrityRevision, "ContentHeadCommitted", new { form_record_id = Record, committed_content_revision = revision }, null, operation, TimeProvider.System);
+            checkpoint.ArchiveDeliveryState = ArchiveDeliveryStates.Anchored;
+            Store.Journal.Add(checkpoint);
+            Accepted = accepted;
         }
     }
 
@@ -150,13 +223,13 @@ public sealed class ContributorWriteProtocolTests
     public async Task OwnerWritesAreUnchangedAndPassIdentityBinding()
     {
         var h = await new Harness().CreatedAsync();
-        var revision = await h.WriteAsync(h.Owner, Change(h.Rows(), h.Other, r => r.With("string_value", RowValue.Text("owner edit"))), withCurrent: false);
+        var revision = await h.WriteAsync(h.Owner, Change(h.Rows(), h.Other, r => r.With("string_value", RowValue.Text("owner edit"))), withCurrent: true);
         Assert.Equal(2, revision.CommittedContentRevision);
 
         // An owner candidate whose value row names another record is refused by identity binding (D8 applies to owners too).
         var forged = Change(h.Rows(), h.Other, r => r.With("form_record_id", RowValue.Uuid(Guid.CreateVersion7())));
         var operation = Guid.CreateVersion7();
-        var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.PrepareAsync(h.Owner, operation, h.Stage(forged, operation), withCurrent: false));
+        var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.PrepareAsync(h.Owner, operation, h.Stage(forged, operation), withCurrent: true));
         Assert.Contains("IDENTITY_BINDING", ex.Message, StringComparison.Ordinal);
     }
 
@@ -200,7 +273,7 @@ public sealed class ContributorWriteProtocolTests
         Assert.DoesNotContain(h.Store.Operations, o => o.ContentChangeOperationId == operation);
 
         // Owner writes are unaffected by the switch.
-        Assert.Equal(2, (await h.WriteAsync(h.Owner, Change(h.Rows(), h.Other, r => r.With("string_value", RowValue.Text("owner"))), withCurrent: false)).CommittedContentRevision);
+        Assert.Equal(2, (await h.WriteAsync(h.Owner, Change(h.Rows(), h.Other, r => r.With("string_value", RowValue.Text("owner"))), withCurrent: true)).CommittedContentRevision);
     }
 
     [Fact]
@@ -298,7 +371,7 @@ public sealed class ContributorWriteProtocolTests
         h.ShareWithContributor();
 
         // The owner's lifecycle transition is an ordinary owner content write and stays allowed.
-        Assert.Equal(2, (await h.WriteAsync(h.Owner, WithStatus(h.Rows(), h.Record, locked), withCurrent: false)).CommittedContentRevision);
+        Assert.Equal(2, (await h.WriteAsync(h.Owner, WithStatus(h.Rows(), h.Record, locked), withCurrent: true)).CommittedContentRevision);
 
         // The contributor's candidate is otherwise perfect: the accepted header unchanged, only the shared value edited.
         var operation = Guid.CreateVersion7();
@@ -316,7 +389,7 @@ public sealed class ContributorWriteProtocolTests
         Assert.Equal(AuthorityErrorCodes.RecordNotEditable, (await Assert.ThrowsAsync<AuthorityException>(() => h.PrepareAsync(h.Contributor, unlock, flip, withCurrent: true))).ErrorCode);
 
         // Once the owner returns the record to Draft, the same contributor write is accepted (the lock is the only difference).
-        await h.WriteAsync(h.Owner, h.Rows(), withCurrent: false);
+        await h.WriteAsync(h.Owner, h.Rows(), withCurrent: true);
         var allowed = Guid.CreateVersion7();
         var accepted = h.Stage(Change(h.Rows(), h.Shared, r => r.With("string_value", RowValue.Text("after unlock"))), allowed);
         var prepared = await h.PrepareAsync(h.Contributor, allowed, accepted, withCurrent: true);
@@ -334,7 +407,7 @@ public sealed class ContributorWriteProtocolTests
 
         var submit = Guid.CreateVersion7();
         var submitCandidate = h.Stage(WithStatus(h.Rows(), h.Record, "Submitted"), submit);
-        await h.CommitAsync(h.Owner, await h.PrepareAsync(h.Owner, submit, submitCandidate, withCurrent: false), submitCandidate);
+        await h.CommitAsync(h.Owner, await h.PrepareAsync(h.Owner, submit, submitCandidate, withCurrent: true), submitCandidate);
 
         var stale = await Assert.ThrowsAsync<AuthorityException>(() => h.CommitAsync(h.Contributor, prepared, candidate));
         Assert.Equal(AuthorityErrorCodes.ContentRevisionConflict, stale.ErrorCode);
@@ -365,7 +438,7 @@ public sealed class ContributorWriteProtocolTests
         var h = await new Harness().CreatedAsync();
         foreach (var status in new[] { "Submitted", "Draft", "Archived", "Submitted" })
         {
-            await h.WriteAsync(h.Owner, WithStatus(h.Rows(), h.Record, status), withCurrent: false);
+            await h.WriteAsync(h.Owner, WithStatus(h.Rows(), h.Record, status), withCurrent: true);
         }
 
         Assert.Equal(5, h.Head.CommittedContentRevision);
@@ -373,7 +446,7 @@ public sealed class ContributorWriteProtocolTests
         // Switch off: a contributor is refused for the switch first, whatever the status (the default stays fail-closed).
         var off = await new Harness(contributorWritesEnabled: false).CreatedAsync();
         off.ShareWithContributor();
-        await off.WriteAsync(off.Owner, WithStatus(off.Rows(), off.Record, "Submitted"), withCurrent: false);
+        await off.WriteAsync(off.Owner, WithStatus(off.Rows(), off.Record, "Submitted"), withCurrent: true);
         var operation = Guid.CreateVersion7();
         var candidate = off.Stage(WithStatus(Change(off.Rows(), off.Shared, r => r.With("string_value", RowValue.Text("x"))), off.Record, "Submitted"), operation);
         Assert.Equal(AuthorityErrorCodes.ContributorWritesDisabled, (await Assert.ThrowsAsync<AuthorityException>(() => off.PrepareAsync(off.Contributor, operation, candidate, withCurrent: true))).ErrorCode);
@@ -389,7 +462,7 @@ public sealed class ContributorWriteProtocolTests
         var preparedA = await h.PrepareAsync(h.Contributor, opA, candidateA, withCurrent: true);
         var opB = Guid.CreateVersion7();
         var candidateB = h.Stage(Change(h.Rows(), h.Other, r => r.With("string_value", RowValue.Text("owner"))), opB);
-        var preparedB = await h.PrepareAsync(h.Owner, opB, candidateB, withCurrent: false);
+        var preparedB = await h.PrepareAsync(h.Owner, opB, candidateB, withCurrent: true);
 
         await h.CommitAsync(h.Owner, preparedB, candidateB);
         var lost = await Assert.ThrowsAsync<AuthorityException>(() => h.CommitAsync(h.Contributor, preparedA, candidateA));

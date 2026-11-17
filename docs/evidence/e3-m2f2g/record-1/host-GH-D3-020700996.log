@@ -1,0 +1,68 @@
+info: AuthorizationAuthority.Api.Composition.ContentAcceptancePolicyStartupGuard[9213]
+      Content acceptance policy: phase=ReleaseB requiredFloor=3; this build applies rule version 3
+info: AuthorizationAuthority.Api.Composition.ContentAcceptanceRuleGuard[9210]
+      Content acceptance rule guard: ready (content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3)
+info: AuthorizationAuthority.Api.Composition.EnvelopeV2AcceptanceStartupGuard[9241]
+      Envelope v2 acceptance configured=True environment=DevelopmentOrTesting phase=ReleaseB requiredFloor=3; acceptance stays off until the policy is recorded on the platform journal
+fail: Microsoft.Extensions.Hosting.Internal.Host[11]
+      Hosting failed to start
+      System.InvalidOperationException: Content:MinimumBusinessEnvelopeCapability must be absent, "1" or "2"; the Authorization Authority refuses to start.
+         at AuthorizationAuthority.Application.Features.Content.EnvelopeCapabilityFloor.ParseDeploymentFloor(String configuredValue) in <local>\src\authority\AuthorizationAuthority.Application\Features\Content\EnvelopeCapabilityFloor.cs:line 110
+         at AuthorizationAuthority.Application.Features.Content.EnvelopeCapabilityFloor.Create(String configuredValue, IEnvelopeCapabilityObserver observer) in <local>\src\authority\AuthorizationAuthority.Application\Features\Content\EnvelopeCapabilityFloor.cs:line 102
+         at AuthorizationAuthority.Api.Composition.EnvelopeCapabilityComposition.<>c.<AddEnvelopeCapabilityFloor>b__0_0(IServiceProvider provider) in <local>\src\authority\AuthorizationAuthority.Api\Composition\EnvelopeCapabilityComposition.cs:line 21
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.Resolve(ServiceCallSite callSite, ServiceProviderEngineScope scope)
+         at Microsoft.Extensions.DependencyInjection.ServiceProvider.CreateServiceAccessor(ServiceIdentifier serviceIdentifier)
+         at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd(TKey key, Func`2 valueFactory)
+         at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+         at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+         at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+         at AuthorizationAuthority.Api.Composition.EnvelopeCapabilityFloorStartupGuard.StartAsync(CancellationToken cancellationToken) in <local>\src\authority\AuthorizationAuthority.Api\Composition\EnvelopeCapabilityComposition.cs:line 113
+         at Microsoft.Extensions.Hosting.Internal.Host.<StartAsync>b__14_1(IHostedService service, CancellationToken token)
+         at Microsoft.Extensions.Hosting.Internal.Host.ForeachService[T](IEnumerable`1 services, CancellationToken token, Boolean concurrent, Boolean abortOnFirstException, List`1 exceptions, Func`3 operation)
+warn: AuthorizationAuthority.Api.Composition.EnvelopeAcceptancePolicyObservationLoop[9244]
+      Envelope v2 acceptance policy could not be recorded (ObjectDisposedException); acceptance stays off; retrying
+fail: Microsoft.Extensions.Hosting.Internal.Host[9]
+      BackgroundService failed
+      System.AggregateException: An error occurred while writing to logger(s). (Cannot access a disposed object.
+      Object name: 'EventLogInternal'.)
+       ---> System.ObjectDisposedException: Cannot access a disposed object.
+      Object name: 'EventLogInternal'.
+         at System.Diagnostics.EventLogInternal.OpenForWrite(String currentMachineName)
+         at System.Diagnostics.EventLogInternal.InternalWriteEvent(UInt32 eventID, UInt16 category, EventLogEntryType type, String[] strings, Byte[] rawData, String currentMachineName)
+         at System.Diagnostics.EventLogInternal.WriteEvent(EventInstance instance, Byte[] data, Object[] values)
+         at Microsoft.Extensions.Logging.EventLog.WindowsEventLog.WriteEntry(String message, EventLogEntryType type, Int32 eventID, Int16 category)
+         at Microsoft.Extensions.Logging.EventLog.EventLogLogger.WriteMessage(String message, EventLogEntryType eventLogEntryType, Int32 eventId)
+         at Microsoft.Extensions.Logging.EventLog.EventLogLogger.Log[TState](LogLevel logLevel, EventId eventId, TState state, Exception exception, Func`3 formatter)
+         at Microsoft.Extensions.Logging.Logger.<Log>g__LoggerLog|14_0[TState](LogLevel logLevel, EventId eventId, ILogger logger, Exception exception, Func`3 formatter, List`1& exceptions, TState& state)
+         --- End of inner exception stack trace ---
+         at Microsoft.Extensions.Logging.Logger.ThrowLoggingError(List`1 exceptions)
+         at Microsoft.Extensions.Logging.Logger.Log[TState](LogLevel logLevel, EventId eventId, TState state, Exception exception, Func`3 formatter)
+         at Microsoft.Extensions.Logging.Logger`1.Microsoft.Extensions.Logging.ILogger.Log[TState](LogLevel logLevel, EventId eventId, TState state, Exception exception, Func`3 formatter)
+         at Microsoft.Extensions.Logging.LoggerMessage.<>c__DisplayClass10_0`1.<Define>g__Log|0(ILogger logger, T1 arg1, Exception exception)
+         at AuthorizationAuthority.Api.Composition.EnvelopeAcceptancePolicyObservationLoop.LogFailed(ILogger logger, String failure) in <local>\src\authority\AuthorizationAuthority.Api\obj\Release\net10.0\Microsoft.Extensions.Logging.Generators\Microsoft.Extensions.Logging.Generators.LoggerMessageGenerator\LoggerMessage.g.cs:line 833
+         at AuthorizationAuthority.Api.Composition.EnvelopeAcceptancePolicyObservationLoop.ExecuteAsync(CancellationToken stoppingToken) in <local>\src\authority\AuthorizationAuthority.Api\Composition\EnvelopeV2AcceptanceComposition.cs:line 95
+         at Microsoft.Extensions.Hosting.Internal.Host.TryExecuteBackgroundServiceAsync(BackgroundService backgroundService)
+Unhandled exception. System.InvalidOperationException: Content:MinimumBusinessEnvelopeCapability must be absent, "1" or "2"; the Authorization Authority refuses to start.
+   at AuthorizationAuthority.Application.Features.Content.EnvelopeCapabilityFloor.ParseDeploymentFloor(String configuredValue) in <local>\src\authority\AuthorizationAuthority.Application\Features\Content\EnvelopeCapabilityFloor.cs:line 110
+   at AuthorizationAuthority.Application.Features.Content.EnvelopeCapabilityFloor.Create(String configuredValue, IEnvelopeCapabilityObserver observer) in <local>\src\authority\AuthorizationAuthority.Application\Features\Content\EnvelopeCapabilityFloor.cs:line 102
+   at AuthorizationAuthority.Api.Composition.EnvelopeCapabilityComposition.<>c.<AddEnvelopeCapabilityFloor>b__0_0(IServiceProvider provider) in <local>\src\authority\AuthorizationAuthority.Api\Composition\EnvelopeCapabilityComposition.cs:line 21
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.Resolve(ServiceCallSite callSite, ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceProvider.CreateServiceAccessor(ServiceIdentifier serviceIdentifier)
+   at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd(TKey key, Func`2 valueFactory)
+   at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+   at AuthorizationAuthority.Api.Composition.EnvelopeCapabilityFloorStartupGuard.StartAsync(CancellationToken cancellationToken) in <local>\src\authority\AuthorizationAuthority.Api\Composition\EnvelopeCapabilityComposition.cs:line 113
+   at Microsoft.Extensions.Hosting.Internal.Host.<StartAsync>b__14_1(IHostedService service, CancellationToken token)
+   at Microsoft.Extensions.Hosting.Internal.Host.ForeachService[T](IEnumerable`1 services, CancellationToken token, Boolean concurrent, Boolean abortOnFirstException, List`1 exceptions, Func`3 operation)
+   at Microsoft.Extensions.Hosting.Internal.Host.StartAsync(CancellationToken cancellationToken)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync(IHost host, CancellationToken token)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync(IHost host, CancellationToken token)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.Run(IHost host)
+   at AuthorizationAuthority.Api.Program.Main(String[] args) in <local>\src\authority\AuthorizationAuthority.Api\Program.cs:line 182

@@ -196,6 +196,13 @@ public interface IBusinessScope : IAsyncDisposable
     /// <summary>Every staged non-header row of the operation (typed values and attachment versions), ordered by item id.</summary>
     Task<List<ISignedContentRow>> GetStagedRowsAsync(Guid formRecordId, Guid contentChangeOperationId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// IX-2 O-2: the staged header and rows of several (record, operation) pairs with one query per row table — the set-based
+    /// form of <see cref="FindStagedHeaderAsync"/> plus <see cref="GetStagedRowsAsync"/>, returning the same rows in the same order
+    /// for each pair. A pair with nothing staged is present with a null header and no rows. The rows stay untrusted bytes.
+    /// </summary>
+    Task<Dictionary<(Guid FormRecordId, Guid ContentChangeOperationId), (FormRecordRevision? Header, List<ISignedContentRow> Rows)>> GetStagedContentBatchAsync(IReadOnlyCollection<(Guid FormRecordId, Guid ContentChangeOperationId)> pairs, CancellationToken cancellationToken);
+
     // Documents
     Task<UploadSession?> FindUploadSessionAsync(Guid tenantId, Guid uploadSessionId, CancellationToken cancellationToken);
 

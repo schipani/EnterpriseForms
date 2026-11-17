@@ -17,7 +17,8 @@ public sealed class AuthorityCommandAwaiter(IAuthorizationAuthorityClient author
         return await AwaitAsync(user, result, cancellationToken, budget).ConfigureAwait(false);
     }
 
-    public async Task<SecurityCommandResult> AwaitAsync(DelegatedUserContext user, SecurityCommandResult result, CancellationToken cancellationToken, TimeSpan? budget = null)
+    /// <param name="onPoll">C-137 (R-37) diagnostics: called once per status poll; it does not change the wait.</param>
+    public async Task<SecurityCommandResult> AwaitAsync(DelegatedUserContext user, SecurityCommandResult result, CancellationToken cancellationToken, TimeSpan? budget = null, Action? onPoll = null)
     {
         var deadline = clock.GetUtcNow().Add(budget ?? DefaultBudget);
         var delay = TimeSpan.FromMilliseconds(60);
@@ -40,6 +41,7 @@ public sealed class AuthorityCommandAwaiter(IAuthorizationAuthorityClient author
 
             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
             delay = TimeSpan.FromMilliseconds(Math.Min(500, delay.TotalMilliseconds * 1.5));
+            onPoll?.Invoke();
             result = await authority.GetSecurityCommandStatusAsync(user, result.CommandId, cancellationToken).ConfigureAwait(false);
         }
     }

@@ -110,11 +110,15 @@ export function SecurityAdministratorsCard() {
                     key: "actions",
                     header: "Actions",
                     isActions: true,
-                    render: (row: SecurityAdministratorResponse) => (
-                      <Button size="sm" variant="ghost" icon={ActionIcons.delete} aria-label={`Remove ${row.displayName} as Security Administrator`} disabled={last} onClick={() => setRemoving(row)}>
-                        Remove
-                      </Button>
-                    ),
+                    // D8-62a: nobody removes themself (the Authority refuses it too); another Security Administrator must.
+                    render: (row: SecurityAdministratorResponse) =>
+                      row.isCurrentUser ? (
+                        <span className="text-sm text-muted">Another Security Administrator must remove you</span>
+                      ) : (
+                        <Button size="sm" variant="ghost" icon={ActionIcons.delete} aria-label={`Remove ${row.displayName} as Security Administrator`} disabled={last} onClick={() => setRemoving(row)}>
+                          Remove
+                        </Button>
+                      ),
                   },
                 ]
               : []),

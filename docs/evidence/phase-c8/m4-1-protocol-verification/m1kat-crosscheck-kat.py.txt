@@ -1,0 +1,18 @@
+# Independent cross-check of the M1 known-answer vector (Python 'cryptography' AESGCM). Throwaway; scratchpad only.
+import hashlib, struct, unicodedata, uuid
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+seq = lambda s, n: bytes(range(s, s + n))
+kek, dek, wrap_nonce, nonce = seq(0, 32), seq(0x20, 32), seq(0x40, 12), seq(0x50, 12)
+org, target, note_id = (uuid.UUID(x).bytes for x in ("019a5b2c-1111-7000-8000-000000000001", "019a5b2c-2222-7000-8000-000000000002", "019a5b2c-3333-7000-8000-000000000003"))
+role, direction = b"security_auditor", b"appoint"
+note = unicodedata.normalize("NFC", "Covers the Q4 audit cycle.\nContact: Le\u0301a".strip())
+aad = b"DynamicForms/AuditorReasonNote/v1" + struct.pack(">i", 1) + org + target + note_id + struct.pack(">i", len(role)) + role + struct.pack(">i", len(direction)) + direction
+u = note.encode("utf-8")
+p = struct.pack(">H", len(u)) + u + b"\x00" * (2048 - 2 - len(u))
+out = AESGCM(dek).encrypt(nonce, p, aad); ct, tag = out[:-16], out[-16:]
+w = AESGCM(kek).encrypt(wrap_nonce, dek, b"DynamicForms/DekWrap/v1:local-dev-kek-v1")
+print(f"aad_hex={aad.hex()}")
+print(f"plaintext_sha256={hashlib.sha256(p).hexdigest()}")
+print(f"ciphertext_sha256={hashlib.sha256(ct).hexdigest()}")
+print(f"tag_hex={tag.hex()}")
+print(f"wrapped_data_key_hex={(wrap_nonce + w).hex()}")

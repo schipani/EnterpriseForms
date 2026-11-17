@@ -1,0 +1,1 @@
+prebuilt: the frozen design-gate Release build of 66f0aa7 (local scratch copy; hashes in legacy-66f0aa7-sha256.txt equal the design-gate evidence)

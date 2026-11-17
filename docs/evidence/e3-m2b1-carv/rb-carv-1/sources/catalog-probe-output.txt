@@ -1,0 +1,40 @@
+﻿CON|PK_content_change_operations|p|true|PRIMARY KEY (content_change_operation_id)
+CON|ck_content_operation_commit_rule_version|c|true|CHECK (((((operation_state_name)::text = 'Committed'::text) AND (((prepare_acceptance_rule_version IS NULL) AND (commit_acceptance_rule_version IS NULL)) OR ((prepare_acceptance_rule_version IS NOT NULL) AND (commit_acceptance_rule_version IS NOT NULL) AND (commit_acceptance_rule_version = prepare_acceptance_rule_version)))) OR (((operation_state_name)::text <> 'Committed'::text) AND (commit_acceptance_rule_version IS NULL))))
+CON|ck_content_operation_rule_floor_v1|c|false|CHECK ((((operation_state_name)::text <> ALL ((ARRAY['Prepared'::character varying, 'Committed'::character varying])::text[])) OR ((prepare_acceptance_rule_version IS NOT NULL) AND (prepare_acceptance_rule_version >= 1)))) NOT VALID
+CON|ck_content_operation_rule_versions_positive|c|true|CHECK ((((prepare_acceptance_rule_version IS NULL) OR (prepare_acceptance_rule_version >= 1)) AND ((commit_acceptance_rule_version IS NULL) OR (commit_acceptance_rule_version >= 1))))
+CON|ck_content_operation_state|c|true|CHECK (((operation_state_name)::text = ANY ((ARRAY['Prepared'::character varying, 'Committed'::character varying, 'Aborted'::character varying, 'Quarantined'::character varying])::text[])))
+CON|content_change_operations_actor_identity_binding_id_not_null|n|true|NOT NULL actor_identity_binding_id
+CON|content_change_operations_candidate_content_revision_not_null|n|true|NOT NULL candidate_content_revision
+CON|content_change_operations_candidate_key_version_not_null|n|true|NOT NULL candidate_key_version
+CON|content_change_operations_candidate_leaf_count_not_null|n|true|NOT NULL candidate_leaf_count
+CON|content_change_operations_candidate_leaf_index_digest_not_null|n|true|NOT NULL candidate_leaf_index_digest
+CON|content_change_operations_candidate_manifest_root_not_null|n|true|NOT NULL candidate_manifest_root
+CON|content_change_operations_content_change_operation_id_not_null|n|true|NOT NULL content_change_operation_id
+CON|content_change_operations_correlation_identifier_not_null|n|true|NOT NULL correlation_identifier
+CON|content_change_operations_expected_authorization_revis_not_null|n|true|NOT NULL expected_authorization_revision
+CON|content_change_operations_expected_content_revision_not_null|n|true|NOT NULL expected_content_revision
+CON|content_change_operations_form_record_id_not_null|n|true|NOT NULL form_record_id
+CON|content_change_operations_operation_created_on_not_null|n|true|NOT NULL operation_created_on
+CON|content_change_operations_operation_expires_on_not_null|n|true|NOT NULL operation_expires_on
+CON|content_change_operations_operation_idempotency_key_not_null|n|true|NOT NULL operation_idempotency_key
+CON|content_change_operations_operation_request_digest_not_null|n|true|NOT NULL operation_request_digest
+CON|content_change_operations_operation_state_name_not_null|n|true|NOT NULL operation_state_name
+CON|content_change_operations_organization_id_not_null|n|true|NOT NULL organization_id
+CON|fk_content_op_actor|f|true|FOREIGN KEY (actor_identity_binding_id) REFERENCES authority.identity_bindings(identity_binding_id) ON DELETE CASCADE
+CON|fk_content_op_org|f|true|FOREIGN KEY (organization_id) REFERENCES authority.organization_authorization_states(organization_id) ON DELETE CASCADE
+TRG|RI_ConstraintTrigger_a_16603|true|O|CREATE CONSTRAINT TRIGGER "RI_ConstraintTrigger_a_16603" AFTER DELETE ON authority.content_change_operations FROM authority.content_candidate_leaves NOT DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION "RI_FKey_cascade_del"()
+TRG|RI_ConstraintTrigger_a_16604|true|O|CREATE CONSTRAINT TRIGGER "RI_ConstraintTrigger_a_16604" AFTER UPDATE ON authority.content_change_operations FROM authority.content_candidate_leaves NOT DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION "RI_FKey_noaction_upd"()
+TRG|RI_ConstraintTrigger_a_16629|true|O|CREATE CONSTRAINT TRIGGER "RI_ConstraintTrigger_a_16629" AFTER DELETE ON authority.content_change_operations FROM authority.record_manifest_commits NOT DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION "RI_FKey_cascade_del"()
+TRG|RI_ConstraintTrigger_a_16630|true|O|CREATE CONSTRAINT TRIGGER "RI_ConstraintTrigger_a_16630" AFTER UPDATE ON authority.content_change_operations FROM authority.record_manifest_commits NOT DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION "RI_FKey_noaction_upd"()
+TRG|RI_ConstraintTrigger_a_16708|true|O|CREATE CONSTRAINT TRIGGER "RI_ConstraintTrigger_a_16708" AFTER DELETE ON authority.content_change_operations FROM authority.record_content_heads NOT DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION "RI_FKey_noaction_del"()
+TRG|RI_ConstraintTrigger_a_16709|true|O|CREATE CONSTRAINT TRIGGER "RI_ConstraintTrigger_a_16709" AFTER UPDATE ON authority.content_change_operations FROM authority.record_content_heads NOT DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION "RI_FKey_noaction_upd"()
+TRG|RI_ConstraintTrigger_c_16547|true|O|CREATE CONSTRAINT TRIGGER "RI_ConstraintTrigger_c_16547" AFTER INSERT ON authority.content_change_operations FROM authority.identity_bindings NOT DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION "RI_FKey_check_ins"()
+TRG|RI_ConstraintTrigger_c_16548|true|O|CREATE CONSTRAINT TRIGGER "RI_ConstraintTrigger_c_16548" AFTER UPDATE ON authority.content_change_operations FROM authority.identity_bindings NOT DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION "RI_FKey_check_upd"()
+TRG|RI_ConstraintTrigger_c_16552|true|O|CREATE CONSTRAINT TRIGGER "RI_ConstraintTrigger_c_16552" AFTER INSERT ON authority.content_change_operations FROM authority.organization_authorization_states NOT DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION "RI_FKey_check_ins"()
+TRG|RI_ConstraintTrigger_c_16553|true|O|CREATE CONSTRAINT TRIGGER "RI_ConstraintTrigger_c_16553" AFTER UPDATE ON authority.content_change_operations FROM authority.organization_authorization_states NOT DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION "RI_FKey_check_upd"()
+TRG|trg_content_operation_rule_state_guard|false|O|CREATE TRIGGER trg_content_operation_rule_state_guard BEFORE INSERT OR UPDATE ON authority.content_change_operations FOR EACH ROW EXECUTE FUNCTION authority.content_operation_rule_state_guard()
+FN|content_operation_rule_state_guard|plpgsql|false|search_path=pg_catalog, pg_temp|76382ef436e8ae8e1c76b186dca68efb
+SRC|\\nBEGIN\\n    IF TG_OP = 'INSERT' THEN\\n        IF NEW.operation_state_name <> 'Prepared' OR NEW.commit_acceptance_rule_version IS NOT NULL THEN\\n            RAISE EXCEPTION 'content operation must be inserted as Prepared without a commit rule version'\\n                USING ERRCODE = 'check_violation', CONSTRAINT = 'trg_content_operation_rule_state_guard';\\n        END IF;\\n        RETURN NEW;\\n    END IF;\\n    IF OLD.operation_state_name <> 'Prepared' THEN\\n        RAISE EXCEPTION 'a terminal content operation is immutable'\\n            USING ERRCODE = 'check_violation', CONSTRAINT = 'trg_content_operation_rule_state_guard';\\n    END IF;\\n    IF NEW.prepare_acceptance_rule_version IS DISTINCT FROM OLD.prepare_acceptance_rule_version THEN\\n        RAISE EXCEPTION 'content operation prepare rule version is immutable'\\n            USING ERRCODE = 'check_violation', CONSTRAINT = 'trg_content_operation_rule_state_guard';\\n    END IF;\\n    RETURN NEW;\\nEND 
+INH|0
+KIND|r
+VER|PostgreSQL 18.0 (Debian 18.0-1.pgdg13+3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit

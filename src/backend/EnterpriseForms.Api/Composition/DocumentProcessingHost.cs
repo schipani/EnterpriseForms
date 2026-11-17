@@ -97,7 +97,7 @@ public sealed partial class FieldProtectionMigrationHostedService(EnterpriseForm
     private static partial void LogLoopError(ILogger logger, string exceptionType, string detail);
 }
 
-/// <summary>Fail-closed environment policy for document providers: the local KEK provider is Development/Testing only.</summary>
+/// <summary>Fail-closed environment policy for document providers: the local KEK provider is Development/Testing only (shared with the Worker, E0-1).</summary>
 public sealed class DocumentProviderStartupGuard(IConfiguration configuration, IHostEnvironment environment) : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken)
@@ -107,13 +107,7 @@ public sealed class DocumentProviderStartupGuard(IConfiguration configuration, I
             return Task.CompletedTask;
         }
 
-        var keyProvider = configuration["Encryption:KeyProvider"] ?? "Unconfigured";
-        var testAllowed = environment.IsDevelopment() || environment.IsEnvironment("Testing");
-        if (keyProvider == "LocalDevelopment" && !testAllowed)
-        {
-            throw new InvalidOperationException($"Encryption:KeyProvider 'LocalDevelopment' is forbidden in {environment.EnvironmentName}. Azure Key Vault/Managed HSM providers are required (not implemented in Stage B). Refusing to start.");
-        }
-
+        EnterpriseForms.Infrastructure.Features.Documents.EncryptionProviderEnvironmentPolicy.EnsurePermitted(configuration, environment.EnvironmentName);
         return Task.CompletedTask;
     }
 

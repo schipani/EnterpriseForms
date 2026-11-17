@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using EnterpriseForms.Application.Common;
+using EnterpriseForms.Application.Features.Documents.Ports;
 using EnterpriseForms.Application.Features.FormRecords.Encryption;
 using EnterpriseForms.Contracts.Features;
 using EnterpriseForms.Domain.Features.FormRecords;
@@ -22,6 +23,9 @@ public static class CreationRequestFingerprint
     public const string SealLogicalType = "CreationFingerprintKey/v1";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = false };
+
+    /// <summary>E3-M2c R-M2c-1: the stored envelope JSON is read strictly; an unknown member (for example Envelope v2 metadata) is refused, never ignored.</summary>
+    private static readonly JsonSerializerOptions StrictEnvelopeJson = new() { UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow };
 
     public sealed record Request(string ActorIssuer, string ActorSubject, Guid FormDefinitionId, Guid? OwnerTeamId, Guid? ParentFormRecordId, Guid? FormRelationshipDefinitionId,
         IReadOnlyDictionary<string, string> Values, IReadOnlyList<RecordGroupValuesRequest>? Groups);
@@ -49,14 +53,15 @@ public static class CreationRequestFingerprint
         return JsonSerializer.SerializeToUtf8Bytes(canonical, Json);
     }
 
-    public static FormRecordCreationAttempt Create(IFieldEncryptionService encryption, Guid tenantId, Guid formRecordId, Guid actorUserId, DateTimeOffset now, byte[] canonicalRequest)
+    /// <summary>E-1: the key is sealed under the tenant's IdempotencyProtection key (purpose-separated from field values).</summary>
+    public static async Task<FormRecordCreationAttempt> CreateAsync(IFieldEncryptionService encryption, Guid tenantId, Guid formRecordId, Guid actorUserId, DateTimeOffset now, byte[] canonicalRequest, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(encryption);
         var attemptId = Guid.CreateVersion7();
         var key = RandomNumberGenerator.GetBytes(32);
         try
         {
-            var sealedKey = encryption.Encrypt(new FieldEncryptionContext(tenantId, formRecordId, SealPurposeId, attemptId, SealLogicalType), Convert.ToBase64String(key));
+            var sealedKey = await encryption.EncryptAsync(new FieldEncryptionContext(tenantId, formRecordId, SealPurposeId, attemptId, SealLogicalType), Convert.ToBase64String(key), EncryptionKeyPurpose.IdempotencyProtection, cancellationToken).ConfigureAwait(false);
             return new FormRecordCreationAttempt
             {
                 FormRecordCreationAttemptId = attemptId,
@@ -74,16 +79,21 @@ public static class CreationRequestFingerprint
         }
     }
 
-    /// <summary>True only when the stored envelope opens for this tenant/record/attempt and the MAC of <paramref name="canonicalRequest"/> matches.</summary>
-    public static bool Matches(IFieldEncryptionService encryption, FormRecordCreationAttempt attempt, byte[] canonicalRequest)
+    /// <summary>
+    /// True only when the stored envelope opens for this tenant/record/attempt and the MAC of <paramref name="canonicalRequest"/> matches.
+    /// E-1: opens with the tenant's IdempotencyProtection key, or the legacy development key for attempts sealed before E-1.
+    /// E3-M2c R-M2c-1: through the narrow <see cref="IFieldEncryptionService.OpenCreationFingerprintKeyAsync"/> (Envelope v1, fixed
+    /// purpose and seal identity), not a general decrypt API. The key is used only for the fixed-time MAC comparison and zeroed.
+    /// </summary>
+    public static async Task<bool> MatchesAsync(IFieldEncryptionService encryption, FormRecordCreationAttempt attempt, byte[] canonicalRequest, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(encryption);
         ArgumentNullException.ThrowIfNull(attempt);
         byte[] key;
         try
         {
-            var envelope = JsonSerializer.Deserialize<Envelope>(attempt.FingerprintKeyEnvelopeJson, Json) ?? throw new JsonException("empty envelope");
-            key = Convert.FromBase64String(encryption.Decrypt(envelope.ToValue(attempt)));
+            var envelope = JsonSerializer.Deserialize<Envelope>(attempt.FingerprintKeyEnvelopeJson, StrictEnvelopeJson) ?? throw new JsonException("empty envelope");
+            key = await encryption.OpenCreationFingerprintKeyAsync(envelope.ToSealedKey(attempt), cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is CryptographicException or JsonException or FormatException or ArgumentException)
         {
@@ -111,20 +121,9 @@ public static class CreationRequestFingerprint
             Convert.ToBase64String(value.EncryptedValueBytes), Convert.ToBase64String(value.EncryptionNonceBytes), Convert.ToBase64String(value.EncryptionAuthTagBytes),
             Convert.ToBase64String(value.WrappedDataKeyBytes), value.EncryptionAlgorithmName, value.EncryptionKeyReference, value.EncryptionEnvelopeVersion);
 
-        public FieldEncryptedValue ToValue(FormRecordCreationAttempt attempt) => new()
-        {
-            TenantId = attempt.TenantId,
-            FormRecordId = attempt.FormRecordId,
-            FieldDefinitionId = SealPurposeId,
-            FieldValueItemId = attempt.FormRecordCreationAttemptId,
-            EncryptedLogicalType = SealLogicalType,
-            EncryptedValueBytes = Convert.FromBase64String(Ciphertext),
-            EncryptionNonceBytes = Convert.FromBase64String(Nonce),
-            EncryptionAuthTagBytes = Convert.FromBase64String(Tag),
-            WrappedDataKeyBytes = Convert.FromBase64String(WrappedKey),
-            EncryptionAlgorithmName = Algorithm,
-            EncryptionKeyReference = KeyReference,
-            EncryptionEnvelopeVersion = EnvelopeVersion,
-        };
+        public CreationFingerprintKeyEnvelope ToSealedKey(FormRecordCreationAttempt attempt) => new(
+            attempt.TenantId, attempt.FormRecordId, attempt.FormRecordCreationAttemptId,
+            Convert.FromBase64String(Ciphertext), Convert.FromBase64String(Nonce), Convert.FromBase64String(Tag), Convert.FromBase64String(WrappedKey),
+            Algorithm, KeyReference, EnvelopeVersion);
     }
 }

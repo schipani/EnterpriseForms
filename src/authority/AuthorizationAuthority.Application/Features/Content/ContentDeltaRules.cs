@@ -31,7 +31,14 @@ public enum PrimaryKeyClass
     StorageKey,
 }
 
-/// <summary>Column-class assignment of one signed (entity kind, schema version) — the Authority's own copy, cross-checked against the business registry by an architecture test.</summary>
+/// <summary>E3-M2b-2 S-9: the registered canonical type of one signed column and whether it may carry the NULL marker.</summary>
+public sealed record PinnedColumnShape(RowColumnType Type, bool Nullable);
+
+/// <summary>
+/// Column-class assignment of one signed (entity kind, schema version) — the Authority's own copy, cross-checked against the
+/// business registry by an architecture test. <paramref name="PinnedShapes"/> (E3-M2b-2, S-9; OD-M2-22 = the two envelope
+/// kinds only) additionally pins each column's canonical type and nullability; null means names only (every other kind).
+/// </summary>
 public sealed record SignedItemRule(
     ManifestItemKind Kind,
     string EntityKind,
@@ -39,7 +46,8 @@ public sealed record SignedItemRule(
     PrimaryKeyClass PrimaryKey,
     string? ItemIdColumn,
     IReadOnlyDictionary<string, SignedColumnClass> Columns,
-    bool ShareUpdatable);
+    bool ShareUpdatable,
+    IReadOnlyDictionary<string, PinnedColumnShape>? PinnedShapes = null);
 
 /// <summary>
 /// Phase C5 (decisions D1, D3, D4, D8, D14, D15): identity binding for every user content write, and the column-class
@@ -60,10 +68,11 @@ public static class ContentDeltaRules
     public const string AlgorithmColumn = "encryption_algorithm_name";
     public const string EnvelopeVersionColumn = "encryption_envelope_version";
 
-    /// <summary>Envelope algorithms a share-editor update may introduce (business AesGcmFieldEncryptionService).</summary>
-    public static readonly IReadOnlySet<string> AllowedEnvelopeAlgorithms = new HashSet<string>(StringComparer.Ordinal) { "AES-256-GCM" };
+    /// <summary>Envelope algorithms a share-editor update may introduce: the central list (<see cref="EnvelopeRules"/>, E3-M2a), which every write path now enforces.</summary>
+    public static readonly IReadOnlySet<string> AllowedEnvelopeAlgorithms = EnvelopeRules.AllowedAlgorithms;
 
-    public static readonly IReadOnlySet<int> AllowedEnvelopeVersions = new HashSet<int> { 1 };
+    /// <summary>Envelope versions a share-editor update may introduce: the central list (<see cref="EnvelopeRules"/>, E3-M2a).</summary>
+    public static readonly IReadOnlySet<int> AllowedEnvelopeVersions = EnvelopeRules.AllowedEnvelopeVersions;
 
     private static readonly string[] PlaintextValueKinds =
     [
@@ -381,6 +390,19 @@ public static class ContentDeltaRules
         }
     }
 
+    /// <summary>
+    /// The registered-schema rule of one canonical row, as applied at Prepare (identity binding) and, since E3-M2b-2, again at
+    /// Commit on the verified staged bytes: a supported (entity kind, schema version), exactly the registered column set and,
+    /// for kinds with pinned shapes (S-9), each column's registered type and no NULL in a non-nullable column. Commit re-derives
+    /// it from the staged bytes alone, so it is not a Prepare-only rule (the content acceptance rule version stays unchanged).
+    /// Throws a 422 invalid-command error with an identifier-free reason.
+    /// </summary>
+    public static void EnforceRegisteredSchema(RowCanonicalDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        RequireRule(document);
+    }
+
     private static SignedItemRule RequireRule(RowCanonicalDocument document)
     {
         var rule = FindRule(document.Header.EntityKind, document.Header.SchemaVersion)
@@ -388,6 +410,18 @@ public static class ContentDeltaRules
         if (document.Columns.Count != rule.Columns.Count || document.Columns.Any(c => !rule.Columns.ContainsKey(c.Name)))
         {
             throw AuthorityException.Invalid("UNSUPPORTED_SIGNED_SCHEMA: column set differs from the registered assignment");
+        }
+
+        if (rule.PinnedShapes is { } shapes)
+        {
+            foreach (var column in document.Columns)
+            {
+                var shape = shapes[column.Name];
+                if (column.Type is null ? !shape.Nullable : column.Type != shape.Type)
+                {
+                    throw AuthorityException.Invalid("UNSUPPORTED_SIGNED_SCHEMA: column type or nullability differs from the registered assignment");
+                }
+            }
         }
 
         return rule;
@@ -428,6 +462,17 @@ public static class ContentDeltaRules
 
     private static AuthorityException Out(string code) => AuthorityException.Forbidden("SHARE_MUTATION_OUT_OF_SCOPE: " + code);
 
+    /// <summary>The three Envelope v2 metadata columns (E3-M2b-2): Content class, non-nullable, registered types.</summary>
+    private static void AddEnvelopeV2Columns(Dictionary<string, SignedColumnClass> columns, Dictionary<string, PinnedColumnShape> shapes)
+    {
+        columns["data_key_commitment_bytes"] = SignedColumnClass.Content;
+        columns["data_key_identifier"] = SignedColumnClass.Content;
+        columns["key_wrap_algorithm_code"] = SignedColumnClass.Content;
+        shapes["data_key_commitment_bytes"] = new(RowColumnType.Bytes, false);
+        shapes["data_key_identifier"] = new(RowColumnType.Uuid, false);
+        shapes["key_wrap_algorithm_code"] = new(RowColumnType.Int32, false);
+    }
+
     private static Dictionary<(string, int), SignedItemRule> BuildRules()
     {
         const SignedColumnClass K = SignedColumnClass.Identity;
@@ -454,7 +499,23 @@ public static class ContentDeltaRules
             encrypted[column] = C;
         }
 
-        rules.Add(new SignedItemRule(ManifestItemKind.FieldValue, EncryptedEntityKind, 1, PrimaryKeyClass.StorageKey, "field_value_item_id", encrypted, ShareUpdatable: true));
+        var encryptedShapes = new Dictionary<string, PinnedColumnShape>(StringComparer.Ordinal)
+        {
+            [OperationColumn] = new(RowColumnType.Uuid, false), [FieldColumn] = new(RowColumnType.Uuid, false), ["field_value_item_id"] = new(RowColumnType.Uuid, false),
+            [GroupColumn] = new(RowColumnType.Uuid, true), [RecordColumn] = new(RowColumnType.Uuid, false), [TenantColumn] = new(RowColumnType.Uuid, false),
+            ["encrypted_logical_type"] = new(RowColumnType.Text, false), ["encrypted_value_bytes"] = new(RowColumnType.Bytes, false), ["encryption_auth_tag_bytes"] = new(RowColumnType.Bytes, false),
+            [NonceColumn] = new(RowColumnType.Bytes, false), [WrappedKeyColumn] = new(RowColumnType.Bytes, false), ["encryption_key_reference"] = new(RowColumnType.Text, false),
+            [AlgorithmColumn] = new(RowColumnType.Text, false), [EnvelopeVersionColumn] = new(RowColumnType.Int32, false),
+        };
+        rules.Add(new SignedItemRule(ManifestItemKind.FieldValue, EncryptedEntityKind, 1, PrimaryKeyClass.StorageKey, "field_value_item_id", encrypted, ShareUpdatable: true, encryptedShapes));
+
+        // E3-M2b-2 (contract §4.2): schema 2 = schema 1 plus the three Envelope v2 metadata columns, Content class and
+        // non-nullable. Registered so the business registry and this table stay equal; no schema-2 candidate is accepted,
+        // because EnvelopeRules refuses every envelope row whose schema or envelope version is not 1 (E3-M2a, unchanged).
+        var encryptedV2 = new Dictionary<string, SignedColumnClass>(encrypted, StringComparer.Ordinal);
+        var encryptedV2Shapes = new Dictionary<string, PinnedColumnShape>(encryptedShapes, StringComparer.Ordinal);
+        AddEnvelopeV2Columns(encryptedV2, encryptedV2Shapes);
+        rules.Add(new SignedItemRule(ManifestItemKind.FieldValue, EncryptedEntityKind, 2, PrimaryKeyClass.StorageKey, "field_value_item_id", encryptedV2, ShareUpdatable: true, encryptedV2Shapes));
 
         var option = ValueEnvelope();
         option["field_option_id"] = C;
@@ -490,7 +551,33 @@ public static class ContentDeltaRules
             attachment[column] = C;
         }
 
-        rules.Add(new SignedItemRule(ManifestItemKind.Attachment, "file_attachment_versions", 1, PrimaryKeyClass.StorageKey, "file_attachment_id", attachment, ShareUpdatable: false));
+        var attachmentShapes = new Dictionary<string, PinnedColumnShape>(StringComparer.Ordinal)
+        {
+            [OperationColumn] = new(RowColumnType.Uuid, false), ["file_attachment_id"] = new(RowColumnType.Uuid, false), [RecordColumn] = new(RowColumnType.Uuid, false),
+            [TenantColumn] = new(RowColumnType.Uuid, false), [FieldColumn] = new(RowColumnType.Uuid, false), ["version_number"] = new(RowColumnType.Int32, false),
+            ["ciphertext_sha256"] = new(RowColumnType.Bytes, false), ["ciphertext_size_bytes"] = new(RowColumnType.Int64, false), ["detected_content_type"] = new(RowColumnType.Text, false),
+            [AlgorithmColumn] = new(RowColumnType.Text, false), [EnvelopeVersionColumn] = new(RowColumnType.Int32, false), ["encryption_key_reference"] = new(RowColumnType.Text, false),
+            ["encryption_nonce_prefix"] = new(RowColumnType.Bytes, false), ["encryption_segment_size_bytes"] = new(RowColumnType.Int32, false), ["original_file_name"] = new(RowColumnType.Text, false),
+            ["plaintext_sha256"] = new(RowColumnType.Bytes, false), ["plaintext_size_bytes"] = new(RowColumnType.Int64, false), ["scan_signature_name"] = new(RowColumnType.Text, true),
+            ["scan_verdict"] = new(RowColumnType.Text, false), ["scanned_on"] = new(RowColumnType.TimestampUtc, false), ["scanner_name"] = new(RowColumnType.Text, false),
+            ["storage_object_key"] = new(RowColumnType.Text, false), ["storage_provider_name"] = new(RowColumnType.Text, false), ["uploaded_by_user_id"] = new(RowColumnType.Uuid, false),
+            ["uploaded_on"] = new(RowColumnType.TimestampUtc, false), ["wrapped_data_key"] = new(RowColumnType.Bytes, false),
+        };
+        rules.Add(new SignedItemRule(ManifestItemKind.Attachment, "file_attachment_versions", 1, PrimaryKeyClass.StorageKey, "file_attachment_id", attachment, ShareUpdatable: false, attachmentShapes));
+
+        // E3-M2b-2 (contract §4.3): schema 2 of document rows, registered but not accepted (as for field rows above).
+        var attachmentV2 = new Dictionary<string, SignedColumnClass>(attachment, StringComparer.Ordinal);
+        var attachmentV2Shapes = new Dictionary<string, PinnedColumnShape>(attachmentShapes, StringComparer.Ordinal);
+        AddEnvelopeV2Columns(attachmentV2, attachmentV2Shapes);
+        rules.Add(new SignedItemRule(ManifestItemKind.Attachment, "file_attachment_versions", 2, PrimaryKeyClass.StorageKey, "file_attachment_id", attachmentV2, ShareUpdatable: false, attachmentV2Shapes));
+
+        foreach (var rule in rules)
+        {
+            if (rule.PinnedShapes is { } pinned && (pinned.Count != rule.Columns.Count || rule.Columns.Keys.Any(k => !pinned.ContainsKey(k))))
+            {
+                throw new InvalidOperationException(rule.EntityKind + " v" + rule.SchemaVersion + ": pinned shapes must cover exactly the registered columns");
+            }
+        }
 
         // file_attachment_lifecycle_events (AttachmentLifecycle) has no registered business schema and no producer: it is
         // deliberately absent, so any such item fails closed (UNSUPPORTED_SIGNED_SCHEMA) for identity binding and share writes.

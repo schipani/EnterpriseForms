@@ -1,0 +1,29 @@
+# E-4 local Docker Vault integration run, 2026-11-12 10:42 local; commit base 7ec673b + working tree (E-4); hashicorp/vault:1.20.4 dev server (throwaway container, random tokens not recorded)
+# command: powershell -File scripts\dev\e2-vault-integration.ps1   exit code: 0
+WARNING! The following warnings were returned from Vault:
+
+  * Supplying a custom ID for the token uses the weaker SHA1 hashing instead
+  of the more secure SHA2-256 HMAC for token obfuscation. SHA1 hashed tokens
+  on the wire leads to less secure lookups.
+
+business encryption mount, policy and token ready
+ready: ef-enc-019a5b2ca0007000800000000000000a-field-value
+ready: ef-enc-019a5b2ca0007000800000000000000a-document
+ready: ef-enc-019a5b2ca0007000800000000000000a-auditor-reason-note
+ready: ef-enc-019a5b2ca0007000800000000000000a-idempotency-protection
+provisioned: ef-enc-019a5b2ce400700080000000000000e4-field-value version 2 (NOT active).
+activate explicitly (this organization only): Encryption:VaultTransit:Organizations:019a5b2c-e400-7000-8000-0000000000e4:<Purpose>:CurrentVersion=2,
+keeping every version that still protects data (here 1 and earlier) in that table's RetainedVersions.
+  refused as expected: refusing: ef-enc-019a5b2ce400700080000000000000e4-field-value latest version is 2, not the expected 1 (nothing changed)
+  refused as expected: refusing: KEY_PURPOSE is not a business encryption purpose
+  refused as expected: refusing: ef-enc-59092c0336124cf9b59b6eba352aab61-field-value does not exist (provision the organization's keys first; this script never creates a key)
+  refused as expected: refusing: ORGANIZATION_ID is not a UUID
+  refused as expected: refusing: EXPECTED_LATEST_VERSION is not a positive integer
+version provisioning script: provisioned v2 once; 5 refusals as expected
+
+Test run summary: Passed! - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+  total: 9
+  failed: 0
+  succeeded: 9
+  skipped: 0
+  duration: 5s 000ms

@@ -1,0 +1,6 @@
+== 2026-11-05T10:11:10Z search-execution fresh stack at f117995
+  total: 14
+  failed: 0
+  succeeded: 14
+  skipped: 0
+exit 0 elapsed 1769s

@@ -1,0 +1,360 @@
+{
+  "harness": "E3-M2b-1 CARV implementation gate, harness A (real migration; legacy binary; CARV-build emulation)",
+  "binary": "legacy Authority Release build de1729b (legacy-de1729b-sha256.txt)",
+  "migration": "20261115014221_AuthorityContentAcceptanceRuleVersion (new binary --migrate; see newbin-sha256.txt)",
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "checksTotal": 50,
+  "checksFailed": 0,
+  "checks": [
+    {
+      "Id": "P0-01",
+      "Description": "legacy binary writes before the migration",
+      "Expected": "10 commits, 1 Prepared",
+      "Observed": "Committed=10, Prepared=1",
+      "Pass": true
+    },
+    {
+      "Id": "MG-01",
+      "Description": "migration while a legacy commit transaction holds the table: lock timeout, nothing applied",
+      "Expected": "SQLSTATE 55P03; 0 new columns",
+      "Observed": "55P03 : canceling statement due to lock timeout; columns=0",
+      "Pass": true
+    },
+    {
+      "Id": "RM-01",
+      "Description": "the failed real migration is atomic: no history row, no trigger, no column (one transaction)",
+      "Expected": "history 0; trigger 0; columns 0",
+      "Observed": "history=0; trigger=0; columns=0",
+      "Pass": true
+    },
+    {
+      "Id": "MG-01b",
+      "Description": "the held legacy commit then completes",
+      "Expected": "Committed",
+      "Observed": "OK",
+      "Pass": true
+    },
+    {
+      "Id": "MG-02",
+      "Description": "migration waits for an open legacy Prepare, then applies",
+      "Expected": "migration waited on a lock; Prepare OK; migration OK",
+      "Observed": "waited=True; migration=OK",
+      "Pass": true
+    },
+    {
+      "Id": "RM-02",
+      "Description": "the real migration is recorded once by EF (30 migrations in total)",
+      "Expected": "30 rows; carv=1",
+      "Observed": "30 rows; carv=1",
+      "Pass": true
+    },
+    {
+      "Id": "MG-03",
+      "Description": "every existing row satisfies the new constraints (validated by ADD CONSTRAINT) and carries no stamp",
+      "Expected": "all stamps NULL",
+      "Observed": "Committed=11, Prepared=2",
+      "Pass": true
+    },
+    {
+      "Id": "MG-04",
+      "Description": "legacy Prepare (before the migration) \u002B legacy Commit (after) and a full legacy write succeed; stamps stay NULL",
+      "Expected": "OK, OK, NULL/NULL Committed",
+      "Observed": "OK, OK, NULL/NULL Committed",
+      "Pass": true
+    },
+    {
+      "Id": "MG-05",
+      "Description": "legacy Commit replay of a historical (unstamped) Committed operation returns the head and writes nothing",
+      "Expected": "OK; snapshot unchanged",
+      "Observed": "OK; unchanged (head=3:85c0a54d84f967a364d28f94583cc605e033013f7bccc5dc2d852ced3ba4e24a; commits=11; leaves=33; identities=21; checkpoints=11; journal=11; committedOps=11)",
+      "Pass": true
+    },
+    {
+      "Id": "MG-06",
+      "Description": "guarded Down then Up round-trip with no floor and no stamped Prepared rows",
+      "Expected": "OK, OK",
+      "Observed": "OK, OK",
+      "Pass": true
+    },
+    {
+      "Id": "MG-07a",
+      "Description": "runtime role cannot add a Prepare stamp to a legacy-prepared operation",
+      "Expected": "23514 trg_content_operation_rule_state_guard",
+      "Observed": "23514 trg_content_operation_rule_state_guard: content operation prepare rule version is immutable",
+      "Pass": true
+    },
+    {
+      "Id": "MG-07b",
+      "Description": "runtime role cannot put a commit stamp on a Prepared row",
+      "Expected": "23514 ck_content_operation_commit_rule_version",
+      "Observed": "23514 ck_content_operation_commit_rule_version: new row for relation \u0022content_change_operations\u0022 violates check constraint \u0022ck_content_operation_commit_rule_version\u0022",
+      "Pass": true
+    },
+    {
+      "Id": "MG-07c",
+      "Description": "runtime role cannot mark an unstamped Prepare as a CARV commit",
+      "Expected": "23514 ck_content_operation_commit_rule_version",
+      "Observed": "23514 ck_content_operation_commit_rule_version: new row for relation \u0022content_change_operations\u0022 violates check constraint \u0022ck_content_operation_commit_rule_version\u0022",
+      "Pass": true
+    },
+    {
+      "Id": "MG-07d",
+      "Description": "a Committed (terminal) operation cannot be changed",
+      "Expected": "23514 trg_content_operation_rule_state_guard",
+      "Observed": "23514 trg_content_operation_rule_state_guard: a terminal content operation is immutable",
+      "Pass": true
+    },
+    {
+      "Id": "MG-07e",
+      "Description": "an operation cannot be inserted directly as Committed",
+      "Expected": "23514 trg_content_operation_rule_state_guard",
+      "Observed": "23514 trg_content_operation_rule_state_guard: content operation must be inserted as Prepared without a commit rule version",
+      "Pass": true
+    },
+    {
+      "Id": "SETUP-EMU",
+      "Description": "test-only CARV build emulation installed",
+      "Expected": "OK",
+      "Observed": "OK",
+      "Pass": true
+    },
+    {
+      "Id": "RM-03",
+      "Description": "the real guarded Down refuses while an operation prepared under CARV rules is in flight",
+      "Expected": "refused (in flight); migration still recorded",
+      "Observed": "P0001 : CARV down refused: operations prepared under CARV rules are in flight; 1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "MX-01a",
+      "Description": "CARV-prepared operation stamped at Prepare",
+      "Expected": "1/NULL Prepared",
+      "Observed": "1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "MX-01b",
+      "Description": "legacy binary cannot commit a CARV-prepared operation; retry identical",
+      "Expected": "23514 ck_content_operation_commit_rule_version (twice)",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_commit_rule_version | DbUpdateException \u003C- PostgresException 23514 ck_content_operation_commit_rule_version",
+      "Pass": true
+    },
+    {
+      "Id": "MX-01c",
+      "Description": "no head, manifest, leaf, identity, checkpoint or journal advance; operation still Prepared",
+      "Expected": "snapshot unchanged",
+      "Observed": "unchanged (head=3:85c0a54d84f967a364d28f94583cc605e033013f7bccc5dc2d852ced3ba4e24a; commits=11; leaves=33; identities=21; checkpoints=11; journal=11; committedOps=11); 1/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "MX-01d",
+      "Description": "legacy host classification of that refusal (actual AuthorityExceptionHandler of the old binary)",
+      "Expected": "503 AUTHORITY_NOT_READY retryable (fail closed, transient class)",
+      "Observed": "503 {\u0022errorCode\u0022:\u0022AUTHORITY_NOT_READY\u0022,\u0022correlationId\u0022:\u002201a1dd12-8516-7628-968e-ccaa7d4a357c\u0022,\u0022retryable\u0022:true,\u0022detail\u0022:\u0022authority store unavailable\u0022}",
+      "Pass": true
+    },
+    {
+      "Id": "MX-01e",
+      "Description": "the same CARV-prepared operation commits through a CARV commit",
+      "Expected": "OK; 1/1 Committed",
+      "Observed": "OK; 1/1 Committed",
+      "Pass": true
+    },
+    {
+      "Id": "MX-02a",
+      "Description": "CARV commit of a legacy-prepared (unstamped) operation is refused by the database",
+      "Expected": "23514 ck_content_operation_commit_rule_version",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_commit_rule_version",
+      "Pass": true
+    },
+    {
+      "Id": "MX-02b",
+      "Description": "nothing advances",
+      "Expected": "snapshot unchanged",
+      "Observed": "unchanged (head=4:8e04e0dfea817257d3e0abcaad7ea966c31a15e08e22b34d7df883e6f7a3fca7; commits=12; leaves=36; identities=21; checkpoints=12; journal=12; committedOps=12)",
+      "Pass": true
+    },
+    {
+      "Id": "MX-02c",
+      "Description": "after the lifetime, the legacy binary aborts it with a classified, recoverable error",
+      "Expected": "AuthorityException OPERATION_EXPIRED 409; Aborted NULL/NULL",
+      "Observed": "AuthorityException OPERATION_EXPIRED 409 retryable=False; NULL/NULL Aborted",
+      "Pass": true
+    },
+    {
+      "Id": "MX-02d",
+      "Description": "recovery: a fresh operation (new idempotency key) completes",
+      "Expected": "OK",
+      "Observed": "OK",
+      "Pass": true
+    },
+    {
+      "Id": "MX-03",
+      "Description": "6 concurrent CARV instances x 4 rounds on 4 records in 2 organizations",
+      "Expected": "only OK or CONTENT_REVISION_CONFLICT; no CARV refusal; every commit 1/1",
+      "Observed": "ok=17; conflicts=7; unexpected=0; 985 ms",
+      "Pass": true
+    },
+    {
+      "Id": "FL-01",
+      "Description": "legacy commit in flight when the floor starts: floor waits, commit completes first, then the floor applies",
+      "Expected": "waited; OK; OK; NULL/NULL Committed",
+      "Observed": "waited=True; commit=OK; floor=OK; NULL/NULL Committed",
+      "Pass": true
+    },
+    {
+      "Id": "FL-02a",
+      "Description": "legacy Prepare spanning the floor start completes before the floor (its insert precedes the ACCESS EXCLUSIVE lock)",
+      "Expected": "waited; floor OK; NULL/NULL Prepared",
+      "Observed": "waited=True; floor=OK; NULL/NULL Prepared",
+      "Pass": true
+    },
+    {
+      "Id": "FL-02b",
+      "Description": "after the floor, the legacy binary cannot commit it",
+      "Expected": "23514 ck_content_operation_rule_floor_v1",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1",
+      "Pass": true
+    },
+    {
+      "Id": "FL-02c",
+      "Description": "after the floor, a CARV commit cannot commit it either",
+      "Expected": "23514 (commit rule version)",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_commit_rule_version",
+      "Pass": true
+    },
+    {
+      "Id": "FL-02d",
+      "Description": "nothing advances",
+      "Expected": "snapshot unchanged",
+      "Observed": "unchanged (head=3:fd0ce6d86e531772c36812e09fd0473ec5d75d898d073fd145b3ca1c9e140ff2; commits=21; leaves=63; identities=21; checkpoints=21; journal=21; committedOps=21)",
+      "Pass": true
+    },
+    {
+      "Id": "FL-02e",
+      "Description": "it can still be aborted after expiry (Prepared -\u003E Aborted is unrestricted by the floor)",
+      "Expected": "OPERATION_EXPIRED; NULL/NULL Aborted",
+      "Observed": "AuthorityException OPERATION_EXPIRED 409 retryable=False; NULL/NULL Aborted",
+      "Pass": true
+    },
+    {
+      "Id": "LOCK",
+      "Description": "the floor migration holds ACCESS EXCLUSIVE on content_change_operations while open",
+      "Expected": "AccessExclusiveLock",
+      "Observed": "AccessExclusiveLock",
+      "Pass": true
+    },
+    {
+      "Id": "FL-03",
+      "Description": "legacy Prepare starting during the floor transaction blocks, then is refused; nothing persisted",
+      "Expected": "waited; 23514 ck_content_operation_rule_floor_v1; no new operation or leaf",
+      "Observed": "waited=True; DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1; ops 45-\u003E45; orphan leaves 0",
+      "Pass": true
+    },
+    {
+      "Id": "LOCK",
+      "Description": "the floor migration holds ACCESS EXCLUSIVE on content_change_operations while open",
+      "Expected": "AccessExclusiveLock",
+      "Observed": "AccessExclusiveLock",
+      "Pass": true
+    },
+    {
+      "Id": "FL-04",
+      "Description": "legacy Commit starting during the floor transaction blocks, then is refused; nothing advances",
+      "Expected": "waited; 23514 ck_content_operation_rule_floor_v1; snapshot unchanged",
+      "Observed": "waited=True; DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1; unchanged (head=3:fd0ce6d86e531772c36812e09fd0473ec5d75d898d073fd145b3ca1c9e140ff2; commits=21; leaves=63; identities=21; checkpoints=21; journal=21; committedOps=21)",
+      "Pass": true
+    },
+    {
+      "Id": "LOCK",
+      "Description": "the floor migration holds ACCESS EXCLUSIVE on content_change_operations while open",
+      "Expected": "AccessExclusiveLock",
+      "Observed": "AccessExclusiveLock",
+      "Pass": true
+    },
+    {
+      "Id": "FL-05",
+      "Description": "4 concurrent CARV instances during the floor transition",
+      "Expected": "only OK or CONTENT_REVISION_CONFLICT; floor installed",
+      "Observed": "ok=24; conflicts=0; unexpected=0; 2438 ms; floors=1",
+      "Pass": true
+    },
+    {
+      "Id": "FL-06",
+      "Description": "floor raise blocked by an open transaction times out and changes nothing; the commit completes",
+      "Expected": "55P03; floor still 1; OK",
+      "Observed": "55P03 : canceling statement due to lock timeout; floor=1; OK",
+      "Pass": true
+    },
+    {
+      "Id": "PF-01",
+      "Description": "legacy Prepare after the floor is refused; nothing persisted",
+      "Expected": "23514 ck_content_operation_rule_floor_v1; no new operation",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1; ops 71-\u003E71",
+      "Pass": true
+    },
+    {
+      "Id": "PF-01b",
+      "Description": "legacy host classification of that refusal",
+      "Expected": "503 AUTHORITY_NOT_READY retryable",
+      "Observed": "503 {\u0022errorCode\u0022:\u0022AUTHORITY_NOT_READY\u0022,\u0022correlationId\u0022:\u002201a1dd12-a032-77f9-adc0-8b7ec66c8924\u0022,\u0022retryable\u0022:true,\u0022detail\u0022:\u0022authority store unavailable\u0022}",
+      "Pass": true
+    },
+    {
+      "Id": "PF-02",
+      "Description": "an operation prepared before the migration cannot be committed after the floor by either build",
+      "Expected": "both 23514; snapshot unchanged",
+      "Observed": "DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v1 | DbUpdateException \u003C- PostgresException 23514 ck_content_operation_commit_rule_version | unchanged (head=1:d9788b169885ce3616698ce77a2eaa895b2fb91a2fdfec7ac37f49ec73f8ae9c; commits=34; leaves=102; identities=21; checkpoints=34; journal=34; committedOps=34)",
+      "Pass": true
+    },
+    {
+      "Id": "PF-03",
+      "Description": "a CARV-build write after the floor succeeds",
+      "Expected": "OK",
+      "Observed": "OK",
+      "Pass": true
+    },
+    {
+      "Id": "PF-04",
+      "Description": "the runtime role cannot drop the floor, disable or drop the guard, or switch off triggers",
+      "Expected": "42501 x4",
+      "Observed": "42501 : must be owner of table content_change_operations | 42501 : must be owner of table content_change_operations | 42501 : must be owner of relation content_change_operations | 42501 : permission denied to set parameter \u0022session_replication_role\u0022",
+      "Pass": true
+    },
+    {
+      "Id": "PF-05",
+      "Description": "the runtime role can read the installed floor (startup and readiness guard query)",
+      "Expected": "1",
+      "Observed": "1",
+      "Pass": true
+    },
+    {
+      "Id": "PF-06",
+      "Description": "the guarded Down refuses once a floor exists",
+      "Expected": "refused (floors are never lowered)",
+      "Observed": "P0001 : CARV down refused: a content acceptance rule floor is installed; floors are never lowered",
+      "Pass": true
+    },
+    {
+      "Id": "PF-07",
+      "Description": "the floor stays NOT VALID by design: historical unstamped rows would fail VALIDATE",
+      "Expected": "23514 on VALIDATE (expected)",
+      "Observed": "23514 ck_content_operation_rule_floor_v1: check constraint \u0022ck_content_operation_rule_floor_v1\u0022 of relation \u0022content_change_operations\u0022 is violated by some row",
+      "Pass": true
+    },
+    {
+      "Id": "PF-08",
+      "Description": "an atomic floor raise to 2 refuses rule-version-1 builds and admits version-2 builds",
+      "Expected": "OK; 23514 floor_v2; OK; floor=2",
+      "Observed": "OK; DbUpdateException \u003C- PostgresException 23514 ck_content_operation_rule_floor_v2; OK; floor=2",
+      "Pass": true
+    },
+    {
+      "Id": "FINAL",
+      "Description": "final operation table summary",
+      "Expected": "informational",
+      "Observed": "Aborted=9, Committed=60, Prepared=4",
+      "Pass": true
+    }
+  ]
+}

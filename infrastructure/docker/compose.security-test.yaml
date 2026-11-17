@@ -9,6 +9,14 @@ services:
     tmpfs: [/var/lib/postgresql]
   authority-db:
     tmpfs: [/var/lib/postgresql]
+    environment:
+      # IX-3 (design §5.1): the SELECT-only indexed-search reader login, synthetic credential for this isolated stack only. The cluster
+      # bootstrap creates it; the migration step makes it a member of authority_search_reader. Other stacks set nothing (no query path).
+      AUTHORITY_SEARCH_READER_USER: authority_search_reader_login
+      AUTHORITY_SEARCH_READER_PASSWORD: sectest-search-reader-only-0001
+  authority-migrate:
+    environment:
+      Database__SearchReaderLoginName: authority_search_reader_login
   spicedb-db:
     tmpfs: [/var/lib/postgresql]
   azurite:
@@ -28,6 +36,8 @@ services:
       Testing__StackIdentity: enterpriseforms-security-test
       # C-28: a small lookup page makes every multi-record discovery test cross SpiceDB cursor pages (production keeps 1000).
       SpiceDb__LookupPageSize: "20"
+      # C8 M4 S1 (S2): a short periodic projection-integrity check so RB-14 observes it within a test (production default 60 s).
+      ProjectionIntegrity__PeriodicCheckSeconds: "10"
       # Phase C7 OD-1: synthetic field-protection verifier credential for this isolated stack only (TestIdentity.VerifierToken
       # mirrors it). Other stacks set nothing, so the migration catalogue is unreachable there (fail closed).
       Identity__Verifier__Issuer: enterpriseforms-field-protection-verifier
@@ -38,6 +48,11 @@ services:
       Identity__Reconciler__Issuer: enterpriseforms-team-membership-reconciler
       Identity__Reconciler__Audience: authorization-authority-reconciler
       Identity__Reconciler__SharedKeyBase64: ${RECONCILER_TESTING_AUTHORITY_KEY:-cmVjb25jaWxlci10ZXN0LW9ubHktc2hhcmVkLWtleS0wMDAwMDA=}
+      # IX-2 (IX-D6): synthetic search-index builder credential for this isolated stack only (TestIdentity.SearchIndexBuilderToken
+      # mirrors it). Other stacks set nothing, so the builder plane is unreachable there (fail closed).
+      Identity__SearchIndexBuilder__Issuer: enterpriseforms-search-index-builder
+      Identity__SearchIndexBuilder__Audience: authorization-authority-search-index-builder
+      Identity__SearchIndexBuilder__SharedKeyBase64: c2VhcmNoLWluZGV4LWJ1aWxkZXItdGVzdC1vbmx5LWtleS0wMDAwMDA=
       # Phase C7 M2 (AC-6, OD-7): development-only synthetic step-up for search approvals. The Authority refuses to start
       # with this outside Development/Testing or without the synthetic TestIdentityProvider; every other stack leaves it
       # unset (Unavailable), so approvals are refused there until PB-08 step-up exists.
@@ -64,7 +79,61 @@ services:
       OrganizationOnboarding__ApprovedIdentityIssuers__0: ${TEST_IDP_ISSUER}
       # C-105: accelerated owner recovery waiting period for the isolated test stack (production target 72 hours; Development/Testing minimum 10 s).
       OrganizationOnboarding__RecoveryWaitingPeriodSeconds: "20"
+      # IX-1 (C-126): the Authority-owned search index in Dark mode (derivation, ES256 seals, sweeps; no query path). The seal key is
+      # the SYNTHETIC test key of trust_authority/search-entry-seal-v1.test-vectors.json, imported non-exportable into Vault Transit by
+      # vault-search-seal-init; its public key is pinned here (deployment configuration, never AuthorityDb). Short sweep intervals
+      # for the tests; the C-124 enforcement deadlines (1 h / 24 h / 30 days) are unchanged.
+      SearchIndex__Mode: Dark
+      # IX-5a (C-147): the dark Tier 2 access projection, maintained from the authorization journal; no search path reads it.
+      # C-149 (R-55): IX5_ACCESS_MODE=Off recreates the authority without the maintainer for the bounded comparison only.
+      SearchIndex__Access__Mode: ${IX5_ACCESS_MODE:-Dark}
+      SearchIndex__Access__MaintenanceIntervalMilliseconds: "250"
+      # C-149 (R-55): full reconciliation probe interval (code default 60 s); between passes unchanged organizations are skipped.
+      SearchIndex__Access__ReconciliationIntervalSeconds: ${IX5_ACCESS_RECONCILIATION_SECONDS:-15}
+      # C-150 IX-5c shadow preparation: off by default; IX5C_SHADOW=true recreates the authority comparing Tier 1 answers with Tier 2 (never serving).
+      SearchIndex__Access__ShadowComparisonEnabled: ${IX5C_SHADOW:-false}
+      # IX-5 M1 fence and M2 sweep (verification loop), shortened for the test stack: the defaults are 60 s, 1 h (full check) and 24 h
+      # (SpiceDB pass restart) with 24 h and 7 d deadlines. IX5C_CANARY_ORGANIZATION names one positive-control organization (optional).
+      SearchIndex__Access__VerificationIntervalSeconds: ${IX5_VERIFICATION_SECONDS:-5}
+      SearchIndex__Access__FullVerificationIntervalSeconds: ${IX5_FULL_VERIFICATION_SECONDS:-300}
+      SearchIndex__Access__SpiceDbSweepIntervalSeconds: ${IX5_SWEEP_INTERVAL_SECONDS:-600}
+      SearchIndex__Access__ShadowCanaryOrganizationIds__0: ${IX5C_CANARY_ORGANIZATION:-00000000-0000-0000-0000-000000000000}
+      SearchIndex__CheapSweepIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
+      # C-136 (R-33/R-36): entries per S-B transaction (organization lock released between transactions); the measurement recreates
+      # the authority with other values.
+      SearchIndex__SealCheckTransactionSize: ${IX4_SEAL_TRANSACTION_SIZE:-50}
+      # C-137 (R-37): phase-duration diagnostics (durations and counts only) for bounded measurements; off unless a test recreates
+      # the container with R37_OPERATION_TIMING=true (Development/Testing only; refused at startup elsewhere).
+      Diagnostics__OperationTiming: ${R37_OPERATION_TIMING:-false}
+      # C-149 (P-2): measurement-only SpiceDB call counting (method names and counts); off unless a measurement recreates the authority.
+      Diagnostics__SpiceDbCallCounting: ${IX5_SPICEDB_CALL_COUNTING:-false}
+      # C-150 R56-B: committed authorization changes wake the work loop (default on); R56_COMMIT_WAKEUP=false measures the poll alone.
+      AuthorityWork__CommitWakeupEnabled: ${R56_COMMIT_WAKEUP:-true}
+      # R-02 statement-preparation investigation: an optional Npgsql connection-string suffix for the runtime connection (empty by default),
+      # e.g. ";Max Auto Prepare=50;Auto Prepare Min Usages=2". Test stack only; no production configuration is changed.
+      ConnectionStrings__AuthorityDb: Host=authority-db;Database=${AUTHORITY_DB_NAME};Username=${AUTHORITY_RUNTIME_USER};Password=${AUTHORITY_RUNTIME_PASSWORD}${AUTHORITY_DB_CONNECTION_EXTRA:-}
+      SearchIndex__DeadlineEvaluationIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
+      SearchIndex__Seal__Provider: VaultTransit
+      SearchIndex__Seal__SigningKeyName: search-entry-seal-v1
+      SearchIndex__Seal__SigningKeyVersion: "1"
+      SearchIndex__Seal__PinnedKeys__0__KeyName: search-entry-seal-v1
+      SearchIndex__Seal__PinnedKeys__0__KeyVersion: "1"
+      SearchIndex__Seal__PinnedKeys__0__SubjectPublicKeyInfoBase64: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDyv2JNCpxP55l+tjRMiii0DX2tgMttFQEyRSAtrujr1YgUC943B5upJ66ksIKwecL6AFoEQSwXOXbl2osaQEjQ==
+      # IX-3: the Tier 1 query path (Testing only), on its own SELECT-only reader credential (never the runtime one). A test may
+      # recreate the authority with a shorter snapshot lifetime (default 300 s) to exercise expiry.
+      SearchIndex__Query__QueryEnabled: "true"
+      # IX-6: the indexed My Records endpoint (the business API uses it only with RecordList:Engine=Indexed or the Testing header).
+      SearchIndex__Query__RecordListEnabled: ${IX6_RECORD_LIST_ENABLED:-true}
+      SearchIndex__Query__SnapshotLifetimeSeconds: ${IX3_SNAPSHOT_LIFETIME_SECONDS:-300}
+      SearchIndex__Query__PurgeIntervalSeconds: "5"
+      # C-140 UF-25: the share-only items limit (code default 20,000, unchanged here). Only the focused UF-25 test recreates the
+      # authority with a small value and restores it afterwards.
+      SearchIndex__Query__MaximumShareOnlyItems: ${IX_SHARE_ONLY_ITEM_LIMIT:-20000}
+      ConnectionStrings__AuthoritySearchReader: Host=authority-db;Database=${AUTHORITY_DB_NAME};Username=authority_search_reader_login;Password=sectest-search-reader-only-0001
     restart: unless-stopped          # SEC-P09: the process terminates at the armed crash point and is restarted here
+    depends_on:
+      vault-search-seal-init:
+        condition: service_completed_successfully
     ports: ["127.0.0.1:5190:8080"]   # harness reaches the operator plane and internal contract directly (loopback only)
     # C8 M2 Stage 3: the Platform Console reaches the Authority over its own network (never trust-edge, which the business shares).
     networks: [authority-net, trust-edge, platform-edge]
@@ -118,6 +187,29 @@ services:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set in .env}
       CUSTODY_TOKEN: sectest-organization-key-custody-token-0001
+    depends_on:
+      vault-transit-init:
+        condition: service_completed_successfully
+    networks: [authority-net]
+    restart: "no"
+  vault-search-seal-init:
+    # IX-1 (Testing only): imports the SYNTHETIC search-entry-seal test key (published in trust_authority/search-entry-seal-v1.test-vectors.json,
+    # never a production key) into Vault Transit as a non-exportable ecdsa-p256 key, so the pinned public key above is fixed. An existing
+    # key is left untouched. Production uses an EC-HSM P-256 key in Azure Managed HSM (not implemented in IX-1).
+    image: hashicorp/vault:1.20.4
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        if vault read transit/keys/search-entry-seal-v1 >/dev/null 2>&1; then echo "search seal key present"; exit 0; fi
+        printf '%s' "$$SEARCH_SEAL_TEST_KEY" > /tmp/seal-key.b64
+        vault transit import transit/keys/search-entry-seal-v1 @/tmp/seal-key.b64 type=ecdsa-p256 exportable=false allow_plaintext_backup=false >/dev/null
+        rm -f /tmp/seal-key.b64
+        echo "search seal test key imported"
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set in .env}
+      SEARCH_SEAL_TEST_KEY: MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwmIiV6b38Mm5nbokDkj30eN/n2Lxs9hdRtNS78JBFCOhRANCAAQPK/Yk0KnE/nmX62NEyKKLQNfa2Ay20VATJFIC2u6OvViBQL3jcHm6knrqSwgrB5wvoAWgRBLBc5duXaixpASN
     depends_on:
       vault-transit-init:
         condition: service_completed_successfully
@@ -185,6 +277,18 @@ services:
       DataProtection__KeyRingDirectory: /keyring
       # Phase C7 M3: verified field-value search execution (fail-closed gate; refused at startup outside Development/Testing).
       FieldSearch__ExecutionEnabled: "true"
+      # IX-4 (C-133): the Authority's indexed engine answers searches made with a browser session (or, Testing only, a bearer caller
+      # naming its Authority session with X-Testing-Session-Digest); the complete V1 path answers when the index cannot (IX-D8) and
+      # for bearer callers without a session. The IX-3 shadow comparison stays available through the Testing endpoint.
+      # FIELD_SEARCH_ENGINE=Shadow or VerifiedScan selects the IX-3 or V1 behaviour.
+      FieldSearch__Engine: ${FIELD_SEARCH_ENGINE:-Indexed}
+      # IX-6: My Records stays on the C-29 listing by default; RECORD_LIST_ENGINE=Indexed answers from verified index entries (the
+      # Testing header X-Testing-Record-List-Engine selects the engine per request for the IX-6 stack tests).
+      RecordList__Engine: ${RECORD_LIST_ENGINE:-VerifiedScan}
+      # C-150 R56-A: attempts per search for transient Authority refusals (default 4; R56_RETRY_ATTEMPTS=1 measures without retry).
+      FieldSearch__RetryMaximumAttempts: ${R56_RETRY_ATTEMPTS:-4}
+      # C-137 (R-37): record-creation phase durations (see the authority service); off unless R37_OPERATION_TIMING=true.
+      Diagnostics__OperationTiming: ${R37_OPERATION_TIMING:-false}
       Testing__StackIdentity: enterpriseforms-security-test
       # Phase C8 (D8-16): shortened reconciliation windows, permitted in Testing only (the hosts refuse them elsewhere).
       TeamMembershipReconciliation__InFlightWindowSeconds: "6"
@@ -236,6 +340,14 @@ services:
       TeamMembershipReconciler__Issuer: enterpriseforms-team-membership-reconciler
       TeamMembershipReconciler__Audience: authorization-authority-reconciler
       TeamMembershipReconciler__SharedKeyBase64: ${RECONCILER_TESTING_WORKER_KEY:-cmVjb25jaWxlci10ZXN0LW9ubHktc2hhcmVkLWtleS0wMDAwMDA=}
+      # IX-2 (IX-D6): the same synthetic search-index builder credential as the authority above, for the Worker only (the API
+      # never gets it). IX-27 recreates the worker with IX2_BUILDER_KEY set to a key the Authority does not accept (builder outage).
+      SearchIndexBuilder__Issuer: ${IX2_BUILDER_ISSUER:-enterpriseforms-search-index-builder}
+      SearchIndexBuilder__Audience: authorization-authority-search-index-builder
+      SearchIndexBuilder__SharedKeyBase64: ${IX2_BUILDER_KEY:-c2VhcmNoLWluZGV4LWJ1aWxkZXItdGVzdC1vbmx5LWtleS0wMDAwMDA=}
+      SearchIndexBuilder__BackfillIntervalSeconds: ${IX2_BUILDER_BACKFILL_INTERVAL_SECONDS:-3}
+      SearchIndexBuilder__DeepSweepIntervalSeconds: ${IX2_BUILDER_DEEP_SWEEP_INTERVAL_SECONDS:-86400}
+      SearchIndexBuilder__MaximumRecordsPerSecond: ${IX2_BUILDER_RECORDS_PER_SECOND:-1000}
       # Phase C8 (D8-16): shortened reconciliation windows, Testing only.
       TeamMembershipReconciliation__InFlightWindowSeconds: "6"
       TeamMembershipReconciliation__BackoffSeconds: "1"

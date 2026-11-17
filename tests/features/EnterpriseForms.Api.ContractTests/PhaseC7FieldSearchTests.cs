@@ -174,8 +174,18 @@ public sealed class PhaseC7FieldSearchTests
         // Phase C7 M3: business bytes reach the executor only through the verifier (FormRecords verified-items port, checked
         // against the Authority catalogue); names come from the display port. Nothing that queries business records.
         Assert.Equal([typeof(FieldSearchLimits), typeof(IFieldSearchPolicyAuthority), typeof(Application.Features.Search.Verification.TrustedScopeVerifier), typeof(FieldSearchAdmission),
-            typeof(IAuthorizationAuthorityClient), typeof(IOpaqueCursorProtector), typeof(Application.Features.FormRecords.Ports.IRecordDisplayDirectory), typeof(TimeProvider)], parameters);
+            typeof(IAuthorizationAuthorityClient), typeof(IOpaqueCursorProtector), typeof(Application.Features.FormRecords.Ports.IRecordDisplayDirectory), typeof(TimeProvider), typeof(FieldSearchShadowComparer),
+            typeof(FieldSearchIndexedEngine), typeof(IFieldSearchEngineObserver), typeof(FieldSearchRetryPolicy)], parameters);
         Assert.DoesNotContain(parameters, p => p.Namespace == "EnterpriseForms.Application.Common.Persistence");
+        // IX-3: the Shadow comparer (optional) reaches only the Authority's indexed query; it reads no business record either.
+        var shadow = typeof(FieldSearchShadowComparer).GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToList();
+        Assert.Equal([typeof(FieldSearchLimits), typeof(IIndexedSearchAuthority), typeof(IFieldSearchShadowObserver), typeof(TimeProvider)], shadow);
+        // IX-4: the Indexed engine (optional) likewise reaches only the Authority's indexed query and the display port.
+        var engine = typeof(FieldSearchIndexedEngine).GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToList();
+        Assert.Equal([typeof(FieldSearchLimits), typeof(IIndexedSearchAuthority), typeof(FieldSearchAdmission), typeof(IOpaqueCursorProtector), typeof(Application.Features.FormRecords.Ports.IRecordDisplayDirectory), typeof(TimeProvider), typeof(FieldSearchRetryPolicy)], engine);
+        // C-150 R56-A: the retry policy reads nothing: limits, the clock, the observer and an optional jitter source.
+        var retry = typeof(FieldSearchRetryPolicy).GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToList();
+        Assert.Equal([typeof(FieldSearchLimits), typeof(TimeProvider), typeof(IFieldSearchEngineObserver), typeof(Func<double>)], retry);
     }
 
     // ---- request validation (422, never echoing values) ----

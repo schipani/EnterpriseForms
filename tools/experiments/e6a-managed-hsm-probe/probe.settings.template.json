@@ -1,0 +1,27 @@
+// E-6a TEST-ONLY probe configuration template. Copy OUTSIDE source control (e.g. the scratchpad) before editing.
+// It contains no secret: authentication is the explicitly selected Azure Identity credential (az login / managed identity).
+// This template is deliberately unusable as-is: the endpoint placeholder fails validation and AllowAzureCalls is false.
+// An HSM command additionally needs the --allow-azure-calls command-line flag and separate owner authorization.
+{
+  "Mode": "ManagedHsm",
+  "AllowAzureCalls": false,
+  "HsmEndpoint": "https://<throwaway-test-hsm-name>.managedhsm.azure.net/",
+  "KeyName": "e6a-probe-hmac",
+  "ApiVersion": "2025-07-01",
+  "Credential": "AzureCli",
+  // ImportedKnownTestKeys (byte-for-byte comparison possible) or HsmGenerated (byte checks become Inconclusive).
+  "KeyProvenance": "ImportedKnownTestKeys",
+  // Static TEST-ONLY mapping: integer version -> opaque Managed HSM version identifier (from hsm-import-test-keys or the key's kid).
+  "KeyVersionIdentifiers": {
+    "1": "<opaque-version-id-of-first-import>",
+    "2": "<opaque-version-id-of-second-import>"
+  },
+  "KnownTestKeyByVersion": {
+    "1": "e6a-test-key-1",
+    "2": "e6a-test-key-2"
+  },
+  "PrimaryKeyVersion": 1,
+  "OperationTimeoutSeconds": 15,
+  "AllowTestKeyImport": false,
+  "Experiments": [ "KeyInspection", "DigestPath", "RawInput", "Versions" ]
+}

@@ -297,6 +297,59 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
             return rows.OrderBy(r => r.ItemKindCode).ThenBy(r => r.ItemId).ToList();
         }
 
+        public async Task<Dictionary<(Guid FormRecordId, Guid ContentChangeOperationId), (FormRecordRevision? Header, List<ISignedContentRow> Rows)>> GetStagedContentBatchAsync(IReadOnlyCollection<(Guid FormRecordId, Guid ContentChangeOperationId)> pairs, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(pairs);
+            var wanted = pairs.ToHashSet();
+            var records = wanted.Select(p => p.FormRecordId).Distinct().ToList();
+            var operations = wanted.Select(p => p.ContentChangeOperationId).Distinct().ToList();
+            var result = wanted.ToDictionary(p => p, _ => ((FormRecordRevision?)null, new List<ISignedContentRow>()));
+            if (wanted.Count == 0)
+            {
+                return result;
+            }
+
+            // One query per table over the record and operation sets, then exact pair filtering in memory (operation ids are
+            // derived per record, so the over-fetch is empty in practice; the filter makes it correct regardless).
+            foreach (var header in await context.FormRecordRevisions.AsNoTracking().Where(r => records.Contains(r.FormRecordId) && operations.Contains(r.ContentChangeOperationId)).ToListAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (result.TryGetValue((header.FormRecordId, header.ContentChangeOperationId), out var slot))
+                {
+                    result[(header.FormRecordId, header.ContentChangeOperationId)] = (header, slot.Item2);
+                }
+            }
+
+            void Add(IEnumerable<ISignedContentRow> rows)
+            {
+                foreach (var row in rows)
+                {
+                    if (result.TryGetValue((row.FormRecordId, row.ContentChangeOperationId), out var slot))
+                    {
+                        slot.Item2.Add(row);
+                    }
+                }
+            }
+
+            Add(await context.FieldStringValues.AsNoTracking().Where(v => records.Contains(v.FormRecordId) && operations.Contains(v.ContentChangeOperationId)).ToListAsync(cancellationToken).ConfigureAwait(false));
+            Add(await context.FieldIntegerValues.AsNoTracking().Where(v => records.Contains(v.FormRecordId) && operations.Contains(v.ContentChangeOperationId)).ToListAsync(cancellationToken).ConfigureAwait(false));
+            Add(await context.FieldDecimalValues.AsNoTracking().Where(v => records.Contains(v.FormRecordId) && operations.Contains(v.ContentChangeOperationId)).ToListAsync(cancellationToken).ConfigureAwait(false));
+            Add(await context.FieldDateValues.AsNoTracking().Where(v => records.Contains(v.FormRecordId) && operations.Contains(v.ContentChangeOperationId)).ToListAsync(cancellationToken).ConfigureAwait(false));
+            Add(await context.FieldDateTimeValues.AsNoTracking().Where(v => records.Contains(v.FormRecordId) && operations.Contains(v.ContentChangeOperationId)).ToListAsync(cancellationToken).ConfigureAwait(false));
+            Add(await context.FieldGuidValues.AsNoTracking().Where(v => records.Contains(v.FormRecordId) && operations.Contains(v.ContentChangeOperationId)).ToListAsync(cancellationToken).ConfigureAwait(false));
+            Add(await context.FieldEncryptedValues.AsNoTracking().Where(v => records.Contains(v.FormRecordId) && operations.Contains(v.ContentChangeOperationId)).ToListAsync(cancellationToken).ConfigureAwait(false));
+            Add(await context.FieldBooleanValues.AsNoTracking().Where(v => records.Contains(v.FormRecordId) && operations.Contains(v.ContentChangeOperationId)).ToListAsync(cancellationToken).ConfigureAwait(false));
+            Add(await context.FieldOptionValues.AsNoTracking().Where(v => records.Contains(v.FormRecordId) && operations.Contains(v.ContentChangeOperationId)).ToListAsync(cancellationToken).ConfigureAwait(false));
+            Add(await context.FormRecordGroupRevisions.AsNoTracking().Where(g => records.Contains(g.FormRecordId) && operations.Contains(g.ContentChangeOperationId)).ToListAsync(cancellationToken).ConfigureAwait(false));
+            Add(await context.FileAttachmentVersions.AsNoTracking().Where(v => records.Contains(v.FormRecordId) && operations.Contains(v.ContentChangeOperationId)).ToListAsync(cancellationToken).ConfigureAwait(false));
+            foreach (var key in result.Keys.ToList())
+            {
+                var (header, rows) = result[key];
+                result[key] = (header, rows.OrderBy(r => r.ItemKindCode).ThenBy(r => r.ItemId).ToList()); // the per-record order
+            }
+
+            return result;
+        }
+
         public Task<UploadSession?> FindUploadSessionAsync(Guid tenantId, Guid uploadSessionId, CancellationToken cancellationToken) =>
             context.UploadSessions.FirstOrDefaultAsync(s => s.TenantId == tenantId && s.UploadSessionId == uploadSessionId, cancellationToken);
 

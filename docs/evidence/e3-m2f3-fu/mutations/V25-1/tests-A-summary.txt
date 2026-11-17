@@ -1,0 +1,18 @@
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceNoSummaryTests.NoOutcomeRetryWindowOrHourRolloverEverWritesAnythingButOneEvidenceEntryPerKeyAndBucket (471ms)
+  other instance: 1 entries added by outcomes [AlreadyRecorded]
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceNoSummaryTests.Ledger.Run(String label, Func`1 action, Nullable`1 refused) in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceNoSummaryTests.cs:81
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.AnAmbiguousCommitThatTookEffectIsReconciledWithoutASecondEntry (8ms)
+  Assert.Single() Failure: The collection contained 2 items
+  Collection: [SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }, SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }]
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ARestartedProcessFindsTheEntryAndAppendsNothing (1ms)
+  Assert.Single() Failure: The collection contained 2 items
+  Collection: [SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }, SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }]
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRecorderTests.ARestartAfterAnAmbiguousCommitStillWritesAtMostOneEntry (1ms)
+  Assert.Single() Failure: The collection contained 2 items
+  Collection: [SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }, SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ��� }]
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 29
+  failed: 4
+  succeeded: 25
+  skipped: 0
+  duration: 1s 692ms

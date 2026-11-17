@@ -1,0 +1,8 @@
+-- E3-M2b-1F proposed migration "AuthorityContentAcceptanceRuleFloor1" (design artifact). One transaction; the ADD CONSTRAINT takes
+-- ACCESS EXCLUSIVE on content_change_operations: that lock is the serialization point of the floor transition.
+-- NOT VALID: historical rows are not re-checked (they are terminal and immutable under the state guard); every later INSERT and
+-- every UPDATE of a Prepared row is checked. No Down: floors are never lowered.
+SET LOCAL lock_timeout = '5s';
+ALTER TABLE authority.content_change_operations
+    ADD CONSTRAINT ck_content_operation_rule_floor_v1
+        CHECK (operation_state_name NOT IN ('Prepared', 'Committed') OR prepare_acceptance_rule_version >= 1) NOT VALID;

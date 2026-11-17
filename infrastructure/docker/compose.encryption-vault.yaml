@@ -1,0 +1,91 @@
+# E-2 (DEVELOPMENT/TESTING ONLY, opt-in): business encryption keys in Vault Transit instead of the local keyring.
+#
+#   docker compose -f compose.yaml -f compose.encryption-vault.yaml up -d
+#   docker compose -f compose.yaml -f compose.encryption-vault.yaml run --rm -e ORGANIZATION_ID=<uuid> vault-encryption-provision
+#
+# Reuses the existing dev-mode Vault with a DEDICATED mount (`enterpriseforms-encryption`, never the Authority's `transit`) and a
+# DEDICATED token (BUSINESS_ENCRYPTION_VAULT_TOKEN in .env) whose policy is wrap/unwrap only (vault/business-encryption-policy.hcl).
+# The API and Worker reach Vault over their own internal network, `encryption-kms-net`; they are still not attached to authority-net,
+# so AuthorityDb, SpiceDB and the archive stay unreachable from them, and nothing on business-net (including the security-test
+# "attacker" container) can reach Vault. Residual (documented in docs/security/E2_VAULT_TRANSIT_PROVIDER.md): the business workloads
+# can now open a network connection to the shared dev Vault server; what they can do there is limited by their token's policy.
+#
+# Not used by the security-test or persistent development stacks. Switching an existing stack from LocalDevelopment to VaultTransit
+# leaves data sealed by the local keyring unreadable (no fallback): use a fresh stack.
+networks:
+  encryption-kms-net:
+    internal: true
+
+services:
+  vault:
+    networks: [authority-net, encryption-kms-net]
+
+  vault-encryption-init:
+    image: hashicorp/vault:1.20.4
+    entrypoint: ["sh", "/vault-config/business-encryption-init.sh"]
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set in .env}
+      BUSINESS_ENCRYPTION_VAULT_TOKEN: ${BUSINESS_ENCRYPTION_VAULT_TOKEN:?set in .env}
+    volumes:
+      - ./vault/business-encryption-init.sh:/vault-config/business-encryption-init.sh:ro
+      - ./vault/business-encryption-policy.hcl:/vault-config/business-encryption-policy.hcl:ro
+    depends_on:
+      vault-transit-init:
+        condition: service_completed_successfully
+    networks: [authority-net]
+    restart: "no"
+
+  vault-encryption-provision:
+    # Operator action, never started by `up`: provisions the four purpose keys of ORGANIZATION_ID (root token, this container only).
+    image: hashicorp/vault:1.20.4
+    profiles: [encryption-provisioning]
+    entrypoint: ["sh", "/vault-config/provision-business-encryption-keys.sh"]
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set in .env}
+      ORGANIZATION_ID: ${ORGANIZATION_ID:-}
+    volumes:
+      - ./vault/provision-business-encryption-keys.sh:/vault-config/provision-business-encryption-keys.sh:ro
+    networks: [authority-net]
+    restart: "no"
+
+  vault-encryption-provision-version:
+    # E-4 operator action, never started by `up`: adds ONE version to ONE existing key (root token, this container only). The new
+    # version is NOT active until Encryption:VaultTransit configuration names it (docs/security/E4_CONTROLLED_KEY_ACTIVATION.md).
+    #   docker compose -f compose.yaml -f compose.encryption-vault.yaml run --rm -e ORGANIZATION_ID=<uuid> -e KEY_PURPOSE=field-value -e EXPECTED_LATEST_VERSION=1 vault-encryption-provision-version
+    image: hashicorp/vault:1.20.4
+    profiles: [encryption-provisioning]
+    entrypoint: ["sh", "/vault-config/provision-business-encryption-key-version.sh"]
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set in .env}
+      ORGANIZATION_ID: ${ORGANIZATION_ID:-}
+      KEY_PURPOSE: ${KEY_PURPOSE:-}
+      EXPECTED_LATEST_VERSION: ${EXPECTED_LATEST_VERSION:-}
+    volumes:
+      - ./vault/provision-business-encryption-key-version.sh:/vault-config/provision-business-encryption-key-version.sh:ro
+    networks: [authority-net]
+    restart: "no"
+
+  api:
+    environment:
+      Encryption__KeyProvider: VaultTransit
+      Encryption__VaultTransit__Address: http://vault:8200
+      Encryption__VaultTransit__Token: ${BUSINESS_ENCRYPTION_VAULT_TOKEN:?set in .env}
+      Encryption__LocalDevelopmentKekBase64: ""
+    depends_on:
+      vault-encryption-init:
+        condition: service_completed_successfully
+    networks: [business-net, trust-edge, web-net, encryption-kms-net]
+
+  worker:
+    environment:
+      Encryption__KeyProvider: VaultTransit
+      Encryption__VaultTransit__Address: http://vault:8200
+      Encryption__VaultTransit__Token: ${BUSINESS_ENCRYPTION_VAULT_TOKEN:?set in .env}
+      Encryption__LocalDevelopmentKekBase64: ""
+    depends_on:
+      vault-encryption-init:
+        condition: service_completed_successfully
+    networks: [business-net, trust-edge, encryption-kms-net]

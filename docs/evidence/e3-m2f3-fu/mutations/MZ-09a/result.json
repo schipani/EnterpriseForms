@@ -1,0 +1,48 @@
+{
+  "id": "MZ-09a",
+  "kind": "MZ",
+  "what": "record on admit: after an admitted request completes, the filter records evidence (organization from the request arguments)",
+  "files": [
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs": "3898d8967194ab22cb844f0875603a06aefeb98df66c4d838f5808b83d33fc97"
+  },
+  "restored": true,
+  "verdict": "SURVIVED",
+  "results": [
+    {
+      "build": "H",
+      "exit": 0,
+      "seconds": 37.5
+    },
+    {
+      "build": "X",
+      "exit": 0,
+      "seconds": 36.5
+    },
+    {
+      "letter": "H",
+      "classes": [
+        "CapabilityRefusalEvidenceHostTests"
+      ],
+      "exit": 0,
+      "seconds": 8.3,
+      "total": 4,
+      "succeeded": 4,
+      "failed": []
+    },
+    {
+      "letter": "X",
+      "classes": [
+        "CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "exit": 0,
+      "seconds": 3.1,
+      "total": 20,
+      "succeeded": 20,
+      "failed": []
+    }
+  ],
+  "seconds": 85.4
+}

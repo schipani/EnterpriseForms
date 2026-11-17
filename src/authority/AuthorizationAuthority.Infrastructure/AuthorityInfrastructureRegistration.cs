@@ -1,3 +1,4 @@
+using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Application.Features.Authorization;
 using AuthorizationAuthority.Application.Features.Content;
@@ -28,14 +29,32 @@ public static class AuthorityInfrastructureRegistration
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(environment);
 
-        var connectionString = configuration.GetConnectionString("AuthorityDb");
+        // E3-M2b-1: a versioned application name on every Authority store connection, so an operator can confirm from
+        // pg_stat_activity that no pre-CARV instance remains before the separate floor migration (contract §19.9 step 3).
+        var connectionString = ContentAcceptanceRuleConnection.WithVersionedApplicationName(configuration.GetConnectionString("AuthorityDb"));
         services.AddDbContextFactory<AuthorityDbContext>(options =>
         {
             options.UseNpgsql(connectionString ?? "Host=unconfigured.invalid;Database=unconfigured;Username=unconfigured;Password=unconfigured", npgsql => npgsql.MigrationsHistoryTable("ef_migrations_history", AuthorityDbContext.SchemaName));
+            if (environment.IsEnvironment("Testing"))
+            {
+                options.AddInterceptors(new AuthorityCommandCountingInterceptor()); // IX-1 measurement only (round-trip counts)
+            }
         });
+        // C-150 R56-B: committed authorization changes wake the work loop (transactional NOTIFY + in-process signal); the poll stays the fallback.
+        services.AddSingleton(configuration.GetSection(AuthorityWorkOptions.SectionName).Get<AuthorityWorkOptions>() ?? new AuthorityWorkOptions());
+        services.AddSingleton<AuthorityWorkSignal>();
         services.AddSingleton<IAuthorityStore, AuthorityStore>();
+        services.AddSingleton<IContentAcceptanceRuleSchemaReader, ContentAcceptanceRuleSchemaReader>();
 
         services.Configure<SpiceDbOptions>(configuration.GetSection(SpiceDbOptions.SectionName));
+        // C-149 (P-2): measurement-only SpiceDB call counting; off unless configured, refused outside Development/Testing.
+        var countSpiceDbCalls = configuration.GetValue<bool>(SpiceDbCallCounter.ConfigurationKey);
+        if (countSpiceDbCalls && !environment.IsDevelopment() && !environment.IsEnvironment("Testing"))
+        {
+            throw new InvalidOperationException($"{SpiceDbCallCounter.ConfigurationKey} is a Development/Testing diagnostic and must not be set in the {environment.EnvironmentName} environment. Refusing to start.");
+        }
+
+        services.AddSingleton(new SpiceDbCallCounter(countSpiceDbCalls));
         services.AddSingleton<ISpiceDbProjection, SpiceDbProjectionClient>();
 
         services.Configure<ArchiveOptions>(configuration.GetSection(ArchiveOptions.SectionName));
@@ -68,6 +87,11 @@ public static class AuthorityInfrastructureRegistration
         services.AddSingleton(TimeProvider.System);
         services.TryAddSingleton(FieldSearchApprovalGate.Unavailable); // the API host registers the configured gate (OD-7)
         services.AddSingleton<SecurityCommandService>();
+        // C8 M4 S1: projection-integrity protocol (pin, decide, verify), startup marker transition and periodic check.
+        services.AddSingleton<ProjectionMarkerTransitionState>();
+        services.AddSingleton<ProjectionIntegrityMetrics>();
+        services.AddSingleton<ProjectionIntegrityVerifier>();
+        services.AddSingleton<ProjectionIntegrityMonitor>();
         services.AddSingleton<PermissionCheckService>();
         services.AddSingleton<FormAccessService>();
         services.AddSingleton<ContentService>();

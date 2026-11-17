@@ -102,6 +102,8 @@ public sealed class AuthoritySigningPolicyTests
             ["Identity:UserAssertion:Issuer"] = "https://test-idp.enterpriseforms.invalid",
             ["Identity:UserAssertion:Audience"] = "enterpriseforms",
             ["Identity:UserAssertion:SharedKeyBase64"] = "dGVzdC1pZHAtZGV2LW9ubHktc2lnbmluZy1rZXktMDAwMDAwMDAwMA==",
+            // RB-CARV-1: outside Development the phase is mandatory; without it the host stops at that refusal first.
+            ["ContentAcceptance:EnforcementPhase"] = "ReleaseA",
         };
         foreach (var (key, value) in extra)
         {

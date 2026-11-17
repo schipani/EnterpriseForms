@@ -98,6 +98,32 @@ public sealed class ArchiveProcessorTests
 
     private sealed class FakeStore(Guid organizationId) : IAuthorityStore, IAuthorityScope
     {
+        // E3-M2e ports (not used by these tests).
+        public Task<List<ContentDataKeyBinding>> FindDataKeyBindingsAsync(IReadOnlyCollection<Guid> dataKeyIdentifiers, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<bool> OrganizationHasDataKeyBindingsAsync(Guid organizationId, CancellationToken cancellationToken) => throw new NotSupportedException(); // E3-M2f-2 (not used here)
+
+        // E3-M2f-3b capability-refusal evidence port: not used by these tests.
+        public Task SetCapabilityEvidenceLockTimeoutAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<DateTimeOffset> StartCapabilityEvidenceLookupAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<bool> IsCapabilityRefusalEvidenceIndexUsableAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<CapabilityRefusalEvidenceRow>> GetNewestCapabilityRefusalEvidenceAsync(Guid organizationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<ContentDataKeyBinding>> GetDataKeyBindingsForOperationAsync(Guid contentChangeOperationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddDataKeyBindings(IEnumerable<ContentDataKeyBinding> bindings) => throw new NotSupportedException();
+
+        public Task RequireDataKeyLedgerAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<PlatformJournalEntry>> GetLatestPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ISearchIndexStore SearchIndex => throw new NotSupportedException();
+
+        public ISearchAccessStore SearchAccess => throw new NotSupportedException();
+
         public OrganizationAuthorizationState State { get; } = new() { OrganizationId = organizationId };
 
         public List<SecurityJournalEntry> Entries { get; } = [];
@@ -115,7 +141,13 @@ public sealed class ArchiveProcessorTests
 
         public Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Guid>>([organizationId]);
 
+        public Task<IReadOnlyList<Guid>> GetAllOrganizationIdsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Guid>>([organizationId]);
+
+        public Task<IReadOnlyList<OrganizationChangeMarker>> GetOrganizationChangeMarkersAsync(CancellationToken ct) => throw new NotSupportedException();
+
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid org, CancellationToken ct) => Task.FromResult<OrganizationAuthorizationState?>(org == organizationId ? State : null);
+
+        public Task RequireContentAcceptanceFloorAsync(CancellationToken ct) => throw new NotSupportedException();
 
         public Task<List<SecurityJournalEntry>> GetPendingJournalEntriesAsync(Guid org, int limit, CancellationToken ct) => Task.FromResult(Entries.Where(e => e.OrganizationId == org && e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending).Take(limit).ToList());
 
@@ -279,6 +311,8 @@ public sealed class ArchiveProcessorTests
 
         public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid org, string key, CancellationToken ct) => throw new NotSupportedException();
 
+        public Task<List<string>> GetCommandPayloadsAsync(Guid organizationId, IReadOnlyCollection<string> commandKinds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task<SecurityCommand?> FindCommandAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
 
         public void AddCommand(SecurityCommand command) => throw new NotSupportedException();
@@ -313,6 +347,12 @@ public sealed class ArchiveProcessorTests
 
         public void AddManifestLeaves(IEnumerable<RecordManifestLeaf> leaves) => throw new NotSupportedException();
 
+        public Task<List<ContentItemIdentity>> FindItemIdentitiesAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddItemIdentities(IEnumerable<ContentItemIdentity> identities) => throw new NotSupportedException();
+
+        public Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task<List<RecordManifestLeaf>> GetManifestLeavesAsync(Guid commitId, CancellationToken ct) => throw new NotSupportedException();
 
         public Task<RecordManifestCommit?> FindManifestCommitByOperationAsync(Guid organizationId, Guid formRecordId, Guid committedOperationId, CancellationToken ct) => Task.FromResult<RecordManifestCommit?>(null);
@@ -326,6 +366,8 @@ public sealed class ArchiveProcessorTests
         public void AddContentCheckpoint(ContentIntegrityCheckpoint checkpoint) => throw new NotSupportedException();
 
         public Task<IntegrityKeyRegistration?> FindKeyRegistrationAsync(Guid org, string purpose, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<IntegrityKeyRegistration?> FindKeyRegistrationForUpdateAsync(Guid org, string purpose, CancellationToken ct) => throw new NotSupportedException();
 
         public void AddKeyRegistration(IntegrityKeyRegistration registration) => throw new NotSupportedException();
 

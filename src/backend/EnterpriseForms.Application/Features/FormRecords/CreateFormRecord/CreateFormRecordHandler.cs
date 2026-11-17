@@ -27,7 +27,7 @@ namespace EnterpriseForms.Application.Features.FormRecords.CreateFormRecord;
 /// is deleted or repaired from business-database data, and only one content revision can be accepted for the creation.
 /// </para>
 /// </summary>
-public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, RecordCandidateStager stager, TimeProvider clock, Encryption.IFieldEncryptionService encryption, Projection.VerifiedRecordReader reader, IWriteFaultInjector faults)
+public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, RecordCandidateStager stager, TimeProvider clock, Encryption.IFieldEncryptionService encryption, Projection.VerifiedRecordReader reader, IWriteFaultInjector faults, IOperationTimingSink timing)
 {
     public Task<FormRecordResponse> HandleAsync(RequestContext context, Guid formDefinitionId, CreateFormRecordRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
@@ -80,6 +80,42 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(values);
 
+        // C-137 (R-37): phase durations for the optional diagnostics sink (the no-op sink measures nothing).
+        var timer = new OperationPhaseTimer(timing);
+        var outcome = "Created";
+        try
+        {
+            return await CreateCoreAsync(context, formDefinitionId, values, groupValues, ownerTeamId, child, idempotencyKey, timer, cancellationToken).ConfigureAwait(false);
+        }
+        catch (BusinessException ex)
+        {
+            outcome = ex.ErrorCode;
+            throw;
+        }
+        catch (AuthorityClientException ex)
+        {
+            outcome = ex.ErrorCode;
+            throw;
+        }
+        catch (PendingCommandException)
+        {
+            outcome = "COMMAND_PENDING";
+            throw;
+        }
+        catch (Exception ex)
+        {
+            outcome = ex.GetType().Name;
+            throw;
+        }
+        finally
+        {
+            timer.Complete(child is null ? "CreateRecord" : "CreateChildRecord", context.OrganizationId, outcome);
+        }
+    }
+
+    private async Task<FormRecordResponse> CreateCoreAsync(RequestContext context, Guid formDefinitionId, IReadOnlyDictionary<string, string> values, IReadOnlyList<RecordGroupValuesRequest>? groupValues, Guid? ownerTeamId, (Guid ParentId, FormRelationshipDefinition Relationship, int SortOrder)? child, string idempotencyKey, OperationPhaseTimer timer, CancellationToken cancellationToken)
+    {
+
         Domain.Features.FormDefinitions.FormDefinition definition;
         Domain.Features.FormDefinitions.FormVersion version;
         List<Domain.Features.FormDefinitions.FieldDefinition> fields;
@@ -101,14 +137,16 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             groups = await scope.GetGroupDefinitionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false);
         }
 
+        timer.Mark("load_form");
         var layout = FormLayoutCodec.Parse(version.LayoutJson);
         var now = clock.GetUtcNow();
         var formRecordId = CreateFormDefinitionHandler.DeterministicId(idempotencyKey, "record");
         // Validate before any authority command so a bad request never registers a phantom resource.
-        var applied = CandidateBuilder.ApplyValuesDetailed([], values, layout, fields, options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, options.ToDictionary(o => o.FieldOptionId), encryption, creating: true,
-            groups: new CandidateBuilder.GroupInput(groups, [], RecordGroupWrites.From(groupValues)));
+        var applied = await CandidateBuilder.ApplyValuesDetailedAsync([], values, layout, fields, options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, options.ToDictionary(o => o.FieldOptionId), encryption, cancellationToken, creating: true,
+            groups: new CandidateBuilder.GroupInput(groups, [], RecordGroupWrites.From(groupValues))).ConfigureAwait(false);
         var candidateValues = applied.Rows;
         CandidateBuilder.EnsureWithinCeiling(candidateValues.Count + applied.Occurrences.Count + 1);
+        timer.Mark("validate");
 
         if (child is null)
         {
@@ -119,10 +157,13 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             }
         }
 
+        timer.Mark("permission_create");
         var canonicalRequest = CreationRequestFingerprint.Canonicalize(new CreationRequestFingerprint.Request(context.IssuerUri, context.SubjectIdentifier, formDefinitionId, ownerTeamId, child?.ParentId, child?.Relationship.FormRelationshipDefinitionId, values, groupValues));
         await RequireSameRequestAsync(context, formRecordId, canonicalRequest, now, cancellationToken).ConfigureAwait(false);
+        timer.Mark("request_fingerprint");
 
         var revisionDecision = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.ManageOrganization), cancellationToken).ConfigureAwait(false);
+        timer.Mark("permission_revision");
         var payload = JsonSerializer.SerializeToElement(new
         {
             form_record_id = formRecordId,
@@ -131,9 +172,13 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             parent_form_record_id = child?.ParentId,
             form_relationship_definition_id = child?.Relationship.FormRelationshipDefinitionId,
         });
-        var command = await awaiter.SubmitAndAwaitAsync(context.ToDelegatedUser(), new SecurityCommandRequest(
+        // Equivalent to AuthorityCommandAwaiter.SubmitAndAwaitAsync, split so the submit and the Effective wait are timed apart.
+        var submitted = await awaiter.Authority.SubmitSecurityCommandAsync(context.ToDelegatedUser(), new SecurityCommandRequest(
             context.OrganizationId, SecurityCommandKind.RegisterRecord, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), revisionDecision.AuthorizationRevision, payload, child is null ? "create record" : "create child record"),
             "record:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
+        timer.Mark("command_submit");
+        var command = await awaiter.AwaitAsync(context.ToDelegatedUser(), submitted, cancellationToken, onPoll: timer.Poll).ConfigureAwait(false);
+        timer.Mark("command_effective_wait");
         if (command.CommandStatus != SecurityCommandStatus.Effective)
         {
             throw new PendingCommandException(new CommandOutcome(command.CommandId, command.CommandStatus.ToString(), command.AuthorizationRevision, false));
@@ -186,8 +231,10 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             }
         }
 
+        timer.Mark("business_row");
         faults.Checkpoint(WriteFaultCheckpoints.RecordProjected);
         var head = await authority.GetCommittedContentRevisionAsync(context.ToDelegatedUser(), context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
+        timer.Mark("content_head");
         if (head.CommittedContentRevision > 1)
         {
             // A retry of a creation that was accepted and edited since: the current verified record, never a new version.
@@ -228,6 +275,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             faults.Checkpoint(WriteFaultCheckpoints.ContentCommitted);
         }
 
+        timer.Mark("content_commit");
         if (accepted.CommittedOperationId is { } acceptedOperation)
         {
             await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
@@ -235,10 +283,16 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        timer.Mark("head_projection");
+
         var fieldsById = fields.ToDictionary(f => f.FieldDefinitionId);
         var optionsById = options.ToDictionary(o => o.FieldOptionId);
+        // E3-M2c OD-M2c-02a path C: candidateValues are always this request's own fresh seals (ApplyValuesDetailedAsync with no current
+        // rows, then ProtectAsync), on the first attempt and on every retry or replay; committed or staged rows of an earlier attempt are
+        // never formatted here (a head past revision 1 returns the verified read above). Self-sealed mode enforces that at run time.
+        var decrypted = await Values.DecryptedFieldValues.DecryptSelfSealedAsync(encryption, candidateValues, cancellationToken).ConfigureAwait(false);
         return new FormRecordResponse(formRecordId, context.OrganizationId, formDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true,
-            candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, optionsById, encryption), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue, FormRecordGroupId: v.FormRecordGroupId)).ToList(),
+            candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, optionsById, decrypted), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue, FormRecordGroupId: v.FormRecordGroupId)).ToList(),
             "Committed(" + accepted.ArchiveState + ")",
             Projection.RecordGroupProjection.Build(groups, layout, applied.Occurrences));
     }
@@ -250,7 +304,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         var existing = await scope.FindCreationAttemptAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
         if (existing is null)
         {
-            var attempt = CreationRequestFingerprint.Create(encryption, context.OrganizationId, formRecordId, context.LocalUserId, now, canonicalRequest);
+            var attempt = await CreationRequestFingerprint.CreateAsync(encryption, context.OrganizationId, formRecordId, context.LocalUserId, now, canonicalRequest, cancellationToken).ConfigureAwait(false);
             if (await scope.TryAddCreationAttemptAsync(attempt, cancellationToken).ConfigureAwait(false))
             {
                 await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -260,7 +314,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             existing = await scope.FindCreationAttemptAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false); // an identical request raced this one
         }
 
-        if (existing is null || !CreationRequestFingerprint.Matches(encryption, existing, canonicalRequest))
+        if (existing is null || !await CreationRequestFingerprint.MatchesAsync(encryption, existing, canonicalRequest, cancellationToken).ConfigureAwait(false))
         {
             throw new BusinessException("IDEMPOTENCY_CONFLICT", 409, "this idempotency key was already used for a different record-creation request");
         }
@@ -284,9 +338,10 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             {
                 return await authority.CommitContentChangeAsync(context.ToDelegatedUser(), operationId, new CommitContentChangeRequest(context.OrganizationId, formRecordId, staged.Items), cancellationToken).ConfigureAwait(false);
             }
-            catch (AuthorityClientException ex) when (ex.ErrorCode is "OPERATION_EXPIRED" or "OPERATION_STATE_INVALID")
+            catch (AuthorityClientException ex) when (IsAbandonedOperation(ex.ErrorCode))
             {
-                // The earlier operation expired or was aborted: it can never be accepted; a fresh one follows.
+                // The earlier operation expired, was aborted, or was prepared under other content acceptance rules (E3-M2b-1
+                // CARV: the Authority aborts it): it can never be accepted; a fresh one follows.
             }
             catch (AuthorityClientException ex) when (ex.ErrorCode == "CONTENT_REVISION_CONFLICT")
             {
@@ -299,9 +354,10 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         {
             return await stager.StageAndCommitAsync(context, head, candidate, idempotencyKey, cancellationToken).ConfigureAwait(false);
         }
-        catch (AuthorityClientException ex) when (ex.ErrorCode == "IDEMPOTENCY_CONFLICT")
+        catch (AuthorityClientException ex) when (IsUnusableOperationKey(ex.ErrorCode))
         {
-            // An earlier attempt prepared a different (never staged, or expired) candidate under this key.
+            // An earlier attempt prepared a different (never staged, or expired) candidate under this key, or (E3-M2b-1 CARV) the
+            // operation under this key was prepared under other content acceptance rules and is never handed back for commit.
         }
         catch (AuthorityClientException ex) when (ex.ErrorCode == "CONTENT_REVISION_CONFLICT")
         {
@@ -321,6 +377,19 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         }
     }
 
+    /// <summary>
+    /// Step 1 of <see cref="CommitInitialContentAsync"/>: Authority refusals meaning the staged operation can never be accepted, so a
+    /// fresh operation follows. E3-M2b-1 adds OPERATION_RULES_OUTDATED (the Authority aborted an operation that crosses content
+    /// acceptance rule versions).
+    /// </summary>
+    public static bool IsAbandonedOperation(string errorCode) => errorCode is "OPERATION_EXPIRED" or "OPERATION_STATE_INVALID" or "OPERATION_RULES_OUTDATED";
+
+    /// <summary>
+    /// Step 2: refusals meaning the creation's own idempotency key cannot produce an acceptable operation, so step 3 uses a fresh
+    /// retry key. E3-M2b-1 adds OPERATION_RULES_OUTDATED (a Prepare replay of an operation prepared under other rules).
+    /// </summary>
+    public static bool IsUnusableOperationKey(string errorCode) => errorCode is "IDEMPOTENCY_CONFLICT" or "OPERATION_RULES_OUTDATED";
+
     /// <summary>The accepted record, read back and verified (a completed earlier attempt of this request).</summary>
     private async Task<FormRecordResponse> CompletedAsync(RequestContext context, Guid formRecordId, CancellationToken cancellationToken)
     {
@@ -333,6 +402,6 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         }
 
         return new FormRecordResponse(formRecordId, context.OrganizationId, verified.Header.FormDefinitionId, verified.Header.RecordStatus, verified.Head.CommittedContentRevision, verified.Head.CommittedOperationId, verified.Head.AuthorizationRevision, verified.IsComplete,
-            verified.ToValueResponses(), "Committed(" + verified.Head.ArchiveState + ")", Projection.RecordGroupProjection.Build(verified.Groups, verified.Layout, verified.Occurrences));
+            await verified.ToValueResponsesAsync(cancellationToken).ConfigureAwait(false), "Committed(" + verified.Head.ArchiveState + ")", Projection.RecordGroupProjection.Build(verified.Groups, verified.Layout, verified.Occurrences));
     }
 }

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    E3-M2b-2 business real-PostgreSQL gate (legacy writer; GateBinaries = a pre-E3-M2b-2 Business API Release build). It writes
+    v1 envelope rows to the MIGRATED database through the legacy build's own EF model and signed-schema registry, and reports the
+    legacy canonical bytes. Development/Testing only; built only by scripts/dev/e3-m2b2-business-pg-gate.ps1 in a temporary work
+    directory. References no repository project.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>BusinessLegacyWriter</AssemblyName>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS1591;CA2007;CA1303;CA1031;CA1849</NoWarn>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="$(GateBinaries)\*.dll" Private="true" />
+  </ItemGroup>
+  <Target Name="RequireGateBinaries" BeforeTargets="ResolveAssemblyReferences" Condition="'$(GateBinaries)' == '' Or !Exists('$(GateBinaries)\EnterpriseForms.Infrastructure.dll')">
+    <Error Text="Build through scripts/dev/e3-m2b2-business-pg-gate.ps1 (GateBinaries must name a folder of legacy Business Release binaries)." />
+  </Target>
+</Project>

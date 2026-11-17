@@ -1,0 +1,375 @@
+{
+  "schema": "EnterpriseForms/E6a/ManagedHsmHmacProbe/reference-vectors/v1",
+  "purpose": "E-6a: decide whether Azure Managed HSM HS256 reproduces EnterpriseForms HMAC-SHA-256 over raw canonical bytes (Experiment B) or only over a SHA-256 digest (Experiment A).",
+  "warning": "TEST KEYS ONLY. Both keys are published. They may be imported only into a throwaway non-production Managed HSM. No EnterpriseForms deployment key equals or derives from them.",
+  "lengthInput": "input[i] = (byte)(i mod 256) for i = 0 .. inputLength-1",
+  "rowVectorSource": "trust_authority/row-integrity-v1.test-vectors.json",
+  "testKeys": [
+    {
+      "testKeyId": "e6a-test-key-1",
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "keySource": "trust_authority/row-integrity-v1.test-vectors.json testHmacKeyHex (published RowHmac/v1 test key)"
+    },
+    {
+      "testKeyId": "e6a-test-key-2",
+      "keyHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "keySource": "E-6a published second test key (bytes 0x20..0x3f)"
+    }
+  ],
+  "vectors": [
+    {
+      "vectorId": "len-00000",
+      "vectorKind": "Length",
+      "inputLength": 0,
+      "inputSha256Hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "d38b42096d80f45f826b44a9d5607de72496a415d3f4a1a8c88e3bb9da8dc1cb",
+          "digestMessageHmacSha256Hex": "d43ab268ace84897c7c38db898ceba8460c30c061f52a2ea4c514367ed85f6fa",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "f49240b78aa90e53f46106c3481e377e19696e777328b1cd6ec6061a0bd868a9",
+          "digestMessageHmacSha256Hex": "2de97529c78a7d0d94dece8fe3429cb406019692fdef8d3a22bc8982679c8c10",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "len-00001",
+      "vectorKind": "Length",
+      "inputLength": 1,
+      "inputSha256Hex": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "e711546e3faad4c7c4aa756bc26cad6abea8241984a0f6b0839c70ca61c4ef88",
+          "digestMessageHmacSha256Hex": "5ea6888cbd931010004948cb5d712231b625a9e4f50a02fb3c256f4afb900a0b",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "9bfa8949908db435fab3eb44b898b93a20b76e825014dd4867faefaee044372e",
+          "digestMessageHmacSha256Hex": "c2b60ca9be75c5711ecbcecf2c72fbd3e809748b98c0fb5c52a3e158b09d4b32",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "len-00031",
+      "vectorKind": "Length",
+      "inputLength": 31,
+      "inputSha256Hex": "4f23c2ca8c5c962e50cd31e221bfb6d0adca19111dca8e0c62598ff146dd19c4",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "3df5adf2a33c959e4f31daa7177c487f8273f22655033c58d343be6921fea4ed",
+          "digestMessageHmacSha256Hex": "5a148a8ea4954ee26bdde9974f69ab1371885f5b6ef6bde5653061c500145c5e",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "a826c19e93fad03ceec292d9faee6e3a1c2ef5e5f7108ecde7e5428a088b2522",
+          "digestMessageHmacSha256Hex": "ba1ed45e778c0e7ca3afff713e8892509e8e6b713cf54192f9d4296aab80bb49",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "len-00032",
+      "vectorKind": "Length",
+      "inputLength": 32,
+      "inputSha256Hex": "630dcd2966c4336691125448bbb25b4ff412a49c732db2c8abc1b8581bd710dd",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "e8499be4f1980d68f13222a418df5cbd97d53fddf590c2108e22d40005b70713",
+          "digestMessageHmacSha256Hex": "61ced625b38aa86ffb7096c3d76824670a70c193d578762f8d102c4f78375176",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "a27b86e7a70a029cba778d6f738d952696d6d8361b95103dd84ae9df6af063af",
+          "digestMessageHmacSha256Hex": "4bc5434ba63d2123ec99ea4bc83b24b53ea6a843ddd714099073023bac15cf72",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "len-00033",
+      "vectorKind": "Length",
+      "inputLength": 33,
+      "inputSha256Hex": "5d8fcfefa9aeeb711fb8ed1e4b7d5c8a9bafa46e8e76e68aa18adce5a10df6ab",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "02765154823398754ef0909cec9578bdeefadc3ce2be43f38c1e16e2a5c9b6fe",
+          "digestMessageHmacSha256Hex": "6b632f10bc3bf61144375be6929e10a3ba8bf9f1e8c1940ddaee829089dd2513",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "95aaa52e2210d1ca3b158c55bdfd677431b32183f2d179ebdcd57b63b852bc1f",
+          "digestMessageHmacSha256Hex": "f62bf38fefd3d868b3966ddbbc5f9aa628ab49e1d8a00b78520b76a9c8ffb9fe",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "len-00064",
+      "vectorKind": "Length",
+      "inputLength": 64,
+      "inputSha256Hex": "fdeab9acf3710362bd2658cdc9a29e8f9c757fcf9811603a8c447cd1d9151108",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "173206781c3b828a0dc2a716fe0ddb5e6e56ec171170952ff6b3f4de44fa18d7",
+          "digestMessageHmacSha256Hex": "eb91e4e05bc405d51e19e49b18881f29245a318c85b1499f3098ffc14e5f8526",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "962f216cc730f541aa1ee91ca3aa361a0a8e18375a8afc80ecdb17fc5a219a8e",
+          "digestMessageHmacSha256Hex": "8ade1b6cf5b9b86b5fc428e1a452743a1ebd86a2d7a677a496b235a10de24bc0",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "len-00256",
+      "vectorKind": "Length",
+      "inputLength": 256,
+      "inputSha256Hex": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "42bf6fcd2ae46e32b29ce8bcbfd1f43896ea948aa9df2744eb4a47d28a8386c8",
+          "digestMessageHmacSha256Hex": "06b15d4528b8eb8b9ab4c2ad8c0aaf7d6b85fe3fbb834d274e44a8bd015d57cf",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "96c7fb2db0c95dff6426bd5e27ec44df5e6e799e0f96a43ac9a790b662058a96",
+          "digestMessageHmacSha256Hex": "2f140137b2d822c7bb83f98151e5640427ad4b80b6a574347d5a2c92abaa319a",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "len-01024",
+      "vectorKind": "Length",
+      "inputLength": 1024,
+      "inputSha256Hex": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "b7461b582e6d4e287bcc2f9f853344bc3fcbf7dd4e5c87e4fab2b4fcd50c7c05",
+          "digestMessageHmacSha256Hex": "1e3983aa9bdfc0a3afc3e993d676eea9fcd11fe9249aa85022243243363c6cf4",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "6575c3187a9effbd0344c4b0789b4e9cbc4fa2a0a03909d9d3ed989d78d104e7",
+          "digestMessageHmacSha256Hex": "338b2fdc05d1b80a0d902535a3020bd4f97a94a27b9422f28e34f7733d48d392",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "len-04096",
+      "vectorKind": "Length",
+      "inputLength": 4096,
+      "inputSha256Hex": "c8f5d0341d54d951a71b136e6e2afcb14d11ed8489a7ae126a8fee0df6ecf193",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "08bd5e1d9577699b6f63ce0fa8371a8b1058193dcb81d15a5de7b58f60440cd7",
+          "digestMessageHmacSha256Hex": "1fc1f8896c42943f4d76e314f587342956e679d37b382e48993687b0ca7822ed",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "f91298b48f5077caa73e35b05533efbc8a784a0791971f7bbe327f3987991794",
+          "digestMessageHmacSha256Hex": "ac64dea052d0c76cd1c186d793babbce5d616672e42c3a36339225125f9755a2",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "len-65536",
+      "vectorKind": "Length",
+      "inputLength": 65536,
+      "inputSha256Hex": "7daca2095d0438260fa849183dfc67faa459fdf4936e1bc91eec6b281b27e4c2",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "263be03a58198c013d9d8f1cb05b1c860a374dbd2811fc96f59d05f12b9441d4",
+          "digestMessageHmacSha256Hex": "d7e1a351327b0b4c8136a61b133de50cc4f864e5ee6205483acc310176fe31eb",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "0df25ddbbaf15d9004814fd40234911ba672646bfde0413a5fd36886b13b7243",
+          "digestMessageHmacSha256Hex": "6f8fe0544f3db69d65bcdb85038f0c36aee115d6f414eb5161eb0cd5a3c3ed9c",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "row-ROWV1-FORM-RECORD-USER-OWNED",
+      "vectorKind": "RowHmacV1",
+      "inputLength": 334,
+      "inputHex": "10001744796e616d6963466f726d732f526f77486d61632f7631000100000001000c666f726d5f7265636f726473111111111111411181111111111111110199a2b3c4d57e6f8123456789abce050000000000000001000000080012637265617465645f62795f757365725f6964070199a2b3c4d57e6f8123456789abce010017637265617465645f666f726d5f76657273696f6e5f6964070199a2b3c4d57e6f8123456789abce040012666f726d5f646566696e6974696f6e5f6964070199a2b3c4d57e6f8123456789abce03000d6f776e65725f7465616d5f696400000d6f776e65725f757365725f6964070199a2b3c4d57e6f8123456789abce01000d7265636f72645f73746174757308000000095375626d6974746564000c7375626d69747465645f6f6e0600065e0a1da43a90000974656e616e745f69640711111111111141118111111111111111",
+      "inputSha256Hex": "8bc6b6da8e3f69a34e4ad88efd5a71cb1c9b8d0a0cd18988cdebb117fd3baa13",
+      "publishedRowSignatureHex": "7c7a359e433ed62552f1443942b12d13961e776342c0e6b80d76122bfed814f7",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "7c7a359e433ed62552f1443942b12d13961e776342c0e6b80d76122bfed814f7",
+          "digestMessageHmacSha256Hex": "16f00dd7020e94c3d6ed1ecd8657c6eb8171d7aaa007a3a6e03831ecf41be50a",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "554f4e132baeb0fc51dc43961cb3f2171de6bbcae2b7184c59ae4e7fad4114e8",
+          "digestMessageHmacSha256Hex": "996b2d875781bcf46a314fb074f96cb06b482aa2eaf56436b39d74e01a0517ea",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "row-ROWV1-FORM-RECORD-TEAM-OWNED",
+      "vectorKind": "RowHmacV1",
+      "inputLength": 334,
+      "inputHex": "10001744796e616d6963466f726d732f526f77486d61632f7631000100000001000c666f726d5f7265636f726473111111111111411181111111111111110199a2b3c4d57e6f8123456789abce050000000000000002000000080012637265617465645f62795f757365725f6964070199a2b3c4d57e6f8123456789abce010017637265617465645f666f726d5f76657273696f6e5f6964070199a2b3c4d57e6f8123456789abce040012666f726d5f646566696e6974696f6e5f6964070199a2b3c4d57e6f8123456789abce03000d6f776e65725f7465616d5f6964070199a2b3c4d57e6f8123456789abce02000d6f776e65725f757365725f696400000d7265636f72645f73746174757308000000095375626d6974746564000c7375626d69747465645f6f6e0600065e0a1da43a90000974656e616e745f69640711111111111141118111111111111111",
+      "inputSha256Hex": "693506509e81b4045135e1d389bebbdb0162372f6efad725fff7f8ab032bb7ca",
+      "publishedRowSignatureHex": "4b1ecce518230d11a18911a0b4670be73354964de47b50f9e512bfd5a2b904e6",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "4b1ecce518230d11a18911a0b4670be73354964de47b50f9e512bfd5a2b904e6",
+          "digestMessageHmacSha256Hex": "2ce7401085e0bd7745c454d2cc28cea256305229e9f31889c858d9936c5e35c5",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "89684d0eba982cdd816f54222dc12fc1741566a99ddc9eee4a4ba977080aac64",
+          "digestMessageHmacSha256Hex": "3ae577831e1b0a5f690d51a858f79907aec47adbdb1962fb30edd2700645fce8",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "row-ROWV1-TYPES-ALL-PRESENT",
+      "vectorKind": "RowHmacV1",
+      "inputLength": 369,
+      "inputHex": "10001744796e616d6963466f726d732f526f77486d61632f76310001000000010017696e746567726974795f747970655f636f766572616765111111111111411181111111111111110199a2b3c4d57e6f8123456789abce0500000000000000010000000a000c626f6f6c65616e5f666c61670101000b62797465735f76616c75650900000004deadbeef000a646174655f76616c75650500004d46000d646563696d616c5f76616c75650400000002000301e240000b696e7433325f76616c756502fffffffe000b696e7436345f76616c7565030020000000000001000a6a736f6e5f76616c75650a000000367b2261223a5b747275652c6e756c6c2c2278225d2c2262223a312c226e6573746564223a7b2279223a2d352c227a223a22c3a9227d7d000a746578745f76616c75650800000005436166c3a9000f74696d657374616d705f76616c75650600061348f9377c01000a757569645f76616c7565070199a2b3c4d57e6f8123456789abcdf0",
+      "inputSha256Hex": "0fc81b442f25b107a5077850fb99585a9b846b9bffae5a41d9db99663a008666",
+      "publishedRowSignatureHex": "9de6bf53b54a19831ffe2aa3eaa5875d33c93172d059dab66e3e44c20618914a",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "9de6bf53b54a19831ffe2aa3eaa5875d33c93172d059dab66e3e44c20618914a",
+          "digestMessageHmacSha256Hex": "26a2a8be69a55675d2efffb6069611969a45da2967dd1ff2c4b21970557a245e",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "ee5ebd893aeeaaedbe97473732033b8a6812838ad04ffb2916d7ebb6d64082b6",
+          "digestMessageHmacSha256Hex": "39ad1e396ea59c0b0938873e296057e4b079398f10d6c3cb6ad5eaec186448ce",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "row-ROWV1-TYPES-NFC-EQUIVALENCE",
+      "vectorKind": "RowHmacV1",
+      "inputLength": 369,
+      "inputHex": "10001744796e616d6963466f726d732f526f77486d61632f76310001000000010017696e746567726974795f747970655f636f766572616765111111111111411181111111111111110199a2b3c4d57e6f8123456789abce0500000000000000010000000a000c626f6f6c65616e5f666c61670101000b62797465735f76616c75650900000004deadbeef000a646174655f76616c75650500004d46000d646563696d616c5f76616c75650400000002000301e240000b696e7433325f76616c756502fffffffe000b696e7436345f76616c7565030020000000000001000a6a736f6e5f76616c75650a000000367b2261223a5b747275652c6e756c6c2c2278225d2c2262223a312c226e6573746564223a7b2279223a2d352c227a223a22c3a9227d7d000a746578745f76616c75650800000005436166c3a9000f74696d657374616d705f76616c75650600061348f9377c01000a757569645f76616c7565070199a2b3c4d57e6f8123456789abcdf0",
+      "inputSha256Hex": "0fc81b442f25b107a5077850fb99585a9b846b9bffae5a41d9db99663a008666",
+      "publishedRowSignatureHex": "9de6bf53b54a19831ffe2aa3eaa5875d33c93172d059dab66e3e44c20618914a",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "9de6bf53b54a19831ffe2aa3eaa5875d33c93172d059dab66e3e44c20618914a",
+          "digestMessageHmacSha256Hex": "26a2a8be69a55675d2efffb6069611969a45da2967dd1ff2c4b21970557a245e",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "ee5ebd893aeeaaedbe97473732033b8a6812838ad04ffb2916d7ebb6d64082b6",
+          "digestMessageHmacSha256Hex": "39ad1e396ea59c0b0938873e296057e4b079398f10d6c3cb6ad5eaec186448ce",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "row-ROWV1-TYPES-ALL-NULL",
+      "vectorKind": "RowHmacV1",
+      "inputLength": 257,
+      "inputHex": "10001744796e616d6963466f726d732f526f77486d61632f76310001000000010017696e746567726974795f747970655f636f766572616765111111111111411181111111111111110199a2b3c4d57e6f8123456789abce0500000000000000010000000a000c626f6f6c65616e5f666c61670100000b62797465735f76616c756500000a646174655f76616c756500000d646563696d616c5f76616c756500000b696e7433325f76616c75650200000000000b696e7436345f76616c7565030000000000000000000a6a736f6e5f76616c756500000a746578745f76616c756500000f74696d657374616d705f76616c756500000a757569645f76616c756500",
+      "inputSha256Hex": "9299694425eafc67048e5c4f9907c7e88430256356b8528272eec3724eeb838d",
+      "publishedRowSignatureHex": "cbaf4eff59181a057ae30aae75b8f28e6456e3a56e2629c8eeb310322023fd4d",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "cbaf4eff59181a057ae30aae75b8f28e6456e3a56e2629c8eeb310322023fd4d",
+          "digestMessageHmacSha256Hex": "99a8eda96bc317ee09d7c608e59af817b8b1e8399acf606e17354e6f2ca3c4fc",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "9864a2b750c4e8f07879d2b8d88443d6b762120da705da6db15458ac89f930c5",
+          "digestMessageHmacSha256Hex": "1306b5d2c20ed768e7a260cd47523ba9fe0427f4bc1617bd26f3fa28eff46741",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "row-ROWV1-EMPTY-STRING-NOT-NULL",
+      "vectorKind": "RowHmacV1",
+      "inputLength": 265,
+      "inputHex": "10001744796e616d6963466f726d732f526f77486d61632f76310001000000010017696e746567726974795f747970655f636f766572616765111111111111411181111111111111110199a2b3c4d57e6f8123456789abce0500000000000000010000000a000c626f6f6c65616e5f666c61670100000b62797465735f76616c75650900000000000a646174655f76616c756500000d646563696d616c5f76616c756500000b696e7433325f76616c75650200000000000b696e7436345f76616c7565030000000000000000000a6a736f6e5f76616c756500000a746578745f76616c75650800000000000f74696d657374616d705f76616c756500000a757569645f76616c756500",
+      "inputSha256Hex": "a6ee68278e4b987a0d0601be3aa24315bd3d694c4c53a7484625cd01919cd956",
+      "publishedRowSignatureHex": "e1ddd71c3129917257189c4d76a81a69909f0da165db65ad4808fd515cef3f48",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "e1ddd71c3129917257189c4d76a81a69909f0da165db65ad4808fd515cef3f48",
+          "digestMessageHmacSha256Hex": "547c1227787bdebd2d8289d2dc8e086bbe0367efad02df55adae2aae9037491f",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "01887414cf12a444ea9c25b04be02925829df683245c5f18c8ed172f04fa11ce",
+          "digestMessageHmacSha256Hex": "401da265c22f95a665c6534bddbf67586bc30653dd0497acf83156d62507a745",
+          "rawEqualsDigest": false
+        }
+      ]
+    },
+    {
+      "vectorId": "row-ROWV1-DECIMAL-NORMALIZATION",
+      "vectorKind": "RowHmacV1",
+      "inputLength": 300,
+      "inputHex": "10001744796e616d6963466f726d732f526f77486d61632f76310001000000030017696e746567726974795f747970655f636f766572616765111111111111411181111111111111110199a2b3c4d57e6f8123456789abce05ffffffffffffffff0000000a000c626f6f6c65616e5f666c61670101000b62797465735f76616c756500000a646174655f76616c756505ffffffff000d646563696d616c5f76616c756504000000040001ff000b696e7433325f76616c7565027fffffff000b696e7436345f76616c7565038000000000000000000a6a736f6e5f76616c75650a000000025b5d000a746578745f76616c7565080000000ee697a5e69cace8aa9e20f09f9492000f74696d657374616d705f76616c756506ffffffffffffffff000a757569645f76616c756500",
+      "inputSha256Hex": "ffa76bb01725400e18071df63b24c71dda2e1838deaf716de06a0de1aae33532",
+      "publishedRowSignatureHex": "27b42cf79dad5da190bf3c2ae6fb08b05770ab5fedd300fe716001908917d3f6",
+      "macs": [
+        {
+          "testKeyId": "e6a-test-key-1",
+          "rawMessageHmacSha256Hex": "27b42cf79dad5da190bf3c2ae6fb08b05770ab5fedd300fe716001908917d3f6",
+          "digestMessageHmacSha256Hex": "ab45b4f1dd0f13c81a1e9ca6e7bb9fe697c42ac2c2f32a8b3fb82997ab127567",
+          "rawEqualsDigest": false
+        },
+        {
+          "testKeyId": "e6a-test-key-2",
+          "rawMessageHmacSha256Hex": "587ade1fcdbe5b04db02958158071865bde4076efdc923161477602b3a4ac965",
+          "digestMessageHmacSha256Hex": "3e3dfb822b31e74712bfa9cc64f37e6d621a453100ec7e5063855f9991282851",
+          "rawEqualsDigest": false
+        }
+      ]
+    }
+  ]
+}

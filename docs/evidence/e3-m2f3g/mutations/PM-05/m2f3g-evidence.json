@@ -1,0 +1,249 @@
+{
+  "harness": "E3-M2f-3G capability-refusal evidence PostgreSQL verification (real Authority host and real recorder/store on disposable PostgreSQL 18.0)",
+  "run": "mutation-PM-05",
+  "groups": "L",
+  "isolation": {
+    "databases": [
+      "g3_base",
+      "g3_l1",
+      "g3_noindex",
+      "g3_prefloor",
+      "m2f3ggate"
+    ],
+    "scrubbedEnvironmentVariables": [],
+    "stopped": false
+  },
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "elapsedSeconds": 30,
+  "checksTotal": 19,
+  "checksFailed": 4,
+  "byKind": {
+    "Control": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "Liveness": {
+      "total": 12,
+      "passed": 8,
+      "failed": 4
+    },
+    "Setup": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0
+    }
+  },
+  "byGroup": {
+    "L": {
+      "total": 12,
+      "passed": 8,
+      "failed": 4
+    },
+    "S": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0
+    },
+    "Z": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "demonstrationsOutsidePassTotals": 0,
+  "notExecuted": [],
+  "checks": [
+    {
+      "Id": "S-01",
+      "Group": "S",
+      "Kind": "Setup",
+      "Description": "the server is a disposable PostgreSQL 18.0 (one container of this run; admitted by nonce and system identifier)",
+      "Expected": "PostgreSQL 18.0",
+      "Observed": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-\u2026",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "S-02",
+      "Group": "S",
+      "Kind": "Setup",
+      "Description": "the approved runtime identity is an ordinary login (no superuser, CREATEROLE, CREATEDB, BYPASSRLS, REPLICATION; NOINHERIT)",
+      "Expected": "falsefalsefalsefalsefalsefalsetrue",
+      "Observed": "falsefalsefalsefalsefalsefalsetrue",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "S-03",
+      "Group": "S",
+      "Kind": "Setup",
+      "Description": "templates: the ordinary migration (migration identity), floors 1 -\u003E 2 -\u003E 3 (Release B floor 3; Envelope v2 acceptance stays OFF), then IX-B by the accepted E3-M2f-3i command (migration identity) and its --verify-only; the harness\u0027s own catalogue query finds the approved definition valid, ready and live. g3_prefloor (migrated only) and g3_noindex (floors, no IX-B) are copies taken before",
+      "Expected": "migrate 0; floors 0,0,0; index absent -\u003E exit 0 -\u003E approved-valid; verify-only exit 0",
+      "Observed": "migrate 0; floors 0,0,0; index absent -\u003E exit 0 outcome Created -\u003E approved-valid; verify-only exit 0 outcome AlreadyValid",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "S-04",
+      "Group": "S",
+      "Kind": "Setup",
+      "Description": "the copies keep their states: g3_noindex has no IX-B, g3_prefloor has no floor and no IX-B",
+      "Expected": "g3_noindex absent; g3_prefloor absent and no floor",
+      "Observed": "g3_noindex absent; g3_prefloor absent; prefloor floors none",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-01",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "M2F3-70 / M2F3-30: a mature organization (200000 unrelated audit entries; 250000 journal entries in all; statistics never/never) records its FIRST refusal on the first attempt; inside the real T2 the eight-row lookup is a backward index scan on IX-B under Limit that returns 0 rows and touches a handful of buffers (no unrelated audit entry read); T2 holds the organization row briefly",
+      "Expected": "Committed; backward IX-B; Limit; scan rows 0; buffers \u003C 50; no filter removals; lock hold \u003C 500 ms; oracle holds",
+      "Observed": "Committed in 429 ms; backward IX-B True; Limit True; scan rows 0; shared buffers 2; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.12..8.14 rows=1 width=88) (actual time=0.003..0.003 ro\u2026]; lock hold 187 ms; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-02",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "repeat refusal (fresh process): the lookup returns the one entry through IX-B; AlreadyRecorded; nothing appended",
+      "Expected": "AlreadyRecorded; backward IX-B; scan rows 1",
+      "Observed": "AlreadyRecorded in 54 ms; backward IX-B True; Limit True; scan rows 1; shared buffers 2; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.14..8.16 rows=1 width=88) (actual time=0.021..0.022 ro\u2026]; evidence 1",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-03",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "multiple entry points on the mature organization: the six other keys each recorded on the first attempt; a further lookup reads the seven entries (\u2264 8 heap rows) through IX-B and finds its key",
+      "Expected": "Committed x6; AlreadyRecorded; backward IX-B; scan rows 7; oracle 7 holds",
+      "Observed": "Committed,Committed,Committed,Committed,Committed,Committed; AlreadyRecorded; backward IX-B True; Limit True; scan rows 7; shared buffers 3; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.14..8.16 rows=1 width=88) (actual time=0.025..0.029 ro\u2026]; evidence 7; max per (key, bucket) 1; max per bucket 7; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-04",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "after ANALYZE: inside T2 the lookup is still the backward IX-B scan under Limit",
+      "Expected": "AlreadyRecorded; backward IX-B; Limit",
+      "Observed": "AlreadyRecorded; backward IX-B True; Limit True; scan rows 7; shared buffers 3; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.14..22.76 rows=7 width=79) (actual time=0.020..0.024 r\u2026]",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-05",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "generic prepared plan (plan_cache_mode = force_generic_plan, runtime identity, parameterized organization): the literal predicates still match IX-B: backward IX-B scan under Limit",
+      "Expected": "backward IX-B; Limit; scan rows 7",
+      "Observed": "backward IX-B True; Limit True; scan rows 7; shared buffers 204; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.14..9.92 rows=2 width=79) (actual time=0.024..0.029 ro\u2026]",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-06",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "later hour: with seven entries in each of the three previous hours (the eight newest are all older than the current bucket), the current hour\u0027s first refusal of a key is recorded; the lookup reads exactly eight rows; per-bucket bound holds",
+      "Expected": "Committed; backward IX-B; scan rows 8; evidence 22; max per bucket 7; oracle holds",
+      "Observed": "Committed; backward IX-B True; Limit True; scan rows 8; shared buffers 3; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.14..5.90 rows=1 width=79) (actual time=0.036..0.041 ro\u2026]; evidence 22; max per (key, bucket) 1; max per bucket 7; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-07",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "lookup timeout on a mature organization: IX-B held ACCESS EXCLUSIVE by another session; the lookup is cancelled by statement_timeout; Deferred within the budget; nothing appended",
+      "Expected": "Deferred; server statement-timeout at LOOKUP; \u003C 1500 ms; evidence 0",
+      "Observed": "Deferred Error; server statement-timeout LOOKUP; 557 ms; evidence 0",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-08",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "catalogue check failure on a mature organization: the journal table held ACCESS EXCLUSIVE; the catalogue check (deparse, ACCESS SHARE on the table) is cancelled by statement_timeout; Deferred; no lookup ran; nothing appended",
+      "Expected": "Deferred; server statement-timeout at INDEX_CHECK; no LOOKUP; evidence 0",
+      "Observed": "Deferred Error; server statement-timeout INDEX_CHECK; lookups 0; evidence 0",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-09",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "missing IX-B on the mature database: T2 checks the catalogue, finds no usable IX-B, runs no lookup and appends nothing (Deferred INDEX_UNAVAILABLE; under D-3b-2 a retry is scheduled, log 9253, rather than the 9254/negative cache named in the closure text of M2F3-62); a repeat refusal of the key is suppressed while the retry is pending; the oracle holds",
+      "Expected": "index absent; Deferred IndexUnavailable; repeat SuppressedPending; INDEX_CHECK x1; LOOKUP none; evidence 0; oracle holds",
+      "Observed": "index absent; Committed None; repeat SuppressedRecorded; INDEX_CHECK x1; LOOKUP x1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": false,
+      "Gap": null
+    },
+    {
+      "Id": "L-10",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "mismatched IX-B (same name, no predicate) on the mature database: T2 checks the catalogue, finds no usable IX-B, runs no lookup and appends nothing (Deferred INDEX_UNAVAILABLE; under D-3b-2 a retry is scheduled, log 9253, rather than the 9254/negative cache named in the closure text of M2F3-62); a repeat refusal of the key is suppressed while the retry is pending; the oracle holds",
+      "Expected": "index mismatched; Deferred IndexUnavailable; repeat SuppressedPending; INDEX_CHECK x1; LOOKUP none; evidence 0; oracle holds",
+      "Observed": "index mismatched; AlreadyRecorded None; repeat SuppressedRecorded; INDEX_CHECK x1; LOOKUP x1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": false,
+      "Gap": null
+    },
+    {
+      "Id": "L-11",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "invalid IX-B (an interrupted CREATE INDEX CONCURRENTLY of the approved definition) on the mature database: T2 checks the catalogue, finds no usable IX-B, runs no lookup and appends nothing (Deferred INDEX_UNAVAILABLE; under D-3b-2 a retry is scheduled, log 9253, rather than the 9254/negative cache named in the closure text of M2F3-62); a repeat refusal of the key is suppressed while the retry is pending; the oracle holds",
+      "Expected": "index invalid; Deferred IndexUnavailable; repeat SuppressedPending; INDEX_CHECK x1; LOOKUP none; evidence 0; oracle holds",
+      "Observed": "index invalid; AlreadyRecorded None; repeat SuppressedRecorded; INDEX_CHECK x1; LOOKUP x1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": false,
+      "Gap": null
+    },
+    {
+      "Id": "L-12",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "recovery: after the manual DROP of the unusable index, the accepted E3-M2f-3i command (migration identity) rebuilds IX-B on the mature table; the next refusal is recorded on the first attempt through IX-B",
+      "Expected": "command exit 0; approved-valid; Committed; backward IX-B; scan rows 0; evidence 1; oracle holds",
+      "Observed": "command exit 0 outcome Created; approved-valid; AlreadyRecorded; backward IX-B True; Limit True; scan rows 1; shared buffers 2; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.14..8.15 rows=1 width=79) (actual time=0.008..0.009 ro\u2026]; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": false,
+      "Gap": null
+    },
+    {
+      "Id": "Z-01",
+      "Group": "Z",
+      "Kind": "Control",
+      "Description": "the runtime identity\u0027s privileges, memberships and role attributes are unchanged by the whole run (template database)",
+      "Expected": "4f11c3ac8659f78a3a5573c73d0d41ae (2379 entries)",
+      "Observed": "4f11c3ac8659f78a3a5573c73d0d41ae (2379 entries)",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "Z-02",
+      "Group": "Z",
+      "Kind": "Control",
+      "Description": "Envelope v2 acceptance was never requested: no database of the run holds an acceptance policy record with acceptance requested (hosts ran with Content:EnvelopeV2AcceptanceEnabled = false)",
+      "Expected": "none",
+      "Observed": "none",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "Z-03",
+      "Group": "Z",
+      "Kind": "Control",
+      "Description": "no data-key binding exists in any database of the run (every organization stayed unbound: no bound-organization scenario was executed)",
+      "Expected": "none",
+      "Observed": "none",
+      "Pass": true,
+      "Gap": null
+    }
+  ],
+  "demonstrations": []
+}

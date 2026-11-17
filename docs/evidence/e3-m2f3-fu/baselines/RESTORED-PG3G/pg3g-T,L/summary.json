@@ -1,0 +1,17 @@
+{
+    "RunLabel":  "mutation-RESTORED-PG3G",
+    "Groups":  "T,L",
+    "ExitCode":  0,
+    "Checks":  31,
+    "Failed":  0,
+    "DemonstrationsOutsidePassTotals":  0,
+    "NotExecuted":  0,
+    "ContainersRemoved":  true,
+    "ContainerListUnchanged":  true,
+    "NewDockerVolumes":  0,
+    "DeadlocksInServerLog":  0,
+    "PermissionDeniedInServerLog":  0,
+    "ConfigEnablersBefore":  0,
+    "ConfigEnablersAfter":  0,
+    "EvidenceLeaksAfterScrub":  0
+}

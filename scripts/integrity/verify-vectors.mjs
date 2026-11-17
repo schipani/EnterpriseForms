@@ -241,9 +241,51 @@ function verifyRows(doc) {
   }
 }
 
+// E3-M2b-2: signed schema 2 of the two envelope tables (RowHmac v1 framing unchanged). Int32 values must be JSON numbers.
+function strictTypes(schema, values) {
+  for (const col of schema.signedColumns) {
+    const v = values[col.columnName];
+    if (v !== null && v !== undefined && col.type === "Int32" && typeof v !== "number") throw new FormatError("TypeMismatch");
+  }
+}
+function verifyEnvelopeSchema2(doc) {
+  const key = Buffer.from(doc.testHmacKeyHex, "hex");
+  const schemas = new Map(doc.schemas.map((s) => [`${s.entityKind}:${s.schemaVersion}`, loadSchema(s)]));
+  for (const kind of ["field_encrypted_values", "file_attachment_versions"]) {
+    const v1 = new Set(schemas.get(`${kind}:1`).signedColumns.map((c) => c.columnName));
+    const v2cols = schemas.get(`${kind}:2`).signedColumns;
+    const added = v2cols.filter((c) => !v1.has(c.columnName));
+    check(JSON.stringify(added.map((c) => c.columnName)) === JSON.stringify(["data_key_commitment_bytes", "data_key_identifier", "key_wrap_algorithm_code"]) && added.every((c) => !c.nullable)
+      && [...v1].every((n) => v2cols.some((c) => c.columnName === n)), `${kind}: schema 2 = schema 1 + three non-nullable v2 columns`);
+  }
+  const byId = {};
+  for (const c of doc.cases) {
+    const schema = schemas.get(`${c.entityKind}:${c.schemaVersion}`);
+    strictTypes(schema, c.values);
+    const canonical = canonicalRow(schema, c);
+    byId[c.caseId] = { c, canonical };
+    check(hex(canonical) === c.expected.canonicalBytesHex, `${c.caseId}: canonical bytes`);
+    check(canonical.length === c.expected.canonicalByteLength, `${c.caseId}: length`);
+    check(hex(sha256(canonical)) === c.expected.canonicalPayloadDigestHex, `${c.caseId}: digest`);
+    check(createHmac("sha256", key).update(canonical).digest("hex") === c.expected.rowSignatureHexWithTestKey, `${c.caseId}: hmac`);
+  }
+  check(hex(byId["ENVS2-FIELD-S1-REFERENCE"].canonical) !== hex(byId["ENVS2-FIELD-S2-LOCAL-WRAP"].canonical), "schema 1 and schema 2 bytes differ");
+  for (const n of doc.negativeCases) {
+    const base = byId[n.baseCaseId].c;
+    const schema = schemas.get(`${base.entityKind}:${base.schemaVersion}`);
+    const values = { ...base.values, ...(n.set ?? {}) };
+    for (const name of n.remove ?? []) delete values[name];
+    let threw = false;
+    try { strictTypes(schema, values); canonicalRow(schema, { ...base, values }); } catch (err) { threw = err instanceof FormatError; }
+    check(threw, `${n.caseId}: expected rejection`);
+  }
+}
+
 const merkle = JSON.parse(readFileSync(path.join(root, "trust_authority", "merkle-v1.test-vectors.json"), "utf8"));
 const rows = readJsonWithBigInts(readFileSync(path.join(root, "trust_authority", "row-integrity-v1.test-vectors.json"), "utf8"));
 verifyMerkle(merkle);
 verifyRows(rows);
+const schema2 = JSON.parse(readFileSync(path.join(root, "trust_authority", "row-integrity-v1-envelope-schema2.test-vectors.json"), "utf8"));
+verifyEnvelopeSchema2(schema2);
 if (failures.length) { for (const f of failures) console.error("FAIL:", f); process.exit(1); }
-console.log(`NODE VECTOR VERIFICATION PASS (${merkle.cases.length + merkle.negativeCases.length + rows.cases.length + rows.negativeCases.length + rows.decimalEncodingExamples.length + 1} checks across merkle-v1 and row-integrity-v1)`);
+console.log(`NODE VECTOR VERIFICATION PASS (${merkle.cases.length + merkle.negativeCases.length + rows.cases.length + rows.negativeCases.length + rows.decimalEncodingExamples.length + 1 + schema2.cases.length + schema2.negativeCases.length} checks across merkle-v1, row-integrity-v1 and envelope schema 2)`);

@@ -30,6 +30,27 @@ describe("advanced search failure messages", () => {
     }
   });
 
+  it("explains the IX-4 search-index states and an encrypted predicate value without implying no match", () => {
+    const cases: [string, string, boolean][] = [
+      ["SEARCH_INDEX_NOT_READY", "The search index is not ready", true],
+      ["SEARCH_INDEX_INCONSISTENT", "Search is temporarily unavailable", false],
+      ["SEARCH_INDEX_VERIFICATION_OVERDUE", "Search is paused", false],
+      ["PREDICATE_VALUE_ENCRYPTED", "A searched field holds protected values", false],
+    ];
+    for (const [reason, title, canRetry] of cases) {
+      const presented = presentSearchFailure(failure(503, "SEARCH_VERIFICATION_UNAVAILABLE", { unavailable_reason: reason }));
+      expect(presented.title).toBe(title);
+      expect(presented.canRetry).toBe(canRetry);
+      expect(presented.message).toContain("does not mean nothing matched");
+    }
+  });
+
+  it("explains the indexed result cap separately from the verification limit", () => {
+    const presented = presentSearchFailure(failure(422, "SEARCH_VERIFICATION_LIMIT", { limit_kind: "results" }));
+    expect(presented.title).toBe("Too many matching records");
+    expect(presented.message).toContain("Narrow the search");
+  });
+
   it("asks to narrow the search when the verification limit is reached", () => {
     const presented = presentSearchFailure(failure(422, "SEARCH_VERIFICATION_LIMIT", { limit_kind: "records" }));
     expect(presented.message).toContain("Narrow the search");

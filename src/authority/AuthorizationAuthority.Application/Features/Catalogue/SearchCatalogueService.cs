@@ -55,7 +55,7 @@ public sealed class CatalogueOptions
 /// registry state changed. Issuance and denials are journaled on the non-gating audit stream (OD-8).
 /// </para>
 /// </summary>
-public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjection spiceDb, TimeProvider clock, CatalogueOptions options)
+public sealed class SearchCatalogueService(IAuthorityStore store, ProjectionIntegrityVerifier verifier, TimeProvider clock, CatalogueOptions options)
 {
     private static readonly string[] UserScopeStates = [ResourceLifecycleStates.Active, ResourceLifecycleStates.Quarantined];
 
@@ -77,15 +77,22 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
         var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
+        var projectionSnapshot = await verifier.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
         IReadOnlyList<string> lookedUp;
         try
         {
-            lookedUp = await spiceDb.LookupResourcesAsync(ResourceTypeNames.FormRecord, "discover", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D"), state.ProjectionZedToken!, PermissionCheckService.MaximumDiscoverableRecords, cancellationToken).ConfigureAwait(false);
+            lookedUp = await verifier.LookupResourcesAsync(projectionSnapshot, ResourceTypeNames.FormRecord, "discover", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D"), PermissionCheckService.MaximumDiscoverableRecords, cancellationToken).ConfigureAwait(false);
         }
         catch (SpiceDbLookupLimitExceededException)
         {
             await JournalRefusalAsync(state.OrganizationId, "SearchCatalogueRefused", s => new CatalogueAuditBody(null, CatalogueScopeKinds.UserSearch, request.FormDefinitionId, bound.AuthorityUserId, null, null, 0, null, s.AuthorizationRevision, s.ContentIntegrityRevision, "DISCOVERY_CEILING", correlationId), cancellationToken).ConfigureAwait(false);
             throw new AuthorityException(AuthorityErrorCodes.LimitExceeded, 422, false, "the discoverable set exceeds the lookup ceiling; nothing partial is returned");
+        }
+
+        // Decisive marker re-read and state re-read before the lookup result is used (S1); LockUnchangedAsync re-checks again under the lock.
+        if (!await verifier.CompleteAsync(projectionSnapshot, "catalogue", cancellationToken).ConfigureAwait(false))
+        {
+            throw AuthorityException.NotReady("authorization state moved during catalogue issuance");
         }
 
         var discoverable = lookedUp.Select(v => Guid.TryParse(v, out var id) ? id : Guid.Empty).Where(id => id != Guid.Empty).ToHashSet();

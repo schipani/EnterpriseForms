@@ -19,7 +19,7 @@ public sealed class OrganizationRosterService(IAuthorityStore store, FieldSearch
 {
     public static readonly TimeSpan HistoryWindow = TimeSpan.FromDays(30);
 
-    private static readonly string[] RoleOrder = [OrganizationRoleNames.OrganizationOwner, OrganizationRoleNames.Designer, OrganizationRoleNames.SystemAdministrator];
+    private static readonly string[] RoleOrder = [OrganizationRoleNames.OrganizationOwner, OrganizationRoleNames.Designer, OrganizationRoleNames.SystemAdministrator, OrganizationRoleNames.SecurityAuditor];
 
     public async Task<OrganizationRosterResponse> GetAsync(VerifiedActor actor, OrganizationRosterRequest request, Guid correlationId, CancellationToken cancellationToken)
     {

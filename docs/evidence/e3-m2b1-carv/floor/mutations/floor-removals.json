@@ -1,0 +1,267 @@
+[
+  {
+    "id": "MF-1",
+    "removal": "the floor migration attributed to AuthorityDbContext (Release A/B separation removed)",
+    "kind": "unit",
+    "restoredSha256Matches": true,
+    "testsRun": 45,
+    "testsFailed": 2,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.TheFloorContextOwnsExactlyTheFloorMigrationAndSharesTheAuthorityHistoryTable",
+      "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.TheOrdinaryAuthorityMigrationSetNeverContainsTheFloor"
+    ],
+    "detected": true
+  },
+  {
+    "id": "MF-2",
+    "removal": "readiness ignores a recorded floor whose constraint is missing",
+    "kind": "unit",
+    "restoredSha256Matches": true,
+    "testsRun": 45,
+    "testsFailed": 1,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.AMissingOrLoweredFloorIsNotReady(scenario: \"floor recorded but its constraint dropped\", ready: False, detail: \"ContentAcceptanceRuleFloorMissing(recorded in the \"\u00b7\u00b7\u00b7)"
+    ],
+    "detected": true
+  },
+  {
+    "id": "MF-3",
+    "removal": "readiness ignores the deployment's required floor",
+    "kind": "unit",
+    "restoredSha256Matches": true,
+    "testsRun": 45,
+    "testsFailed": 2,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.AMissingOrLoweredFloorIsNotReady(scenario: \"restore removed floor and history, floor required\", ready: False, detail: \"ContentAcceptanceRuleFloorBelowRequired(installed=\"\u00b7\u00b7\u00b7)",
+      "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.TheGuardAppliesTheDeploymentsRequiredFloor"
+    ],
+    "detected": true
+  },
+  {
+    "id": "MF-4",
+    "removal": "the floor command accepts --migrate in the same invocation",
+    "kind": "unit",
+    "restoredSha256Matches": true,
+    "testsRun": 45,
+    "testsFailed": 0,
+    "failingTests": [],
+    "detected": false
+  },
+  {
+    "id": "MF-5",
+    "removal": "the floor Down drops the floor instead of refusing",
+    "kind": "unit",
+    "restoredSha256Matches": true,
+    "testsRun": 45,
+    "testsFailed": 1,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.TheFloorSqlLocksChecksPreconditionsThenAddsAPermanentlyUnvalidatedTwoValuedFloor"
+    ],
+    "detected": true
+  },
+  {
+    "id": "MF-6",
+    "removal": "the floor migration no longer takes the table lock before its preconditions",
+    "kind": "unit",
+    "restoredSha256Matches": true,
+    "testsRun": 45,
+    "testsFailed": 1,
+    "failingTests": [
+      "AuthorizationAuthority.Tests.ContentAcceptanceFloorTests.TheFloorSqlLocksChecksPreconditionsThenAddsAPermanentlyUnvalidatedTwoValuedFloor"
+    ],
+    "detected": true
+  },
+  {
+    "id": "MP-1",
+    "removal": "the floor migration attributed to AuthorityDbContext (Release A/B separation removed)",
+    "kind": "pg",
+    "restoredSha256Matches": true,
+    "checksTotal": 4,
+    "checksFailed": 4,
+    "failedChecks": [
+      {
+        "id": "FX-01",
+        "observed": "exit 4: content acceptance rule floor 1 is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with --reinstate-recorded-floor; floor=none; history=0"
+      },
+      {
+        "id": "FX-02",
+        "observed": "OK; carv=1; floor=1; floorHistory=1"
+      },
+      {
+        "id": "FX-03",
+        "observed": "OK; floor=1; floorHistory=1"
+      },
+      {
+        "id": "HARNESS",
+        "observed": "NullReferenceException"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MP-2",
+    "removal": "the in-flight legacy operation precondition removed",
+    "kind": "pg",
+    "restoredSha256Matches": true,
+    "checksTotal": 11,
+    "checksFailed": 5,
+    "failedChecks": [
+      {
+        "id": "FX-06",
+        "observed": "exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; history=1"
+      },
+      {
+        "id": "FX-08",
+        "observed": "exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; history=1"
+      },
+      {
+        "id": "FX-09",
+        "observed": "exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; history=1"
+      },
+      {
+        "id": "FX-10",
+        "observed": "waited=False; killed=0; exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; history=1"
+      },
+      {
+        "id": "HARNESS",
+        "observed": "NullReferenceException"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MP-3",
+    "removal": "the unmarked-session precondition removed",
+    "kind": "pg",
+    "restoredSha256Matches": true,
+    "checksTotal": 11,
+    "checksFailed": 4,
+    "failedChecks": [
+      {
+        "id": "FX-08",
+        "observed": "exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; history=1"
+      },
+      {
+        "id": "FX-09",
+        "observed": "exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; history=1"
+      },
+      {
+        "id": "FX-10",
+        "observed": "waited=False; killed=0; exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it; floor=1; history=1"
+      },
+      {
+        "id": "HARNESS",
+        "observed": "NullReferenceException"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MP-4",
+    "removal": "the floor restricted to Prepared rows (D-2)",
+    "kind": "pg",
+    "restoredSha256Matches": true,
+    "checksTotal": 30,
+    "checksFailed": 3,
+    "failedChecks": [
+      {
+        "id": "FX-13",
+        "observed": "false CHECK ((((operation_state_name)::text <> 'Prepared'::text) OR ((prepare_acceptance_rule_version IS NOT NULL) AND (prepare_acceptance_rule_version >= 1)))) NOT VALID"
+      },
+      {
+        "id": "FX-15",
+        "observed": "; CHANGED head=1:3eb0aff69a7bd1b5575779ca16647424e473e081938ab2bb0a8efbd04b28561c; commits=20; leaves=60; identities=18; checkpoints=20; journal=20; committedOps=20 -> head=2:ae837d1c475723031b75dec3e60b1ca1b379eaf21c0f19855114fa2663de7f31; commits=21; leaves=63; identities=18; checkpoints=21; journ"
+      },
+      {
+        "id": "FX-20",
+        "observed": "23514 trg_content_operation_rule_state_guard: a terminal content operation is immutable | 23514 trg_content_operation_rule_state_guard: a terminal content operation is immutable | 23514 trg_content_operation_rule_state_guard: a terminal content operation is immutable"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MP-5",
+    "removal": "the floor without its IS NOT NULL term (D-1)",
+    "kind": "pg",
+    "restoredSha256Matches": true,
+    "checksTotal": 30,
+    "checksFailed": 8,
+    "failedChecks": [
+      {
+        "id": "FX-13",
+        "observed": "false CHECK ((((operation_state_name)::text <> ALL ((ARRAY['Prepared'::character varying, 'Committed'::character varying])::text[])) OR (prepare_acceptance_rule_version >= 1))) NOT VALID"
+      },
+      {
+        "id": "FX-14",
+        "observed": "; ; ops 37->38"
+      },
+      {
+        "id": "FX-15",
+        "observed": "; CHANGED head=1:418bc585888fb6dc3a876c6d522836ada0ca6f13679b622686ee775a82186f10; commits=20; leaves=60; identities=18; checkpoints=20; journal=20; committedOps=20 -> head=2:d49dd216681656896cd2399af4bc1f992d45ccc9f27d51025f906a3b226d0fcf; commits=21; leaves=63; identities=18; checkpoints=21; journ"
+      },
+      {
+        "id": "FX-18",
+        "observed": "OK | 23514 ck_content_operation_rule_floor_v1: new row for relation \"content_change_operations\" violates check constraint \"ck_content_operation_rule_floor_v1\" | 23514 ck_content_operation_commit_rule_version: new row for relation \"content_change_operations\" violates check constraint \"ck_content_oper"
+      },
+      {
+        "id": "FX-20",
+        "observed": "23514 trg_content_operation_rule_state_guard: a terminal content operation is immutable | 23514 trg_content_operation_rule_state_guard: a terminal content operation is immutable | 23514 trg_content_operation_rule_state_guard: a terminal content operation is immutable"
+      },
+      {
+        "id": "FX-25",
+        "observed": "False ContentAcceptanceRuleFloorMissing(recorded in the migration history, constraint absent) | exit 4: content acceptance rule floor 1 is recorded in the migration history but its constraint is missing; investigate (privileged change or partial restore), then re-run with --reinstate-recorded-floor "
+      },
+      {
+        "id": "FX-26",
+        "observed": "True content acceptance rules v1 (floor none) | False ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1) | exit 3: content acceptance rule floor NOT applied: P0001: CARV floor refused: 2 unexpired operation(s) prepared by a pre-CARV build are in flight; let them expire or abort them"
+      },
+      {
+        "id": "FX-27",
+        "observed": "accepted!"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MP-6",
+    "removal": "the floor Down drops the floor instead of refusing",
+    "kind": "pg",
+    "restoredSha256Matches": true,
+    "checksTotal": 30,
+    "checksFailed": 3,
+    "failedChecks": [
+      {
+        "id": "FX-23",
+        "observed": "reverted! | P0001 : CARV down refused: operations prepared under CARV rules are in flight | 42501 : must be owner of table content_change_operations; floor=none"
+      },
+      {
+        "id": "FX-24",
+        "observed": "True content acceptance rules v1 (floor none) | False ContentAcceptanceRuleFloorBelowRequired(installed=none, required=1)"
+      },
+      {
+        "id": "FX-25",
+        "observed": "True content acceptance rules v1 (floor none) | exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it | exit 0: content acceptance rule floor 1 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordin"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "MP-7",
+    "removal": "the command no longer verifies that the recorded floor exists",
+    "kind": "pg",
+    "restoredSha256Matches": true,
+    "checksTotal": 30,
+    "checksFailed": 1,
+    "failedChecks": [
+      {
+        "id": "FX-25",
+        "observed": "False ContentAcceptanceRuleFloorMissing(recorded in the migration history, constraint absent) | exit 0: content acceptance rule floor 0 installed (ck_content_operation_rule_floor_v1, NOT VALID); ordinary --migrate never applies or removes it | exit 0: content acceptance rule floor 0 installed (ck_co"
+      }
+    ],
+    "detected": true
+  },
+  {
+    "id": "REBUILD",
+    "authorityTestsBuildOk": true
+  }
+]

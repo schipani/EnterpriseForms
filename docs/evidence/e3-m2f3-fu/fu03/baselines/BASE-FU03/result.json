@@ -1,0 +1,29 @@
+{
+  "id": "BASE-FU03",
+  "kind": "BASE",
+  "what": "unmutated: FU-M2f3-03 test and the existing evidence host tests",
+  "files": [],
+  "original_sha256": {},
+  "restored": true,
+  "verdict": "SURVIVED",
+  "results": [
+    {
+      "build": "H",
+      "exit": 0,
+      "seconds": 42.6
+    },
+    {
+      "letter": "H",
+      "classes": [
+        "CapabilityRefusalEvidenceAdmittedSuccessHostTests",
+        "CapabilityRefusalEvidenceHostTests"
+      ],
+      "exit": 0,
+      "seconds": 9.2,
+      "total": 5,
+      "succeeded": 5,
+      "failed": []
+    }
+  ],
+  "seconds": 51.8
+}

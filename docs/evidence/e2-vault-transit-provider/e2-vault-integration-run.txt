@@ -1,0 +1,19 @@
+﻿# E-2 local Docker Vault integration run, 2026-11-12 09:58 local; commit base c2722aa + working tree; hashicorp/vault:1.20.4 dev server (throwaway container, random tokens not recorded)
+# command: powershell -File scripts\dev\e2-vault-integration.ps1   exit code: 0
+WARNING! The following warnings were returned from Vault:
+  * Supplying a custom ID for the token uses the weaker SHA1 hashing instead
+  of the more secure SHA2-256 HMAC for token obfuscation. SHA1 hashed tokens
+  on the wire leads to less secure lookups.
+business encryption mount, policy and token ready
+ready: ef-enc-019a5b2ca0007000800000000000000a-field-value
+ready: ef-enc-019a5b2ca0007000800000000000000a-document
+ready: ef-enc-019a5b2ca0007000800000000000000a-auditor-reason-note
+ready: ef-enc-019a5b2ca0007000800000000000000a-idempotency-protection
+
+Test run summary: Passed! - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+  total: 5
+  failed: 0
+  succeeded: 5
+  skipped: 0
+  duration: 5s 085ms
+

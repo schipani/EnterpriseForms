@@ -47,8 +47,9 @@ test.describe("Security Administrators", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Security Administrators" })).toBeVisible();
     await expect(table(page).getByRole("row", { name: /Sam Security.*\(you\)/ })).toBeVisible();
 
-    // The last administrator cannot be removed.
-    await expect(page.getByRole("button", { name: "Remove Sam Security (System Administrator) as Security Administrator" })).toBeDisabled();
+    // Nobody removes themself (D8-62a): one's own row offers no Remove button, and the last administrator cannot be removed.
+    await expect(page.getByRole("button", { name: "Remove Sam Security (System Administrator) as Security Administrator" })).toHaveCount(0);
+    await expect(table(page).getByRole("row", { name: /Sam Security.*\(you\)/ }).getByText("Another Security Administrator must remove you")).toBeVisible();
     await expect(page.getByText("The last Security Administrator cannot be removed. Appoint another one first.")).toBeVisible();
     await axe(page);
 

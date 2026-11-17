@@ -80,6 +80,11 @@ public static class SigningProviderRegistration
         services.AddSingleton<SigningProviderPolicy>();
         services.AddHostedService<SigningProviderStartupGuard>();
         services.AddSingleton<AuthorityReadiness>();
+        // RB-CARV-1 (contract §22): the content acceptance phase and required floor (section ContentAcceptance), from deployment
+        // configuration only; no default; an invalid policy refuses the start and every content write.
+        services.AddContentAcceptancePolicy();
+        services.AddSingleton<ContentAcceptanceRuleGuard>(); // E3-M2b-1: CARV startup/readiness guard
+        services.AddHostedService<ContentAcceptanceRuleMonitor>();
 
         // Provider implementation is chosen here and nowhere else. Unsupported/unconfigured kinds register a provider that always fails closed.
         var kind = configuration.GetSection(SigningProviderOptions.SectionName).GetValue<SigningProviderKind>("Provider");
@@ -117,8 +122,13 @@ public sealed class UnavailableMacProvider(string reason) : IIntegrityMacProvide
     public Task<IntegrityKeyInspection> InspectKeyAsync(string providerKeyName, CancellationToken cancellationToken) => throw new IntegrityProviderUnavailableException(reason);
 }
 
-/// <summary>Readiness = provider usable AND authority store reachable AND SpiceDB schema present AND archive reachable.</summary>
-public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbProjection spiceDb, ISecurityEventArchive archive, IDbContextFactory<AuthorityDbContext> contextFactory)
+/// <summary>
+/// Readiness = provider usable AND authority store reachable AND SpiceDB schema present AND archive reachable AND the C8 M4 S1
+/// projection-marker transition completed (until then no decision is pinned and the projector does not write) AND the E3-M2b-1
+/// content acceptance rule fence matches this build (<see cref="ContentAcceptanceRuleGuard"/>). E3-M2f-2 (INV-4): a ready detail also states that
+/// the envelope capability floor is enforced and the effective deployment floor (supporting evidence only, never proof of the build).
+/// </summary>
+public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbProjection spiceDb, ISecurityEventArchive archive, IDbContextFactory<AuthorityDbContext> contextFactory, AuthorizationAuthority.Application.Common.ProjectionMarkerTransitionState transition, ContentAcceptanceRuleGuard contentAcceptanceRules, AuthorizationAuthority.Application.Features.Content.EnvelopeCapabilityFloor? envelopeCapabilityFloor = null)
 {
     public async Task<(bool Ready, string Detail)> CheckAsync(CancellationToken cancellationToken)
     {
@@ -141,6 +151,12 @@ public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbP
             return (false, "AuthorityDbUnreachable");
         }
 
+        var (rulesReady, rulesDetail) = contentAcceptanceRules.Current;
+        if (!rulesReady)
+        {
+            return (false, rulesDetail);
+        }
+
         var (spiceReady, spiceDetail) = await spiceDb.ProbeAsync(cancellationToken).ConfigureAwait(false);
         if (!spiceReady)
         {
@@ -148,7 +164,13 @@ public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbP
         }
 
         var (archiveReady, archiveDetail) = await archive.ProbeAsync(cancellationToken).ConfigureAwait(false);
-        return archiveReady ? (true, $"{providerDetail}; {spiceDetail}; {archiveDetail}") : (false, archiveDetail);
+        if (!archiveReady)
+        {
+            return (false, archiveDetail);
+        }
+
+        var capabilityDetail = (envelopeCapabilityFloor ?? AuthorizationAuthority.Application.Features.Content.EnvelopeCapabilityFloor.Default).Description;
+        return transition.Completed ? (true, $"{providerDetail}; {spiceDetail}; {archiveDetail}; projection markers verified; {rulesDetail}; {capabilityDetail}") : (false, "ProjectionMarkerTransitionPending");
     }
 }
 

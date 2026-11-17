@@ -74,7 +74,8 @@ public sealed class AuthorityClient(string baseAddress)
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower, Converters = { new JsonStringEnumConverter() } };
     private readonly HttpClient http = new() { BaseAddress = new Uri(baseAddress), Timeout = TimeSpan.FromSeconds(60) };
 
-    public async Task<HttpResult> SendAsync(HttpMethod method, string path, string? bearer, object? body, string? userAssertion = null, string? idempotencyKey = null)
+    /// <param name="correlationId">C-141: sent as <c>X-Correlation-Id</c> when given (the Testing-only share-only probe is keyed by it).</param>
+    public async Task<HttpResult> SendAsync(HttpMethod method, string path, string? bearer, object? body, string? userAssertion = null, string? idempotencyKey = null, Guid? correlationId = null)
     {
         using var request = new HttpRequestMessage(method, path);
         if (bearer is not null)
@@ -85,6 +86,11 @@ public sealed class AuthorityClient(string baseAddress)
         if (userAssertion is not null)
         {
             request.Headers.Add("X-Delegated-User-Assertion", userAssertion);
+        }
+
+        if (correlationId is { } correlation)
+        {
+            request.Headers.Add("X-Correlation-Id", correlation.ToString("D"));
         }
 
         if (idempotencyKey is not null)

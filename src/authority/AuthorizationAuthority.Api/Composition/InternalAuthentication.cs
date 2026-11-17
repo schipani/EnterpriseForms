@@ -48,6 +48,15 @@ public static class InternalAuthentication
     public const string PlatformConsolePolicy = "PlatformConsoleCaller";
     public const string PlatformConsoleRole = "platform-console";
 
+    /// <summary>
+    /// IX-2 (IX-D6, OD-1 pattern): the search-index builder workload. Its own credential, scheme and role; it satisfies only the
+    /// builder plane (<c>/internal/v1/search-index-builder/*</c>), carries no user assertion, and no other credential satisfies
+    /// that plane. Unconfigured => no scheme is registered and the policy denies everything (fail closed).
+    /// </summary>
+    public const string SearchIndexBuilderScheme = "SearchIndexBuilder";
+    public const string SearchIndexBuilderPolicy = "SearchIndexBuilderCaller";
+    public const string SearchIndexBuilderRole = "search-index-builder";
+
     /// <summary>The signed-in Platform Operator, asserted by the Platform Console with its own key (never the business user-assertion key).</summary>
     public const string OperatorAssertionHeader = "X-Platform-Operator-Assertion";
     public const string UserAssertionHeader = "X-Delegated-User-Assertion";
@@ -74,6 +83,12 @@ public static class InternalAuthentication
         if (reconcilerConfigured)
         {
             authentication.AddJwtBearer(ReconcilerScheme, options => Configure(options, identity.Reconciler));
+        }
+
+        var builderConfigured = identity.SearchIndexBuilder.IsConfigured;
+        if (builderConfigured)
+        {
+            authentication.AddJwtBearer(SearchIndexBuilderScheme, options => Configure(options, identity.SearchIndexBuilder));
         }
 
         var consoleConfigured = identity.PlatformConsole.IsConfigured && identity.OperatorAssertion.IsConfigured;
@@ -106,6 +121,18 @@ public static class InternalAuthentication
                 else
                 {
                     // No reconciler credential in this deployment: nothing can ever satisfy the policy.
+                    policy.AddAuthenticationSchemes(WorkloadScheme).RequireAssertion(_ => false);
+                }
+            })
+            .AddPolicy(SearchIndexBuilderPolicy, policy =>
+            {
+                if (builderConfigured)
+                {
+                    policy.AddAuthenticationSchemes(SearchIndexBuilderScheme).RequireAuthenticatedUser().RequireClaim("workload_role", SearchIndexBuilderRole);
+                }
+                else
+                {
+                    // No builder credential in this deployment: nothing can ever satisfy the policy.
                     policy.AddAuthenticationSchemes(WorkloadScheme).RequireAssertion(_ => false);
                 }
             })
@@ -171,6 +198,18 @@ public static class InternalAuthentication
         ArgumentNullException.ThrowIfNull(context);
         return Guid.TryParse(context.Request.Headers[CorrelationHeader].ToString(), out var id) ? id : Guid.CreateVersion7();
     }
+
+    /// <summary>
+    /// E3-M2f-2 (CAP-S3/S5/S6): the business envelope capability the request declares in
+    /// <see cref="AuthorizationAuthority.Application.Features.Content.ClientEnvelopeCapability.HeaderName"/>. Every header instance is
+    /// passed to the parser, so a repeated header is level 1; nothing is echoed or logged here.
+    /// </summary>
+    public static AuthorizationAuthority.Application.Features.Content.ClientEnvelopeCapability EnvelopeCapability(HttpContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return AuthorizationAuthority.Application.Features.Content.ClientEnvelopeCapability.FromHeaderValues(
+            context.Request.Headers[AuthorizationAuthority.Application.Features.Content.ClientEnvelopeCapability.HeaderName]);
+    }
 }
 
 public class CredentialOptions
@@ -210,6 +249,9 @@ public sealed class IdentityOptions
 
     /// <summary>Optional (Phase C8 AC-9): the team-membership reconciler credential; absent ⇒ the outcome lookup is unreachable.</summary>
     public CredentialOptions Reconciler { get; set; } = new();
+
+    /// <summary>Optional (IX-2): the search-index builder workload credential; absent => the builder plane is unreachable.</summary>
+    public CredentialOptions SearchIndexBuilder { get; set; } = new();
 
     /// <summary>Optional (C8 M2): the Platform Console workload credential; absent => the platform plane is unreachable.</summary>
     public CredentialOptions PlatformConsole { get; set; } = new();
@@ -296,6 +338,7 @@ public sealed class IdentityPolicyStartupGuard(IOptions<IdentityOptions> options
 
         ValidateReconciler(identity, environment, configuration);
         ValidatePlatformConsole(identity, environment, configuration);
+        ValidateSearchIndexBuilder(identity, environment, configuration);
 
         var provider = identity.UserAssertion.ProviderKind;
         var testProviderAllowed = environment.IsDevelopment() || environment.IsEnvironment("Testing");
@@ -356,6 +399,42 @@ public sealed class IdentityPolicyStartupGuard(IOptions<IdentityOptions> options
         if (!syntheticEnvironment && !string.Equals(configuration["Kestrel:EndpointDefaults:ClientCertificateMode"], "RequireCertificate", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("Outside Development/Testing the Platform Console policy requires the server to demand client certificates (Kestrel:EndpointDefaults:ClientCertificateMode = RequireCertificate).");
+        }
+    }
+
+    /// <summary>
+    /// IX-2: the search-index builder credential is complete or absent, and has its own key and issuer, distinct from every other
+    /// credential (with HS256 the key, not the role claim, separates callers). Outside Development/Testing a configured builder
+    /// requires the server to demand client certificates, as for the reconciler.
+    /// </summary>
+    public static void ValidateSearchIndexBuilder(IdentityOptions identity, IHostEnvironment environment, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(configuration);
+        var builder = identity.SearchIndexBuilder;
+        var partlyConfigured = !string.IsNullOrWhiteSpace(builder.Issuer) || !string.IsNullOrWhiteSpace(builder.Audience) || !string.IsNullOrWhiteSpace(builder.SharedKeyBase64);
+        if (partlyConfigured && !builder.IsConfigured)
+        {
+            throw new InvalidOperationException("Identity:SearchIndexBuilder must be configured completely (issuer, audience, >=256-bit key) or not at all.");
+        }
+
+        if (!builder.IsConfigured)
+        {
+            return;
+        }
+
+        var others = new[] { identity.Workload, identity.Operator, identity.UserAssertion, identity.Verifier, identity.Reconciler, identity.PlatformConsole, identity.OperatorAssertion };
+        if (others.Any(o => !string.IsNullOrWhiteSpace(o.SharedKeyBase64) && o.SharedKeyBase64 == builder.SharedKeyBase64)
+            || others.Any(o => !string.IsNullOrWhiteSpace(o.Issuer) && o.Issuer == builder.Issuer))
+        {
+            throw new InvalidOperationException("The search-index builder credential must have its own key and issuer, distinct from every other workload, operator and assertion credential.");
+        }
+
+        var syntheticEnvironment = environment.IsDevelopment() || environment.IsEnvironment("Testing");
+        if (!syntheticEnvironment && !string.Equals(configuration["Kestrel:EndpointDefaults:ClientCertificateMode"], "RequireCertificate", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Outside Development/Testing the search-index builder policy requires the server to demand client certificates (Kestrel:EndpointDefaults:ClientCertificateMode = RequireCertificate).");
         }
     }
 

@@ -1,0 +1,26 @@
+Unable to find image 'python:3.12-slim' locally
+3.12-slim: Pulling from library/python
+6fc242d221a6: Pulling fs layer
+3eb771151506: Pulling fs layer
+f574edac59d9: Pulling fs layer
+acca7542dfc7: Pulling fs layer
+acca7542dfc7: Waiting
+3eb771151506: Verifying Checksum
+3eb771151506: Download complete
+acca7542dfc7: Verifying Checksum
+acca7542dfc7: Download complete
+f574edac59d9: Verifying Checksum
+f574edac59d9: Download complete
+6fc242d221a6: Verifying Checksum
+6fc242d221a6: Download complete
+6fc242d221a6: Pull complete
+3eb771151506: Pull complete
+f574edac59d9: Pull complete
+acca7542dfc7: Pull complete
+Digest: sha256:b18b261e1b4974b4f321451ad5251ded85abb22c2b8b262da527dda1d031ab30
+Status: Downloaded newer image for python:3.12-slim
+aad_hex=44796e616d6963466f726d732f41756469746f72526561736f6e4e6f74652f763100000001019a5b2c111170008000000000000001019a5b2c222270008000000000000002019a5b2c3333700080000000000000030000001073656375726974795f61756469746f72000000076170706f696e74
+plaintext_sha256=53e210f6271cb59265dc59875cd3b07859def1770cb3b0e0d26cdf7cc80c38a6
+ciphertext_sha256=d3df0ab93fbf1a159fb9df7debf956863bbdf9c7181390379989552871841d11
+tag_hex=c88d22db2a5e2bb5434a1c52d30de413
+wrapped_data_key_hex=404142434445464748494a4bc2988c000219a124e5ed3d1db7493d7449f7606f830039144f7e74deab2ed3e405e2a68bd43d7c6116749b14f108ed35

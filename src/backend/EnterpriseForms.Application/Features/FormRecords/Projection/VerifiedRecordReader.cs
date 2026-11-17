@@ -44,26 +44,30 @@ public sealed record VerifiedRecord(
 
     public string ETag => "\"" + Head.CommittedContentRevision.ToString(System.Globalization.CultureInfo.InvariantCulture) + "-" + (Head.CommittedOperationId?.ToString("N") ?? string.Empty) + "\"";
 
-    public List<FieldValueResponse> ToValueResponses()
+    public async Task<List<FieldValueResponse>> ToValueResponsesAsync(CancellationToken cancellationToken)
     {
         var fields = FieldsById;
         var options = OptionsById;
         // A partial projection never releases values of repeating sections (they are not field-shareable in V1, C-17).
-        return AuthorizedValues
-            .Where(v => fields.ContainsKey(v.FieldDefinitionId) && (IsComplete || v.FormRecordGroupId is null))
+        var released = AuthorizedValues.Where(v => fields.ContainsKey(v.FieldDefinitionId) && (IsComplete || v.FormRecordGroupId is null)).ToList();
+        // E-1: exactly the released rows are decrypted (asynchronous key operations), then projected.
+        var decrypted = await DecryptedFieldValues.DecryptAsync(Encryption, released, cancellationToken).ConfigureAwait(false);
+        return released
             .OrderBy(v => v.FormRecordGroupId is null ? 0 : 1)
             .ThenBy(v => v.FormRecordGroupId)
             .ThenBy(v => fields[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal)
-            .Select(v => new FieldValueResponse(v.FieldDefinitionId, fields[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, options, Encryption), fields[v.FieldDefinitionId].FieldDataType,
+            .Select(v => new FieldValueResponse(v.FieldDefinitionId, fields[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, options, decrypted), fields[v.FieldDefinitionId].FieldDataType,
                 ApplicationEncrypted: v is FieldEncryptedValue,
                 LegacyPlaintext: v is not FieldEncryptedValue && fields[v.FieldDefinitionId].FieldProtectionMode == FieldProtectionModes.ApplicationEncrypted,
                 FormRecordGroupId: v.FormRecordGroupId))
             .ToList();
     }
 
-    public FormRecordResponse ToRecordResponse(Guid organizationId, string integrityStatus = "Verified") =>
+    public Task<FormRecordResponse> ToRecordResponseAsync(Guid organizationId, CancellationToken cancellationToken) => ToRecordResponseAsync(organizationId, "Verified", cancellationToken);
+
+    public async Task<FormRecordResponse> ToRecordResponseAsync(Guid organizationId, string integrityStatus, CancellationToken cancellationToken) =>
         new(Header.FormRecordId, organizationId, Header.FormDefinitionId, IsComplete ? Header.RecordStatus : "(partial)",
-            Verification.CommittedContentRevision, Verification.CommittedOperationId, Verification.AuthorizationRevision, IsComplete, ToValueResponses(), integrityStatus,
+            Verification.CommittedContentRevision, Verification.CommittedOperationId, Verification.AuthorizationRevision, IsComplete, await ToValueResponsesAsync(cancellationToken).ConfigureAwait(false), integrityStatus,
             IsComplete ? RecordGroupProjection.Build(Groups, Layout, Occurrences) : []);
 }
 

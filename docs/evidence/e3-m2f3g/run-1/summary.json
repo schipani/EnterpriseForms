@@ -1,0 +1,17 @@
+{
+    "RunLabel":  "run-1",
+    "Groups":  "all",
+    "ExitCode":  0,
+    "Checks":  68,
+    "Failed":  0,
+    "DemonstrationsOutsidePassTotals":  2,
+    "NotExecuted":  1,
+    "ContainersRemoved":  true,
+    "ContainerListUnchanged":  true,
+    "NewDockerVolumes":  0,
+    "DeadlocksInServerLog":  0,
+    "PermissionDeniedInServerLog":  0,
+    "ConfigEnablersBefore":  0,
+    "ConfigEnablersAfter":  0,
+    "EvidenceLeaksAfterScrub":  0
+}

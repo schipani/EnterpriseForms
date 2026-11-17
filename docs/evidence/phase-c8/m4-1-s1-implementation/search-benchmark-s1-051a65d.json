@@ -1,0 +1,53 @@
+{
+  "measuredOn": "2026-11-05T02:58:00.8856823+00:00",
+  "environment": "GitHub-hosted isolated Docker stack (compose.security-test)",
+  "note": "provisional engineering measurement; small sample sizes; p99 of n\u003C=15 runs is the maximum",
+  "scenarios": [
+    {
+      "records": 50,
+      "runs": 15,
+      "serverMilliseconds": {
+        "p50": 1561.4,
+        "p95": 1697,
+        "p99": 1697,
+        "max": 1697,
+        "samples": 15
+      },
+      "clientMilliseconds": {
+        "p50": 1564.4,
+        "p95": 1699.2,
+        "p99": 1699.2,
+        "max": 1699.2,
+        "samples": 15
+      },
+      "catalogueEntries": 50,
+      "recordsWithoutContent": 0,
+      "authorityCalls": 3,
+      "verificationBatches": 1,
+      "verifiedBytes": 183450
+    },
+    {
+      "records": 150,
+      "runs": 12,
+      "serverMilliseconds": {
+        "p50": 4451.2,
+        "p95": 4716.8,
+        "p99": 4716.8,
+        "max": 4716.8,
+        "samples": 12
+      },
+      "clientMilliseconds": {
+        "p50": 4453,
+        "p95": 4718.2,
+        "p99": 4718.2,
+        "max": 4718.2,
+        "samples": 12
+      },
+      "catalogueEntries": 150,
+      "recordsWithoutContent": 0,
+      "authorityCalls": 5,
+      "verificationBatches": 3,
+      "verifiedBytes": 550350
+    }
+  ]
+}

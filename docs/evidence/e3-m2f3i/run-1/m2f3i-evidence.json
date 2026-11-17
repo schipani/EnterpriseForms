@@ -1,0 +1,255 @@
+{
+  "gate": "E3-M2f-3i capability-refusal evidence index (disposable PostgreSQL)",
+  "checksTotal": 40,
+  "checksFailed": 0,
+  "elapsedSeconds": 88,
+  "checks": [
+    {
+      "id": "I-01",
+      "title": "fresh creation: exit 0, outcome Created, before Absent",
+      "passed": true,
+      "detail": "exit=0 outcome=Created state_before=Absent state_after=ValidMatching sqlstate= ms=740"
+    },
+    {
+      "id": "I-02",
+      "title": "independent catalogue verification: schema, table, name, btree, columns and order, ascending, predicate, valid/ready/live, non-unique, owner = table owner, no ACL, exact pg_get_indexdef",
+      "passed": true,
+      "detail": "oid=18359; kind=i; def=CREATE INDEX ix_journal_capability_refusal_evidence ON authority.security_journal_entries USING btree (organization_id, journal_stream_revision) WHERE (((journal_stream_name)::text = \u0027audit\u0027::text) AND ((journal_event_kind)::text = \u0027EnvelopeCapabilityRefused\u0027::text)); valid=true; ready=true; live=true; uniq=false; am=btree; tbl=authority.security_journal_entries; pred=(((journal_stream_name)::text = \u0027audit\u0027::text) AND ((journal_event_kind)::text = \u0027EnvelopeCapabilityRefused\u0027::text)); indkey=2 4; opt=0 0; cols=organization_id,journal_stream_revision; owner_ok=true; no_acl=true; owner=postgres"
+    },
+    {
+      "id": "I-03",
+      "title": "predicate semantics: usable for stream \u0027audit\u0027 \u002B kind \u0027EnvelopeCapabilityRefused\u0027 only (not another kind, not another stream)",
+      "passed": true,
+      "detail": "exact uses index: True; other kind: False; other stream: False"
+    },
+    {
+      "id": "I-04",
+      "title": "catalogue (structure, privileges, roles, memberships, migration history) differs by exactly the new index",
+      "passed": true,
+      "detail": "added: [ix authority.security_journal_entries ix_journal_capability_refusal_evidence CREATE INDEX ix_journal_capability_refusal_evidence ON authority.security_journal_entries USING btree (organization_id, journal_stream_revision) WHERE (((journal_stream_name)::text = \u0027audit\u0027::text) AND ((journal_event_kind)::text = \u0027EnvelopeCapabilityRefused\u0027::text)) | rel authority.ix_journal_capability_refusal_evidence i postgres -] removed: []"
+    },
+    {
+      "id": "I-05",
+      "title": "no data change in any Authority table (organization, authorization, content, ledger, quarantine, journal, search)",
+      "passed": true,
+      "detail": "61 tables compared"
+    },
+    {
+      "id": "I-06",
+      "title": "the command\u0027s own report agrees: catalogue added exactly the index relation and definition, nothing removed",
+      "passed": true,
+      "detail": "[\u0022idx|authority.ix_journal_capability_refusal_evidence|authority.security_journal_entries|false|false|false|true|true|true|true|2 4|10065 3124|0 0|0 0||{BOOLEXPR :boolop and :args ({OPEXPR :opno 98 :opfuncid 67 :opresulttype 16 :opretset false :opcollid 0 :inputcollid 100 :args ({RELABELTYPE :arg {VAR :varno 1 :varattno 3 :vartype 1043 :vartypmod 34 :varcollid 100 :varnullingrels (b) :varlevelsup 0 :varreturningtype 0 :varnosyn 1 :varattnosyn 3 :location -1} :resulttype 25 :resulttypmod -1 :resultcollid 100 :relabelformat 2 :location -1} {CONST :consttype 25 :consttypmod -1 :constcollid 100 :constlen -1 :constbyval false :constisnull false :location -1 :constvalue 9 [ 36 0 0 0 97 117 100 105 116 ]}) :location -1} {OPEXPR :opno 98 :opfuncid 67 :opresulttype 16 :opretset false :opcollid 0 :inputcollid 100 :args ({RELABELTYPE :arg {VAR :varno 1 :varattno 5 :vartype 1043 :vartypmod 64 :varcollid 100 :varnullingrels (b) :varlevelsup 0 :varreturningtype 0 :varnosyn 1 :varattnosyn 5 :location -1} :resulttype 25 :resulttypmod -1 :resultcollid 100 :relabelformat 2 :location -1} {CONST :consttype 25 :consttypmod -1 :constcollid 100 :constlen -1 :constbyval false :constisnull false :location -1 :constvalue 29 [ 116 0 0 0 69 110 118 101 108 111 112 101 67 97 112 97 98 105 108 105 116 121 82 101 102 117 115 101 100 ]}) :location -1}) :location -1}\u0022,\u0022rel|authority|ix_journal_capability_refusal_evidence|i|postgres|\u0022]"
+    },
+    {
+      "id": "I-07",
+      "title": "repeated invocation is an idempotent success: exit 0 AlreadyValid, same index oid, no catalogue change",
+      "passed": true,
+      "detail": "exit=0 outcome=AlreadyValid state_before=ValidMatching state_after= sqlstate= ms=497 added: [] removed: []"
+    },
+    {
+      "id": "I-08",
+      "title": "--verify-only on the valid index: exit 0 AlreadyValid, nothing changed",
+      "passed": true,
+      "detail": "exit=0 outcome=AlreadyValid state_before=ValidMatching state_after= sqlstate= ms=485"
+    },
+    {
+      "id": "I-09",
+      "title": "statement trace (3 invocations): no transaction statement, no migration-history, organization, grant, DDL other than the one build, no data change; lock timeout, then provisioning lock, then the build",
+      "passed": true,
+      "detail": "23 statements; forbidden hits: []; order lock_timeout=1 advisory=3 create=8"
+    },
+    {
+      "id": "I-10",
+      "title": "--verify-only on an absent index: exit 11 Absent, nothing created",
+      "passed": true,
+      "detail": "exit=11 outcome=Absent state_before=Absent state_after= sqlstate= ms=415"
+    },
+    {
+      "id": "I-11",
+      "title": "existing invalid index (another session\u0027s build cancelled): exit 4 IndexInvalid; not dropped, rebuilt or validated; catalogue unchanged",
+      "passed": true,
+      "detail": "setup build=57014; before: oid=18362; kind=i; def=CREATE INDEX ix_journal_capability_refusal_evidence ON authority.security_journal_entries USING btree (organization_id, journal_stream_revision) WHERE (((journal_stream_name)::text = \u0027audit\u0027::text) AND ((journal_event_kind)::text = \u0027EnvelopeCapabilityRefused\u0027::text)); valid=false; ready=true; live=true; uniq=false; am=btree; tbl=authority.security_journal_entries; pred=(((journal_stream_name)::text = \u0027audit\u0027::text) AND ((journal_event_kind)::text = \u0027EnvelopeCapabilityRefused\u0027::text)); indkey=2 4; opt=0 0; cols=organization_id,journal_stream_revision; owner_ok=true; no_acl=true; owner=postgres; exit=4 outcome=IndexInvalid state_before=Invalid state_after= sqlstate= ms=450"
+    },
+    {
+      "id": "I-12",
+      "title": "manual recovery: after the operator\u0027s DROP INDEX CONCURRENTLY, the command creates a valid approved index",
+      "passed": true,
+      "detail": "exit=0 outcome=Created state_before=Absent state_after=ValidMatching sqlstate= ms=534"
+    },
+    {
+      "id": "I-13.1",
+      "title": "same name, wrong definition (column order): exit 5 DefinitionMismatch, object unchanged, nothing created",
+      "passed": true,
+      "detail": "exit=5 outcome=DefinitionMismatch state_before=DefinitionMismatch state_after= sqlstate= ms=500 mismatches=[\u0022key columns (journal_stream_revision, organization_id), expected (organization_id, journal_stream_revision)\u0022,\u0022operator classes (int8_ops, uuid_ops), expected (uuid_ops, int8_ops)\u0022,\u0022pg_get_indexdef differs from the approved definition\u0022]"
+    },
+    {
+      "id": "I-13.2",
+      "title": "same name, wrong definition (unique): exit 5 DefinitionMismatch, object unchanged, nothing created",
+      "passed": true,
+      "detail": "exit=5 outcome=DefinitionMismatch state_before=DefinitionMismatch state_after= sqlstate= ms=459 mismatches=[\u0022unique, primary-key or exclusion index; the approved index is none of these\u0022,\u0022pg_get_indexdef differs from the approved definition\u0022]"
+    },
+    {
+      "id": "I-13.3",
+      "title": "same name, wrong definition (kind-only predicate): exit 5 DefinitionMismatch, object unchanged, nothing created",
+      "passed": true,
+      "detail": "exit=5 outcome=DefinitionMismatch state_before=DefinitionMismatch state_after= sqlstate= ms=454 mismatches=[\u0022partial predicate differs from the approved predicate\u0022,\u0022pg_get_indexdef differs from the approved definition\u0022]"
+    },
+    {
+      "id": "I-13.4",
+      "title": "same name, wrong definition (no predicate): exit 5 DefinitionMismatch, object unchanged, nothing created",
+      "passed": true,
+      "detail": "exit=5 outcome=DefinitionMismatch state_before=DefinitionMismatch state_after= sqlstate= ms=469 mismatches=[\u0022partial predicate differs from the approved predicate\u0022,\u0022pg_get_indexdef differs from the approved definition\u0022]"
+    },
+    {
+      "id": "I-13.5",
+      "title": "same name, wrong definition (descending revision): exit 5 DefinitionMismatch, object unchanged, nothing created",
+      "passed": true,
+      "detail": "exit=5 outcome=DefinitionMismatch state_before=DefinitionMismatch state_after= sqlstate= ms=450 mismatches=[\u0022key ordering options \\u00270 3\\u0027, expected \\u00270 0\\u0027 (ascending, NULLS LAST)\u0022,\u0022pg_get_indexdef differs from the approved definition\u0022]"
+    },
+    {
+      "id": "I-13.6",
+      "title": "same name, wrong definition (other table): exit 5 DefinitionMismatch, object unchanged, nothing created",
+      "passed": true,
+      "detail": "exit=5 outcome=DefinitionMismatch state_before=DefinitionMismatch state_after= sqlstate= ms=504 mismatches=[\u0022not an index on authority.security_journal_entries\u0022,\u0022column count 1 (key 1), expected 2 key columns and no INCLUDE columns\u0022,\u0022key columns (organization_id), expected (organization_id, journal_stream_revision)\u0022,\u0022key ordering options \\u00270\\u0027, expected \\u00270 0\\u0027 (ascending, NULLS LAST)\u0022,\u0022operator classes (uuid_ops), expected (uuid_ops, int8_ops)\u0022,\u0022partial predicate differs from the approved predicate\u0022,\u0022pg_get_indexdef differs from the approved definition\u0022]"
+    },
+    {
+      "id": "I-13.7",
+      "title": "same name, wrong definition (not an index): exit 5 DefinitionMismatch, object unchanged, nothing created",
+      "passed": true,
+      "detail": "exit=5 outcome=DefinitionMismatch state_before=DefinitionMismatch state_after= sqlstate= ms=455 mismatches=[\u0022relation kind is \\u0027v\\u0027, not an index\u0022,\u0022not owned by the table owner\u0022]"
+    },
+    {
+      "id": "I-14",
+      "title": "concurrent invocations: the second exits 10 Busy without inspecting or changing anything; the first creates the index",
+      "passed": true,
+      "detail": "build pid seen=True; second exit=10 outcome=Busy state_before= state_after= sqlstate= ms=516; first exit=0 outcome=Created state_before=Absent state_after=ValidMatching sqlstate= ms=1198"
+    },
+    {
+      "id": "I-15",
+      "title": "concurrent build by another session: exit 6 BuildInProgress, nothing changed; once it completes, exit 0 AlreadyValid",
+      "passed": true,
+      "detail": "during exit=6 outcome=BuildInProgress state_before=BuildInProgress state_after= sqlstate= ms=474; afterwards exit=0 outcome=AlreadyValid state_before=ValidMatching state_after= sqlstate= ms=449"
+    },
+    {
+      "id": "I-16",
+      "title": "interrupted concurrent build: exit 4 IndexInvalid (SQLSTATE 57014), the invalid index is left in place (same oid), not dropped or rebuilt",
+      "passed": true,
+      "detail": "exit=4 outcome=IndexInvalid state_before=Absent state_after=Invalid sqlstate=57014 ms=898; left: oid=18386; kind=i; def=CREATE INDEX ix_journal_capability_refusal_evidence ON authority.security_journal_entries USING btree (organization_id, journal_stream_revision) WHERE (((journal_stream_name)::text = \u0027audit\u0027::text) AND ((journal_event_kind)::text = \u0027EnvelopeCapabilityRefused\u0027::text)); valid=false; ready=true; live=true; uniq=false; am=btree; tbl=authority.security_journal_entries; pred=(((journal_stream_name)::text = \u0027audit\u0027::text) AND ((journal_event_kind)::text = \u0027EnvelopeCapabilityRefused\u0027::text)); indkey=2 4; opt=0 0; cols=organization_id,journal_stream_revision; owner_ok=true; no_acl=true; owner=postgres"
+    },
+    {
+      "id": "I-17",
+      "title": "re-running over the invalid index does not repair it: exit 4 again, still invalid",
+      "passed": true,
+      "detail": "exit=4 outcome=IndexInvalid state_before=Invalid state_after= sqlstate= ms=446"
+    },
+    {
+      "id": "I-18",
+      "title": "insufficient privileges: the runtime role and an unrelated login are refused (exit 7 NotOwner), no index, no catalogue or privilege change",
+      "passed": true,
+      "detail": "runtime exit=7 outcome=NotOwner state_before=Absent state_after= sqlstate= ms=398; outsider exit=7 outcome=DatabaseFailure state_before= state_after= sqlstate=42501 ms=377; added: [] removed: []"
+    },
+    {
+      "id": "I-19",
+      "title": "no runtime privilege expansion: role attributes, memberships, table and schema privileges of the runtime role and the unrelated login unchanged; index ACL empty",
+      "passed": true,
+      "detail": "exit=0 outcome=Created state_before=Absent state_after=ValidMatching sqlstate= ms=544; privilege lines 877; added: [] removed: []"
+    },
+    {
+      "id": "I-20",
+      "title": "lock timeout on the table lock: exit 8 LockTimeout (55P03) within the bound, index absent afterwards",
+      "passed": true,
+      "detail": "exit=8 outcome=LockTimeout state_before=Absent state_after=Absent sqlstate=55P03 ms=5458"
+    },
+    {
+      "id": "I-21",
+      "title": "lock timeout while the build waits for an old snapshot: exit 8 LockTimeout (55P03), the invalid index is reported and left in place",
+      "passed": true,
+      "detail": "exit=8 outcome=LockTimeout state_before=Absent state_after=Invalid sqlstate=55P03 ms=5599; left: oid=18391; kind=i; def=CREATE INDEX ix_journal_capability_refusal_evidence ON authority.security_journal_entries USING btree (organization_id, journal_stream_revision) WHERE (((journal_stream_name)::text = \u0027audit\u0027::text) AND ((journal_event_kind)::text = \u0027EnvelopeCapabilityRefused\u0027::text)); valid=false; ready=true; live=true; uniq=false; am=btree; tbl=authority.security_journal_entries; pred=(((journal_stream_name)::text = \u0027audit\u0027::text) AND ((journal_event_kind)::text = \u0027EnvelopeCapabilityRefused\u0027::text)); indkey=2 4; opt=0 0; cols=organization_id,journal_stream_revision; owner_ok=true; no_acl=true; owner=postgres"
+    },
+    {
+      "id": "I-22",
+      "title": "no migration-history or organization-row interaction: completes while both tables are held ACCESS EXCLUSIVE by another session; history unchanged",
+      "passed": true,
+      "detail": "exit=0 outcome=Created state_before=Absent state_after=ValidMatching sqlstate= ms=498; migrations 31"
+    },
+    {
+      "id": "I-23",
+      "title": "large unrelated history: the index builds concurrently on a journal of this size and is valid; it covers only the evidence rows",
+      "passed": true,
+      "detail": "2053500 journal rows (1050350 of the mature organization, 5000 evidence rows), seeding 42319 ms; exit=0 outcome=Created state_before=Absent state_after=ValidMatching sqlstate= ms=1205; index 221184 bytes, table\u002Bindexes 668999680 bytes"
+    },
+    {
+      "id": "I-24",
+      "title": "no data change on the large database (every Authority table, including the 2M-row journal) and catalogue differs by exactly the index",
+      "passed": true,
+      "detail": "61 tables"
+    },
+    {
+      "id": "I-25a",
+      "title": "plan of the approved lookup, mature organization without evidence, no statistics (never analyzed): Limit over a backward index scan of IX-B, at most 8 rows, no other index, no sequential or bitmap scan",
+      "passed": true,
+      "detail": "nodes [Limit \u003E Index Scan], index [ix_journal_capability_refusal_evidence], direction Backward, rows 0, shared buffers 2, heap fetches -, time 0.020 ms"
+    },
+    {
+      "id": "I-25b",
+      "title": "plan of the approved lookup, organization with evidence, no statistics (never analyzed): Limit over a backward index scan of IX-B, at most 8 rows, no other index, no sequential or bitmap scan",
+      "passed": true,
+      "detail": "nodes [Limit \u003E Index Scan], index [ix_journal_capability_refusal_evidence], direction Backward, rows 8, shared buffers 9, heap fetches -, time 0.106 ms"
+    },
+    {
+      "id": "I-26a",
+      "title": "plan of the approved lookup, mature organization without evidence, after ANALYZE: Limit over a backward index scan of IX-B, at most 8 rows, no other index, no sequential or bitmap scan",
+      "passed": true,
+      "detail": "nodes [Limit \u003E Index Scan], index [ix_journal_capability_refusal_evidence], direction Backward, rows 0, shared buffers 2, heap fetches -, time 0.011 ms"
+    },
+    {
+      "id": "I-26b",
+      "title": "plan of the approved lookup, organization with evidence, after ANALYZE: Limit over a backward index scan of IX-B, at most 8 rows, no other index, no sequential or bitmap scan",
+      "passed": true,
+      "detail": "nodes [Limit \u003E Index Scan], index [ix_journal_capability_refusal_evidence], direction Backward, rows 8, shared buffers 9, heap fetches -, time 0.049 ms"
+    },
+    {
+      "id": "I-27a",
+      "title": "plan of the approved lookup, mature organization without evidence, with dead index entries from archive-delivery updates (no vacuum): Limit over a backward index scan of IX-B, at most 8 rows, no other index, no sequential or bitmap scan",
+      "passed": true,
+      "detail": "nodes [Limit \u003E Index Scan], index [ix_journal_capability_refusal_evidence], direction Backward, rows 0, shared buffers 2, heap fetches -, time 0.012 ms"
+    },
+    {
+      "id": "I-27b",
+      "title": "plan of the approved lookup, organization with evidence, with dead index entries from archive-delivery updates (no vacuum): Limit over a backward index scan of IX-B, at most 8 rows, no other index, no sequential or bitmap scan",
+      "passed": true,
+      "detail": "nodes [Limit \u003E Index Scan], index [ix_journal_capability_refusal_evidence], direction Backward, rows 8, shared buffers 26, heap fetches -, time 0.113 ms"
+    },
+    {
+      "id": "I-28a",
+      "title": "plan of the approved lookup, mature organization without evidence, after VACUUM ANALYZE: Limit over a backward index scan of IX-B, at most 8 rows, no other index, no sequential or bitmap scan",
+      "passed": true,
+      "detail": "nodes [Limit \u003E Index Scan], index [ix_journal_capability_refusal_evidence], direction Backward, rows 0, shared buffers 2, heap fetches -, time 0.009 ms"
+    },
+    {
+      "id": "I-28b",
+      "title": "plan of the approved lookup, organization with evidence, after VACUUM ANALYZE: Limit over a backward index scan of IX-B, at most 8 rows, no other index, no sequential or bitmap scan",
+      "passed": true,
+      "detail": "nodes [Limit \u003E Index Scan], index [ix_journal_capability_refusal_evidence], direction Backward, rows 8, shared buffers 3, heap fetches -, time 0.041 ms"
+    },
+    {
+      "id": "I-29",
+      "title": "generic prepared plan (plan_cache_mode = force_generic_plan) with literal stream and kind still uses IX-B",
+      "passed": true,
+      "detail": "nodes [Limit \u003E Index Scan], index [ix_journal_capability_refusal_evidence], direction Backward, rows 8, shared buffers 3, heap fetches -, time 0.046 ms"
+    },
+    {
+      "id": "I-30",
+      "title": "concurrent build with live synthetic writers (autocommit and organization-locked transactions, archive-state updates): no writer error, no deadlock, valid index, exactly the matching rows indexed",
+      "passed": true,
+      "detail": "exit=0 outcome=Created state_before=Absent state_after=ValidMatching sqlstate= ms=1470; writer rows 305/307/220/211; errors 0 []; via index 5103:-129781733667813978330; via heap 5103:-129781733667813978330"
+    }
+  ],
+  "demonstrationsOutsidePassTotals": [
+    {
+      "id": "D-1",
+      "title": "generic plan with the stream and kind as bind parameters (why the literals are binding)",
+      "detail": "nodes [Limit \u003E Index Scan], index [uq_journal_stream_revision], direction , rows 8, shared buffers 29, heap fetches -, time 0.196 ms; uses IX-B: False"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+[
+    {
+        "Run":  "harness A / legacy 66f0aa7",
+        "ExitCode":  0,
+        "Checks":  50,
+        "Failed":  0,
+        "ContainerRemoved":  true
+    },
+    {
+        "Run":  "harness B / legacy 66f0aa7",
+        "ExitCode":  0,
+        "Checks":  36,
+        "Failed":  0,
+        "ContainerRemoved":  true
+    },
+    {
+        "Run":  "harness F / legacy 66f0aa7",
+        "ExitCode":  0,
+        "Checks":  30,
+        "Failed":  0,
+        "ContainerRemoved":  true
+    },
+    {
+        "Run":  "harness A / legacy de1729b",
+        "ExitCode":  0,
+        "Checks":  50,
+        "Failed":  0,
+        "ContainerRemoved":  true
+    },
+    {
+        "Run":  "harness B / legacy de1729b",
+        "ExitCode":  0,
+        "Checks":  36,
+        "Failed":  0,
+        "ContainerRemoved":  true
+    },
+    {
+        "Run":  "harness F / legacy de1729b",
+        "ExitCode":  0,
+        "Checks":  30,
+        "Failed":  0,
+        "ContainerRemoved":  true
+    }
+]

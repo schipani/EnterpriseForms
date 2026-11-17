@@ -1,0 +1,10 @@
+Limit  (cost=0.12..5.89 rows=1 width=79) (actual time=0.023..0.028 rows=7.00 loops=1)
+  Buffers: shared hit=3
+  ->  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.12..5.89 rows=1 width=79) (actual time=0.023..0.027 rows=7.00 loops=1)
+        Index Cond: (organization_id = $1)
+        Index Searches: 1
+        Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=204
+Planning Time: 0.863 ms
+Execution Time: 0.127 ms
