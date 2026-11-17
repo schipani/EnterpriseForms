@@ -46,8 +46,10 @@ public sealed partial class ContributorWriteProtocolTests
         DataKeyBoundOn = DateTimeOffset.UtcNow,
     };
 
+    // E3-M2f-2: these tests bind organizations, so their business build declares level 2 (as every E3-M2f-1+ build does); a level-1 caller
+    // would be refused by the capability floor before any ledger rule is reached (ContributorWriteProtocolTests.EnvelopeCapability).
     private static Task<ContentRevision> CommitSeededAsync(Harness h, Guid operation, List<StagedContentItem> staged) =>
-        h.Service.CommitAsync(Harness.Actor(h.Owner), operation, new CommitContentChangeRequest(h.Org, h.Record, staged), Guid.CreateVersion7(), CancellationToken.None);
+        h.Service.CommitAsync(Harness.Actor(h.Owner), operation, new CommitContentChangeRequest(h.Org, h.Record, staged), Guid.CreateVersion7(), CancellationToken.None, ClientEnvelopeCapability.Current);
 
     [Fact]
     public async Task WithAcceptanceOffANewV2GroupIsRefusedAtPrepareBeforeTheLedgerIsConsultedAndNothingIsBound()
@@ -133,6 +135,7 @@ public sealed partial class ContributorWriteProtocolTests
     {
         var v2 = await AcceptedV2HeadAsync();
         var h = v2.H;
+        h.EnvelopeCapability = ClientEnvelopeCapability.Current; // E3-M2f-2: a level-2 business build (the organization is bound below)
         var earlier = Guid.CreateVersion7();
         h.Store.Operations.Add(new ContentChangeOperation
         {
@@ -173,6 +176,7 @@ public sealed partial class ContributorWriteProtocolTests
         var h = await new Harness().CreatedAsync();
         var (operation, staged, batch) = await SeedNewV2GroupAsync(h);
         h.Store.DataKeyBindings.Add(LedgerRow(h, batch, operation));
+        h.EnvelopeCapability = ClientEnvelopeCapability.Current; // E3-M2f-2: a level-2 business build in a bound organization
         h.Store.DataKeyLedgerRefused = true;
         var incidents = Incidents(h);
 

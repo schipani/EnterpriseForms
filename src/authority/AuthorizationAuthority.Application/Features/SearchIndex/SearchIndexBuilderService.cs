@@ -109,7 +109,8 @@ public sealed class SearchIndexBuilderService(IAuthorityStore store, ContentServ
     }
 
     /// <summary>Verifies 1..50 submitted records and derives their entries from the verified bytes (one transaction, organization lock).</summary>
-    public async Task<SearchIndexBackfillResponse> BackfillAsync(string workloadName, SearchIndexBackfillRequest request, Guid correlationId, CancellationToken cancellationToken)
+    /// <param name="envelopeCapability">E3-M2f-2: the capability the request declared (null ⇒ level 1, CAP-S5).</param>
+    public async Task<SearchIndexBackfillResponse> BackfillAsync(string workloadName, SearchIndexBackfillRequest request, Guid correlationId, CancellationToken cancellationToken, ClientEnvelopeCapability? envelopeCapability = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workloadName);
         ArgumentNullException.ThrowIfNull(request);
@@ -119,6 +120,8 @@ public sealed class SearchIndexBuilderService(IAuthorityStore store, ContentServ
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        // E3-M2f-2 (CAP-O2/O3): right after the lock, before the gate, the downgrade check and every record's verification (G-2).
+        await content.CapabilityFloor.RequireAsync(scope, state, envelopeCapability, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
         var index = scope.SearchIndex;
         await RequireServableProjectionAsync(index, state.OrganizationId, cancellationToken).ConfigureAwait(false);
@@ -320,7 +323,8 @@ public sealed class SearchIndexBuilderService(IAuthorityStore store, ContentServ
     }
 
     /// <summary>S-C for 1..50 entries: verify the submitted business bytes against the head, re-derive, compare with the stored postings.</summary>
-    public async Task<SearchIndexDeepVerifyResponse> DeepVerifyAsync(string workloadName, SearchIndexDeepVerifyRequest request, Guid correlationId, CancellationToken cancellationToken)
+    /// <param name="envelopeCapability">E3-M2f-2: the capability the request declared (null ⇒ level 1, CAP-S5).</param>
+    public async Task<SearchIndexDeepVerifyResponse> DeepVerifyAsync(string workloadName, SearchIndexDeepVerifyRequest request, Guid correlationId, CancellationToken cancellationToken, ClientEnvelopeCapability? envelopeCapability = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workloadName);
         ArgumentNullException.ThrowIfNull(request);
@@ -330,6 +334,8 @@ public sealed class SearchIndexBuilderService(IAuthorityStore store, ContentServ
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        // E3-M2f-2 (CAP-O2/O3): right after the lock, before the gate, deep-check bookkeeping and every record's verification (G-2).
+        await content.CapabilityFloor.RequireAsync(scope, state, envelopeCapability, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
         var index = scope.SearchIndex;
         var projection = await RequireServableProjectionAsync(index, state.OrganizationId, cancellationToken).ConfigureAwait(false);

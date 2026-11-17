@@ -99,9 +99,10 @@ public sealed class EnvelopeCapabilityEmissionBoundaryTests
     }
 
     [Fact]
-    public void TheHeaderLiteralExistsOnlyInTheDeclarerAndNoAuthorityAssemblyReferencesItYet()
+    public void TheHeaderLiteralExistsOnlyInTheDeclarerOnTheBusinessSide()
     {
-        var mentions = Instructions(MentionsHeader).Select(s => (s.Assembly, Type: Outermost(s.Type).FullName, Text: (string)s.Instruction.Operand)).ToList();
+        var mentions = Instructions(MentionsHeader).Select(s => (s.Assembly, Type: Outermost(s.Type).FullName, Text: (string)s.Instruction.Operand))
+            .Where(m => m.Assembly.StartsWith("EnterpriseForms.", StringComparison.Ordinal)).ToList();
         Assert.NotEmpty(mentions);
         Assert.All(mentions, m =>
         {
@@ -110,13 +111,8 @@ public sealed class EnvelopeCapabilityEmissionBoundaryTests
             Assert.Equal(Header, m.Text);
         });
 
-        // M2f-1 compatibility pin: the Authority neither reads nor rejects the header (enforcement is E3-M2f-2).
-        foreach (var path in ProductAssemblies().Where(p => Path.GetFileName(p).StartsWith("AuthorizationAuthority.", StringComparison.Ordinal)))
-        {
-            using var assembly = AssemblyDefinition.ReadAssembly(path, new ReaderParameters { ReadSymbols = false });
-            var constants = assembly.MainModule.GetTypes().SelectMany(t => t.Fields).Where(f => f.HasConstant && f.Constant is string s && s.Contains("Envelope-Capability", StringComparison.OrdinalIgnoreCase));
-            Assert.Empty(constants);
-        }
+        // E3-M2f-2 replaced the M2f-1 compatibility pin ("no Authority assembly references the header yet"): the Authority now reads the
+        // header for enforcement. Where it may appear there is pinned by EnvelopeCapabilityEnforcementBoundaryTests.
     }
 
     [Fact]

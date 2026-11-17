@@ -125,9 +125,10 @@ public sealed class UnavailableMacProvider(string reason) : IIntegrityMacProvide
 /// <summary>
 /// Readiness = provider usable AND authority store reachable AND SpiceDB schema present AND archive reachable AND the C8 M4 S1
 /// projection-marker transition completed (until then no decision is pinned and the projector does not write) AND the E3-M2b-1
-/// content acceptance rule fence matches this build (<see cref="ContentAcceptanceRuleGuard"/>).
+/// content acceptance rule fence matches this build (<see cref="ContentAcceptanceRuleGuard"/>). E3-M2f-2 (INV-4): a ready detail also states that
+/// the envelope capability floor is enforced and the effective deployment floor (supporting evidence only, never proof of the build).
 /// </summary>
-public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbProjection spiceDb, ISecurityEventArchive archive, IDbContextFactory<AuthorityDbContext> contextFactory, AuthorizationAuthority.Application.Common.ProjectionMarkerTransitionState transition, ContentAcceptanceRuleGuard contentAcceptanceRules)
+public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbProjection spiceDb, ISecurityEventArchive archive, IDbContextFactory<AuthorityDbContext> contextFactory, AuthorizationAuthority.Application.Common.ProjectionMarkerTransitionState transition, ContentAcceptanceRuleGuard contentAcceptanceRules, AuthorizationAuthority.Application.Features.Content.EnvelopeCapabilityFloor? envelopeCapabilityFloor = null)
 {
     public async Task<(bool Ready, string Detail)> CheckAsync(CancellationToken cancellationToken)
     {
@@ -168,7 +169,8 @@ public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbP
             return (false, archiveDetail);
         }
 
-        return transition.Completed ? (true, $"{providerDetail}; {spiceDetail}; {archiveDetail}; projection markers verified; {rulesDetail}") : (false, "ProjectionMarkerTransitionPending");
+        var capabilityDetail = (envelopeCapabilityFloor ?? AuthorizationAuthority.Application.Features.Content.EnvelopeCapabilityFloor.Default).Description;
+        return transition.Completed ? (true, $"{providerDetail}; {spiceDetail}; {archiveDetail}; projection markers verified; {rulesDetail}; {capabilityDetail}") : (false, "ProjectionMarkerTransitionPending");
     }
 }
 

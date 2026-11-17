@@ -50,6 +50,14 @@ public static class AuthorityErrorCodes
 
     /// <summary>E3-M2e L-12: the database refused a ledger write through the P-1 binding guard or P-2 immutability (an invariant failure; 503, not retryable).</summary>
     public const string DataKeyLedgerInvariantViolated = "DATA_KEY_LEDGER_INVARIANT_VIOLATED";
+
+    /// <summary>
+    /// E3-M2f-2 (docs/security/E3_M2F_CONTRACT_CLOSURE.md CAP-E1/E2): 409, not retryable. The business envelope capability the request
+    /// declares (header <c>EnterpriseForms-Envelope-Capability</c>) is below the effective floor, so the request is refused before any
+    /// content is verified. One fixed response whichever floor applies; nothing was written. Not a content conflict: retrying, or a
+    /// fresh operation, is refused the same way until a current business build makes the request.
+    /// </summary>
+    public const string ClientEnvelopeCapabilityInsufficient = "CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT";
     public const string KeyUnavailable = "KEY_UNAVAILABLE";
     public const string CandidateMismatch = "CANDIDATE_MISMATCH";
     public const string LimitExceeded = "LIMIT_EXCEEDED";

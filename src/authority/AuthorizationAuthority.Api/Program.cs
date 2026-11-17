@@ -78,6 +78,9 @@ public sealed class Program
         // E3-M2e (OD-M2e-07): Envelope v2 acceptance; off unless the deployment sets exactly "true"; refused outside Development/Testing,
         // without Release B RequiredFloor 3, or without the data-key ledger migration. E3-M2e-1 is dark: never enabled.
         builder.Services.AddEnvelopeV2Acceptance();
+        // E3-M2f-2 (§9): the business envelope capability floor; deployment floor from Content:MinimumBusinessEnvelopeCapability (absent => 1,
+        // exactly "1" or "2" otherwise; anything else refuses the start). The check itself runs at the seven content entry points.
+        builder.Services.AddEnvelopeCapabilityFloor();
         AuthorizationAuthority.Api.Features.Health.TestStackIdentityEndpoints.RefuseOutsideTesting(builder.Configuration, builder.Environment);
         builder.Services.AddInternalAuthentication(builder.Configuration);
         // Phase C8 AC-9: read-only outcome lookup for the business reconciler (own credential, rate limit; bad limits fail at startup).

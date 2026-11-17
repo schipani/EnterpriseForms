@@ -382,6 +382,20 @@
         ],
         "summary": "Validates the exact candidate snapshot against the accepted head and the actor's edit scope (or, without a user, the reprotection rules of an effective PublishFormSecurityRevision command), then signs it. Not a generic signing endpoint.",
         "operationId": "PrepareContentChange",
+        "parameters": [
+          {
+            "name": "EnterpriseForms-Envelope-Capability",
+            "in": "header",
+            "description": "E3-M2f: the business envelope capability of the calling workload build. Exactly one instance, exactly \"1\" or \"2\"; absent, repeated or any other value is level 1. Not part of the request digest or idempotency identity.",
+            "schema": {
+              "enum": [
+                "1",
+                "2"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -399,6 +413,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PreparedContentOperation"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -422,6 +446,18 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "EnterpriseForms-Envelope-Capability",
+            "in": "header",
+            "description": "E3-M2f: the business envelope capability of the calling workload build. Exactly one instance, exactly \"1\" or \"2\"; absent, repeated or any other value is level 1. Not part of the request digest or idempotency identity.",
+            "schema": {
+              "enum": [
+                "1",
+                "2"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -441,6 +477,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContentRevision"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -568,6 +614,20 @@
         ],
         "summary": "Compares the observed staged items with the complete accepted leaf index, verifies every signature and the root, and returns the authorized subset.",
         "operationId": "VerifyRecordProjection",
+        "parameters": [
+          {
+            "name": "EnterpriseForms-Envelope-Capability",
+            "in": "header",
+            "description": "E3-M2f: the business envelope capability of the calling workload build. Exactly one instance, exactly \"1\" or \"2\"; absent, repeated or any other value is level 1. Not part of the request digest or idempotency identity.",
+            "schema": {
+              "enum": [
+                "1",
+                "2"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -588,6 +648,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -599,6 +669,20 @@
         ],
         "summary": "Phase C7 OD-6: batch of 1..50 records, each verified exactly like VerifyRecordProjection (registry, discover/read, quarantine, archive receipt, complete leaf set, every signature, root, readable field scope) against the head the caller expects. Per-record typed results; mismatches quarantine the record; read action only. Not a signature oracle: every record needs the caller's own read or discover permission.",
         "operationId": "VerifyRecordProjections",
+        "parameters": [
+          {
+            "name": "EnterpriseForms-Envelope-Capability",
+            "in": "header",
+            "description": "E3-M2f: the business envelope capability of the calling workload build. Exactly one instance, exactly \"1\" or \"2\"; absent, repeated or any other value is level 1. Not part of the request digest or idempotency identity.",
+            "schema": {
+              "enum": [
+                "1",
+                "2"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -616,6 +700,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VerifyRecordProjectionsResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -851,6 +945,18 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "EnterpriseForms-Envelope-Capability",
+            "in": "header",
+            "description": "E3-M2f: the business envelope capability of the calling workload build. Exactly one instance, exactly \"1\" or \"2\"; absent, repeated or any other value is level 1. Not part of the request digest or idempotency identity.",
+            "schema": {
+              "enum": [
+                "1",
+                "2"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -870,6 +976,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProtectionCensusResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2754,6 +2870,20 @@
         ],
         "summary": "IX-2 (builder workload only): 1..50 records' observed business bytes. Each is verified like a G19 census against the head the builder expects (complete leaf set, every HMAC, root, archive receipt; tampering quarantines the record), then postings are derived from the verified bytes and sealed, under the organization lock and conditional on the head (HEAD_CHANGED otherwise). Idempotent per record, head and coverage set. Provider outages fail the whole call (503, nothing written).",
         "operationId": "BackfillSearchIndex",
+        "parameters": [
+          {
+            "name": "EnterpriseForms-Envelope-Capability",
+            "in": "header",
+            "description": "E3-M2f: the business envelope capability of the calling workload build. Exactly one instance, exactly \"1\" or \"2\"; absent, repeated or any other value is level 1. Not part of the request digest or idempotency identity.",
+            "schema": {
+              "enum": [
+                "1",
+                "2"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2771,6 +2901,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SearchIndexBackfillResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2847,6 +2987,20 @@
         ],
         "summary": "IX-2 S-C (builder workload only): 1..50 entries; the submitted bytes are verified against the head, postings re-derived and compared with the stored rows. Pass writes the entry's S-C timestamp; a posting mismatch quarantines the search index; unverifiable business bytes quarantine the record and the unit is Inconclusive.",
         "operationId": "DeepVerifySearchIndex",
+        "parameters": [
+          {
+            "name": "EnterpriseForms-Envelope-Capability",
+            "in": "header",
+            "description": "E3-M2f: the business envelope capability of the calling workload build. Exactly one instance, exactly \"1\" or \"2\"; absent, repeated or any other value is level 1. Not part of the request digest or idempotency identity.",
+            "schema": {
+              "enum": [
+                "1",
+                "2"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2864,6 +3018,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SearchIndexDeepVerifyResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

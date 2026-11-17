@@ -20,8 +20,15 @@ namespace AuthorizationAuthority.Application.Features.Content;
 /// commit proves the staged bytes equal the approved candidate and CAS-advances the trusted head, verify compares an
 /// observed projection with the complete accepted leaf index. No generic signing path exists (A9).
 /// </summary>
-public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ProjectionIntegrityVerifier verifier, IFaultInjector faultInjector, TimeProvider clock, ShareContributorWriteSwitch contributorWrites, AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator? revisionCoordinator = null, IOperationTimingObserver? timing = null, EnvelopeV2AcceptanceSwitch? envelopeV2Acceptance = null)
+public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ProjectionIntegrityVerifier verifier, IFaultInjector faultInjector, TimeProvider clock, ShareContributorWriteSwitch contributorWrites, AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator? revisionCoordinator = null, IOperationTimingObserver? timing = null, EnvelopeV2AcceptanceSwitch? envelopeV2Acceptance = null, EnvelopeCapabilityFloor? envelopeCapabilityFloor = null)
 {
+    /// <summary>
+    /// E3-M2f-2 (CAP-O7): the one shared capability check of the seven content entry points; the protection census and the search-index
+    /// builder use this same instance. The host composes it from deployment configuration; without one (unit tests, tools) the deployment
+    /// floor is 1, exactly as for an absent configuration value.
+    /// </summary>
+    public EnvelopeCapabilityFloor CapabilityFloor { get; } = envelopeCapabilityFloor ?? EnvelopeCapabilityFloor.Default;
+
     // E3-M2e (OD-M2e-07): Envelope v2 acceptance, default off. The Authority host always composes it; without one (unit tests,
     // tools) acceptance is off and the Development/Testing wrap codes apply, so the E3-M2d behaviour of existing fixtures holds.
     private readonly EnvelopeV2AcceptanceSwitch v2Acceptance = envelopeV2Acceptance ?? EnvelopeV2AcceptanceSwitch.DarkForTests;
@@ -46,14 +53,15 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         [ManifestItemKind.AttachmentLifecycle] = ["file_attachment_lifecycle_events"],
     };
 
-    public async Task<PreparedContentOperation> PrepareAsync(VerifiedActor? actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken)
+    /// <param name="envelopeCapability">E3-M2f-2: the capability the request declared (null ⇒ level 1, CAP-S5).</param>
+    public async Task<PreparedContentOperation> PrepareAsync(VerifiedActor? actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken, ClientEnvelopeCapability? envelopeCapability = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         var timer = new LockTiming();
         var outcome = "Completed";
         try
         {
-            return await PrepareCoreAsync(actor, request, idempotencyKey, correlationId, timer, cancellationToken).ConfigureAwait(false);
+            return await PrepareCoreAsync(actor, request, idempotencyKey, correlationId, timer, envelopeCapability, cancellationToken).ConfigureAwait(false);
         }
         catch (AuthorityException ex)
         {
@@ -71,7 +79,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
     }
 
-    private async Task<PreparedContentOperation> PrepareCoreAsync(VerifiedActor? actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, LockTiming timer, CancellationToken cancellationToken)
+    private async Task<PreparedContentOperation> PrepareCoreAsync(VerifiedActor? actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, LockTiming timer, ClientEnvelopeCapability? envelopeCapability, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length is < 8 or > 128)
         {
@@ -86,6 +94,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         timer.Locked();
         // RB-CARV-1 (contract §22): Release B verifies the floor in this transaction before anything else, replays included.
         await scope.RequireContentAcceptanceFloorAsync(cancellationToken).ConfigureAwait(false);
+        // E3-M2f-2 (CAP-O2/O3): the capability floor next, before actor resolution, the gate, replays and snapshot binding (G-2).
+        await CapabilityFloor.RequireAsync(scope, state, envelopeCapability, cancellationToken).ConfigureAwait(false);
         var (bound, reprotection) = await ResolveActorAsync(scope, state, actor, request.ReprotectionCommandId, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
@@ -292,14 +302,15 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         return ToPrepared(operation, candidateLeaves, correlationId);
     }
 
-    public async Task<ContentRevision> CommitAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, CancellationToken cancellationToken)
+    /// <param name="envelopeCapability">E3-M2f-2: the capability the request declared (null ⇒ level 1, CAP-S5).</param>
+    public async Task<ContentRevision> CommitAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, CancellationToken cancellationToken, ClientEnvelopeCapability? envelopeCapability = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         var timer = new LockTiming();
         var outcome = "Completed";
         try
         {
-            return await CommitCoreAsync(actor, operationId, request, correlationId, timer, cancellationToken).ConfigureAwait(false);
+            return await CommitCoreAsync(actor, operationId, request, correlationId, timer, envelopeCapability, cancellationToken).ConfigureAwait(false);
         }
         catch (AuthorityException ex)
         {
@@ -317,7 +328,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
     }
 
-    private async Task<ContentRevision> CommitCoreAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, LockTiming timer, CancellationToken cancellationToken)
+    private async Task<ContentRevision> CommitCoreAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, LockTiming timer, ClientEnvelopeCapability? envelopeCapability, CancellationToken cancellationToken)
     {
 
         // Testing only (no-op elsewhere): holds a commit before it takes the organization lock, so integration tests can
@@ -329,6 +340,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         timer.Locked();
         // RB-CARV-1 (contract §22): Release B verifies the floor in this transaction before anything else, replays included.
         await scope.RequireContentAcceptanceFloorAsync(cancellationToken).ConfigureAwait(false);
+        // E3-M2f-2 (CAP-O2/O3): the capability floor next, before the gate, replays, expiry/CARV aborts and staged verification (G-2).
+        await CapabilityFloor.RequireAsync(scope, state, envelopeCapability, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
         var operation = await scope.FindOperationAsync(operationId, cancellationToken).ConfigureAwait(false);
@@ -773,12 +786,15 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         return new ContentHistoryPage(state.OrganizationId, formRecordId, head.CommittedContentRevision, entries, hasMore ? entries[^1].ContentRevision : null, state.AuthorizationRevision, correlationId);
     }
 
-    public async Task<VerifyRecordProjectionResult> VerifyProjectionAsync(VerifiedActor actor, VerifyRecordProjectionRequest request, Guid correlationId, CancellationToken cancellationToken)
+    /// <param name="envelopeCapability">E3-M2f-2: the capability the request declared (null ⇒ level 1, CAP-S5).</param>
+    public async Task<VerifyRecordProjectionResult> VerifyProjectionAsync(VerifiedActor actor, VerifyRecordProjectionRequest request, Guid correlationId, CancellationToken cancellationToken, ClientEnvelopeCapability? envelopeCapability = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        // E3-M2f-2 (CAP-O2/O3): right after the lock, before actor resolution, pinning and verification (G-2: no false quarantine).
+        await CapabilityFloor.RequireAsync(scope, state, envelopeCapability, cancellationToken).ConfigureAwait(false);
         var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
@@ -825,7 +841,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     /// must fail its whole search on any of them, D3); provider outages fail the whole call; tamper evidence is committed
     /// even when the authorization state moved meanwhile (then the call fails as not ready). Read action only.
     /// </summary>
-    public async Task<VerifyRecordProjectionsResponse> VerifyProjectionsAsync(VerifiedActor actor, VerifyRecordProjectionsRequest request, Guid correlationId, CancellationToken cancellationToken)
+    /// <param name="envelopeCapability">E3-M2f-2: the capability the request declared (null ⇒ level 1, CAP-S5).</param>
+    public async Task<VerifyRecordProjectionsResponse> VerifyProjectionsAsync(VerifiedActor actor, VerifyRecordProjectionsRequest request, Guid correlationId, CancellationToken cancellationToken, ClientEnvelopeCapability? envelopeCapability = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (request.Records is null || request.Records.Count is 0 or > MaximumBatchRecords)
@@ -841,6 +858,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        // E3-M2f-2 (CAP-O2/O3): right after the lock, before actor resolution, pinning and any record's verification (G-2).
+        await CapabilityFloor.RequireAsync(scope, state, envelopeCapability, cancellationToken).ConfigureAwait(false);
         var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 

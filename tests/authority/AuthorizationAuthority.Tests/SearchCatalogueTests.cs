@@ -23,7 +23,7 @@ namespace AuthorizationAuthority.Tests;
 /// catalogue and content services, real signed manifests (LocalHmacProvider) and the in-memory store; SpiceDB answers from
 /// explicit sets. The real PostgreSQL/SpiceDB/Vault path runs in the Stage B integration suite (SearchCatalogueTests).
 /// </summary>
-public sealed class SearchCatalogueTests
+public sealed partial class SearchCatalogueTests
 {
     private const string Issuer = "https://issuer.test";
 

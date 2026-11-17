@@ -274,6 +274,12 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             // expires unused. Not a record failure: nothing about the record's content is wrong.
             return new ItemOutcome(FieldProtectionMigrationItemStates.Pending, ex.ErrorCode, null, null, null, null, Retry: true);
         }
+        catch (AuthorityClientException ex) when (EnvelopeCapabilityRefusal.Is(ex))
+        {
+            // E3-M2f-2 (CAP-E3): this build's declared envelope capability is below the organization's or the deployment's floor. Terminal:
+            // no further attempt and so no fresh operation (each would be refused the same way, before any verification); a current build is needed.
+            return new ItemOutcome(FieldProtectionMigrationItemStates.Failed, ex.ErrorCode, null, null, null, null, Retry: false);
+        }
         catch (AuthorityClientException ex) when (!ex.Retryable)
         {
             // Candidate refused (tampered current rows, integrity quarantine, forbidden): bounded attempts, then Failed; never re-signed silently.

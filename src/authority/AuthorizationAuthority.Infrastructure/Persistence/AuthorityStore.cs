@@ -377,6 +377,10 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public void AddDataKeyBindings(IEnumerable<ContentDataKeyBinding> bindings) => context.ContentDataKeyBindings.AddRange(bindings);
 
+        /// <summary>E3-M2f-2 AM-F1: <c>SELECT EXISTS (SELECT 1 FROM authority.content_data_key_bindings WHERE organization_id = @p)</c> on this scope's transaction (index <c>ix_content_data_key_bindings_record</c>).</summary>
+        public Task<bool> OrganizationHasDataKeyBindingsAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            context.ContentDataKeyBindings.AnyAsync(b => b.OrganizationId == organizationId, cancellationToken);
+
         public Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken)
         {
             var ids = manifestItemIds.Distinct().ToList();

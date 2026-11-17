@@ -16,7 +16,7 @@ namespace AuthorizationAuthority.Tests;
 /// S-C deep comparison, the Complete-coverage completeness check of S-A, and SearchProjectionRebuild (IX-45, IX-59). Atomicity
 /// against real PostgreSQL, the worker and the credential separation are the Docker tests (SearchIndexBuilderStackTests).
 /// </summary>
-public sealed class SearchIndexBuilderTests
+public sealed partial class SearchIndexBuilderTests
 {
     private const string Workload = "ix2-unit-builder";
 

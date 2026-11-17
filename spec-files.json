@@ -614,8 +614,8 @@
     },
     {
       "path": "docs/security/E3_M2B1_CARV_OPERATIONS.md",
-      "sha256": "c00e71ae2bf458953361a67812c24498bd5a3e0e0da6cdafd681d2480fad3170",
-      "bytes": 31282
+      "sha256": "c841eda647cfd76aaa8c50c86ae2600035afcaec04fca5054b07569624dff6d6",
+      "bytes": 36557
     },
     {
       "path": "docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md",
@@ -651,6 +651,11 @@
       "path": "docs/security/E3_M2F1_IMPLEMENTATION_RECORD.md",
       "sha256": "e853c45e2e7c9917d82d686cd2e2d22438b27152d04f2941f4ddd45aac128080",
       "bytes": 13807
+    },
+    {
+      "path": "docs/security/E3_M2F2_IMPLEMENTATION_RECORD.md",
+      "sha256": "50b480d96563aae56a99a6a6345c0152ce474a1b5960d763b9d2bd2843189902",
+      "bytes": 30885
     },
     {
       "path": "docs/security/E3_M2F_CONTRACT_CLOSURE.md",

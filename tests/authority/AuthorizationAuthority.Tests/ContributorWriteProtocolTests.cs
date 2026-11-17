@@ -79,6 +79,9 @@ public sealed partial class ContributorWriteProtocolTests
 
         public RecordContentHead Head => Store.Heads.Single();
 
+        /// <summary>E3-M2f-2: the envelope capability this harness's business build declares on Prepare and Commit (null: no declaration, level 1).</summary>
+        public ClientEnvelopeCapability? EnvelopeCapability { get; set; }
+
         public static VerifiedActor Actor(Guid user) => new(Issuer, user.ToString("D"), "test");
 
         public AuthorityRelationshipEdge Edge(string resourceType, Guid resource, string relation, string subjectType, Guid subject, string subjectRelation = "")
@@ -127,13 +130,13 @@ public sealed partial class ContributorWriteProtocolTests
         public List<Staged> Stage(IEnumerable<Row> rows, Guid operation) => rows.Select(r => Encode(r, Org, operation, Head.CommittedContentRevision + 1)).ToList();
 
         public async Task<PreparedContentOperation> PrepareAsync(Guid actor, Guid operation, List<Staged> candidate, bool withCurrent, string? key = null) =>
-            await Service.PrepareAsync(Actor(actor), Request(operation, candidate, withCurrent), key ?? "key-" + operation.ToString("N"), Guid.CreateVersion7(), CancellationToken.None);
+            await Service.PrepareAsync(Actor(actor), Request(operation, candidate, withCurrent), key ?? "key-" + operation.ToString("N"), Guid.CreateVersion7(), CancellationToken.None, EnvelopeCapability);
 
         public async Task<ContentRevision> CommitAsync(Guid actor, PreparedContentOperation prepared, List<Staged> candidate)
         {
             var signatures = prepared.SignedItems.ToDictionary(s => (s.ItemKind, s.ItemId), s => Convert.FromBase64String(s.RowSignatureBase64));
             var staged = candidate.Select(c => new StagedContentItem(c.Kind, c.ItemId, c.Base64, Convert.ToBase64String(signatures[(c.Kind, c.ItemId)]))).ToList();
-            var revision = await Service.CommitAsync(Actor(actor), prepared.OperationId, new CommitContentChangeRequest(Org, Record, staged), Guid.CreateVersion7(), CancellationToken.None);
+            var revision = await Service.CommitAsync(Actor(actor), prepared.OperationId, new CommitContentChangeRequest(Org, Record, staged), Guid.CreateVersion7(), CancellationToken.None, EnvelopeCapability);
             Accepted = candidate.Select(c => (c, signatures[(c.Kind, c.ItemId)])).ToList();
             return revision;
         }

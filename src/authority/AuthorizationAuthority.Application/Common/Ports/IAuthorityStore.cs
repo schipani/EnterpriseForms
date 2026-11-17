@@ -141,6 +141,14 @@ public interface IAuthorityScope : IAsyncDisposable
     /// </summary>
     Task RequireDataKeyLedgerAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// E3-M2f-2 AM-F1 (docs/security/E3_M2F_CONTRACT_CLOSURE.md §5): whether the organization has any data-key binding, in any state, in this
+    /// transaction. Exactly <c>EXISTS (SELECT 1 … WHERE organization_id = @organization)</c>; returns a boolean only, materializes no binding
+    /// column. Called solely by <c>EnvelopeCapabilityFloor</c> under the organization lock; never by a read, verification, search or history
+    /// path for any other purpose. A failure throws (the caller refuses).
+    /// </summary>
+    Task<bool> OrganizationHasDataKeyBindingsAsync(Guid organizationId, CancellationToken cancellationToken);
+
     void AddEdge(AuthorityRelationshipEdge edge);
 
     /// <summary>Phase C8 AC-9: every desired-state edge (active and removed) of one exact relationship, read-only.</summary>

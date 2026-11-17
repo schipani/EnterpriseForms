@@ -189,3 +189,35 @@ Contract: `docs/security/E3_M2E_CONTRACT_CLOSURE.md` (OD-M2e-01..16, AM-1..AM-12
   - **Mandatory prerequisite (owner decision OA-FE1-2, 2026-11-16):** before **any persistent floor raise**, a **verified A-1-capable deployment inventory** must confirm the build of every Release B instance. CARV connection markers alone are insufficient evidence.
   - **Do not run the ordinary `--migrate` under live Release B writes.** It re-applies the runtime grants one statement at a time, so writes are refused meanwhile, and a committed write can be reported as failed. By source and unit tests, retrying the Commit of the same operation after the window returns the committed result (an idempotent replay); this has not been reproduced in PostgreSQL after an F-E2 misreport. F-E2 is open: `F-E2_MIGRATE_GRANT_WINDOW_DEFECT.md` (mitigations in its §6).
 - **Ledger Down (Development/Testing only):** refused while any binding exists; bindings are never deleted (P-2 refuses UPDATE, DELETE and TRUNCATE for every role the triggers fire for).
+
+## 10. E3-M2f-2: business envelope capability floor (Development/Testing only)
+
+Contract: `docs/security/E3_M2F_CONTRACT_CLOSURE.md` (OD-M2f-01..10, AM-F1, CAP-S/F/O/E, §9, §10). Record: `docs/security/E3_M2F2_IMPLEMENTATION_RECORD.md`. **No migration, table, trigger, CARV bump or floor (F0). No persistent database, Release B configuration or deployment is changed by E3-M2f-2, and Envelope v2 acceptance stays off everywhere. Persistent use additionally needs E3-M2f-2G evidence, E3-M2f-3 refusal evidence (RE-1..RE-6), the INV-1/INV-2 inventory and everything in closure §11.5.**
+
+**What the Authority does.** At the seven content entry points (Prepare, Commit, Verify, batch Verify, protection census, search-index backfill, deep-sweep verify), right after the organization lock and (Prepare, Commit) the Release B fence, it reads the request header `EnterpriseForms-Envelope-Capability` and refuses with `409 CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT` (not retryable, fixed detail, nothing written) when the declared level is below `max(deployment floor, organization floor)`. Exactly one header instance whose value is exactly `1` or `2` is recognized; anything else, and no header, is level 1. The organization floor is 2 once the organization has any data-key binding (any state). Level 2 is never refused by this build and never reads the ledger. Every other Authority endpoint ignores the header.
+
+**Deployment floor `Content:MinimumBusinessEnvelopeCapability`.**
+
+| Value | Effect |
+|---|---|
+| absent | 1 (the organization floor alone decides) |
+| `1` | 1 |
+| `2` | every level-1 caller is refused in every organization, bound or not (the only restore-independent backstop, closure §4.4) |
+| anything else (empty, padded, `02`, `0`, `3`, text) | the Authority refuses to start (startup log names the key, never the value) |
+
+- **Governance (OD-M2f-10, PB-11):** protected deployment configuration only. Raising it is a tightening (one approver); lowering it is a loosening (two distinct approvers outside Development/Testing). In Development/Testing it may be set freely. Its monotonicity is procedural only: a configuration rollback or a redeployment with older settings lowers it, and nothing in the Authority can detect that (OPEN-M2f-2). An AuthorityDb restore does not change it.
+- **Signals:** startup log event 9252 `Envelope capability floor enforced: deployment floor N`; readiness detail ends `envelope capability floor enforced; deployment floor N` (supporting evidence only, INV-2/INV-4); refusals log event 9250 (Warning) and store failures 9251 (Error), each with the organization identifier and parsed level only; meter `AuthorizationAuthority.EnvelopeCapability`, counter `envelope_capability_evaluations` (tags `outcome` = admitted/refused/unavailable, `client_level`, `organization_id`). These are operational signals, **not** the durable refusal evidence required before persistent use (OD-M2f-09, E3-M2f-3).
+
+**Deployment order.**
+
+| Step | What | Check |
+|---|---|---|
+| 1 | Business API and Worker instances on E3-M2f-1 or later (they declare level 2) | business build inventory; a level-1 straggler is refused only in bound organizations (availability, R-M2f-8) |
+| 2 | Authority instances on an E3-M2f-2 build | INV-1/INV-2: deployed image digest mapped to a commit containing E3-M2f-2; `carv-v3` markers do **not** distinguish it from `0be5f52`/`6e0ee1d` (INV-3, R-M2f-3) |
+| 3 | Optionally set the deployment floor to `2` (PB-11) | readiness and log event 9252 show `deployment floor 2` |
+
+**Refusal handling.** The business build containing E3-M2f-2 treats the code as terminal: users get `503 SERVICE_UNAVAILABLE` without detail (behaviour-tested); a field-protection migration item becomes `Failed` with the code (no further attempt, so no fresh operation) and a protection reconciliation finishes `Incomplete` with the code (both pinned structurally by architecture tests and mutations; the workers were not run in E3-M2f-2); the search-index builder is unchanged and, by source analysis, skips the form or entry for the round and re-reads on its next scheduled round (nothing is written). E3-M2f-1 business builds without this mapping surface the 409 with the Authority's code. Remedy: deploy a current business build, or check that no intermediary strips the header. The header is self-asserted by the authenticated workload (R-M2f-6).
+
+**Header transport note.** HTTP field values exclude surrounding optional whitespace (RFC 9110 §5.5), so a server may deliver a value sent as `2 ` as `2`. The Authority parser itself treats any padded value as level 1 (unit-tested); the transport-level trimming by Kestrel was **not** tested in E3-M2f-2. Inner whitespace, lists (`1, 2`), repeated header lines and any other value are level 1 (host-tested for lists and repeats).
+
+**Rollback and restore.** Rolling the Authority back to an E3-M2f-1 build removes enforcement (nothing is persisted; R-M2f-3 applies). An AuthorityDb restore to before an organization's first binding lowers that organization's floor to 1 while BusinessDb may still hold its schema-2 rows (R-M2f-4, BD-1): only deployment floor `2` remains in force. Any future recovery path that re-inserts bindings must take the organization lock (FB-1 obligation on BD-2).

@@ -39,6 +39,12 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
     /// <summary>E3-M2e L-13: number of ledger verifications requested by the services under test.</summary>
     public int DataKeyLedgerChecks { get; private set; }
+
+    /// <summary>E3-M2f-2 AM-F1: number of organization binding-existence queries (proves the CAP-F3 short-circuit).</summary>
+    public int DataKeyBindingExistenceQueries { get; private set; }
+
+    /// <summary>E3-M2f-2 CAP-F5: when set, every binding-existence query throws this (a store failure).</summary>
+    public Exception? DataKeyBindingExistenceFailure { get; set; }
     public List<SecurityJournalEntry> Journal { get; } = [];
     public List<ContentIntegrityCheckpoint> Checkpoints { get; } = [];
     public List<IntegrityKeyRegistration> Keys { get; } = [];
@@ -300,6 +306,12 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
             }
 
             s.DataKeyBindings.AddRange(list);
+        }
+
+        public Task<bool> OrganizationHasDataKeyBindingsAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            s.DataKeyBindingExistenceQueries++;
+            return s.DataKeyBindingExistenceFailure is { } failure ? throw failure : Task.FromResult(s.DataKeyBindings.Any(b => b.OrganizationId == organizationId));
         }
 
         public Task RequireDataKeyLedgerAsync(CancellationToken cancellationToken)

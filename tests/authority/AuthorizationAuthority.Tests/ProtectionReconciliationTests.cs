@@ -27,7 +27,7 @@ namespace AuthorizationAuthority.Tests;
 /// state only; the real PostgreSQL/SpiceDB/Vault path and the hostile business DBA run in the Stage B integration suite
 /// (ProtectionReconciliationTests).
 /// </summary>
-public sealed class ProtectionReconciliationTests
+public sealed partial class ProtectionReconciliationTests
 {
     private const string Issuer = "https://issuer.test";
     private const string Verifier = "field-protection-verifier";

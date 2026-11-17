@@ -44,6 +44,11 @@ public sealed class BusinessProblemHandler : IExceptionHandler
                 }
 
                 break;
+            case AuthorityClientException ex when EnvelopeCapabilityRefusal.Is(ex):
+                // E3-M2f-2 (CAP-E3): a service-unavailable condition without the Authority's code or detail; not retryable.
+                problem = Build(StatusCodes.Status503ServiceUnavailable, "SERVICE_UNAVAILABLE", "the service cannot process this request at the moment");
+                problem.Extensions["retryable"] = false;
+                break;
             case AuthorityClientException ex:
                 problem = Build(ex.HttpStatusCode, ex.ErrorCode, ex.Message);
                 problem.Extensions["retryable"] = ex.Retryable;
