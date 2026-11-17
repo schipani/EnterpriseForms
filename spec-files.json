@@ -939,13 +939,18 @@
     },
     {
       "path": "scripts/ci/assert_test_totals.py",
-      "sha256": "bb2de3d64a3c19fc9dc074a5ea9f421d06a7a26e4198292567b76fb3e43240e7",
-      "bytes": 3673
+      "sha256": "ffddb05f81a704fae0f9895a06dc21486d464c3c7503e434a22da07b6d656bbe",
+      "bytes": 10391
+    },
+    {
+      "path": "scripts/ci/authorized_test_skips.json",
+      "sha256": "baf4789cd78880034105291c849276bff98c01cabe5d993c215aacf2bc8c665a",
+      "bytes": 8619
     },
     {
       "path": "scripts/ci/run_dotnet_tests.py",
-      "sha256": "9efc3bda170dd0c753d84116b524ed73f957294edd4997cf6b2902b9cc628e68",
-      "bytes": 4044
+      "sha256": "cc86e5ee2797952b2963b08148ce88a13de0051002a9e54cd6742ca786f385f2",
+      "bytes": 4779
     },
     {
       "path": "scripts/ci/stage_b_groups.py",
@@ -964,8 +969,8 @@
     },
     {
       "path": "scripts/ci/test_test_results.py",
-      "sha256": "c63cede5ac611a8899f3936452d556db07533dfc537e3bf39dfaee650a2aaa48",
-      "bytes": 4364
+      "sha256": "d140e83e39d8857452d151f1ef3e5fc7c88e6b6493ecff3d03cf8ea6eb6e95dd",
+      "bytes": 13552
     },
     {
       "path": "scripts/dev/e2-vault-integration.ps1",

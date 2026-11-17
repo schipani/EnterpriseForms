@@ -7,7 +7,9 @@ result silently overwrote the other (PR #15, first ci attempt on fcdb52a: 302 te
 
 This runner removes the shared directory: each test project writes exactly <results>/<Project>/<Project>.trx, the
 results root is emptied first so no file from an earlier run can be counted, and the aggregate check then requires
-exactly one TRX per discovered project (assert_test_totals.py --expect-projects).
+exactly one TRX per discovered project (assert_test_totals.py --expect-projects). Skips are accepted only when they
+match the reviewed allowlist scripts/ci/authorized_test_skips.json by project, exact test name and exact reason; this is the
+single entry point of both ci.yml and scripts/dev/test.ps1 -Level 3, so both gates apply the same rule.
 Usage: python scripts/ci/run_dotnet_tests.py EnterpriseForms.All.slnx --results-dir artifacts/test-results \
            --configuration Release --no-build --minimum-expected-tests 10 --min-total 130
 """
@@ -25,6 +27,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import assert_test_totals  # noqa: E402
+
+DEFAULT_AUTHORIZED_SKIPS = HERE / "authorized_test_skips.json"
 
 
 def test_projects(solution: Path) -> list[Path]:
@@ -60,7 +64,13 @@ def main() -> int:
     parser.add_argument("--no-build", action="store_true")
     parser.add_argument("--minimum-expected-tests", type=int, default=10)
     parser.add_argument("--min-total", type=int, required=True)
+    parser.add_argument("--authorized-skips", default=str(DEFAULT_AUTHORIZED_SKIPS), help="reviewed skip allowlist (JSON)")
     args = parser.parse_args()
+    try:
+        authorized_skips = assert_test_totals.load_authorized_skips(Path(args.authorized_skips))
+    except assert_test_totals.AllowlistError as error:
+        print(f"FAIL  {error}")
+        return 1
 
     projects = test_projects(Path(args.solution).resolve())
     if not projects:
@@ -76,7 +86,8 @@ def main() -> int:
         print(f"{name}: exit code {code}")
         if code != 0:
             print((results / name / "console.log").read_text(encoding="utf-8")[-4000:])
-    verdict = assert_test_totals.check(results, min_total=args.min_total, min_files=len(projects), expect_projects=[p.stem for p in projects])
+    verdict = assert_test_totals.check(results, min_total=args.min_total, min_files=len(projects), expect_projects=[p.stem for p in projects],
+                                       authorized_skips=authorized_skips)
     return 1 if verdict or any(code != 0 for _, code in outcomes) else 0
 
 

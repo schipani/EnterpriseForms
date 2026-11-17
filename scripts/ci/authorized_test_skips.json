@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "description": "Explicitly authorized xUnit skips for the solution-wide .NET test gate (scripts/ci/assert_test_totals.py, used by ci.yml and scripts/dev/test.ps1 -Level 3). A skip is accepted only when the project, the exact TRX test name and the exact skip reason all match one entry; any other skipped, aborted or not-executed test fails the gate. Every entry here is an opt-in real-Vault integration test: it runs only when its developer script provisions a disposable Vault Transit container and exports the variables, and never on hosted CI runners. Adding an entry requires review; a stale entry (test no longer in the results) fails the gate.",
+  "skips": [
+    {
+      "project": "AuthorizationAuthority.Tests",
+      "test": "AuthorizationAuthority.Tests.IntegrityKeyActivationVaultIntegrationTests.ARetiredOrMissingHistoricalVersionFailsClosedAndTheActiveVersionIsNeverTriedInstead",
+      "reason": "E5_VAULT_* not set (run scripts/dev/e5-vault-hmac-integration.ps1)",
+      "justification": "E-5 real Vault Transit HMAC integration; requires the disposable Vault container provisioned by scripts/dev/e5-vault-hmac-integration.ps1."
+    },
+    {
+      "project": "AuthorizationAuthority.Tests",
+      "test": "AuthorizationAuthority.Tests.IntegrityKeyActivationVaultIntegrationTests.TheAuthorityTokenCanOnlyReadSignAndVerifyAndCannotProvisionActivateOrRetireVersions",
+      "reason": "E5_VAULT_* not set (run scripts/dev/e5-vault-hmac-integration.ps1)",
+      "justification": "E-5 real Vault Transit HMAC integration; requires the disposable Vault container provisioned by scripts/dev/e5-vault-hmac-integration.ps1."
+    },
+    {
+      "project": "AuthorizationAuthority.Tests",
+      "test": "AuthorizationAuthority.Tests.IntegrityKeyActivationVaultIntegrationTests.AScriptProvisionedVersionIsUnusedUntilActivatedAndBothVersionsVerifyOnlyAsThemselves",
+      "reason": "E5_VAULT_* not set (run scripts/dev/e5-vault-hmac-integration.ps1)",
+      "justification": "E-5 real Vault Transit HMAC integration; requires the disposable Vault container provisioned by scripts/dev/e5-vault-hmac-integration.ps1."
+    },
+    {
+      "project": "AuthorizationAuthority.Tests",
+      "test": "AuthorizationAuthority.Tests.IntegrityKeyActivationVaultIntegrationTests.ActivatingAVersionVaultDoesNotHaveIsRefusedAndKeysDoNotCrossOrganizations",
+      "reason": "E5_VAULT_* not set (run scripts/dev/e5-vault-hmac-integration.ps1)",
+      "justification": "E-5 real Vault Transit HMAC integration; requires the disposable Vault container provisioned by scripts/dev/e5-vault-hmac-integration.ps1."
+    },
+    {
+      "project": "EnterpriseForms.Api.ContractTests",
+      "test": "EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.TheBusinessTokenHasNoAdministrativeExportOrAuthorityCapability",
+      "reason": "E2_VAULT_* not set (run scripts/dev/e2-vault-integration.ps1)",
+      "justification": "E-2 real Vault Transit encryption-key provider integration; requires the disposable Vault container provisioned by scripts/dev/e2-vault-integration.ps1."
+    },
+    {
+      "project": "EnterpriseForms.Api.ContractTests",
+      "test": "EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.TheApplicationCannotCreateAKeyByEncryptingUnderAnUnprovisionedOrganization",
+      "reason": "E2_VAULT_* not set (run scripts/dev/e2-vault-integration.ps1)",
+      "justification": "E-2 real Vault Transit encryption-key provider integration; requires the disposable Vault container provisioned by scripts/dev/e2-vault-integration.ps1."
+    },
+    {
+      "project": "EnterpriseForms.Api.ContractTests",
+      "test": "EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.RealVaultRejectsCrossOrganizationCrossPurposeAndVersionSubstitution",
+      "reason": "E2_VAULT_* not set (run scripts/dev/e2-vault-integration.ps1)",
+      "justification": "E-2 real Vault Transit encryption-key provider integration; requires the disposable Vault container provisioned by scripts/dev/e2-vault-integration.ps1."
+    },
+    {
+      "project": "EnterpriseForms.Api.ContractTests",
+      "test": "EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.InvalidCredentialsAndAnUnreachableVaultFailClosed",
+      "reason": "E2_VAULT_* not set (run scripts/dev/e2-vault-integration.ps1)",
+      "justification": "E-2 real Vault Transit encryption-key provider integration; requires the disposable Vault container provisioned by scripts/dev/e2-vault-integration.ps1."
+    },
+    {
+      "project": "EnterpriseForms.Api.ContractTests",
+      "test": "EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.RealVaultWrapsAndUnwrapsUnderTheScriptProvisionedKeys",
+      "reason": "E2_VAULT_* not set (run scripts/dev/e2-vault-integration.ps1)",
+      "justification": "E-2 real Vault Transit encryption-key provider integration; requires the disposable Vault container provisioned by scripts/dev/e2-vault-integration.ps1."
+    },
+    {
+      "project": "EnterpriseForms.Api.ContractTests",
+      "test": "EnterpriseForms.Api.ContractTests.EnvelopeV2ReaderVaultIntegrationTests.TheVerifiedFieldReaderOpensVaultWrappedV1AndV2RowsWithOneUnwrapPerDataKeyGroup",
+      "reason": "E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e3-m2c-vault-reader.ps1)",
+      "justification": "E3-M2c dark envelope v2 reader against real Vault Transit; requires scripts/dev/e3-m2c-vault-reader.ps1. Envelope v2 acceptance stays disabled."
+    },
+    {
+      "project": "EnterpriseForms.Api.ContractTests",
+      "test": "EnterpriseForms.Api.ContractTests.EnvelopeV2ReaderVaultIntegrationTests.TheExactVaultKeyVersionIsUsedAndARetiredVersionIsNotReplacedByTheCurrentOne",
+      "reason": "E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e3-m2c-vault-reader.ps1)",
+      "justification": "E3-M2c dark envelope v2 reader against real Vault Transit; requires scripts/dev/e3-m2c-vault-reader.ps1. Envelope v2 acceptance stays disabled."
+    },
+    {
+      "project": "EnterpriseForms.Api.ContractTests",
+      "test": "EnterpriseForms.Api.ContractTests.EnvelopeV2ReaderVaultIntegrationTests.TheVerifiedDocumentReaderOpensAVaultWrappedV2VersionAndRefusesAForeignOrganization",
+      "reason": "E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e3-m2c-vault-reader.ps1)",
+      "justification": "E3-M2c dark envelope v2 reader against real Vault Transit; requires scripts/dev/e3-m2c-vault-reader.ps1. Envelope v2 acceptance stays disabled."
+    },
+    {
+      "project": "EnterpriseForms.Api.ContractTests",
+      "test": "EnterpriseForms.Api.ContractTests.KeyActivationVaultIntegrationTests.ActivatingVersionTwoChangesOnlyThatOrganizationAndPurposeAndKeepsVersionOneReadable",
+      "reason": "E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e2-vault-integration.ps1)",
+      "justification": "E-4 controlled key activation against real Vault Transit; requires the disposable Vault container provisioned by scripts/dev/e2-vault-integration.ps1."
+    },
+    {
+      "project": "EnterpriseForms.Api.ContractTests",
+      "test": "EnterpriseForms.Api.ContractTests.KeyActivationVaultIntegrationTests.TheVersionScriptProvisionedVersionTwoWithoutActivatingIt",
+      "reason": "E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e2-vault-integration.ps1)",
+      "justification": "E-4 controlled key activation against real Vault Transit; requires the disposable Vault container provisioned by scripts/dev/e2-vault-integration.ps1."
+    },
+    {
+      "project": "EnterpriseForms.Api.ContractTests",
+      "test": "EnterpriseForms.Api.ContractTests.KeyActivationVaultIntegrationTests.TheBusinessTokenCannotProvisionActivateOrRetireVersions",
+      "reason": "E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e2-vault-integration.ps1)",
+      "justification": "E-4 controlled key activation against real Vault Transit; requires the disposable Vault container provisioned by scripts/dev/e2-vault-integration.ps1."
+    },
+    {
+      "project": "EnterpriseForms.Api.ContractTests",
+      "test": "EnterpriseForms.Api.ContractTests.KeyActivationVaultIntegrationTests.AnIncorrectActivationThatDropsVersionOneFailsClosedAndCorrectingItRecoversTheData",
+      "reason": "E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e2-vault-integration.ps1)",
+      "justification": "E-4 controlled key activation against real Vault Transit; requires the disposable Vault container provisioned by scripts/dev/e2-vault-integration.ps1."
+    }
+  ]
+}
