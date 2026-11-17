@@ -49,7 +49,8 @@ public static class EnvelopeCapabilityComposition
                 if (operation.Responses?.TryGetValue("409", out var conflict) == true && conflict is OpenApiResponse response)
                 {
                     response.Description = "Conflict. Among other codes: " + AuthorityErrorCodes.ClientEnvelopeCapabilityInsufficient
-                                           + " (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.";
+                                           + " (not retryable): the declared envelope capability is below the effective floor. The refused request's transaction was ended before any verification and wrote nothing. "
+                                           + "Independently of that transaction, the Authority may record bounded refusal evidence on the organization's audit stream.";
                 }
 
                 return Task.CompletedTask;

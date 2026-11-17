@@ -1,0 +1,239 @@
+{
+  "harness": "E3-M2f-3G capability-refusal evidence PostgreSQL verification (real Authority host and real recorder/store on disposable PostgreSQL 18.0)",
+  "run": "mutation-MZ-22",
+  "groups": "F",
+  "isolation": {
+    "databases": [
+      "g3_base",
+      "g3_f1",
+      "g3_f2",
+      "g3_f3",
+      "g3_f4",
+      "g3_f5",
+      "g3_f6",
+      "g3_noindex",
+      "g3_prefloor",
+      "m2f3ggate"
+    ],
+    "scrubbedEnvironmentVariables": [],
+    "stopped": false
+  },
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "elapsedSeconds": 21,
+  "checksTotal": 17,
+  "checksFailed": 0,
+  "byKind": {
+    "Control": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "Failure": {
+      "total": 9,
+      "passed": 9,
+      "failed": 0
+    },
+    "Safety": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "Setup": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0
+    }
+  },
+  "byGroup": {
+    "F": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0
+    },
+    "S": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0
+    },
+    "Z": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "demonstrationsOutsidePassTotals": 0,
+  "notExecuted": [],
+  "checks": [
+    {
+      "Id": "S-01",
+      "Group": "S",
+      "Kind": "Setup",
+      "Description": "the server is a disposable PostgreSQL 18.0 (one container of this run; admitted by nonce and system identifier)",
+      "Expected": "PostgreSQL 18.0",
+      "Observed": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-\u2026",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "S-02",
+      "Group": "S",
+      "Kind": "Setup",
+      "Description": "the approved runtime identity is an ordinary login (no superuser, CREATEROLE, CREATEDB, BYPASSRLS, REPLICATION; NOINHERIT)",
+      "Expected": "falsefalsefalsefalsefalsefalsetrue",
+      "Observed": "falsefalsefalsefalsefalsefalsetrue",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "S-03",
+      "Group": "S",
+      "Kind": "Setup",
+      "Description": "templates: the ordinary migration (migration identity), floors 1 -\u003E 2 -\u003E 3 (Release B floor 3; Envelope v2 acceptance stays OFF), then IX-B by the accepted E3-M2f-3i command (migration identity) and its --verify-only; the harness\u0027s own catalogue query finds the approved definition valid, ready and live. g3_prefloor (migrated only) and g3_noindex (floors, no IX-B) are copies taken before",
+      "Expected": "migrate 0; floors 0,0,0; index absent -\u003E exit 0 -\u003E approved-valid; verify-only exit 0",
+      "Observed": "migrate 0; floors 0,0,0; index absent -\u003E exit 0 outcome Created -\u003E approved-valid; verify-only exit 0 outcome AlreadyValid",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "S-04",
+      "Group": "S",
+      "Kind": "Setup",
+      "Description": "the copies keep their states: g3_noindex has no IX-B, g3_prefloor has no floor and no IX-B",
+      "Expected": "g3_noindex absent; g3_prefloor absent and no floor",
+      "Observed": "g3_noindex absent; g3_prefloor absent; prefloor floors none",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-01",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "journal insert failure (server CHECK violation in T2\u0027s SaveChanges, after the commit was requested): classified Ambiguous (D-6, safe under L-C); the whole T2 rolled back (no entry, audit revision unchanged); the retry reconciles against the journal and records exactly one entry",
+      "Expected": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; oracle holds",
+      "Observed": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True (Ambiguous/Ambiguousx1,Committedx1)",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-02",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "organization-row update failure (server CHECK violation on the audit head update): Ambiguous; the journal INSERT of the same transaction rolled back with it (no entry, revision unchanged); the retry records exactly one",
+      "Expected": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; oracle holds",
+      "Observed": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True (Ambiguous/Ambiguousx1,Committedx1)",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-03",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "commit failure (a deferred constraint trigger fails COMMIT on the server): Ambiguous; nothing durable; the retry records exactly one",
+      "Expected": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; oracle holds",
+      "Observed": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True (Ambiguous/Ambiguousx1,Committedx1)",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-04",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "M2F3-35 on PostgreSQL: COMMIT succeeded, its outcome was lost (exception after the commit returned): Ambiguous; the entry IS durable; the same process\u0027s retry and a restarted process both reconcile against the journal (AlreadyRecorded), never appending a second entry",
+      "Expected": "Ambiguous; during 1; retry AlreadyRecorded; restart AlreadyRecorded; evidence 1; oracle holds",
+      "Observed": "Ambiguous; during 1; retry AlreadyRecorded; restart AlreadyRecorded; evidence 1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-05",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "unknown outcome, rolled back: the T2 session is terminated just before COMMIT: Ambiguous; nothing durable; the retry finds the key absent and records exactly one entry",
+      "Expected": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; oracle holds",
+      "Observed": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True (Ambiguous/Ambiguousx1,Committedx1)",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-06",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "M2F3-34 in-process: a refused T1 (level 1, D = 2) committed nothing (organization fingerprint and audit head unchanged); a crash before T2 leaves no evidence; the next refusal records exactly one entry",
+      "Expected": "409; evidence 0; fingerprint unchanged; next 409 Committed; evidence 1",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; evidence 0; fingerprint unchanged; next AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False Committed; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-07",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "M2F3-65 on PostgreSQL: the newest entry (controlled setup through the real AuditJournal) is dated 4 s after t_db; T2 defers (CLOCK_REGRESSION; under D-3b-2 a retry is scheduled, log 9253, rather than the 9254 named in the closure text) and appends nothing; once t_db has passed the entry the retry records exactly one entry",
+      "Expected": "Deferred ClockRegression; evidence 1 (seeded); retry Committed; evidence 2; oracle holds",
+      "Observed": "Deferred ClockRegression; evidence 1; retry Committed; evidence 2; max per (key, bucket) 1; max per bucket 2; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-10",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "M2F3-64 on PostgreSQL: a database error at the insert (unique violation: a non-recorder audit entry already at the revision T2 computed) leaves nothing appended and the audit head unchanged (Ambiguous, retried; the retry meets the same occupied revision until the inconsistency is resolved: evidence is lost, never duplicated)",
+      "Expected": "Ambiguous; evidence 0; audit head still 0",
+      "Observed": "Ambiguous; evidence 0; audit 0; authorization 7; projection 7; content 0; quarantine none",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-08",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "invalid evidence is never trusted on PostgreSQL: (a) an entry with an unapproved key (controlled setup, valid digest) makes the lookup inconclusive (UNVERIFIABLE_BODY, 9254), the next refusal is suppressed by the negative cache; (b) an entry altered in place after commit (digest no longer matches) makes the lookup inconclusive; nothing is appended in either case; the independent oracle sees the same defects",
+      "Expected": "(a) Inconclusive UnverifiableBody, SuppressedInconclusive, evidence 1, oracle invalid 1; (b) Inconclusive UnverifiableBody, evidence 1, oracle digest mismatch 1",
+      "Observed": "(a) Inconclusive UnverifiableBody, SuppressedInconclusive, evidence 1, invalid 1; (b) Inconclusive UnverifiableBody, evidence 1, digest mismatches 1",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-09",
+      "Group": "F",
+      "Kind": "Safety",
+      "Description": "MZ-22 equivalence on the PostgreSQL path: eight current-hour entries can only exist with a duplicate key (seven approved keys; any other key is UNVERIFIABLE_BODY first); the duplicate makes T2 inconclusive (BOUND_INCONSISTENT) and nothing is appended. The rule MZ-22 removes (\u0027eight rows, none older\u0027) is therefore never the deciding rule",
+      "Expected": "Inconclusive BoundInconsistent; evidence 8 (seeded); oracle max per (key, bucket) 2",
+      "Observed": "Inconclusive BoundInconsistent; evidence 8; max per (key, bucket) 2",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "Z-01",
+      "Group": "Z",
+      "Kind": "Control",
+      "Description": "the runtime identity\u0027s privileges, memberships and role attributes are unchanged by the whole run (template database)",
+      "Expected": "4f11c3ac8659f78a3a5573c73d0d41ae (2379 entries)",
+      "Observed": "4f11c3ac8659f78a3a5573c73d0d41ae (2379 entries)",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "Z-02",
+      "Group": "Z",
+      "Kind": "Control",
+      "Description": "Envelope v2 acceptance was never requested: no database of the run holds an acceptance policy record with acceptance requested (hosts ran with Content:EnvelopeV2AcceptanceEnabled = false)",
+      "Expected": "none",
+      "Observed": "none",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "Z-03",
+      "Group": "Z",
+      "Kind": "Control",
+      "Description": "no data-key binding exists in any database of the run (every organization stayed unbound: no bound-organization scenario was executed)",
+      "Expected": "none",
+      "Observed": "none",
+      "Pass": true,
+      "Gap": null
+    }
+  ],
+  "demonstrations": []
+}

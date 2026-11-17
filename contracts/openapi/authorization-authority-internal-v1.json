@@ -418,7 +418,7 @@
             }
           },
           "409": {
-            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor. The refused request's transaction was ended before any verification and wrote nothing. Independently of that transaction, the Authority may record bounded refusal evidence on the organization's audit stream.",
             "content": {
               "application/json": {
                 "schema": {
@@ -482,7 +482,7 @@
             }
           },
           "409": {
-            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor. The refused request's transaction was ended before any verification and wrote nothing. Independently of that transaction, the Authority may record bounded refusal evidence on the organization's audit stream.",
             "content": {
               "application/json": {
                 "schema": {
@@ -650,7 +650,7 @@
             }
           },
           "409": {
-            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor. The refused request's transaction was ended before any verification and wrote nothing. Independently of that transaction, the Authority may record bounded refusal evidence on the organization's audit stream.",
             "content": {
               "application/json": {
                 "schema": {
@@ -705,7 +705,7 @@
             }
           },
           "409": {
-            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor. The refused request's transaction was ended before any verification and wrote nothing. Independently of that transaction, the Authority may record bounded refusal evidence on the organization's audit stream.",
             "content": {
               "application/json": {
                 "schema": {
@@ -981,7 +981,7 @@
             }
           },
           "409": {
-            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor. The refused request's transaction was ended before any verification and wrote nothing. Independently of that transaction, the Authority may record bounded refusal evidence on the organization's audit stream.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2906,7 +2906,7 @@
             }
           },
           "409": {
-            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor. The refused request's transaction was ended before any verification and wrote nothing. Independently of that transaction, the Authority may record bounded refusal evidence on the organization's audit stream.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3023,7 +3023,7 @@
             }
           },
           "409": {
-            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor; the request was refused before any verification and nothing was written.",
+            "description": "Conflict. Among other codes: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT (not retryable): the declared envelope capability is below the effective floor. The refused request's transaction was ended before any verification and wrote nothing. Independently of that transaction, the Authority may record bounded refusal evidence on the organization's audit stream.",
             "content": {
               "application/json": {
                 "schema": {

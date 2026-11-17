@@ -221,3 +221,123 @@ Contract: `docs/security/E3_M2F_CONTRACT_CLOSURE.md` (OD-M2f-01..10, AM-F1, CAP-
 **Header transport note.** HTTP field values exclude surrounding optional whitespace (RFC 9110 §5.5), so a server may deliver a value sent as `2 ` as `2`. The Authority parser itself treats any padded value as level 1 (unit-tested); the transport-level trimming by Kestrel was **not** tested in E3-M2f-2. Inner whitespace, lists (`1, 2`), repeated header lines and any other value are level 1 (host-tested for lists and repeats).
 
 **Rollback and restore.** Rolling the Authority back to an E3-M2f-1 build removes enforcement (nothing is persisted; R-M2f-3 applies). An AuthorityDb restore to before an organization's first binding lowers that organization's floor to 1 while BusinessDb may still hold its schema-2 rows (R-M2f-4, BD-1): only deployment floor `2` remains in force. Any future recovery path that re-inserts bindings must take the organization lock (FB-1 obligation on BD-2).
+
+## 11. E3-M2f-3i: capability-refusal evidence index (Development/Testing only)
+
+Contract: `E3_M2F3_CONTRACT_CLOSURE.md` §5A (OD-IX-1 approved with conditions); record `E3_M2F3I_IMPLEMENTATION_RECORD.md`. The index is a cost device for the future evidence lookup (E3-M2f-3b, not implemented). It confers no permission, changes no data and is not read by any code in this build. **Persistent rollout is not authorized (OD-IX-2 open).** *(2026-11-17: superseded in part. E3-M2f-3b is now implemented and its recorder reads this index (catalogue check and eight-row lookup, §12). E3-M2f-3i, -3b and -3G are accepted for Development/Testing only. Persistent rollout is still not authorized.)*
+
+**Command and identity.**
+
+```
+dotnet AuthorizationAuthority.Api.dll --provision-capability-refusal-evidence-index              # provision (create if absent) and verify
+dotnet AuthorizationAuthority.Api.dll --provision-capability-refusal-evidence-index --verify-only  # inspect only; never creates
+```
+
+- Identity: `ConnectionStrings__AuthorityDbMigration` only (the table owner or a member of it). There is no fallback to `ConnectionStrings__AuthorityDb`; provisioning with any identity that may not act as the table owner is refused (exit 7) before anything is attempted. `--verify-only` may run with any identity that can connect.
+- It cannot be combined with `--migrate`, `--apply-content-acceptance-floor` or `--reinstate-recorded-floor`, and accepts no other option.
+- It never runs EF migrations, never reads or locks `authority.ef_migrations_history`, never re-applies runtime grants (no F-E2 window), never locks an organization row, never drops, rebuilds, reindexes or validates anything, and writes no data.
+
+**What it does, in order (one connection, autocommit; no explicit transaction).** `SET lock_timeout = '5s'`; `SET statement_timeout = 0`; session advisory lock `pg_try_advisory_lock(1161055538, 1177774385)` (a second concurrent invocation exits 10 at once); ownership check; catalogue inspection; only if the index is absent: a lock-free catalogue snapshot, the single statement
+
+```sql
+CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_journal_capability_refusal_evidence
+    ON authority.security_journal_entries (organization_id, journal_stream_revision)
+    WHERE journal_stream_name = 'audit' AND journal_event_kind = 'EnvelopeCapabilityRefused';
+```
+
+then a re-inspection and a second snapshot. Success requires the approved, valid index **and** a catalogue difference of exactly that index; `IF NOT EXISTS` alone is never taken as proof. One JSON report line goes to stdout (success) or stderr (failure); it carries no connection details or credentials.
+
+**Expected catalogue state after success.** `authority.ix_journal_capability_refusal_evidence`, B-tree, non-unique, keys `(organization_id, journal_stream_revision)` ascending, `indisvalid`, `indisready`, `indislive` all true, owned by the table owner, no ACL, and `pg_get_indexdef` exactly:
+
+```
+CREATE INDEX ix_journal_capability_refusal_evidence ON authority.security_journal_entries USING btree (organization_id, journal_stream_revision) WHERE (((journal_stream_name)::text = 'audit'::text) AND ((journal_event_kind)::text = 'EnvelopeCapabilityRefused'::text))
+```
+
+(PostgreSQL 18 rendering; Azure PostgreSQL rendering not yet verified, TQ-19.)
+
+**Exit codes.**
+
+| Code | Outcome | Meaning and operator action |
+|---|---|---|
+| 0 | `Created` / `AlreadyValid` | Done. Re-running is an idempotent success |
+| 2 | usage | Wrong flags or no migration connection string; nothing attempted |
+| 3 | `DatabaseFailure` | Connection, catalogue or unexpected database error; the report gives the SQLSTATE. Re-run with `--verify-only` to see the state |
+| 4 | `IndexInvalid` | An invalid index of that name exists (an interrupted or failed build). **Not repaired automatically.** Manual recovery below |
+| 5 | `DefinitionMismatch` | A relation of that name exists with another definition (the report lists every deviation). **Not changed.** Investigate how it was created; removal is a separately approved privileged change |
+| 6 | `BuildInProgress` | Another session is building it (or holds the table's SHARE UPDATE EXCLUSIVE lock, for example VACUUM). Re-run after it finishes |
+| 7 | `NotOwner` | The identity may not act as the table owner. Use the migration identity |
+| 8 | `LockTimeout` | A lock wait exceeded 5 s. `state_after = Absent`: nothing was created (a conflicting table lock); re-run later. `state_after = Invalid`: the build was created but could not finish waiting for an older transaction; treat as exit 4 |
+| 9 | `VerificationFailed` | The index is valid but the catalogue changed by more than the index during the run; investigate before relying on it |
+| 10 | `Busy` | Another invocation holds the provisioning lock; nothing was inspected or changed |
+| 11 | `Absent` | `--verify-only` only: the index does not exist |
+
+**Preconditions.** The Authority schema is migrated (`authority.security_journal_entries` exists). No other DDL on the journal is running. For any persistent environment: **OD-IX-2 decision first** (recommended: quiesced Authority writers, then the command, then `--verify-only`). Long-running transactions in the database delay the build (it waits for them at its phase changes) and, after 5 s, end it with exit 8 and an invalid index; check `pg_stat_activity` for old transactions before starting.
+
+**Manual recovery of an invalid index (exit 4, or exit 8 with `state_after = Invalid`).** Only after confirming that no build is running (`SELECT * FROM pg_stat_progress_create_index`):
+
+```sql
+DROP INDEX CONCURRENTLY authority.ix_journal_capability_refusal_evidence;
+```
+
+run with the migration identity outside a transaction, then re-run the command and `--verify-only`. In a persistent environment this DROP is a privileged change that needs its own approval. Never use `REINDEX` or catalogue edits to "fix" the index.
+
+**Verification.** `--verify-only` (exit 0). Optionally, as any identity with SELECT on the journal, `EXPLAIN` of the approved lookup (closure IXP-6) shows `Limit` over `Index Scan Backward using ix_journal_capability_refusal_evidence`. A plan observed on one PostgreSQL server is not proof of the plan on another (Azure planner behaviour unverified).
+
+**Rollback.** The index is harmless to every build (no build before E3-M2f-3b writes a matching row). Rolling back an Authority binary leaves it in place. Removing it is `DROP INDEX CONCURRENTLY` under a separate approval; once E3-M2f-3b exists, its absence makes evidence recording fail closed (`INDEX_UNAVAILABLE`) without affecting refusals. An AuthorityDb restore from a backup taken before the index existed removes it; re-run the command after such a restore.
+
+**Disposable verification.** `scripts/dev/e3-m2f3i-index-pg-gate.ps1` (40 checks on throwaway PostgreSQL 18 databases; evidence `docs/evidence/e3-m2f3i/`).
+
+## 12. E3-M2f-3b: capability-refusal evidence (Development/Testing only)
+
+Contract: `E3_M2F3_CONTRACT_CLOSURE.md` §3–§9; record `E3_M2F3B_IMPLEMENTATION_RECORD.md`. **Prerequisite:** the E3-M2f-3i index (§11). Without it, every refusal is still refused exactly as before, but no evidence is recorded (`INDEX_UNAVAILABLE`). **Persistent use is not authorized** (OD-IX-2, owner acceptance of E3-M2f-3G, and every item of `E3_M2F_CONTRACT_CLOSURE.md` §11.5). *(2026-11-17: E3-M2f-3G executed on disposable PostgreSQL, `E3_M2F3G_VERIFICATION_RECORD.md`; operational notes in §13. Final closure the same day: E3-M2f-3i, -3b and -3G accepted for Development/Testing; persistent use remains blocked by OD-IX-2, PD-14 monitoring routes and `E3_M2F_CONTRACT_CLOSURE.md` §11.5.)*
+
+**What happens on a capability refusal.** The refused request's transaction (T1) ends exactly as in E3-M2f-2 and the caller receives the same `409 CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT`. Independently, after T1 has been disposed, the endpoint filter on the seven capability routes asks the recorder to record one `EnvelopeCapabilityRefused` entry on the organization's **audit stream**, in its own transaction (T2). At most one entry per organization, route (entry point) and AuthorityDb UTC hour; at most seven per organization per hour. The entry is delivered to the archive by the existing archive processor (pending, then anchored).
+
+**Where to look.** AuthorityDb (privileged access only; there is no API):
+
+```sql
+SELECT journal_stream_revision, journal_created_on, archive_delivery_state, journal_event_body_json
+  FROM authority.security_journal_entries
+ WHERE organization_id = '<organization>' AND journal_stream_name = 'audit' AND journal_event_kind = 'EnvelopeCapabilityRefused'
+ ORDER BY journal_stream_revision DESC LIMIT 50;
+```
+
+The body holds `workload_name`, `entry_point`, `client_capability_level` (always 1), `evidence_database_time_utc` (authoritative AuthorityDb time), `evidence_bucket_start_utc` (its UTC hour) and `refusal_observed_on_utc` (the recording instance's clock; informational). It never holds a floor or its cause, binding data, correlation, request, record or user identifiers, headers, tokens, build or instance identifiers, content or keys.
+
+**Operational signal (not evidence).** Counter `capability_refusal_evidence` on meter `AuthorizationAuthority.EnvelopeCapability`, tags `outcome`, `reason`, `entry_point`:
+
+| Outcome | Meaning | Log |
+|---|---|---|
+| `Committed` | T2 wrote one entry (archive delivery pending) | none |
+| `AlreadyRecorded` | T2's lookup found the key already recorded in the hour | none |
+| `SuppressedRecorded` / `SuppressedInconclusive` / `SuppressedPending` / `SuppressedInFlight` | No T2: the key is known recorded, recently inconclusive, waiting for a retry, or being recorded by a concurrent request of this process | none |
+| `Deferred` (reasons `INDEX_UNAVAILABLE`, `CLOCK_REGRESSION`, `TIMEOUT`, `ERROR`) | T2 reached no decision; a bounded in-memory retry is scheduled (5 s doubling to 5 min, given up after 1 h) | 9253 Warning |
+| `Ambiguous` (reason `AMBIGUOUS_COMMIT`) | The commit outcome is unknown; the retry re-reads the journal before anything else (never appends twice) | 9253 Warning |
+| `Inconclusive` (reasons `BOUND_INCONSISTENT`, `UNVERIFIABLE_BODY`, `TIME_ORDER_VIOLATION`) | The newest evidence cannot be trusted or contradicts the bound; nothing is recorded for that key until the end of the hour, and nothing is retried. **Investigate**: these indicate journal damage or tampering | 9254 Error |
+| `QuotaSuppressed` (reason `ATTEMPT_LIMIT`) | The process used its 256 T2 attempts for the current hour; the key is not attempted again this hour (one signal per key per hour) | 9254 Error |
+| `Abandoned` (reasons `ABANDONED`, `RETRY_CAPACITY`) | A retry was given up after 1 h, or the retry set (1,024 keys) was full | 9254 Error |
+| `NotAttempted` | Not one of the seven approved keys (should never happen) | 9254 Error |
+
+Log 9256 (Warning) reports an unexpected failure of the retry loop. Monitoring routes for 9253, 9254 and 9256 are a deployment prerequisite (PD-14), together with 9100 and 9250.
+
+**What is not guaranteed (closure §4).** A refusal is not proof of evidence. Evidence is best effort: lost on a process crash before T2 commits, on retry abandonment, on quota exhaustion, while the index is missing, and on an AuthorityDb restore before archive delivery. There is no per-request, exactly-once or at-least-once guarantee before commit; after a commit, archive delivery is at least once while AuthorityDb is not restored.
+
+**Restore.** After an AuthorityDb restore, the first audit append of a restored organization (an evidence entry or any other event) collides with the archive, and the archive processor quarantines that organization (`ARCHIVE_BODY_MISMATCH`). That is the existing G14 detection; recovery is the separately reviewed G14 process (not implemented). If the restored database predates the E3-M2f-3i index, re-run the index command; until then no evidence is recorded.
+
+**Rollback.** Rolling the Authority back to an E3-M2f-3i build stops recording; nothing persisted needs removal (entries already written are ordinary, permanent audit evidence).
+
+## 13. Capability-refusal evidence: disposable PostgreSQL verification gate (E3-M2f-3G)
+
+Development/Testing only. Record: `E3_M2F3G_VERIFICATION_RECORD.md`. Never against a persistent database.
+
+```
+powershell -File scripts\dev\e3-m2f3g-evidence-pg-gate.ps1 -Evidence <folder> -RunLabel <label> [-Groups all|S,H,M,T,F,Q,L,W,G,B] [-BigRows 2000000]
+powershell -File scripts\dev\e3-m2f3g-mutations.ps1 -Out <folder> [-LegacyBuildsRoot <work dir of an earlier gate run>] [-DryRun]
+```
+
+- **Duration.** About 8 minutes plus the wait for the next real hour boundary (group B; skipped as NOT EXECUTED when that boundary is more than `-BoundaryMaxWaitMinutes` away or under 3 minutes away). Start a run of record between about HH:15 and HH:45. Never run two gate runs at once (shared ephemeral ports and timing checks).
+- **Statement traces.** The runtime role has `log_statement = 'none'` by product design (`AuthorityRuntimeGrants`); the gate never changes it. T2 statement shapes come from `auto_explain` (a database setting of the disposable copy) and an observing EF interceptor.
+- **Archive delivery.** The host's work loop archives only after SpiceDB reports its schema ready. Without SpiceDB, evidence entries stay `Pending`; recording is unaffected (T-12). In an environment where SpiceDB is down, expect Pending evidence, not missing evidence.
+- **Log classes observed on the real host.** 9253 for a T2 that could not complete (lock or statement bound, index unavailable) and is retried; the client's 409 is unchanged and immediate.
+- **Cleanup.** Both containers are removed with their anonymous volumes (`docker rm -f -v`); the script fails if the container or volume list changed.
+

@@ -614,13 +614,13 @@
     },
     {
       "path": "docs/security/E3_M2B1_CARV_OPERATIONS.md",
-      "sha256": "c841eda647cfd76aaa8c50c86ae2600035afcaec04fca5054b07569624dff6d6",
-      "bytes": 36557
+      "sha256": "d09bdf363e2b965b3c3fd8cd3f54f74bd4606162abc349825f4b2e143fe59084",
+      "bytes": 50405
     },
     {
       "path": "docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md",
-      "sha256": "000695f54dfba09260b1fec01f210a43e2babe7a6e0c97b2411df12d29a23e4b",
-      "bytes": 249717
+      "sha256": "58d2982581985d64a2ccc450d67ae3fe4d55ebec3ec01bb85743ff4537f073a4",
+      "bytes": 249914
     },
     {
       "path": "docs/security/E3_M2C_IMPLEMENTATION_RECORD.md",
@@ -644,8 +644,8 @@
     },
     {
       "path": "docs/security/E3_M2E_CONTRACT_CLOSURE.md",
-      "sha256": "b77443d5cb02983669447791fd3d5d9514101088f96269def22717e36620ffc2",
-      "bytes": 41444
+      "sha256": "b6a8d6c5f7dd6121ffb463234b070ada47c73f72fd5ed54fd78de5faca136612",
+      "bytes": 41617
     },
     {
       "path": "docs/security/E3_M2F1_IMPLEMENTATION_RECORD.md",
@@ -663,9 +663,29 @@
       "bytes": 30885
     },
     {
+      "path": "docs/security/E3_M2F3B_IMPLEMENTATION_RECORD.md",
+      "sha256": "78dc285cfaa4ad18afc4e2b5582e1908f18e54e8d3bd2a98a944714d8879c5ca",
+      "bytes": 22560
+    },
+    {
+      "path": "docs/security/E3_M2F3G_VERIFICATION_RECORD.md",
+      "sha256": "557b7ae0f7f7144b5cbb7f347a691f203b6bcefed2c35ed0285ceca22c3037f3",
+      "bytes": 43305
+    },
+    {
+      "path": "docs/security/E3_M2F3I_IMPLEMENTATION_RECORD.md",
+      "sha256": "dd3ee70e6f19bc2c237cc3059950df6fa1fb5ae019390cde3929c29d4d71b3c2",
+      "bytes": 17315
+    },
+    {
+      "path": "docs/security/E3_M2F3_CONTRACT_CLOSURE.md",
+      "sha256": "f9fbd4a1b44af21af10a928e98972b3e3908d80adef41f7dc7d0969902e365b1",
+      "bytes": 90520
+    },
+    {
       "path": "docs/security/E3_M2F_CONTRACT_CLOSURE.md",
-      "sha256": "3cd2e738b6efbda09da85bfeb49710596022b023d6ecf925433d5e7b751ac49e",
-      "bytes": 45184
+      "sha256": "1d5e63974f1be9b8b995dd9425366791bb37389a9e2c510c0717522aacf884ee",
+      "bytes": 46969
     },
     {
       "path": "docs/security/E3_M2_AUTHORITY_DATABASE_CONTRACT.md",
@@ -981,6 +1001,21 @@
       "path": "scripts/dev/e3-m2f2g-mutations.ps1",
       "sha256": "2bf9059757dae23c6453c02b68778dd528e5858676c471731824b5d10123883f",
       "bytes": 28259
+    },
+    {
+      "path": "scripts/dev/e3-m2f3g-evidence-pg-gate.ps1",
+      "sha256": "88abce0e15551106b03d7742b45eba67d1f3a0f0387a2d2fde76e27edadfeb69",
+      "bytes": 20412
+    },
+    {
+      "path": "scripts/dev/e3-m2f3g-mutations.ps1",
+      "sha256": "1666a502959f32b0d77acc7edd727fe9a120d1a6d683d2e0459d56021590e330",
+      "bytes": 8698
+    },
+    {
+      "path": "scripts/dev/e3-m2f3i-index-pg-gate.ps1",
+      "sha256": "66dc25ac234ab3ca597c4061993948a6f11982be3d0e8105129f3d8cb77d0884",
+      "bytes": 9432
     },
     {
       "path": "scripts/dev/e5-vault-hmac-integration.ps1",

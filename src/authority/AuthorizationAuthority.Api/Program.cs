@@ -29,6 +29,14 @@ public sealed class Program
             return probeExitCode;
         }
 
+        // E3-M2f-3i: the capability-refusal evidence index, a separate privileged step (migration identity, CREATE INDEX
+        // CONCURRENTLY, no EF migration, no grant re-application). It refuses --migrate and the floor command alongside it, so it
+        // is dispatched first.
+        if (CapabilityRefusalEvidenceIndexCommand.TryRun(args, out var evidenceIndexExitCode))
+        {
+            return evidenceIndexExitCode;
+        }
+
         // E3-M2b-1F: Release B only, an explicit operator action; ordinary --migrate never applies the floor, and the two are
         // never combined in one invocation (the command refuses --migrate alongside it).
         if (ContentAcceptanceFloorCommand.TryRun(args, out var floorExitCode))
@@ -81,6 +89,10 @@ public sealed class Program
         // E3-M2f-2 (§9): the business envelope capability floor; deployment floor from Content:MinimumBusinessEnvelopeCapability (absent => 1,
         // exactly "1" or "2" otherwise; anything else refuses the start). The check itself runs at the seven content entry points.
         builder.Services.AddEnvelopeCapabilityFloor();
+
+        // E3-M2f-3b: bounded capability-refusal evidence on the organization audit stream (recorder, endpoint filter on the seven
+        // capability routes, in-memory retry). Never changes a refusal; adds no endpoint, permission or configuration key.
+        builder.Services.AddCapabilityRefusalEvidence();
         AuthorizationAuthority.Api.Features.Health.TestStackIdentityEndpoints.RefuseOutsideTesting(builder.Configuration, builder.Environment);
         builder.Services.AddInternalAuthentication(builder.Configuration);
         // Phase C8 AC-9: read-only outcome lookup for the business reconciler (own credential, rate limit; bad limits fail at startup).

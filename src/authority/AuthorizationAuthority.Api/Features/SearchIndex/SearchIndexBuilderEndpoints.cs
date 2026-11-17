@@ -31,6 +31,7 @@ public static class SearchIndexBuilderEndpoints
                 TypedResults.Ok(await service.BackfillAsync(WorkloadName(context), request, InternalAuthentication.Correlation(context), cancellationToken, InternalAuthentication.EnvelopeCapability(context)).ConfigureAwait(false)))
             .WithName("BackfillSearchIndex")
             .WithEnvelopeCapabilityContract()
+            .WithCapabilityRefusalEvidence(AuthorizationAuthority.Application.Features.Content.CapabilityRefusalEvidence.EntryPoints.IndexBackfill)
             .WithSummary("IX-2 (builder workload only): 1..50 records' observed business bytes. Each is verified like a G19 census against the head the builder expects (complete leaf set, every HMAC, root, archive receipt; tampering quarantines the record), then postings are derived from the verified bytes and sealed, under the organization lock and conditional on the head (HEAD_CHANGED otherwise). Idempotent per record, head and coverage set. Provider outages fail the whole call (503, nothing written).");
 
         builder.MapPost("/attestation", static async Task<Ok<SearchIndexAttestation>> (SearchIndexAttestationRequest request, HttpContext context, SearchIndexBuilderService service, CancellationToken cancellationToken) =>
@@ -47,6 +48,7 @@ public static class SearchIndexBuilderEndpoints
                 TypedResults.Ok(await service.DeepVerifyAsync(WorkloadName(context), request, InternalAuthentication.Correlation(context), cancellationToken, InternalAuthentication.EnvelopeCapability(context)).ConfigureAwait(false)))
             .WithName("DeepVerifySearchIndex")
             .WithEnvelopeCapabilityContract()
+            .WithCapabilityRefusalEvidence(AuthorizationAuthority.Application.Features.Content.CapabilityRefusalEvidence.EntryPoints.IndexDeepVerify)
             .WithSummary("IX-2 S-C (builder workload only): 1..50 entries; the submitted bytes are verified against the head, postings re-derived and compared with the stored rows. Pass writes the entry's S-C timestamp; a posting mismatch quarantines the search index; unverifiable business bytes quarantine the record and the unit is Inconclusive.");
 
         var workload = endpoints.MapGroup(InternalApi.Prefix + "/search-index").WithTags("SearchIndex").RequireAuthorization(InternalAuthentication.WorkloadPolicy);

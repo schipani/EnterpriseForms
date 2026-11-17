@@ -153,7 +153,7 @@ public sealed class EnvelopeCapabilityEnforcementHostTests
         }
     }
 
-    private static WebApplicationFactory<AuthorizationAuthority.Api.Program> Authority(Script script, string? deploymentFloor = null) =>
+    internal static WebApplicationFactory<AuthorizationAuthority.Api.Program> Authority(Script script, string? deploymentFloor = null) =>
         new WebApplicationFactory<AuthorizationAuthority.Api.Program>().WithWebHostBuilder(b =>
         {
             b.UseEnvironment("Development");
@@ -183,7 +183,7 @@ public sealed class EnvelopeCapabilityEnforcementHostTests
 
     // ---- the seven content requests, as the real E3-M2f-1 clients send them ----
 
-    private sealed record Captured(string Name, HttpMethod Method, Uri Uri, Dictionary<string, string[]> Headers, byte[] Body);
+    internal sealed record Captured(string Name, HttpMethod Method, Uri Uri, Dictionary<string, string[]> Headers, byte[] Body);
 
     private sealed class Capturing(HttpMessageHandler inner) : DelegatingHandler(inner)
     {
@@ -209,7 +209,7 @@ public sealed class EnvelopeCapabilityEnforcementHostTests
         }
     }
 
-    private static async Task<List<Captured>> CaptureSevenAsync(WebApplicationFactory<AuthorizationAuthority.Api.Program> authority, Script script, Guid organization)
+    internal static async Task<List<Captured>> CaptureSevenAsync(WebApplicationFactory<AuthorizationAuthority.Api.Program> authority, Script script, Guid organization)
     {
         var capturing = new Capturing(authority.Server.CreateHandler());
         var user = new DelegatedUserContext(UserAssertionIssuer, "e3-m2f2-user", organization, UserAssertion());

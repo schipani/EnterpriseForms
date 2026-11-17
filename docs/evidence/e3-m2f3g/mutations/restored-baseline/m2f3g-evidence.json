@@ -1,0 +1,501 @@
+{
+  "harness": "E3-M2f-3G capability-refusal evidence PostgreSQL verification (real Authority host and real recorder/store on disposable PostgreSQL 18.0)",
+  "run": "mutation-restored-baseline",
+  "groups": "F,L,T",
+  "isolation": {
+    "databases": [
+      "g3_base",
+      "g3_f1",
+      "g3_f2",
+      "g3_f3",
+      "g3_f4",
+      "g3_f5",
+      "g3_f6",
+      "g3_l1",
+      "g3_noindex",
+      "g3_prefloor",
+      "g3_t1",
+      "m2f3ggate"
+    ],
+    "scrubbedEnvironmentVariables": [],
+    "stopped": false
+  },
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "elapsedSeconds": 59,
+  "checksTotal": 41,
+  "checksFailed": 0,
+  "byKind": {
+    "Control": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "Failure": {
+      "total": 12,
+      "passed": 12,
+      "failed": 0
+    },
+    "Liveness": {
+      "total": 13,
+      "passed": 13,
+      "failed": 0
+    },
+    "Safety": {
+      "total": 6,
+      "passed": 6,
+      "failed": 0
+    },
+    "Security": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "Setup": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0
+    }
+  },
+  "byGroup": {
+    "F": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0
+    },
+    "L": {
+      "total": 12,
+      "passed": 12,
+      "failed": 0
+    },
+    "S": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0
+    },
+    "T": {
+      "total": 12,
+      "passed": 12,
+      "failed": 0
+    },
+    "Z": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "demonstrationsOutsidePassTotals": 0,
+  "notExecuted": [],
+  "checks": [
+    {
+      "Id": "S-01",
+      "Group": "S",
+      "Kind": "Setup",
+      "Description": "the server is a disposable PostgreSQL 18.0 (one container of this run; admitted by nonce and system identifier)",
+      "Expected": "PostgreSQL 18.0",
+      "Observed": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-\u2026",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "S-02",
+      "Group": "S",
+      "Kind": "Setup",
+      "Description": "the approved runtime identity is an ordinary login (no superuser, CREATEROLE, CREATEDB, BYPASSRLS, REPLICATION; NOINHERIT)",
+      "Expected": "falsefalsefalsefalsefalsefalsetrue",
+      "Observed": "falsefalsefalsefalsefalsefalsetrue",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "S-03",
+      "Group": "S",
+      "Kind": "Setup",
+      "Description": "templates: the ordinary migration (migration identity), floors 1 -\u003E 2 -\u003E 3 (Release B floor 3; Envelope v2 acceptance stays OFF), then IX-B by the accepted E3-M2f-3i command (migration identity) and its --verify-only; the harness\u0027s own catalogue query finds the approved definition valid, ready and live. g3_prefloor (migrated only) and g3_noindex (floors, no IX-B) are copies taken before",
+      "Expected": "migrate 0; floors 0,0,0; index absent -\u003E exit 0 -\u003E approved-valid; verify-only exit 0",
+      "Observed": "migrate 0; floors 0,0,0; index absent -\u003E exit 0 outcome Created -\u003E approved-valid; verify-only exit 0 outcome AlreadyValid",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "S-04",
+      "Group": "S",
+      "Kind": "Setup",
+      "Description": "the copies keep their states: g3_noindex has no IX-B, g3_prefloor has no floor and no IX-B",
+      "Expected": "g3_noindex absent; g3_prefloor absent and no floor",
+      "Observed": "g3_noindex absent; g3_prefloor absent; prefloor floors none",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "T-01",
+      "Group": "T",
+      "Kind": "Security",
+      "Description": "M2F3-54 / M2F3-71 / M2F3-28 (fence): the real T2 on PostgreSQL 18. Server side (auto_explain; the runtime role logs no statements by product setting): the organization row lock, clock_timestamp() (after the lock), the catalogue check and the eight-row lookup, in that order, then exactly ONE INSERT into the journal and ONE UPDATE of the organization row (EF orders its batch) and nothing else. EF side (observing interceptor): SET LOCAL lock_timeout before the lock, SET LOCAL statement_timeout after it, one SaveChanges batch with the INSERT and the UPDATE, one commit. The UPDATE sets exactly the three permitted columns; no statement reads transaction_timestamp/now/current_timestamp/statement_timestamp; no statement touches content operations, the CARV floors or the data-key ledger",
+      "Expected": "Committed; server [LOCK_ORG,CLOCK,INDEX_CHECK,LOOKUP] \u002B one INSERT_JOURNAL \u002B one UPDATE_ORG; EF [SET_LOCK,LOCK_ORG,SET_STMT,INSERT_JOURNAL\u002BUPDATE_ORG]; commits 1; update columns audit_journal_revision,latest_audit_journal_digest,state_modified_on; forbidden 0; fence 0",
+      "Observed": "Committed; server [LOCK_ORG,CLOCK,INDEX_CHECK,LOOKUP,UPDATE_ORG,INSERT_JOURNAL]; EF [SET_LOCK,LOCK_ORG,SET_STMT,INSERT_JOURNAL\u002BUPDATE_ORG]; commits 1; update columns audit_journal_revision,latest_audit_journal_digest,state_modified_on; forbidden 0; fence 0",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "T-02",
+      "Group": "T",
+      "Kind": "Security",
+      "Description": "M2F3-56 on PostgreSQL: audit_journal_revision \u002B1; authorization, projection and content-integrity revisions unchanged (so result snapshots, which compare authorization and content-integrity revisions, stay valid); no quarantine; nothing else of the organization changed; other organizations untouched; the search-access maintenance schedule plans exactly one CatchUp, for this organization",
+      "Expected": "audit 1; authorization 7; projection 7; content 0; quarantine none; fingerprint unchanged; others unchanged; CatchUp [01a1e9db]",
+      "Observed": "audit 0; authorization 7; projection 7; content 0; quarantine none -\u003E audit 1; authorization 7; projection 7; content 0; quarantine none; fingerprint unchanged; others unchanged; CatchUp [01a1e9db]",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "T-03",
+      "Group": "T",
+      "Kind": "Security",
+      "Description": "M2F3-54 (triggers): during T2 only the quarantine-permanence trigger function runs (pg_stat_user_functions, track_functions = all on this copy)",
+      "Expected": "only a *quarantine* trigger function, once",
+      "Observed": "authority.organization_integrity_quarantine_is_permanent\u002B1",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "T-04",
+      "Group": "T",
+      "Kind": "Safety",
+      "Description": "M2F3-72 after T-01: the oracle holds (one entry, valid body, digest and chain intact, audit head matches)",
+      "Expected": "evidence 1; oracle holds",
+      "Observed": "evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "T-05",
+      "Group": "T",
+      "Kind": "Safety",
+      "Description": "M2F3-05 on PostgreSQL: a second process (fresh recorder, empty pre-filter) finds the key in its locked lookup and writes nothing: no INSERT, no UPDATE on the server, no SaveChanges and no commit on the EF side (the transaction is rolled back on disposal)",
+      "Expected": "AlreadyRecorded; server [LOCK_ORG,CLOCK,INDEX_CHECK,LOOKUP]; EF [SET_LOCK,LOCK_ORG,SET_STMT]; commits 0; evidence 1",
+      "Observed": "AlreadyRecorded; server [LOCK_ORG,CLOCK,INDEX_CHECK,LOOKUP]; EF [SET_LOCK,LOCK_ORG,SET_STMT]; commits 0; evidence 1",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "T-06",
+      "Group": "T",
+      "Kind": "Safety",
+      "Description": "M2F3-52 on PostgreSQL: pre-filter capacity 1: the evicted first key is looked up durably again and found (AlreadyRecorded, not a second append); a flood of 5 passes x 3 organizations x 7 keys makes the lookups rise (most calls reach T2) while every organization keeps exactly its seven entries",
+      "Expected": "Committed x3; AlreadyRecorded; flood lookups \u003E 21; inserts 18 (the 4 keys of the first organization not yet recorded \u002B 7 \u002B 7); fleet oracle holds with 21 entries",
+      "Observed": "Committed,Committed,Committed; AlreadyRecorded; flood AlreadyRecordedx83,Committedx18,SuppressedRecordedx4; lookups 101; inserts 18; organizations 3; evidence 21; per bucket [2026-11-17T14:00:00\u002B00:00=21]; failing []",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "T-07",
+      "Group": "T",
+      "Kind": "Safety",
+      "Description": "D-3b-3 on PostgreSQL: 40 concurrent refusals of one key in one process: one T2 (one lookup, one INSERT), every other call suppressed in flight or by the pre-filter",
+      "Expected": "Committed x1, the rest SuppressedInFlight/SuppressedRecorded; lookups 1; inserts 1; evidence 1",
+      "Observed": "Committedx1,SuppressedInFlightx39; lookups 1; inserts 1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "T-08",
+      "Group": "T",
+      "Kind": "Safety",
+      "Description": "M2F3-27 / M2F3-51 / M2F3-72 on the real organization row lock: R = 10 restarts x 6 recorder instances (separate pre-filters, as separate processes) x 7 keys concurrently within one bucket: exactly 7 Committed in total, every other attempt AlreadyRecorded; no error; the oracle holds independently of R",
+      "Expected": "Committed x7; AlreadyRecorded x413; evidence 7; oracle holds",
+      "Observed": "AlreadyRecordedx413,Committedx7; T2 p50 272 ms, p95 568 ms, max 907 ms; evidence 7; max per (key, bucket) 1; max per bucket 7; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "T-09",
+      "Group": "T",
+      "Kind": "Failure",
+      "Description": "M2F3-36 on PostgreSQL: with the organization row held by another session, T2 gives up at lock_timeout (server: 55P03), appends nothing, and is retried (9253) once the row is free; through the whole pipeline (T1 refusal, row taken at T2\u0027s first statement) the request still returns the 409 within the budget, with no evidence",
+      "Expected": "Deferred in 1000..2500 ms; server lock-timeout at LOCK_ORG; evidence 0 -\u003E 1 after the retry; pipeline 409, Deferred, \u003C 3000 ms, evidence 0",
+      "Observed": "Deferred in 1038 ms; server lock-timeout LOCK_ORG; evidence 0 -\u003E 1; pipeline AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False, Deferred, 1203 ms, evidence 0",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "T-10",
+      "Group": "T",
+      "Kind": "Failure",
+      "Description": "statement bound inside T2 (catalogue check): the journal table held ACCESS EXCLUSIVE by another session; the catalogue check is cancelled by statement_timeout (500 ms) on the server; Deferred; nothing appended; well inside the budget",
+      "Expected": "Deferred; server statement-timeout at INDEX_CHECK; \u003C 1500 ms; evidence 0",
+      "Observed": "Deferred; server statement-timeout INDEX_CHECK; 536 ms; evidence 0",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "T-11",
+      "Group": "T",
+      "Kind": "Failure",
+      "Description": "statement bound inside T2 (lookup): IX-B held ACCESS EXCLUSIVE by another session; the eight-row lookup is cancelled by statement_timeout (500 ms) on the server; Deferred; nothing appended; after the release the retry records exactly one entry",
+      "Expected": "Deferred; server statement-timeout at LOOKUP; \u003C 1500 ms; evidence 0 -\u003E 1; oracle holds",
+      "Observed": "Deferred; server statement-timeout LOOKUP; 546 ms; evidence 0 -\u003E 1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "T-12",
+      "Group": "T",
+      "Kind": "Liveness",
+      "Description": "M2F3-31 (outage): with the archive unavailable, delivery of the evidence entry fails and stays pending, while a further refusal of another key is still recorded; once the archive is back the unchanged archive processor anchors both",
+      "Expected": "Committed; delivery fails; Committed; both not anchored during the outage; both Anchored afterwards; oracle holds",
+      "Observed": "Committed; outage processed; Committed; during [Pending/1,Pending/0]; after [Anchored,Anchored]; evidence 2; max per (key, bucket) 1; max per bucket 2; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-01",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "journal insert failure (server CHECK violation in T2\u0027s SaveChanges, after the commit was requested): classified Ambiguous (D-6, safe under L-C); the whole T2 rolled back (no entry, audit revision unchanged); the retry reconciles against the journal and records exactly one entry",
+      "Expected": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; oracle holds",
+      "Observed": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True (Ambiguous/Ambiguousx1,Committedx1)",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-02",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "organization-row update failure (server CHECK violation on the audit head update): Ambiguous; the journal INSERT of the same transaction rolled back with it (no entry, revision unchanged); the retry records exactly one",
+      "Expected": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; oracle holds",
+      "Observed": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True (Ambiguous/Ambiguousx1,Committedx1)",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-03",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "commit failure (a deferred constraint trigger fails COMMIT on the server): Ambiguous; nothing durable; the retry records exactly one",
+      "Expected": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; oracle holds",
+      "Observed": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True (Ambiguous/Ambiguousx1,Committedx1)",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-04",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "M2F3-35 on PostgreSQL: COMMIT succeeded, its outcome was lost (exception after the commit returned): Ambiguous; the entry IS durable; the same process\u0027s retry and a restarted process both reconcile against the journal (AlreadyRecorded), never appending a second entry",
+      "Expected": "Ambiguous; during 1; retry AlreadyRecorded; restart AlreadyRecorded; evidence 1; oracle holds",
+      "Observed": "Ambiguous; during 1; retry AlreadyRecorded; restart AlreadyRecorded; evidence 1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-05",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "unknown outcome, rolled back: the T2 session is terminated just before COMMIT: Ambiguous; nothing durable; the retry finds the key absent and records exactly one entry",
+      "Expected": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; oracle holds",
+      "Observed": "Ambiguous; during 0, revisions unchanged; retry Committed; after 1; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True (Ambiguous/Ambiguousx1,Committedx1)",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-06",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "M2F3-34 in-process: a refused T1 (level 1, D = 2) committed nothing (organization fingerprint and audit head unchanged); a crash before T2 leaves no evidence; the next refusal records exactly one entry",
+      "Expected": "409; evidence 0; fingerprint unchanged; next 409 Committed; evidence 1",
+      "Observed": "AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; evidence 0; fingerprint unchanged; next AuthorityException CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False Committed; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-07",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "M2F3-65 on PostgreSQL: the newest entry (controlled setup through the real AuditJournal) is dated 4 s after t_db; T2 defers (CLOCK_REGRESSION; under D-3b-2 a retry is scheduled, log 9253, rather than the 9254 named in the closure text) and appends nothing; once t_db has passed the entry the retry records exactly one entry",
+      "Expected": "Deferred ClockRegression; evidence 1 (seeded); retry Committed; evidence 2; oracle holds",
+      "Observed": "Deferred ClockRegression; evidence 1; retry Committed; evidence 2; max per (key, bucket) 1; max per bucket 2; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-10",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "M2F3-64 on PostgreSQL: a database error at the insert (unique violation: a non-recorder audit entry already at the revision T2 computed) leaves nothing appended and the audit head unchanged (Ambiguous, retried; the retry meets the same occupied revision until the inconsistency is resolved: evidence is lost, never duplicated)",
+      "Expected": "Ambiguous; evidence 0; audit head still 0",
+      "Observed": "Ambiguous; evidence 0; audit 0; authorization 7; projection 7; content 0; quarantine none",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-08",
+      "Group": "F",
+      "Kind": "Failure",
+      "Description": "invalid evidence is never trusted on PostgreSQL: (a) an entry with an unapproved key (controlled setup, valid digest) makes the lookup inconclusive (UNVERIFIABLE_BODY, 9254), the next refusal is suppressed by the negative cache; (b) an entry altered in place after commit (digest no longer matches) makes the lookup inconclusive; nothing is appended in either case; the independent oracle sees the same defects",
+      "Expected": "(a) Inconclusive UnverifiableBody, SuppressedInconclusive, evidence 1, oracle invalid 1; (b) Inconclusive UnverifiableBody, evidence 1, oracle digest mismatch 1",
+      "Observed": "(a) Inconclusive UnverifiableBody, SuppressedInconclusive, evidence 1, invalid 1; (b) Inconclusive UnverifiableBody, evidence 1, digest mismatches 1",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "F-09",
+      "Group": "F",
+      "Kind": "Safety",
+      "Description": "MZ-22 equivalence on the PostgreSQL path: eight current-hour entries can only exist with a duplicate key (seven approved keys; any other key is UNVERIFIABLE_BODY first); the duplicate makes T2 inconclusive (BOUND_INCONSISTENT) and nothing is appended. The rule MZ-22 removes (\u0027eight rows, none older\u0027) is therefore never the deciding rule",
+      "Expected": "Inconclusive BoundInconsistent; evidence 8 (seeded); oracle max per (key, bucket) 2",
+      "Observed": "Inconclusive BoundInconsistent; evidence 8; max per (key, bucket) 2",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-01",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "M2F3-70 / M2F3-30: a mature organization (200000 unrelated audit entries; 250000 journal entries in all; statistics never/never) records its FIRST refusal on the first attempt; inside the real T2 the eight-row lookup is a backward index scan on IX-B under Limit that returns 0 rows and touches a handful of buffers (no unrelated audit entry read); T2 holds the organization row briefly",
+      "Expected": "Committed; backward IX-B; Limit; scan rows 0; buffers \u003C 50; no filter removals; lock hold \u003C 500 ms; oracle holds",
+      "Observed": "Committed in 76 ms; backward IX-B True; Limit True; scan rows 0; shared buffers 2; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.12..8.14 rows=1 width=88) (actual time=0.003..0.003 ro\u2026]; lock hold 44 ms; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-02",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "repeat refusal (fresh process): the lookup returns the one entry through IX-B; AlreadyRecorded; nothing appended",
+      "Expected": "AlreadyRecorded; backward IX-B; scan rows 1",
+      "Observed": "AlreadyRecorded in 39 ms; backward IX-B True; Limit True; scan rows 1; shared buffers 2; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.14..8.16 rows=1 width=88) (actual time=0.028..0.029 ro\u2026]; evidence 1",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-03",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "multiple entry points on the mature organization: the six other keys each recorded on the first attempt; a further lookup reads the seven entries (\u2264 8 heap rows) through IX-B and finds its key",
+      "Expected": "Committed x6; AlreadyRecorded; backward IX-B; scan rows 7; oracle 7 holds",
+      "Observed": "Committed,Committed,Committed,Committed,Committed,Committed; AlreadyRecorded; backward IX-B True; Limit True; scan rows 7; shared buffers 3; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.14..8.16 rows=1 width=88) (actual time=0.024..0.027 ro\u2026]; evidence 7; max per (key, bucket) 1; max per bucket 7; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-04",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "after ANALYZE: inside T2 the lookup is still the backward IX-B scan under Limit",
+      "Expected": "AlreadyRecorded; backward IX-B; Limit",
+      "Observed": "AlreadyRecorded; backward IX-B True; Limit True; scan rows 7; shared buffers 3; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.12..5.89 rows=1 width=79) (actual time=0.017..0.020 ro\u2026]",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-05",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "generic prepared plan (plan_cache_mode = force_generic_plan, runtime identity, parameterized organization): the literal predicates still match IX-B: backward IX-B scan under Limit",
+      "Expected": "backward IX-B; Limit; scan rows 7",
+      "Observed": "backward IX-B True; Limit True; scan rows 7; shared buffers 204; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.12..5.89 rows=1 width=79) (actual time=0.022..0.027 ro\u2026]",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-06",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "later hour: with seven entries in each of the three previous hours (the eight newest are all older than the current bucket), the current hour\u0027s first refusal of a key is recorded; the lookup reads exactly eight rows; per-bucket bound holds",
+      "Expected": "Committed; backward IX-B; scan rows 8; evidence 22; max per bucket 7; oracle holds",
+      "Observed": "Committed; backward IX-B True; Limit True; scan rows 8; shared buffers 3; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.12..5.89 rows=1 width=79) (actual time=0.029..0.033 ro\u2026]; evidence 22; max per (key, bucket) 1; max per bucket 7; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-07",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "lookup timeout on a mature organization: IX-B held ACCESS EXCLUSIVE by another session; the lookup is cancelled by statement_timeout; Deferred within the budget; nothing appended",
+      "Expected": "Deferred; server statement-timeout at LOOKUP; \u003C 1500 ms; evidence 0",
+      "Observed": "Deferred Error; server statement-timeout LOOKUP; 537 ms; evidence 0",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-08",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "catalogue check failure on a mature organization: the journal table held ACCESS EXCLUSIVE; the catalogue check (deparse, ACCESS SHARE on the table) is cancelled by statement_timeout; Deferred; no lookup ran; nothing appended",
+      "Expected": "Deferred; server statement-timeout at INDEX_CHECK; no LOOKUP; evidence 0",
+      "Observed": "Deferred Error; server statement-timeout INDEX_CHECK; lookups 0; evidence 0",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-09",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "missing IX-B on the mature database: T2 checks the catalogue, finds no usable IX-B, runs no lookup and appends nothing (Deferred INDEX_UNAVAILABLE; under D-3b-2 a retry is scheduled, log 9253, rather than the 9254/negative cache named in the closure text of M2F3-62); a repeat refusal of the key is suppressed while the retry is pending; the oracle holds",
+      "Expected": "index absent; Deferred IndexUnavailable; repeat SuppressedPending; INDEX_CHECK x1; LOOKUP none; evidence 0; oracle holds",
+      "Observed": "index absent; Deferred IndexUnavailable; repeat SuppressedPending; INDEX_CHECK x1; LOOKUP x0; evidence 0; max per (key, bucket) 0; max per bucket 0; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-10",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "mismatched IX-B (same name, no predicate) on the mature database: T2 checks the catalogue, finds no usable IX-B, runs no lookup and appends nothing (Deferred INDEX_UNAVAILABLE; under D-3b-2 a retry is scheduled, log 9253, rather than the 9254/negative cache named in the closure text of M2F3-62); a repeat refusal of the key is suppressed while the retry is pending; the oracle holds",
+      "Expected": "index mismatched; Deferred IndexUnavailable; repeat SuppressedPending; INDEX_CHECK x1; LOOKUP none; evidence 0; oracle holds",
+      "Observed": "index mismatched; Deferred IndexUnavailable; repeat SuppressedPending; INDEX_CHECK x1; LOOKUP x0; evidence 0; max per (key, bucket) 0; max per bucket 0; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-11",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "invalid IX-B (an interrupted CREATE INDEX CONCURRENTLY of the approved definition) on the mature database: T2 checks the catalogue, finds no usable IX-B, runs no lookup and appends nothing (Deferred INDEX_UNAVAILABLE; under D-3b-2 a retry is scheduled, log 9253, rather than the 9254/negative cache named in the closure text of M2F3-62); a repeat refusal of the key is suppressed while the retry is pending; the oracle holds",
+      "Expected": "index invalid; Deferred IndexUnavailable; repeat SuppressedPending; INDEX_CHECK x1; LOOKUP none; evidence 0; oracle holds",
+      "Observed": "index invalid; Deferred IndexUnavailable; repeat SuppressedPending; INDEX_CHECK x1; LOOKUP x0; evidence 0; max per (key, bucket) 0; max per bucket 0; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "L-12",
+      "Group": "L",
+      "Kind": "Liveness",
+      "Description": "recovery: after the manual DROP of the unusable index, the accepted E3-M2f-3i command (migration identity) rebuilds IX-B on the mature table; the next refusal is recorded on the first attempt through IX-B",
+      "Expected": "command exit 0; approved-valid; Committed; backward IX-B; scan rows 0; evidence 1; oracle holds",
+      "Observed": "command exit 0 outcome Created; approved-valid; Committed; backward IX-B True; Limit True; scan rows 0; shared buffers 1; rows removed by filter False; scan [-\u003E  Index Scan Backward using ix_journal_capability_refusal_evidence on security_journal_entries  (cost=0.14..5.91 rows=1 width=79) (actual time=0.007..0.007 ro\u2026]; evidence 1; max per (key, bucket) 1; max per bucket 1; invalid bodies 0; time-order violations 0; digest mismatches 0; chain breaks 0; revision gaps 0; head matches True",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "Z-01",
+      "Group": "Z",
+      "Kind": "Control",
+      "Description": "the runtime identity\u0027s privileges, memberships and role attributes are unchanged by the whole run (template database)",
+      "Expected": "4f11c3ac8659f78a3a5573c73d0d41ae (2379 entries)",
+      "Observed": "4f11c3ac8659f78a3a5573c73d0d41ae (2379 entries)",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "Z-02",
+      "Group": "Z",
+      "Kind": "Control",
+      "Description": "Envelope v2 acceptance was never requested: no database of the run holds an acceptance policy record with acceptance requested (hosts ran with Content:EnvelopeV2AcceptanceEnabled = false)",
+      "Expected": "none",
+      "Observed": "none",
+      "Pass": true,
+      "Gap": null
+    },
+    {
+      "Id": "Z-03",
+      "Group": "Z",
+      "Kind": "Control",
+      "Description": "no data-key binding exists in any database of the run (every organization stayed unbound: no bound-organization scenario was executed)",
+      "Expected": "none",
+      "Observed": "none",
+      "Pass": true,
+      "Gap": null
+    }
+  ],
+  "demonstrations": []
+}

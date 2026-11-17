@@ -381,6 +381,46 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public Task<bool> OrganizationHasDataKeyBindingsAsync(Guid organizationId, CancellationToken cancellationToken) =>
             context.ContentDataKeyBindings.AnyAsync(b => b.OrganizationId == organizationId, cancellationToken);
 
+        // ---- E3-M2f-3b capability-refusal evidence (T2 only; the SQL is defined and pinned in CapabilityRefusalEvidenceIndex) ----
+
+        public Task SetCapabilityEvidenceLockTimeoutAsync(CancellationToken cancellationToken) =>
+            context.Database.ExecuteSqlRawAsync(CapabilityRefusalEvidenceIndex.EvidenceLockTimeoutSql, cancellationToken);
+
+        public async Task<DateTimeOffset> StartCapabilityEvidenceLookupAsync(CancellationToken cancellationToken)
+        {
+            await context.Database.ExecuteSqlRawAsync(CapabilityRefusalEvidenceIndex.EvidenceStatementTimeoutSql, cancellationToken).ConfigureAwait(false);
+            await using var command = EvidenceCommand(CapabilityRefusalEvidenceIndex.DatabaseClockSql);
+            var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            return value switch
+            {
+                DateTime utc => new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc)),
+                DateTimeOffset offset => offset.ToUniversalTime(),
+                _ => throw new InvalidOperationException("clock_timestamp() returned no timestamp"),
+            };
+        }
+
+        public async Task<bool> IsCapabilityRefusalEvidenceIndexUsableAsync(CancellationToken cancellationToken) =>
+            (await CapabilityRefusalEvidenceIndex.InspectAsync(EvidenceConnection(), cancellationToken).ConfigureAwait(false)).State == CapabilityRefusalEvidenceIndexState.ValidMatching;
+
+        public async Task<IReadOnlyList<CapabilityRefusalEvidenceRow>> GetNewestCapabilityRefusalEvidenceAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            await using var command = EvidenceCommand(CapabilityRefusalEvidenceIndex.EvidenceLookupSql);
+            command.Parameters.AddWithValue("organization_id", organizationId);
+            var rows = new List<CapabilityRefusalEvidenceRow>(CapabilityRefusalEvidence.LookupLimit);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                rows.Add(new CapabilityRefusalEvidenceRow(reader.GetGuid(0), reader.GetInt64(1), reader.GetString(2), reader.GetFieldValue<byte[]>(3)));
+            }
+
+            return rows;
+        }
+
+        private Npgsql.NpgsqlConnection EvidenceConnection() => (Npgsql.NpgsqlConnection)context.Database.GetDbConnection();
+
+        private Npgsql.NpgsqlCommand EvidenceCommand(string sql) =>
+            new(sql, EvidenceConnection(), (Npgsql.NpgsqlTransaction)transaction.GetDbTransaction());
+
         public Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken)
         {
             var ids = manifestItemIds.Distinct().ToList();

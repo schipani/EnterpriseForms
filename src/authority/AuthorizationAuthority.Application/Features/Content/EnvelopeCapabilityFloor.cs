@@ -155,6 +155,10 @@ public sealed class EnvelopeCapabilityFloor
     private AuthorityException Refuse(Guid organizationId, int level)
     {
         observer?.Evaluated(organizationId, level, EnvelopeCapabilityOutcomes.Refused);
-        return new AuthorityException(AuthorityErrorCodes.ClientEnvelopeCapabilityInsufficient, 409, false, RefusalDetail);
+
+        // E3-M2f-3b: the organization and parsed level travel to the evidence handler in Exception.Data (never serialized); the
+        // exception type, code, status, retryable flag and detail, and so the 409 on the wire, are exactly those of E3-M2f-2. The
+        // same context is attached whichever floor refused (CAP-E2: no cause is carried).
+        return CapabilityRefusalContext.Attach(new AuthorityException(AuthorityErrorCodes.ClientEnvelopeCapabilityInsufficient, 409, false, RefusalDetail), organizationId, level);
     }
 }

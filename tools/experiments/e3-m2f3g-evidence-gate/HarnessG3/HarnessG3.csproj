@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    E3-M2f-3G capability-refusal evidence PostgreSQL verification gate (docs/security/E3_M2F3G_VERIFICATION_RECORD.md). Development/
+    Testing only; TEST-ONLY. Not part of EnterpriseForms.All.slnx and never built in place: scripts/dev/e3-m2f3g-evidence-pg-gate.ps1
+    copies this folder to a temporary work directory (outside the repository, so no repository build settings apply), adds the three
+    standalone E3-M2e-2 harness support files under Linked\ (Rows.cs, M1Core.cs, Isolation.cs; copied unchanged) and builds it against
+    ONE merged folder of Release binaries (M2f3gBinaries): this tree's Authority (AuthorizationAuthority.*) plus this tree's business
+    Domain/Application/Infrastructure (business clients, signed-column registry) and EnterpriseForms.Integrity. It references no
+    repository project. The Authority host and every Authority command run as separate processes of the built Authority.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>M2f3gHarness</AssemblyName>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS1591;CA2007;CA1303;CS0436</NoWarn>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="$(M2f3gBinaries)\*.dll" Private="true" />
+  </ItemGroup>
+  <Target Name="RequireM2f3gBinaries" BeforeTargets="ResolveAssemblyReferences" Condition="'$(M2f3gBinaries)' == '' Or !Exists('$(M2f3gBinaries)\AuthorizationAuthority.Api.dll') Or !Exists('$(M2f3gBinaries)\EnterpriseForms.Infrastructure.dll')">
+    <Error Text="Build through scripts/dev/e3-m2f3g-evidence-pg-gate.ps1 (M2f3gBinaries must name the merged Authority + business Release binaries)." />
+  </Target>
+</Project>

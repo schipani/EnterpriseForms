@@ -370,6 +370,15 @@ public sealed class CommandPlannerTests
 
         public Task<bool> OrganizationHasDataKeyBindingsAsync(Guid organizationId, CancellationToken cancellationToken) => throw new NotSupportedException(); // E3-M2f-2 (not used here)
 
+        // E3-M2f-3b capability-refusal evidence port: not used by these tests.
+        public Task SetCapabilityEvidenceLockTimeoutAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<DateTimeOffset> StartCapabilityEvidenceLookupAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<bool> IsCapabilityRefusalEvidenceIndexUsableAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<CapabilityRefusalEvidenceRow>> GetNewestCapabilityRefusalEvidenceAsync(Guid organizationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task<List<ContentDataKeyBinding>> GetDataKeyBindingsForOperationAsync(Guid contentChangeOperationId, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public void AddDataKeyBindings(IEnumerable<ContentDataKeyBinding> bindings) => throw new NotSupportedException();

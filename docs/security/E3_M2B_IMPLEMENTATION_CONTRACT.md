@@ -1291,7 +1291,7 @@ The owner accepted E3-M2b-1 for Development/Testing on the reported implementati
 |---|---|
 | **R-CARV-15** | **Accepted.** `409 OPERATION_RULES_OUTDATED` carries `retryable: false` for the rejected operation. Recovery requires a new Prepare. |
 | **R-CARV-11** (existing F-17) | **Deferral accepted.** The backlog entry stays open; it is **not** resolved. |
-| **R-CARV-12** | **Open release-gate question.** Before deployment, determine whether mandatory Authority audit policy requires a durable event in addition to the operational alert `CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE`. |
+| **R-CARV-12** | **Open release-gate question.** Before deployment, determine whether mandatory Authority audit policy requires a durable event in addition to the operational alert `CONTENT_ACCEPTANCE_RULE_REFUSED_BY_DATABASE`. *(Note 2026-11-17: `E3_M2F3_CONTRACT_CLOSURE.md` CC-4/PD-11 answers the equivalent question for `CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT` only; R-CARV-12 for this class, and R-M2b2-7, stay open.)* |
 | **R-CARV-13** | **Accepted.** The readiness polling delay (at most one 30 s interval) is accepted because database enforcement is immediate. |
 
 **Operation retry versus business-action retry (R-CARV-15).**

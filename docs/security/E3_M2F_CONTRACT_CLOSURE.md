@@ -225,7 +225,7 @@ It must not:
 
 | ID | Requirement |
 |---|---|
-| CAP-E1 | `409 CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT`, `retryable = false`, fixed detail text with no identifiers, levels or binding information. Added to the private Authority error codes and documented in the internal Authority OpenAPI (header parameter and response). |
+| CAP-E1 | `409 CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT`, `retryable = false`, fixed detail text with no identifiers, levels or binding information. Added to the private Authority error codes and documented in the internal Authority OpenAPI (header parameter and response). *(Amended 2026-11-17 by E3-M2f-3a, `E3_M2F3_CONTRACT_CLOSURE.md` §2 CC-2: documentation text only. The response description distinguishes the refused transaction, which wrote nothing, from bounded refusal evidence the Authority may record independently on the organization's audit stream. No wire change. CAP-O6 unchanged.)* |
 | CAP-E2 | The same response for "below the deployment floor" and "below the organization floor" (no distinguishing signal). |
 | CAP-E3 | **Business mapping.** Level-2 builds recognize the code as non-retryable. It must not be added to the retryable or fresh-operation sets (`IsAbandonedOperation`, `IsUnusableOperationKey`, `IsRetryableConflict`, `FieldProtectionMigrationService` retryable codes), so no retry or new-Prepare loop starts. It surfaces to the user as a service-unavailable condition without detail. Older builds see an unrecognized 409 (their existing behaviour). |
 | CAP-E4 | Operational signal in E3-M2f-2: a structured log event and metric carrying the outcome, the parsed level and the organization identifier only (no record, user or binding data). This is **not** the durable refusal evidence required by OD-M2f-09. |
@@ -233,6 +233,10 @@ It must not:
 ---
 
 ## 8. Refusal evidence [DEFERRED; required]
+
+*(Note 2026-11-17: the owner decisions on this section are recorded in `E3_M2F3_CONTRACT_CLOSURE.md` (E3-M2f-3a): option C1, QC-1 and LV-1 (partial journal index, increment E3-M2f-3i), each conditionally approved; B-M2f3-1..B-M2f3-4 decided; migration-plan decisions OD-IX-1 and OD-IX-2 open. RE-1..RE-6 stay unmet until E3-M2f-3b and E3-M2f-3G are implemented and accepted.)*
+
+*(Note 2026-11-17, final closure: E3-M2f-3b and E3-M2f-3G are accepted for Development/Testing; RE-1..RE-6 are satisfied for the capability-refusal class in Development/Testing only, not for persistent use (`E3_M2F3_CONTRACT_CLOSURE.md` §14).)*
 
 | ID | Requirement (approved) |
 |---|---|
@@ -371,7 +375,7 @@ R-M2f-1, R-M2f-2, R-M2f-4 (§2, §4.4); BD-1 and BD-2 (unchanged; FB-1 obligatio
 
 ### 12.4 E3-M2f-3 — Durable bounded refusal evidence
 
-Starts only after a separate owner design decision on §8 (and R-CARV-12 / UQ-4). Scope, storage and migrations, if any, are defined by that decision. Required tests at minimum: survival of the refused transaction; bound under a request flood; no identifiers beyond organization and workload; ordering unchanged (CAP-O6 relaxed only as decided); behaviour under archive and journal outage.
+*(Note 2026-11-17: the design decision is recorded in `E3_M2F3_CONTRACT_CLOSURE.md`; its §12 proposes the E3-M2f-3b boundary and §10 the E3-M2f-3G gate. Neither is authorized.)* Starts only after a separate owner design decision on §8 (and R-CARV-12 / UQ-4). Scope, storage and migrations, if any, are defined by that decision. Required tests at minimum: survival of the refused transaction; bound under a request flood; no identifiers beyond organization and workload; ordering unchanged (CAP-O6 relaxed only as decided); behaviour under archive and journal outage.
 
 ---
 
@@ -422,7 +426,7 @@ Starts only after a separate owner design decision on §8 (and R-CARV-12 / UQ-4)
 
 | ID | Question | Blocks |
 |---|---|---|
-| **OPEN-M2f-1** | Refusal-evidence design (§8; with R-CARV-12, UQ-4) | E3-M2f-3; persistent use |
+| **OPEN-M2f-1** | Refusal-evidence design (§8; with R-CARV-12, UQ-4). *(2026-11-17: design decided conditionally in `E3_M2F3_CONTRACT_CLOSURE.md`; still open pending OD-IX-2 and the accepted E3-M2f-3b and E3-M2f-3G; E3-M2f-3i accepted, E3-M2f-3b conditionally accepted, E3-M2f-3G executed for Development/Testing and under review (`E3_M2F3G_VERIFICATION_RECORD.md`).)* | E3-M2f-3; persistent use. *(2026-11-17: E3-M2f-3a, -3i, -3b and -3G accepted for Development/Testing; OPEN-M2f-1 remains open pending OD-IX-2, `E3_M2F3_CONTRACT_CLOSURE.md` §14)* |
 | OPEN-M2f-2 | Whether the deployment floor should later be recorded or anchored for mechanical monotonicity (§9; needs owner approval for any state) | None now; production governance |
 | OPEN-M2f-3 | Signal evolution under PB-08 (CAP-S8) | None now |
 | OPEN-M2f-4 | Authorization of acceptance-on inside the E3-M2f-2G disposable run (OD-M2e-16) | E3-M2f-2G |
@@ -442,7 +446,7 @@ Starts only after a separate owner design decision on §8 (and R-CARV-12 / UQ-4)
 | R-M2f-6 | The header is self-asserted; a compromised business runtime can claim level 2 (A3) | Accepted by design (CAP-S7) |
 | R-M2f-7 | Deployment floor monotonicity is procedural only | Open (OPEN-M2f-2) |
 | R-M2f-8 | Business instances below E3-M2f-1 lose service for bound organizations | Accepted availability cost; drain before the first binding |
-| R-M2f-9 | Until E3-M2f-3, refusals leave only non-durable operational signals | Open; blocks persistent use |
+| R-M2f-9 | Until E3-M2f-3, refusals leave only non-durable operational signals | Open; blocks persistent use. *(2026-11-17: E3-M2f-3i, -3b and -3G accepted for Development/Testing; closed for Development/Testing only (`E3_M2F3_CONTRACT_CLOSURE.md` §14); persistent use still blocked by OD-IX-2 and §11.5)* |
 | R-M2f-10 | A future business level must be recognized by the Authority before it is sent (CAP-S6); a business-first rollout of a new level is refused | Accepted (fail closed) |
 
 ---

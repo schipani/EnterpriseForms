@@ -1,0 +1,1 @@
+{"Ok":false,"Status":409,"Error":"AuthorityClientException","ErrorCode":"CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT","HttpStatusCode":409,"Retryable":false,"Sent":[{"Path":"/internal/v1/verifier/migration-catalogue/01a1ea09-4786-773d-a04a-8119ba8eb597/census","CapabilityHeaderValues":[],"Status":409}]}

@@ -352,7 +352,7 @@ OD-M2e-07(c) lets a carried v2 group commit with the switch off when P-4 finds a
 | UQ-1 | Exact JSON names and commitment encoding of the body element (existing serializer conventions) | Settled in the E3-M2e-1 implementation review |
 | UQ-2 | Whether the Release B fence verifies the ledger objects on every content write or only in transactions that insert a binding or run P-4 (L-13 requires the latter as a minimum) | E3-M2e-1 review |
 | UQ-3 | Where the "last observed" acceptance policy is kept for `EnvelopeAcceptancePolicyObserved`. If it needs a new table, that table is part of the E3-M2e-1 AuthorityDb migration approval | E3-M2e-1 authorization |
-| UQ-4 | Whether DK-6/P-4 incidents and the switch-off Commit aborts are also journaled on the audit stream (R-CARV-12) | Release gate, unchanged |
+| UQ-4 | Whether DK-6/P-4 incidents and the switch-off Commit aborts are also journaled on the audit stream (R-CARV-12) *(Note 2026-11-17: `E3_M2F3_CONTRACT_CLOSURE.md` PD-11 decides durable audit-stream evidence for the capability refusal class only; UQ-4 is not answered and remains open.)* | Release gate, unchanged |
 | UQ-5 | PostgreSQL 18.0 renderings of the floor-3 and ledger-trigger definitions on Azure PostgreSQL (R-CARV-23) | Production |
 | UQ-6 | P-3 (wrapped-key digest) for a later increment | None in E3-M2e |
 

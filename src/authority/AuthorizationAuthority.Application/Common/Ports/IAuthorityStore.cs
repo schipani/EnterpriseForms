@@ -43,6 +43,9 @@ public interface IAuthorityStore
 /// </summary>
 public sealed record OrganizationChangeMarker(Guid OrganizationId, long AuthorizationRevision, long ContentIntegrityRevision, long AuditJournalRevision);
 
+/// <summary>E3-M2f-3b (closure IXP-6): one capability-refusal evidence journal row as the evidence lookup reads it (no other column).</summary>
+public sealed record CapabilityRefusalEvidenceRow(Guid SecurityJournalEntryId, long JournalStreamRevision, string JournalEventBodyJson, byte[] JournalEventDigest);
+
 public interface IAuthorityScope : IAsyncDisposable
 {
     /// <summary>IX-1: the Authority-owned search index, in this scope's transaction.</summary>
@@ -148,6 +151,28 @@ public interface IAuthorityScope : IAsyncDisposable
     /// path for any other purpose. A failure throws (the caller refuses).
     /// </summary>
     Task<bool> OrganizationHasDataKeyBindingsAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    // ---- E3-M2f-3b capability-refusal evidence (docs/security/E3_M2F3_CONTRACT_CLOSURE.md §3.2, §5.3, §5A). Called solely by the
+    // evidence recorder, in its own transaction T2, never in a refused transaction. None of them reads the data-key ledger. ----
+
+    /// <summary>T2-3: bounds this transaction's lock waits (<c>SET LOCAL lock_timeout</c>); called first, before the organization lock.</summary>
+    Task SetCapabilityEvidenceLockTimeoutAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// T2-4 / IXP-7: after the organization lock, bounds this transaction's statements (<c>SET LOCAL statement_timeout</c>) and returns the
+    /// authoritative time <c>t_db</c>: the AuthorityDb <c>clock_timestamp()</c> read in its own statement after the lock (never the
+    /// transaction start time, never the instance clock).
+    /// </summary>
+    Task<DateTimeOffset> StartCapabilityEvidenceLookupAsync(CancellationToken cancellationToken);
+
+    /// <summary>T2-8 / IXP-8: whether the E3-M2f-3i index exists, is valid, ready and live, and has exactly the approved definition.</summary>
+    Task<bool> IsCapabilityRefusalEvidenceIndexUsableAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// LK-1 / IXP-6: the newest at most eight capability-refusal evidence entries of the organization (stream and kind as SQL literals,
+    /// ordered by stream revision descending). Unrelated audit entries are not read.
+    /// </summary>
+    Task<IReadOnlyList<CapabilityRefusalEvidenceRow>> GetNewestCapabilityRefusalEvidenceAsync(Guid organizationId, CancellationToken cancellationToken);
 
     void AddEdge(AuthorityRelationshipEdge edge);
 

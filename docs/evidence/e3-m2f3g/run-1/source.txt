@@ -1,0 +1,43 @@
+3009878f55dc4430cc90ef5092764ed01abeff80 plus the uncommitted working tree (git status --short below)
+ M SHA256SUMS.txt
+ M contracts/openapi/authorization-authority-internal-v1.json
+ M docs/security/E3_M2B1_CARV_OPERATIONS.md
+ M docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md
+ M docs/security/E3_M2E_CONTRACT_CLOSURE.md
+ M docs/security/E3_M2F_CONTRACT_CLOSURE.md
+ M spec-files.json
+ M src/authority/AuthorizationAuthority.Api/Composition/EnvelopeCapabilityComposition.cs
+ M src/authority/AuthorizationAuthority.Api/Features/Catalogue/CatalogueEndpoints.cs
+ M src/authority/AuthorizationAuthority.Api/Features/Content/ContentEndpoints.cs
+ M src/authority/AuthorizationAuthority.Api/Features/SearchIndex/SearchIndexBuilderEndpoints.cs
+ M src/authority/AuthorizationAuthority.Api/Program.cs
+ M src/authority/AuthorizationAuthority.Application/Common/Ports/IAuthorityStore.cs
+ M src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeCapabilityFloor.cs
+ M src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityStore.cs
+ M tests/authority/AuthorizationAuthority.Tests/ArchiveProcessorTests.cs
+ M tests/authority/AuthorizationAuthority.Tests/CommandPlannerTests.cs
+ M tests/authority/AuthorizationAuthority.Tests/InMemoryAuthorityStore.cs
+ M tests/features/EnterpriseForms.Api.ContractTests/EnvelopeCapabilityEnforcementHostTests.cs
+?? docs/evidence/e3-m2f3b/
+?? docs/evidence/e3-m2f3i/
+?? docs/security/E3_M2F3B_IMPLEMENTATION_RECORD.md
+?? docs/security/E3_M2F3I_IMPLEMENTATION_RECORD.md
+?? docs/security/E3_M2F3_CONTRACT_CLOSURE.md
+?? scripts/dev/e3-m2f3g-evidence-pg-gate.ps1
+?? scripts/dev/e3-m2f3g-mutations.ps1
+?? scripts/dev/e3-m2f3i-index-pg-gate.ps1
+?? src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs
+?? src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceIndexCommand.cs
+?? src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidence.cs
+?? src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceLookup.cs
+?? src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs
+?? src/authority/AuthorizationAuthority.Infrastructure/Persistence/CapabilityRefusalEvidenceIndex.cs
+?? tests/architecture/EnterpriseForms.ArchitectureTests/CapabilityRefusalEvidenceIndexBoundaryTests.cs
+?? tests/architecture/EnterpriseForms.ArchitectureTests/CapabilityRefusalEvidenceRecorderBoundaryTests.cs
+?? tests/authority/AuthorizationAuthority.Tests/CapabilityRefusalEvidenceIndexTests.cs
+?? tests/authority/AuthorizationAuthority.Tests/CapabilityRefusalEvidenceLookupTests.cs
+?? tests/authority/AuthorizationAuthority.Tests/CapabilityRefusalEvidenceRecorderTests.cs
+?? tests/authority/AuthorizationAuthority.Tests/CapabilityRefusalEvidenceWorld.cs
+?? tests/features/EnterpriseForms.Api.ContractTests/CapabilityRefusalEvidenceHostTests.cs
+?? tools/experiments/e3-m2f3g-evidence-gate/
+?? tools/experiments/e3-m2f3i-index-gate/

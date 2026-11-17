@@ -1,0 +1,598 @@
+{
+  "summary": {
+    "mutations": 33,
+    "detected": 32,
+    "survived": [
+      "MZ-22"
+    ],
+    "inconclusive": [],
+    "all_restored": true,
+    "restored_baseline": {
+      "build_A": 0,
+      "build_H": 0,
+      "failed_A": [],
+      "failed_H": [],
+      "failed_X": []
+    }
+  },
+  "results": [
+    {
+      "id": "MZ-01",
+      "mutation": "remove recording (recorder never attempts)",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests",
+        "H:CapabilityRefusalEvidenceHostTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          31.7
+        ],
+        [
+          "H",
+          0,
+          39.0
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-04",
+      "mutation": "swallow the refusal (filter returns instead of rethrowing)",
+      "file": "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "H:CapabilityRefusalEvidenceHostTests",
+        "X:CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "builds": [
+        [
+          "H",
+          0,
+          38.9
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-05",
+      "mutation": "convert the refusal to 503",
+      "file": "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "H:CapabilityRefusalEvidenceHostTests",
+        "X:CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "builds": [
+        [
+          "H",
+          0,
+          36.5
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-06",
+      "mutation": "pass the request abort token to T2",
+      "file": "src/authority/AuthorizationAuthority.Api/Composition/CapabilityRefusalEvidenceComposition.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "X:CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "builds": [],
+      "restored": true
+    },
+    {
+      "id": "MZ-07",
+      "mutation": "filter on six routes (Prepare dropped)",
+      "file": "src/authority/AuthorizationAuthority.Api/Features/Content/ContentEndpoints.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "H:CapabilityRefusalEvidenceHostTests",
+        "X:CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "builds": [
+        [
+          "H",
+          0,
+          35.7
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-08",
+      "mutation": "filter on an eighth route (history)",
+      "file": "src/authority/AuthorizationAuthority.Api/Features/Content/ContentEndpoints.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "H:CapabilityRefusalEvidenceHostTests",
+        "X:CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "builds": [
+        [
+          "H",
+          0,
+          36.2
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-10",
+      "mutation": "remove the pre-filter",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.3
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-11",
+      "mutation": "remove the attempt limit",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          27.8
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-12",
+      "mutation": "append without the lookup decision",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests",
+        "X:CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.4
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-14",
+      "mutation": "treat an ambiguous commit as recorded (no retry)",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          27.9
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-15",
+      "mutation": "append to another stream",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests",
+        "X:CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          27.9
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-16",
+      "mutation": "set the organization quarantine in T2",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests",
+        "X:CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.2
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-17",
+      "mutation": "advance the authorization revision in T2",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests",
+        "X:CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.1
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-18",
+      "mutation": "wrong workload for an entry point",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidence.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceLookupTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.1
+        ],
+        [
+          "H",
+          0,
+          36.5
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-19",
+      "mutation": "add a correlation identifier to the body",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidence.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests",
+        "A:CapabilityRefusalEvidenceLookupTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          27.7
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-20",
+      "mutation": "add the floor cause to the body",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidence.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests",
+        "A:CapabilityRefusalEvidenceLookupTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.0
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-21",
+      "mutation": "query the ledger from the recorder",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests",
+        "X:CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          30.0
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-22",
+      "mutation": "treat eight rows all in the bucket as conclusive",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceLookup.cs",
+      "result": "SURVIVED",
+      "builds": [
+        [
+          "A",
+          0,
+          27.7
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-23",
+      "mutation": "drop the per-key presence check",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceLookup.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests",
+        "A:CapabilityRefusalEvidenceLookupTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.2
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-25",
+      "mutation": "use transaction_timestamp() for t_db",
+      "file": "src/authority/AuthorizationAuthority.Infrastructure/Persistence/CapabilityRefusalEvidenceIndex.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "X:CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "builds": [],
+      "restored": true
+    },
+    {
+      "id": "MZ-26",
+      "mutation": "use the instance clock for t_db",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          27.2
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-27",
+      "mutation": "drop the clock-regression check",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceLookup.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests",
+        "A:CapabilityRefusalEvidenceLookupTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.0
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-28a",
+      "mutation": "drop the digest check",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceLookup.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests",
+        "A:CapabilityRefusalEvidenceLookupTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.2
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-28b",
+      "mutation": "drop the time-order check",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceLookup.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceLookupTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          27.8
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-29",
+      "mutation": "append after an inconclusive verdict",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.1
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-30",
+      "mutation": "read seven rows instead of eight",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidence.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceLookupTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          27.7
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-31",
+      "mutation": "skip the index check",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.3
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-32",
+      "mutation": "event kind as a bind parameter in the lookup",
+      "file": "src/authority/AuthorizationAuthority.Infrastructure/Persistence/CapabilityRefusalEvidenceIndex.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceIndexTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          27.6
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-33",
+      "mutation": "lookup ordered ascending",
+      "file": "src/authority/AuthorizationAuthority.Infrastructure/Persistence/CapabilityRefusalEvidenceIndex.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceIndexTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.1
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-37",
+      "mutation": "the floor no longer attaches the refusal context",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/EnvelopeCapabilityFloor.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceLookupTests",
+        "H:CapabilityRefusalEvidenceHostTests",
+        "X:CapabilityRefusalEvidenceRecorderBoundaryTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          27.8
+        ],
+        [
+          "H",
+          0,
+          36.5
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-40",
+      "mutation": "no in-flight coalescing",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.2
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-38",
+      "mutation": "never abandon a retry",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.1
+        ]
+      ],
+      "restored": true
+    },
+    {
+      "id": "MZ-39",
+      "mutation": "unbounded retry set",
+      "file": "src/authority/AuthorizationAuthority.Application/Features/Content/CapabilityRefusalEvidenceRecorder.cs",
+      "result": "DETECTED",
+      "detected_by": [
+        "A:CapabilityRefusalEvidenceRecorderTests"
+      ],
+      "builds": [
+        [
+          "A",
+          0,
+          28.0
+        ]
+      ],
+      "restored": true
+    }
+  ]
+}

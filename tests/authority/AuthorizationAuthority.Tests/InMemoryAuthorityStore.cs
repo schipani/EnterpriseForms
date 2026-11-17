@@ -2,6 +2,7 @@ using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Domain.Features.Content;
 using AuthorizationAuthority.Domain.Features.FieldSearch;
+using AuthorizationAuthority.Application.Features.Content;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Contracts.V1;
@@ -46,6 +47,12 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     /// <summary>E3-M2f-2 CAP-F5: when set, every binding-existence query throws this (a store failure).</summary>
     public Exception? DataKeyBindingExistenceFailure { get; set; }
     public List<SecurityJournalEntry> Journal { get; } = [];
+
+    /// <summary>E3-M2f-3b: whether the evidence index is reported usable (T2-8).</summary>
+    public bool EvidenceIndexUsable { get; set; } = true;
+
+    /// <summary>E3-M2f-3b: the emulated AuthorityDb clock_timestamp().</summary>
+    public Func<DateTimeOffset> EvidenceDatabaseClock { get; set; } = () => DateTimeOffset.UtcNow;
     public List<ContentIntegrityCheckpoint> Checkpoints { get; } = [];
     public List<IntegrityKeyRegistration> Keys { get; } = [];
     public List<SearchCatalogueSnapshot> Snapshots { get; } = [];
@@ -313,6 +320,19 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
             s.DataKeyBindingExistenceQueries++;
             return s.DataKeyBindingExistenceFailure is { } failure ? throw failure : Task.FromResult(s.DataKeyBindings.Any(b => b.OrganizationId == organizationId));
         }
+
+        // E3-M2f-3b: the evidence port over the in-memory journal (no rollback: use CapabilityRefusalEvidenceWorld for T2 semantics).
+        public Task SetCapabilityEvidenceLockTimeoutAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<DateTimeOffset> StartCapabilityEvidenceLookupAsync(CancellationToken cancellationToken) => Task.FromResult(s.EvidenceDatabaseClock());
+
+        public Task<bool> IsCapabilityRefusalEvidenceIndexUsableAsync(CancellationToken cancellationToken) => Task.FromResult(s.EvidenceIndexUsable);
+
+        public Task<IReadOnlyList<CapabilityRefusalEvidenceRow>> GetNewestCapabilityRefusalEvidenceAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<CapabilityRefusalEvidenceRow>>(s.Journal
+                .Where(e => e.OrganizationId == organizationId && e.JournalStreamName == CapabilityRefusalEvidence.StreamName && e.JournalEventKind == CapabilityRefusalEvidence.EventKind)
+                .OrderByDescending(e => e.JournalStreamRevision).Take(CapabilityRefusalEvidence.LookupLimit)
+                .Select(e => new CapabilityRefusalEvidenceRow(e.SecurityJournalEntryId, e.JournalStreamRevision, e.JournalEventBodyJson, e.JournalEventDigest)).ToList());
 
         public Task RequireDataKeyLedgerAsync(CancellationToken cancellationToken)
         {

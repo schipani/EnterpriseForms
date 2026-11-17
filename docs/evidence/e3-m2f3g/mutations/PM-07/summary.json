@@ -1,0 +1,17 @@
+{
+    "RunLabel":  "mutation-PM-07",
+    "Groups":  "T",
+    "ExitCode":  1,
+    "Checks":  19,
+    "Failed":  3,
+    "DemonstrationsOutsidePassTotals":  0,
+    "NotExecuted":  0,
+    "ContainersRemoved":  true,
+    "ContainerListUnchanged":  true,
+    "NewDockerVolumes":  0,
+    "DeadlocksInServerLog":  0,
+    "PermissionDeniedInServerLog":  0,
+    "ConfigEnablersBefore":  0,
+    "ConfigEnablersAfter":  0,
+    "EvidenceLeaksAfterScrub":  0
+}
