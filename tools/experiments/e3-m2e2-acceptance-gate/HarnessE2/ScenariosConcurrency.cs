@@ -94,7 +94,7 @@ internal sealed partial class Lab
             PreparedContentOperation? replayed = null;
             try
             {
-                replayed = await node.Service.PrepareAsync(Actor(cOrg), crashed.Request, crashed.Key, Guid.CreateVersion7(), CancellationToken.None);
+                replayed = await node.Service.PrepareAsync(Actor(cOrg), crashed.Request, crashed.Key, Guid.CreateVersion7(), CancellationToken.None, BusinessBuild.Current.Declared);
                 replay = "OK";
             }
             catch (Exception ex)

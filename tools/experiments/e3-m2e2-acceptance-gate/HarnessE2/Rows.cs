@@ -181,6 +181,48 @@ internal static class Rows
         }
     }
 
+    /// <summary>
+    /// E3-M2f-2G: the stored business row that <see cref="Encode"/> staged for <paramref name="source"/> under storage key
+    /// <paramref name="storageKey"/>, operation <paramref name="operation"/> and <paramref name="revision"/> (every column as the business
+    /// would read it back from BusinessDb), so another business build can encode the same stored row with its own registry. The record
+    /// header is not a business row in this harness (harness schema) and has no copy.
+    /// </summary>
+    public static object? StoredRow(object source, Guid storageKey, Guid operation, long revision)
+    {
+        switch (source)
+        {
+            case FieldStringValue v:
+                return new FieldStringValue
+                {
+                    FieldStringValueId = storageKey, TenantId = v.TenantId, FormRecordId = v.FormRecordId, FieldDefinitionId = v.FieldDefinitionId, FormRecordGroupId = v.FormRecordGroupId,
+                    FieldValueItemId = v.FieldValueItemId, StringValue = v.StringValue, ContentChangeOperationId = operation, ContentRevision = revision, RowRevision = revision,
+                    RowSignatureSchemaVersion = v.RowSignatureSchemaVersion, CreatedByUserId = v.CreatedByUserId, CreatedOn = v.CreatedOn,
+                };
+            case FieldEncryptedValue v:
+            {
+                var copy = CloneEncrypted(v);
+                copy.FieldEncryptedValueId = storageKey;
+                copy.ContentChangeOperationId = operation;
+                copy.ContentRevision = revision;
+                copy.RowRevision = revision;
+                return copy;
+            }
+
+            case FileAttachmentVersion a:
+            {
+                var copy = CloneAttachment(a);
+                copy.FileAttachmentVersionId = storageKey;
+                copy.ContentChangeOperationId = operation;
+                copy.ContentRevision = revision;
+                copy.RowRevision = revision;
+                return copy;
+            }
+
+            default:
+                return null;
+        }
+    }
+
     // ------------------------------------------------------------------------------------------------ raw rows (S-4 / S-9 negatives only)
     /// <summary>
     /// A field_encrypted_values row encoded directly (not through the business registry, which refuses these shapes): the schema version,

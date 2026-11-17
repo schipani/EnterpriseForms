@@ -37,6 +37,14 @@
 .PARAMETER NewBinaries
   A prebuilt Authority Release folder to test instead of building this tree (enforcement-removal runs build a mutated scratch copy).
 
+.PARAMETER HistoricalBusinessCommits
+  E3-M2f-2G (groups G, GC, GR, GH; docs/security/E3_M2F2G_VERIFICATION_RECORD.md): business builds exported with `git archive` and built
+  (Release, src/backend/EnterpriseForms.Api) unmodified; each gets its own BusinessAgent. Default: 11e15ee (before E3-M2b-2) and 0be5f52
+  (E3-M2e-2, no capability header). This tree's business build is always added as "current".
+
+.PARAMETER BaselineAuthorityCommit
+  E3-M2f-2G: the Authority build without E3-M2f-2 enforcement (default 0be5f52) for the expected-gap demonstrations (AuthorityAgent).
+
 .EXAMPLE
   powershell -File scripts\dev\e3-m2e2-acceptance-pg-gate.ps1 -Evidence C:\out\m2e2-run1
 #>
@@ -51,16 +59,22 @@ param(
     [string]$Groups = 'all',
     [string]$Label = 'run',
     [string]$DbMutationApply,
-    [string]$DbMutationRestore
+    [string]$DbMutationRestore,
+    [string]$HistoricalBusinessCommits = '11e15ee7d7c3d9e9be0685c2330ec006503bf1ec,0be5f522456acfa2102cf3e709ee9de1774a3d3a',
+    [string]$BaselineAuthorityCommit = '0be5f522456acfa2102cf3e709ee9de1774a3d3a'
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $gate = Join-Path $repo 'tools\experiments\e3-m2e2-acceptance-gate'
 $legacySource = Join-Path $repo 'tools\experiments\e3-m2e1-ledger-gate\LegacyAgent'
+$capabilityGate = Join-Path $repo 'tools\experiments\e3-m2f2g-capability-gate'
 if (-not $WorkDir) { $WorkDir = Join-Path ([System.IO.Path]::GetTempPath()) ('e3-m2e2-gate-' + [guid]::NewGuid().ToString('N').Substring(0, 8)) }
 if (-not $Evidence) { $Evidence = Join-Path $WorkDir 'evidence' }
 New-Item -ItemType Directory -Force $WorkDir, $Evidence | Out-Null
+# E3-M2f-2G: canonical Windows paths, so the evidence scrub below matches every rendering of the work directory (a caller may pass '/').
+$WorkDir = [System.IO.Path]::GetFullPath($WorkDir).TrimEnd('')
+$Evidence = [System.IO.Path]::GetFullPath($Evidence).TrimEnd('')
 Write-Output "work directory: $WorkDir"
 
 function Invoke-Checked([string]$exe, [string[]]$arguments) {
@@ -119,6 +133,29 @@ function Get-FrozenBuild([string]$commit, [string]$label) {
     }
     Write-Hashes $target (Join-Path $Evidence "$label-sha256.txt")
     "git archive $commit, Release build" | Set-Content -Encoding ascii (Join-Path $Evidence "$label-origin.txt")
+    return $target
+}
+
+# E3-M2f-2G: an unmodified historical BUSINESS build (src/backend/EnterpriseForms.Api, Release) from `git archive`.
+function Get-FrozenBusinessBuild([string]$commit) {
+    $short = $commit.Substring(0, 7)
+    $label = "business-$short"
+    $target = Join-Path $WorkDir $label
+    if ($LegacyBuildsRoot -and (Test-Path (Join-Path $LegacyBuildsRoot "$label\EnterpriseForms.Infrastructure.dll"))) {
+        Copy-Item (Join-Path $LegacyBuildsRoot $label) $target -Recurse -Force
+    }
+    else {
+        $archive = Join-Path $WorkDir "src-$short.zip"
+        $source = Join-Path $WorkDir "src-$short"
+        if (-not (Test-Path (Join-Path $source 'src'))) {
+            Invoke-Checked 'git' @('-C', $repo, 'archive', '--format=zip', '-o', $archive, $commit)
+            Expand-Archive -Path $archive -DestinationPath $source -Force
+        }
+        Invoke-Checked 'dotnet' @('build', (Join-Path $source 'src\backend\EnterpriseForms.Api\EnterpriseForms.Api.csproj'), '-c', 'Release', '-nologo', '-v', 'q')
+        Copy-Item (Join-Path $source 'src\backend\EnterpriseForms.Api\bin\Release\net10.0') $target -Recurse -Force
+    }
+    Write-Hashes $target (Join-Path $Evidence "$label-sha256.txt")
+    "git archive $commit, Release build of src/backend/EnterpriseForms.Api (unmodified)" | Set-Content -Encoding ascii (Join-Path $Evidence "$label-origin.txt")
     return $target
 }
 
@@ -194,6 +231,28 @@ $harness = Join-Path $WorkDir 'harnessE2'
 Copy-Item (Join-Path $gate 'HarnessE2') $harness -Recurse -Force
 Invoke-Checked 'dotnet' @('build', (Join-Path $harness 'HarnessE2.csproj'), '-c', 'Release', '-nologo', '-v', 'q', "-p:M2e2Binaries=$merged")
 $exe = Join-Path $harness 'bin\Release\net10.0\M2e2Harness.exe'
+# E3-M2f-2G agents: one BusinessAgent per business build, one AuthorityAgent per Authority build (each built against that build alone).
+$capabilityGroups = $Groups -eq 'all' -or @($Groups -split ',' | Where-Object { $_.Trim() -like 'G*' }).Count -gt 0
+$businessAgents = New-Object System.Collections.Generic.List[string]
+$authorityAgents = New-Object System.Collections.Generic.List[string]
+if ($capabilityGroups) {
+    $businessBuilds = [ordered]@{ current = $business }
+    foreach ($commit in @($HistoricalBusinessCommits -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) { $businessBuilds[$commit.Substring(0, 7)] = Get-FrozenBusinessBuild $commit }
+    $baseline = Get-FrozenBuild $BaselineAuthorityCommit 'base'
+    foreach ($entry in $businessBuilds.GetEnumerator()) {
+        $dir = Join-Path $WorkDir ('bagent-' + $entry.Key)
+        Copy-Item (Join-Path $capabilityGate 'BusinessAgent') $dir -Recurse -Force
+        Invoke-Checked 'dotnet' @('build', (Join-Path $dir 'BusinessAgent.csproj'), '-c', 'Release', '-nologo', '-v', 'q', "-p:BusinessBinaries=$($entry.Value)")
+        $businessAgents.Add("$($entry.Key)=" + (Join-Path $dir 'bin\Release\net10.0\BusinessAgent.exe'))
+    }
+    foreach ($pair in @(@('current', $new), @($BaselineAuthorityCommit.Substring(0, 7), $baseline))) {
+        $dir = Join-Path $WorkDir ('aagent-' + $pair[0])
+        Copy-Item (Join-Path $capabilityGate 'AuthorityAgent') $dir -Recurse -Force
+        Invoke-Checked 'dotnet' @('build', (Join-Path $dir 'AuthorityAgent.csproj'), '-c', 'Release', '-nologo', '-v', 'q', "-p:AuthorityBinaries=$($pair[1])")
+        $authorityAgents.Add("$($pair[0])=" + (Join-Path $dir 'bin\Release\net10.0\AuthorityAgent.exe'))
+    }
+}
+
 $agents = @{}
 foreach ($pair in @(@('carv1', $carv1), @('carv2', $carv2))) {
     $dir = Join-Path $WorkDir ("agent-" + $pair[0])
@@ -216,6 +275,7 @@ $adminPassword = 'm2e2-admin-' + [guid]::NewGuid().ToString('N')
 $runtimePassword = 'm2e2-runtime-' + [guid]::NewGuid().ToString('N')
 $vaultRoot = 'm2e2-root-' + [guid]::NewGuid().ToString('N')
 $vaultBusiness = 'm2e2-business-' + [guid]::NewGuid().ToString('N')
+$vaultAuthority = 'm2f2g-authority-' + [guid]::NewGuid().ToString('N')
 $vaultOrgs = @((New-UuidV7), (New-UuidV7))
 $code = 99
 $started = @()
@@ -253,6 +313,11 @@ try {
     foreach ($org in $vaultOrgs) {
         if (-not (Test-NativeQuiet { docker exec @envArgs -e "ORGANIZATION_ID=$org" $vaultName sh /vault-config/provision-business-encryption-keys.sh })) { throw "Vault provisioning failed for $org" }
     }
+    # E3-M2f-2G host group: the Authority's own Transit mount and a token holding ONLY the repository's authority-transit-policy.hcl.
+    docker cp (Join-Path $repo 'infrastructure\docker\vault\authority-transit-policy.hcl') "${vaultName}:/vault-config/authority-transit-policy.hcl" | Out-Null
+    if (-not (Test-NativeQuiet { docker exec @envArgs $vaultName vault secrets enable -path=transit transit })) { throw 'enabling the authority transit mount failed' }
+    if (-not (Test-NativeQuiet { docker exec @envArgs $vaultName vault policy write authority-transit /vault-config/authority-transit-policy.hcl })) { throw 'writing the authority transit policy failed' }
+    if (-not (Test-NativeQuiet { docker exec @envArgs $vaultName vault token create "-id=$vaultAuthority" -orphan -no-default-policy -policy=authority-transit -ttl=6h })) { throw 'creating the authority token failed' }
 
     $env:M2E2_NEWBIN = Join-Path $new 'AuthorizationAuthority.Api.dll'
     $env:M2E2_HOSTBIN = $hostCopy
@@ -269,6 +334,11 @@ try {
     $env:M2E2_VAULT_PORT = "$vaultPort"
     $env:M2E2_VAULT_ORGS = ($vaultOrgs -join ',')
     $env:M2E2_GROUPS = $Groups
+    $env:M2F2G_BUSINESS_AGENTS = ($businessAgents -join ';')
+    $env:M2F2G_AUTHORITY_AGENTS = ($authorityAgents -join ';')
+    $env:M2F2G_VAULT_AUTHORITY_TOKEN = $vaultAuthority
+    $env:M2F2G_AGENT_WORK = (Join-Path $WorkDir 'agent-calls')
+    New-Item -ItemType Directory -Force $env:M2F2G_AGENT_WORK | Out-Null
     if ($DbMutationApply) { $env:M2E2_DBMUT_APPLY = $DbMutationApply; $env:M2E2_DBMUT_RESTORE = $DbMutationRestore }
     & $exe *> (Join-Path $Evidence 'console.txt')
     $code = $LASTEXITCODE
@@ -279,7 +349,7 @@ finally {
     if ($started -contains $pgName) { cmd /c "docker logs $pgName > `"$(Join-Path $Evidence 'postgres-server.log')`" 2>&1" }
     foreach ($c in $started) { docker rm -f $c 2>$null | Out-Null }
     $ErrorActionPreference = $previous
-    Get-ChildItem Env: | Where-Object { $_.Name -like 'M2E2_*' } | ForEach-Object { Remove-Item "Env:$($_.Name)" -ErrorAction SilentlyContinue }
+    Get-ChildItem Env: | Where-Object { $_.Name -like 'M2E2_*' -or $_.Name -like 'M2F2G_*' } | ForEach-Object { Remove-Item "Env:$($_.Name)" -ErrorAction SilentlyContinue }
 }
 
 # ---------------------------------------------------------------- 3. cleanup verification, log classification, scrubbing
@@ -291,14 +361,24 @@ $enablersAfter = Get-ConfigEnablers
 $serverLog = Join-Path $Evidence 'postgres-server.log'
 $lines = if (Test-Path $serverLog) { Get-Content $serverLog } else { @() }
 $deadlocks = @($lines | Select-String -SimpleMatch 'deadlock detected').Count
+$lockWaits = @($lines | Select-String -SimpleMatch 'still waiting for').Count
 $lockTimeouts = @($lines | Select-String -SimpleMatch 'canceling statement due to lock timeout').Count
 $denied = @($lines | Select-String -SimpleMatch 'permission denied')
 $expectedDenied = @($denied | Where-Object { $_.Line -match 'app=m2e2-expected-42501' }).Count
 $unexpectedDenied = @($denied | Where-Object { $_.Line -notmatch 'app=m2e2-expected-42501' })
 $unexpectedDenied | ForEach-Object { $_.Line } | Set-Content -Encoding ascii (Join-Path $Evidence 'unexpected-permission-denied.txt')
 
+# E3-M2f-2G: the agents' OUTPUTS (results, refusals, the capability headers each build sent) join the evidence; their inputs (test-only
+# credentials, the run's seal key) stay in the work directory.
+$agentWork = Join-Path $WorkDir 'agent-calls'
+if (Test-Path $agentWork) {
+    $agentEvidence = Join-Path $Evidence 'agent-calls'
+    New-Item -ItemType Directory -Force $agentEvidence | Out-Null
+    Get-ChildItem $agentWork -Filter '*.out.json' | Copy-Item -Destination $agentEvidence
+}
+
 # Scrub: local paths, user profile, passwords and tokens never stay in the evidence.
-$secrets = @($adminPassword, $runtimePassword, $vaultRoot, $vaultBusiness)
+$secrets = @($adminPassword, $runtimePassword, $vaultRoot, $vaultBusiness, $vaultAuthority)
 $paths = @($WorkDir.TrimEnd('\'), $repo, $env:USERPROFILE) | Where-Object { $_ }
 foreach ($file in Get-ChildItem $Evidence -Recurse -File | Where-Object { $_.Extension -in '.txt', '.json', '.log' }) {
     $text = [System.IO.File]::ReadAllText($file.FullName)
@@ -322,10 +402,17 @@ $summary = [pscustomobject]@{
     Checks = if ($checks) { $checks.checksTotal } else { 0 }
     Failed = if ($checks) { $checks.checksFailed } else { -1 }
     ExpectedGapDemonstrations = if ($checks) { $checks.expectedGapDemonstrations } else { -1 }
+    M2e2RegressionChecks = if ($checks) { $checks.m2e2Regression.total } else { 0 }
+    M2e2RegressionFailed = if ($checks) { $checks.m2e2Regression.failed } else { -1 }
+    M2f2gChecks = if ($checks) { $checks.m2f2g.total } else { 0 }
+    M2f2gFailed = if ($checks) { $checks.m2f2g.failed } else { -1 }
+    M2f2gByKind = if ($checks) { ($checks.m2f2g.byKind.PSObject.Properties | ForEach-Object { "$($_.Name) $($_.Value.passed)/$($_.Value.total)" }) -join '; ' } else { '' }
+    M2f2gGapDemonstrations = if ($checks) { ($checks.m2f2g.gapDemonstrations.PSObject.Properties | ForEach-Object { "$($_.Name) $($_.Value.asExpected)/$($_.Value.total)" }) -join '; ' } else { '' }
     ContainersRemoved = $removed
     ContainerListUnchanged = $listUnchanged
     DeadlocksInServerLog = $deadlocks
     LockTimeoutsInServerLog = $lockTimeouts
+    LockWaitsLoggedInServerLog = $lockWaits
     ExpectedPermissionDenied = $expectedDenied
     UnexpectedPermissionDenied = $unexpectedDenied.Count
     ConfigEnablersBefore = $enablersBefore.Count

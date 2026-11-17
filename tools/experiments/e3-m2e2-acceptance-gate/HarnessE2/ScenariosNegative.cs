@@ -39,7 +39,7 @@ internal sealed partial class Lab
         string outcome;
         try
         {
-            await acc.Service.CommitAsync(Actor(record.Org), operation, new CommitContentChangeRequest(record.Org.Id, record.Id, staged), Guid.CreateVersion7(), CancellationToken.None);
+            await acc.Service.CommitAsync(Actor(record.Org), operation, new CommitContentChangeRequest(record.Org.Id, record.Id, staged), Guid.CreateVersion7(), CancellationToken.None, BusinessBuild.Current.Declared);
             outcome = "OK";
         }
         catch (Exception ex)
@@ -303,7 +303,7 @@ internal sealed partial class Lab
             string outcome;
             try
             {
-                await acc.Service.PrepareAsync(Actor(nOrg), request, "m2e2-stale-" + request.OperationId.ToString("N"), Guid.CreateVersion7(), CancellationToken.None);
+                await acc.Service.PrepareAsync(Actor(nOrg), request, "m2e2-stale-" + request.OperationId.ToString("N"), Guid.CreateVersion7(), CancellationToken.None, BusinessBuild.Current.Declared);
                 outcome = "OK";
             }
             catch (Exception ex)
@@ -352,7 +352,7 @@ internal sealed partial class Lab
                 string outcome;
                 try
                 {
-                    await acc.Service.CommitAsync(Actor(nOrg), forged.Operation, new CommitContentChangeRequest(nOrg.Id, target.Id, forged.Staged), Guid.CreateVersion7(), CancellationToken.None);
+                    await acc.Service.CommitAsync(Actor(nOrg), forged.Operation, new CommitContentChangeRequest(nOrg.Id, target.Id, forged.Staged), Guid.CreateVersion7(), CancellationToken.None, BusinessBuild.Current.Declared);
                     outcome = "OK";
                 }
                 catch (Exception ex)

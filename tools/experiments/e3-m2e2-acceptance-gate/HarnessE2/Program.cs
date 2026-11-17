@@ -38,12 +38,20 @@ var inputs = new Inputs(
     int.Parse(Need("M2E2_PORT"), System.Globalization.CultureInfo.InvariantCulture), Need("M2E2_NONCE"), Need("M2E2_SYSID"),
     Need("M2E2_VAULT_ADDRESS"), Need("M2E2_VAULT_TOKEN"), int.Parse(Need("M2E2_VAULT_PORT"), System.Globalization.CultureInfo.InvariantCulture),
     [.. Need("M2E2_VAULT_ORGS").Split(',').Select(Guid.Parse)], Environment.GetEnvironmentVariable("M2E2_GROUPS") ?? "all",
-    Environment.GetEnvironmentVariable("M2E2_DBMUT_APPLY"), Environment.GetEnvironmentVariable("M2E2_DBMUT_RESTORE"));
+    Environment.GetEnvironmentVariable("M2E2_DBMUT_APPLY"), Environment.GetEnvironmentVariable("M2E2_DBMUT_RESTORE"),
+    Agents("M2F2G_BUSINESS_AGENTS"), Agents("M2F2G_AUTHORITY_AGENTS"), Environment.GetEnvironmentVariable("M2F2G_VAULT_AUTHORITY_TOKEN"),
+    Environment.GetEnvironmentVariable("M2F2G_AGENT_WORK") is { Length: > 0 } agentWork ? agentWork : Path.Combine(Path.GetTempPath(), "m2f2g-agent-calls"));
+
+// E3-M2f-2G: "label=path;label=path" (the BusinessAgent per business build and the AuthorityAgent per Authority build); empty when not built.
+static IReadOnlyDictionary<string, string> Agents(string name) =>
+    (Environment.GetEnvironmentVariable(name) ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .Select(p => p.Split('=', 2)).ToDictionary(p => p[0], p => p[1], StringComparer.Ordinal);
 var removed = Target.ScrubProcessEnvironment();
 return await new Lab(inputs, removed).RunAsync();
 
 internal sealed record Inputs(string NewBinary, string HostBinaries, string Carv1Agent, string Carv2Agent, string AdminCs, string RuntimeCs, string EvidenceDir, int Port, string Nonce, string SystemIdentifier,
-    string VaultAddress, string VaultToken, int VaultPort, IReadOnlyList<Guid> VaultOrganizations, string Groups, string? DatabaseMutationApply, string? DatabaseMutationRestore);
+    string VaultAddress, string VaultToken, int VaultPort, IReadOnlyList<Guid> VaultOrganizations, string Groups, string? DatabaseMutationApply, string? DatabaseMutationRestore,
+    IReadOnlyDictionary<string, string> BusinessAgents, IReadOnlyDictionary<string, string> AuthorityAgents, string? VaultAuthorityToken, string AgentWorkDir);
 
 internal sealed partial class Lab(Inputs inputs, IReadOnlyList<string> scrubbed)
 {
@@ -111,6 +119,11 @@ internal sealed partial class Lab(Inputs inputs, IReadOnlyList<string> scrubbed)
         var failed = counted.Count(c => !c.Pass);
         var byKind = counted.GroupBy(c => c.Kind).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => new { total = g.Count(), passed = g.Count(c => c.Pass), failed = g.Count(c => !c.Pass) });
         var gaps = checks.Where(c => c.Gap is not null).ToList();
+        // E3-M2f-2G: the E3-M2e-2 regression groups and the M2f-2G groups are reported separately (never merged into one security total).
+        static bool IsM2f2g(string group) => group.StartsWith('G') && !group.StartsWith("G-", StringComparison.Ordinal);
+        var byGroup = counted.GroupBy(c => c.Group).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => new { total = g.Count(), passed = g.Count(c => c.Pass), failed = g.Count(c => !c.Pass) });
+        var m2e2 = counted.Where(c => !IsM2f2g(c.Group)).ToList();
+        var m2f2g = counted.Where(c => IsM2f2g(c.Group)).ToList();
         var json = JsonSerializer.Serialize(new
         {
             harness = "E3-M2e-2 controlled Envelope v2 acceptance verification (real Authority build in-process; real E3-M1 core; business signed-column registry; disposable PostgreSQL 18.0 and Vault 1.20.4)",
@@ -122,6 +135,14 @@ internal sealed partial class Lab(Inputs inputs, IReadOnlyList<string> scrubbed)
             checksTotal = counted.Count,
             checksFailed = failed,
             byKind,
+            byGroup,
+            m2e2Regression = new { total = m2e2.Count, failed = m2e2.Count(c => !c.Pass) },
+            m2f2g = new
+            {
+                total = m2f2g.Count, failed = m2f2g.Count(c => !c.Pass),
+                byKind = m2f2g.GroupBy(c => c.Kind).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => new { total = g.Count(), passed = g.Count(c => c.Pass), failed = g.Count(c => !c.Pass) }),
+                gapDemonstrations = gaps.Where(c => IsM2f2g(c.Group)).GroupBy(c => c.Gap!).ToDictionary(g => g.Key, g => new { total = g.Count(), asExpected = g.Count(c => c.Pass) }),
+            },
             expectedGapDemonstrations = gaps.Count,
             checks = counted,
             gapDemonstrations = gaps,
@@ -206,6 +227,32 @@ internal sealed partial class Lab(Inputs inputs, IReadOnlyList<string> scrubbed)
             await RecoveryScenariosAsync();
         }
 
+        // E3-M2f-2G (docs/security/E3_M2F2G_VERIFICATION_RECORD.md): the capability floor on real PostgreSQL.
+        if (Run("G"))
+        {
+            await CapabilityScenariosAsync();
+        }
+
+        if (Run("GS"))
+        {
+            await CapabilityShortCircuitScenariosAsync();
+        }
+
+        if (Run("GC"))
+        {
+            await CapabilityConcurrencyScenariosAsync();
+        }
+
+        if (Run("GR"))
+        {
+            await CapabilityRecoveryScenariosAsync();
+        }
+
+        if (Run("GH"))
+        {
+            await CapabilityHostScenariosAsync();
+        }
+
         if (Run("H"))
         {
             await HostScenariosAsync();
@@ -221,6 +268,7 @@ internal sealed partial class Lab(Inputs inputs, IReadOnlyList<string> scrubbed)
             grantsBaseline = await ScalarAsync(adminCs, GrantsQuery);
         }
 
+        await WriteDiagnosticsAsync();
         await TeardownChecksAsync();
     }
 
@@ -306,7 +354,9 @@ internal sealed partial class Lab(Inputs inputs, IReadOnlyList<string> scrubbed)
     }
 
     // ------------------------------------------------------------------------------------------------ organizations and records
-    private async Task<Org> SeedOrgAsync(int records, IEncryptionKeyProvider keys, int wrapCode, Guid? organizationId = null, string? database = null)
+    /// <param name="journalDigest">E3-M2f-2G: give the state the journal digest every projected revision has in production (the
+    /// projection pin of the user Verify paths refuses a state without one). The E3-M2e-2 scenarios never pin and seed without it.</param>
+    private async Task<Org> SeedOrgAsync(int records, IEncryptionKeyProvider keys, int wrapCode, Guid? organizationId = null, string? database = null, bool journalDigest = false)
     {
         var owner = Guid.CreateVersion7();
         var binding = Guid.CreateVersion7();
@@ -315,7 +365,11 @@ internal sealed partial class Lab(Inputs inputs, IReadOnlyList<string> scrubbed)
         var seedCs = Target.Require(new NpgsqlConnectionStringBuilder(adminCs) { Options = "-c session_replication_role=replica", ApplicationName = "m2e2-seed", Database = database ?? PrimaryDatabase }.ConnectionString);
         await using var context = new AuthorityDbContext(new DbContextOptionsBuilder<AuthorityDbContext>().UseNpgsql(seedCs).Options);
         var now = DateTimeOffset.UtcNow;
-        context.OrganizationStates.Add(new OrganizationAuthorizationState { OrganizationAuthorizationStateId = Guid.CreateVersion7(), OrganizationId = org.Id, OrganizationDisplayName = "M2e2 gate", AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous, StateModifiedOn = now });
+        context.OrganizationStates.Add(new OrganizationAuthorizationState
+        {
+            OrganizationAuthorizationStateId = Guid.CreateVersion7(), OrganizationId = org.Id, OrganizationDisplayName = "M2e2 gate", AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7",
+            CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous, StateModifiedOn = now, LatestSecurityJournalDigest = journalDigest ? SHA256.HashData(org.Id.ToByteArray()) : null,
+        });
         context.IdentityBindings.Add(new IdentityBinding { IdentityBindingId = binding, OrganizationId = org.Id, AuthorityUserId = owner, IdentityIssuerUri = Issuer, IdentitySubjectIdentifier = owner.ToString("D"), IdentityBindingEnabled = true, IdentityCreatedOn = now });
         context.KeyRegistrations.Add(new IntegrityKeyRegistration { IntegrityKeyRegistrationId = Guid.CreateVersion7(), OrganizationId = org.Id, ProviderName = "LocalDevelopment", ProviderKeyName = keyName, CurrentSigningKeyVersion = 1, MinimumVerificationKeyVersion = 1, KeyRegisteredOn = now, KeyModifiedOn = now });
         for (var i = 0; i < records; i++)
@@ -428,13 +482,13 @@ internal sealed partial class Lab(Inputs inputs, IReadOnlyList<string> scrubbed)
         return (request, rows, operation);
     }
 
-    private async Task<Prepared> PrepareAsync(Node node, Rec record, List<object> sources, VerifiedActor? actor = null, string? database = null)
+    private async Task<Prepared> PrepareAsync(Node node, Rec record, List<object> sources, VerifiedActor? actor = null, string? database = null, BusinessBuild? build = null)
     {
         var (request, rows, operation) = await BuildAsync(record, sources, database);
         var key = "m2e2-" + operation.ToString("N");
         try
         {
-            var prepared = await node.Service.PrepareAsync(actor ?? Actor(record.Org), request, key, Guid.CreateVersion7(), CancellationToken.None);
+            var prepared = await node.Service.PrepareAsync(actor ?? Actor(record.Org), request, key, Guid.CreateVersion7(), CancellationToken.None, (build ?? BusinessBuild.Current).Declared);
             return new Prepared(prepared, prepared.OperationId, request, key, rows, sources, "OK", string.Empty);
         }
         catch (Exception ex)
@@ -449,12 +503,12 @@ internal sealed partial class Lab(Inputs inputs, IReadOnlyList<string> scrubbed)
         return [.. rows.Select(c => new StagedContentItem(c.Kind, c.ItemId, c.Base64, signatures[(c.Kind, c.ItemId)]))];
     }
 
-    private async Task<(string Outcome, string Message)> CommitAsync(Node node, Rec record, Prepared prepared, VerifiedActor? actor = null, List<StagedContentItem>? stagedOverride = null)
+    private async Task<(string Outcome, string Message)> CommitAsync(Node node, Rec record, Prepared prepared, VerifiedActor? actor = null, List<StagedContentItem>? stagedOverride = null, BusinessBuild? build = null)
     {
         var staged = stagedOverride ?? StagedOf(prepared.Operation!, prepared.Rows);
         try
         {
-            await node.Service.CommitAsync(actor ?? Actor(record.Org), prepared.OperationId, new CommitContentChangeRequest(record.Org.Id, record.Id, staged), Guid.CreateVersion7(), CancellationToken.None);
+            await node.Service.CommitAsync(actor ?? Actor(record.Org), prepared.OperationId, new CommitContentChangeRequest(record.Org.Id, record.Id, staged), Guid.CreateVersion7(), CancellationToken.None, (build ?? BusinessBuild.Current).Declared);
             if (stagedOverride is null)
             {
                 record.Accepted = [.. prepared.Rows.Select(c => (c, Convert.FromBase64String(staged.Single(s => s.ItemKind == c.Kind && s.ItemId == c.ItemId).RowSignatureBase64)))];
@@ -470,15 +524,15 @@ internal sealed partial class Lab(Inputs inputs, IReadOnlyList<string> scrubbed)
     }
 
     /// <summary>Prepare then Commit; returns "OK" or the first refusal (Prepare refusals are prefixed "prepare:").</summary>
-    private async Task<string> WriteAsync(Node node, Rec record, List<object> sources, VerifiedActor? actor = null)
+    private async Task<string> WriteAsync(Node node, Rec record, List<object> sources, VerifiedActor? actor = null, BusinessBuild? build = null)
     {
-        var prepared = await PrepareAsync(node, record, sources, actor);
+        var prepared = await PrepareAsync(node, record, sources, actor, build: build);
         if (prepared.Outcome != "OK")
         {
             return "prepare: " + prepared.Outcome + " | " + prepared.Message;
         }
 
-        var (outcome, message) = await CommitAsync(node, record, prepared, actor);
+        var (outcome, message) = await CommitAsync(node, record, prepared, actor, build: build);
         return outcome == "OK" ? "OK" : "commit: " + outcome + " | " + message;
     }
 

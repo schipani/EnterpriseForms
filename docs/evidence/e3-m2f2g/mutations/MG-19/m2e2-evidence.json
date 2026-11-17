@@ -1,0 +1,470 @@
+{
+  "harness": "E3-M2e-2 controlled Envelope v2 acceptance verification (real Authority build in-process; real E3-M1 core; business signed-column registry; disposable PostgreSQL 18.0 and Vault 1.20.4)",
+  "build": "ContentAcceptanceRules.CurrentVersion = 3; RecognizedFloors = 1,2,3; EnvelopeRules.AllowedEnvelopeVersions = 1",
+  "groups": "GH",
+  "isolation": {
+    "databases": [
+      "m2e2_floor2",
+      "m2e2gate",
+      "m2f2ghost",
+      "postgres"
+    ],
+    "scrubbedEnvironmentVariables": [],
+    "stopped": false
+  },
+  "postgres": "PostgreSQL 18.0 (Debian 18.0-1.pgdg13\u002B3) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "checksTotal": 31,
+  "checksFailed": 1,
+  "byKind": {
+    "Control": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "Database": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    "Negative": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "Premise": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "Security": {
+      "total": 7,
+      "passed": 6,
+      "failed": 1
+    },
+    "Setup": {
+      "total": 16,
+      "passed": 16,
+      "failed": 0
+    }
+  },
+  "byGroup": {
+    "GH": {
+      "total": 11,
+      "passed": 10,
+      "failed": 1
+    },
+    "L": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    "S": {
+      "total": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    "setup": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    "teardown": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "m2e2Regression": {
+    "total": 20,
+    "failed": 0
+  },
+  "m2f2g": {
+    "total": 11,
+    "failed": 1,
+    "byKind": {
+      "Control": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "Premise": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "Security": {
+        "total": 7,
+        "passed": 6,
+        "failed": 1
+      },
+      "Setup": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    "gapDemonstrations": {
+      "INCONCLUSIVE": {
+        "total": 1,
+        "asExpected": 1
+      }
+    }
+  },
+  "expectedGapDemonstrations": 1,
+  "checks": [
+    {
+      "Id": "S-00",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "target identity: the primary and maintenance databases carry this run\u0027s nonce, the cluster\u0027s system identifier and port 5432 behind the run\u0027s loopback port",
+      "Expected": "admitted m2e2gate, postgres",
+      "Observed": "m2e2gate,postgres",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-01",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "inherited connection strings, content settings, Azure settings and environment overrides are removed from the harness process (and so from every child)",
+      "Expected": "none remaining",
+      "Observed": "removed []; remaining []",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-02",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "the ordinary --migrate runs before any runtime connection: it applies the ledger migration and never a floor",
+      "Expected": "runtime sessions 0; exit 0; floors none; ledger 20261116031706_AuthorityContentDataKeyBindings",
+      "Observed": "runtime sessions 0; exit 0; floors none; ledger 20261116031706_AuthorityContentDataKeyBindings",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-03",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "runtime role on the ledger: SELECT and INSERT only (L-8); the role is ordinary",
+      "Expected": "select=true insert=true update=false delete=false truncate=false; false false",
+      "Observed": "select=true insert=true update=false delete=false truncate=false; false false",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-04",
+      "Kind": "Setup",
+      "Group": "setup",
+      "Description": "floors 1 -\u003E 2 -\u003E 3 applied in order (focused run without group F)",
+      "Expected": "0 0 0; floors 3",
+      "Observed": "0 0 0; floors 3",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-10",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "target identity re-verified for every admitted database immediately before acceptance is enabled",
+      "Expected": "all admitted",
+      "Observed": "m2e2_floor2,m2e2gate,postgres",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-11",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "Release B with RequiredFloor = 3: the readiness guard is ready on floor 3 with the ledger migration",
+      "Expected": "True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3",
+      "Observed": "True content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-12",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "the switch refuses to be configured on outside Development/Testing (Staging, Production) and without Release B RequiredFloor 3 (floor 2, Release A)",
+      "Expected": "refused: environment x2; refused: policy x2",
+      "Observed": "refused: environment; refused: environment; refused: policy; refused: policy",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-13",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "the Testing switch is configured on with its static prerequisites; acceptance is NOT effective before the exact policy is recorded",
+      "Expected": "configured True; prerequisites True; enabled False",
+      "Observed": "configured True; prerequisites True; enabled False",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-14",
+      "Kind": "Negative",
+      "Group": "S",
+      "Description": "missing policy observation: with the switch configured on but the policy unrecorded, a New v2 group is refused at Prepare (nothing signed, no operation, no binding)",
+      "Expected": "ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; unchanged",
+      "Observed": "ENVELOPE_INVALID: ENVELOPE_VERSION_NOT_ENABLED; signatures 0-\u003E0; bindings 0-\u003E0; ops 0-\u003E0",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "S-15",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "the effective policy is recorded on the disposable platform journal (in-memory archive); acceptance becomes effective only then",
+      "Expected": "Recorded; body records the exact digest and acceptance requested; enabled True",
+      "Observed": "Recorded; body has the digest, requested on; enabled True",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-after-activation",
+      "Kind": "Setup",
+      "Group": "S",
+      "Description": "F-E2 sentinel (after-activation): the runtime role\u0027s table grants equal the setup baseline",
+      "Expected": "unchanged",
+      "Observed": "unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-01",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "raw SQL positive control: the runtime role inserts a binding for a Prepared operation stamped 3 of the same organization and record (P-1 admits it)",
+      "Expected": "setup write OK; seed OK; insert OK",
+      "Observed": "setup OK; seed OK; insert OK",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-02",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "P-1 (database): a binding for a Committed operation is refused by the binding guard trigger",
+      "Expected": "23514 trg_content_data_key_binding_guard",
+      "Observed": "23514 trg_content_data_key_binding_guard: a data-key binding must belong to a Prepared content operation of the same organization and record, prepared under content acceptance rule version 3 or later",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-03",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "global uniqueness (database): a second binding of an identifier is refused by the unique index",
+      "Expected": "23505 uq_content_data_key_binding_identifier",
+      "Observed": "23505 uq_content_data_key_binding_identifier: duplicate key value violates unique constraint \u0022uq_content_data_key_binding_identifier\u0022",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-04",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "L-8 (database): the runtime role has no UPDATE, DELETE or TRUNCATE privilege on the ledger",
+      "Expected": "42501 x3 (labelled expected)",
+      "Observed": "42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings | 42501 aclcheck_error: permission denied for table content_data_key_bindings",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "L-05",
+      "Kind": "Database",
+      "Group": "L",
+      "Description": "P-2 (database): even the superuser is refused UPDATE, DELETE and TRUNCATE by the immutability triggers; the binding is intact",
+      "Expected": "23514 trg_content_data_key_binding_permanent x3; 1/1",
+      "Observed": "23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated | 23514 trg_content_data_key_binding_permanent: content data-key bindings are permanent: they are never updated, deleted or truncated; 1/1",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GH-00",
+      "Kind": "Setup",
+      "Group": "GH",
+      "Description": "the real Authority host (Development, settings file removed, every setting explicit; Vault Transit signer; Release B floor 3; acceptance configured on and recorded by the host itself) runs on its own disposable database; the CURRENT business build (BusinessAgent, its own clients over HTTP) writes 7 schema-2 heads in one organization and v1 heads in two others; a pending operation; census decisions and snapshots; approvals and two backfilled entries; every content entry anchored",
+      "Expected": "migrate 0; floors 0,0,0; host live; policy recorded; writes OK x17; pending OK; unanchored 0; census OK x2; approvals 4; backfills Indexed x2; bindings \u003E 0",
+      "Observed": "migrate 0; floors 0,0,0; host live; policy True; writes OK (17); pending OK; unanchored 0; census OK,OK; approvals 4; backfills OK Indexed / OK Indexed; bindings 8",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GH-02",
+      "Kind": "Security",
+      "Group": "GH",
+      "Description": "M2F-36 / CAP-S5 on the real host: the E3-M2e-2 business build 0be5f52 (it reads and encodes schema 2 faithfully but sends no header) is refused at all seven content endpoints of an organization with a binding, with the fixed non-retryable 409 seen by its own client; nothing in the organization changed",
+      "Expected": "7 x CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; organization rows unchanged",
+      "Observed": "Prepare=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; Commit=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; Verify=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; BatchVerify=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; Census=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; Backfill=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; DeepVerify=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GH-03",
+      "Kind": "Security",
+      "Group": "GH",
+      "Description": "M2F-35 real G-2 on the real host: the 11e15ee business build\u0027s own requests (its registry re-encodes the schema-2 rows as schema 1) are refused at all seven endpoints before signed-content verification: no head quarantined, no incident, the pending operation untouched, every Authority row of the organization unchanged",
+      "Expected": "7 x CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; incidents unchanged; organization rows unchanged",
+      "Observed": "Prepare=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; Commit=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; Verify=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; BatchVerify=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; Census=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; Backfill=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; DeepVerify=CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; incidents 0-\u003E0; rows unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GH-04",
+      "Kind": "Security",
+      "Group": "GH",
+      "Description": "compatibility (CAP-S5) on the real host: in an organization WITHOUT a binding both historical builds keep working through their own clients: Prepare \u002B Commit of a v1 change, protection census, backfill and deep-sweep verification succeed; user Verify and batch Verify are admitted past the capability check (they then stop as not ready on the unreachable SpiceDB, never with the capability refusal)",
+      "Expected": "writes OK x2; census Verified; backfill Indexed; deep Pass; verify and batch not the capability refusal (AUTHORITY_NOT_READY 503)",
+      "Observed": "11e15ee: write OK; 0be5f52: write OK; census OK Verified; backfill OK Indexed; deep OK Pass MATCH; verify AUTHORITY_NOT_READY 503 retryable=True; batch AUTHORITY_NOT_READY 503 retryable=True",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GH-05",
+      "Kind": "Security",
+      "Group": "GH",
+      "Description": "mixed clients on the real host cannot bypass the floor: (a) a current-build operation in a bound organization cannot be committed by the 0be5f52 build (refused, still Prepared; the current build then commits it); (b) an operation the 11e15ee build prepared before the organization\u0027s first binding cannot be committed by it afterwards (refused, still Prepared; the current build can finish it)",
+      "Expected": "(a) CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; 3/NULL Prepared; current OK. (b) legacy prepare OK; first binding OK; CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; 3/NULL Prepared; current OK",
+      "Observed": "(a) CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; 3/NULL Prepared -; current OK. (b) prepare OK; first OK; legacy commit CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; 3/NULL Prepared -; current OK",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GH-06",
+      "Kind": "Security",
+      "Group": "GH",
+      "Description": "M2F-06 / CAP-S3 / CAP-S6 through the real host\u0027s header parsing (current build\u0027s client, header replaced on the wire): absent, 1, 3, 02, empty, two, 1,2, \u002B2, two instances (1 and 2; 2 and 2) and 2.0 are all level 1 and refused; exactly \u00222\u0022 is admitted (then stops as not ready on the unreachable SpiceDB). A value padded with HTTP optional whitespace is recorded as a diagnostic",
+      "Expected": "11 x CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; \u00222\u0022 admitted (AUTHORITY_NOT_READY 503)",
+      "Observed": "absent -\u003E CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; \u00221\u0022 -\u003E CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; \u00223\u0022 -\u003E CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; \u002202\u0022 -\u003E CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; \u0022\u0022 -\u003E CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; \u0022two\u0022 -\u003E CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; \u00221,2\u0022 -\u003E CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; \u0022\u002B2\u0022 -\u003E CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; instances 1 and 2 -\u003E CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; instances 2 and 2 -\u003E CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; \u00222.0\u0022 -\u003E CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; \u00222\u0022 -\u003E AUTHORITY_NOT_READY 503 retryable=True; padded -\u003E AUTHORITY_NOT_READY 503 retryable=True",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GH-01",
+      "Kind": "Premise",
+      "Group": "GH",
+      "Description": "CAP-S2/S5 on the wire: every request the 11e15ee and 0be5f52 builds sent carried NO capability header; every request of the current build carried exactly one header with value 2 (recorded below each build\u0027s own client)",
+      "Expected": "11e15ee [] only; 0be5f52 [] only; current [2] only",
+      "Observed": "11e15ee []x14; 0be5f52 []x12; current [2]x41",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GH-07",
+      "Kind": "Control",
+      "Group": "GH",
+      "Description": "INV-4 / \u00A79 on the real host: with the deployment floor not configured the host logs at startup that the capability floor is enforced with deployment floor 1 (supporting evidence only, INV-2)",
+      "Expected": "startup log names deployment floor 1",
+      "Observed": "startup log names deployment floor 1; readiness 503 {\u0022type\u0022:\u0022https://tools.ietf.org/html/rfc9110#section-15.6.4\u0022,\u0022title\u0022:\u0022Not ready\u0022,\u0022status\u0022:503,\u0022detail\u0022:\u0022SpiceDbUnavailable:Unavailable\u0022,\u0022trace_id\u0022:\u002200-03b88f852e9b08fe23be37351deae66f-13e1e0142665d796-00\u0022}",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GH-08",
+      "Kind": "Security",
+      "Group": "GH",
+      "Description": "M2F-38 on the real host: with Content:MinimumBusinessEnvelopeCapability = 2 the host refuses the 0be5f52 build\u0027s write and the 11e15ee build\u0027s census in an organization WITHOUT a binding (organization rows unchanged); the current build writes; the startup log names deployment floor 2",
+      "Expected": "prepare: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; census CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; rows unchanged; current OK; startup floor 2",
+      "Observed": "legacy prepare: CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; census CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT 409 retryable=False; rows unchanged; current OK; startup True",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "GH-09",
+      "Kind": "Security",
+      "Group": "GH",
+      "Description": "M2F-29 / \u00A79 on the real host: Content:MinimumBusinessEnvelopeCapability = \u00223\u0022 refuses the start (fail closed)",
+      "Expected": "not live; exits non-zero; names the configuration key",
+      "Observed": "LIVE; live",
+      "Pass": false,
+      "Gap": null,
+      "Result": "FAIL"
+    },
+    {
+      "Id": "G-after-capability-host",
+      "Kind": "Setup",
+      "Group": "GH",
+      "Description": "F-E2 sentinel (after-capability-host): the runtime role\u0027s table grants equal the setup baseline",
+      "Expected": "unchanged",
+      "Observed": "unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "T-01",
+      "Kind": "Setup",
+      "Group": "teardown",
+      "Description": "teardown: the Testing override disables acceptance on the in-process switch (instances are discarded with the process)",
+      "Expected": "enabled False",
+      "Observed": "enabled False",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "G-end",
+      "Kind": "Setup",
+      "Group": "teardown",
+      "Description": "F-E2 sentinel (end): the runtime role\u0027s table grants equal the setup baseline",
+      "Expected": "unchanged",
+      "Observed": "unchanged",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    },
+    {
+      "Id": "T-02",
+      "Kind": "Setup",
+      "Group": "teardown",
+      "Description": "end: every admitted database still carries this run\u0027s nonce and system identifier; the runtime role is ordinary",
+      "Expected": "verified; false false",
+      "Observed": "verified 4; false false",
+      "Pass": true,
+      "Gap": null,
+      "Result": "PASS"
+    }
+  ],
+  "gapDemonstrations": [
+    {
+      "Id": "GH-07r",
+      "Kind": "Recovery",
+      "Group": "GH",
+      "Description": "the composed readiness text (E3-M2f-2 record \u00A711: not executed in-process) on the real host: readiness needs SpiceDB, which the disposable run does not provide; whether the capability text is appended when every other dependency is ready is not observable here",
+      "Expected": "readiness detail contains the capability text, or readiness fails earlier on SpiceDB",
+      "Observed": "503; contains capability text False; {\u0022type\u0022:\u0022https://tools.ietf.org/html/rfc9110#section-15.6.4\u0022,\u0022title\u0022:\u0022Not ready\u0022,\u0022status\u0022:503,\u0022detail\u0022:\u0022SpiceDbUnavailable:Unavailable\u0022,\u0022trace_id\u0022:\u002200-03b88f852e9b08fe23be37351deae66f-13e1e0142665d796-00\u0022}",
+      "Pass": true,
+      "Gap": "INCONCLUSIVE",
+      "Result": "INCONCLUSIVE"
+    }
+  ]
+}

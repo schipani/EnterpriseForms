@@ -1,0 +1,8 @@
+added EnterpriseForms.Application.dll
+added EnterpriseForms.Contracts.dll
+added EnterpriseForms.Domain.dll
+added EnterpriseForms.Infrastructure.dll
+kept the Authority's Microsoft.IdentityModel.Abstractions.dll 8.19.2.0 (business has 8.23.0.0)
+kept the Authority's Microsoft.IdentityModel.JsonWebTokens.dll 8.19.2.0 (business has 8.23.0.0)
+kept the Authority's Microsoft.IdentityModel.Logging.dll 8.19.2.0 (business has 8.23.0.0)
+kept the Authority's Microsoft.IdentityModel.Tokens.dll 8.19.2.0 (business has 8.23.0.0)

@@ -1,0 +1,1416 @@
+info: AuthorizationAuthority.Api.Composition.ContentAcceptancePolicyStartupGuard[9213]
+      Content acceptance policy: phase=ReleaseB requiredFloor=3; this build applies rule version 3
+info: AuthorizationAuthority.Api.Composition.ContentAcceptanceRuleGuard[9210]
+      Content acceptance rule guard: ready (content acceptance rules v3 (floor 3); phase=ReleaseB requiredFloor=3)
+info: AuthorizationAuthority.Api.Composition.EnvelopeV2AcceptanceStartupGuard[9241]
+      Envelope v2 acceptance configured=True environment=DevelopmentOrTesting phase=ReleaseB requiredFloor=3; acceptance stays off until the policy is recorded on the platform journal
+info: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityFloorStartupGuard[9252]
+      Envelope capability floor enforced: deployment floor 1
+info: AuthorizationAuthority.Api.Composition.AuthorityWorkNotificationListener[5310]
+      R56-B work notification listener connected; committed authorization changes now wake the work loop.
+warn: Microsoft.EntityFrameworkCore.Query[10103]
+      The query uses the 'First'/'FirstOrDefault' operator without 'OrderBy' and filter operators. This may lead to unpredictable results.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://127.0.0.1:58485
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: <local>\host
+info: AuthorizationAuthority.Api.Composition.EnvelopeAcceptancePolicyObservationLoop[9243]
+      Envelope v2 acceptance policy Recorded on the platform journal (policy digest 05434fe3ba42864506494e405063cff959416c7f046263304402c0fb91a950df)
+warn: Microsoft.EntityFrameworkCore.Query[10103]
+      The query uses the 'First'/'FirstOrDefault' operator without 'OrderBy' and filter operators. This may lead to unpredictable results.
+warn: Microsoft.EntityFrameworkCore.Query[10103]
+      The query uses the 'First'/'FirstOrDefault' operator without 'OrderBy' and filter operators. This may lead to unpredictable results.
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 39.2542ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 46.7212ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.887ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 4.0075ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5261ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.6088ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3242ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.402ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 4.0787ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 4.212ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6417ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7622ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6527ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7614ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6855ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7734ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8287ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.942ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.7836ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.8717ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.686ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7646ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.7485ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.8346ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6997ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.8056ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8692ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.9558ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.4434ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.5417ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6967ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7832ms - 200
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.7211ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.8315ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.7157ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.8199ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8732ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.9624ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.0925ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.183ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5766ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.6892ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6251ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.708ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5107ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.5974ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5886ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.6652ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.0788ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.1856ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8184ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.9062ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.5263ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.6354ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8153ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.0024ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.9959ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.0833ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5858ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7791ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.816ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.9003ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.7174ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7855ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8841ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.0156ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8373ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.9348ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.836ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.9198ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.3231ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.4229ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6013ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7204ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.2105ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.329ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.7465ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.82ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.736ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.8054ms - 200
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.163ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.3586ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.9894ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.074ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.7642ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.85ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.4324ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.5156ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6487ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7278ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8075ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.875ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5724ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.6531ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8429ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.938ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8734ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.9719ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.7345ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.8268ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.7914ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.8938ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8319ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.9045ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.9971ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.0787ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.9627ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.0458ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.0255ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.1028ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8653ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.933ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.0737ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.1864ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.0009ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.0641ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.2953ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.361ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6413ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7108ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.2982ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.368ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.2651ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3354ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6723ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7536ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.0313ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.1107ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.0118ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.0833ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6115ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.714ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.0933ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.1527ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5272ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.6038ms - 200
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.9877ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.0875ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6059ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.6608ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6279ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.6967ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3293ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3965ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.311ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3809ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.4146ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.4693ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5763ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.6422ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.456ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.5163ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6068ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.6854ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3466ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3936ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6795ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7548ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.1999ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2521ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.4181ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.47ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.237ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2773ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.4141ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.4663ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3405ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3902ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.168ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2137ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6227ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.66ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.0777ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.1167ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.188ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2248ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.0935ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.1321ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.655ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.747ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.569ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.6378ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8871ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.139ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.7121ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7578ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3233ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3636ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.1748ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2218ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.1995ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2384ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.2306ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2637ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.9019ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.949ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.9126ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.96ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8461ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.8904ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5104ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.5584ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.7113ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7769ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 5.4505ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 5.5028ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8698ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.9094ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.0894ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.1224ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.0907ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.1178ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.1337ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.159ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 1.959ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 1.9946ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 1.946ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 1.9728ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.0585ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.0837ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.1745ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2222ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3221ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3547ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.1797ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2184ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3801ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.4233ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3092ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3457ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.2811ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.322ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.1481ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.1856ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5068ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.553ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.4934ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.5362ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.1918ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2262ms - 200
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6587ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.6945ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5172ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.5538ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.1716ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2056ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.1453ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.1696ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.4145ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.4541ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.651ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.6872ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8649ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.9141ms - 200
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.2801ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.3264ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3134ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3477ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.2243ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2578ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5337ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.5771ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.2226ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2521ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.1984ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2278ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.4532ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.49ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3214ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3529ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.4326ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.4652ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.0377ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.0738ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.0577ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.089ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.0226ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.0588ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5257ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7238ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3614ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3995ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3872ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.429ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 3.1188ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 3.1699ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.7032ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.742ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3838ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.4174ms - 200
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6101ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.6502ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.0674ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.103ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5b37333961a457518aedfe6-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.5239ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.5635ms - 200
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.6599ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.7093ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.4151ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.4475ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.2747ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3103ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d524747a8eda038e08fcf0aa-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 4.0444ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 4.0843ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3135ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3533ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.2592ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.293ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.2498ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2817ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.1845ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.223ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.7821ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.8156ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/hmac/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.21ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.2425ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.2795ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3293ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.296ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3344ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.1303ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.171ms - 200
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d5fe-7ebe-869b-48611edab6ee client_level=1 outcome=refused
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.3474ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.3963ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8118ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.8474ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request POST http://127.0.0.1:63678/v1/transit/verify/org-01a1e740d5fe7ebe869b48611edab6ee-row-integrity-v1/sha2-256
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.4148ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.4485ms - 200
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1754791360]
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+warn: AuthorizationAuthority.Api.Composition.EnvelopeCapabilityObserver[9250]
+      Envelope capability refused: organization=01a1e740-d524-747a-8eda-038e08fcf0aa client_level=1 outcome=refused
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[100]
+      Start processing HTTP request GET http://127.0.0.1:63678/v1/sys/health
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[100]
+      Sending HTTP request GET http://127.0.0.1:63678/v1/sys/health
+info: System.Net.Http.HttpClient.vault-transit.ClientHandler[101]
+      Received HTTP response headers after 2.8261ms - 200
+info: System.Net.Http.HttpClient.vault-transit.LogicalHandler[101]
+      End processing HTTP request after 2.8763ms - 200

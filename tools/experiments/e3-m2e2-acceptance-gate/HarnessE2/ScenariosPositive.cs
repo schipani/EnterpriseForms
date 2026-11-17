@@ -204,7 +204,7 @@ internal sealed partial class Lab
             Guid replayOperation = Guid.Empty;
             try
             {
-                var replay = await acc.Service.PrepareAsync(Actor(pOrg), prepared.Request, prepared.Key, Guid.CreateVersion7(), CancellationToken.None);
+                var replay = await acc.Service.PrepareAsync(Actor(pOrg), prepared.Request, prepared.Key, Guid.CreateVersion7(), CancellationToken.None, BusinessBuild.Current.Declared);
                 replayOutcome = "OK";
                 replayOperation = replay.OperationId;
             }
@@ -225,7 +225,7 @@ internal sealed partial class Lab
             long replayRevision = -1;
             try
             {
-                var revision = await acc.Service.CommitAsync(Actor(pOrg), prepared.OperationId, new CommitContentChangeRequest(pOrg.Id, record.Id, staged), Guid.CreateVersion7(), CancellationToken.None);
+                var revision = await acc.Service.CommitAsync(Actor(pOrg), prepared.OperationId, new CommitContentChangeRequest(pOrg.Id, record.Id, staged), Guid.CreateVersion7(), CancellationToken.None, BusinessBuild.Current.Declared);
                 replayCommit = "OK";
                 replayRevision = revision.CommittedContentRevision;
             }

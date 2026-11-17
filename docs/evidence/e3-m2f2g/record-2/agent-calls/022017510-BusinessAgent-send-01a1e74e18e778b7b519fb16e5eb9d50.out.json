@@ -1,0 +1,1 @@
+{"Ok":false,"Status":409,"Error":"AuthorityClientException","ErrorCode":"CLIENT_ENVELOPE_CAPABILITY_INSUFFICIENT","HttpStatusCode":409,"Retryable":false,"Sent":[{"Path":"/internal/v1/integrity/verify-record-projection","CapabilityHeaderValues":["1,2"],"Status":409}]}

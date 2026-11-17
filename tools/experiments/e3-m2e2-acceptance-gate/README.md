@@ -50,3 +50,22 @@ powershell -File scripts\dev\e3-m2e2-mutations.ps1 -BaseWorkDir <work dir of a g
 | D | database-level enforcement with acceptance on (ledger objects, floor corruption, floor-2 restore copy) |
 | R | M2-RST-06 and the recovery-gap demonstrations (`EXPECTED_LIMIT`, `EXPECTED_GAP_BD1`; never counted as passes) |
 | H | Authority host starts |
+
+## E3-M2f-2G additions (capability floor; `docs/security/E3_M2F2G_VERIFICATION_RECORD.md`)
+
+Owner authorization of E3-M2f-2G (2026-11-16). The harness is **capability-aware** (OA-M2f2-05): every in-process request names the business
+build it models (`BusinessBuild` in `Support.cs`). The E3-M2e-2 scenarios model the current build (level 2: E3-M2f-1 and later); older builds
+are modelled only in the groups below, and real older builds run as separate processes. No E3-M2e-2 assertion was changed.
+
+| Group | Content |
+|---|---|
+| G | M2F-10..16 G-2 at all seven entry points on real PostgreSQL (bytes from the real 11e15ee business build), level-2 controls, counterfactuals on a disposable copy, baseline 0be5f52 demonstrations (`EXPECTED_GAP_G2`, `EXPECTED_GAP_INVENTORY`), the C x D x O matrix, any-state bindings, the existence query (statement, plan, privileges, unreadable ledger) |
+| GS | Self-contained level-2 short-circuit detector (M2F-22 on PostgreSQL; MG-17): its setup needs no level-2 Commit in a bound organization; statement trace and a server-enforced check (ledger SELECT revoked) |
+| GC | FB-1 / M2F-34 with transactions held open at exact statements (both orders, rollback), Commit racing the first binding, per-organization lock scope, mixed concurrent stress |
+| GR | Restore (BD-1, `EXPECTED_GAP_RESTORE`) and incomplete ledger reconstruction (BD-2, `EXPECTED_GAP_BD2`) on disposable copies, with the deployment-floor backstop |
+| GH | This tree's real Authority HOST (Vault Transit signer) driven over HTTP by the real 11e15ee, 0be5f52 and current business clients: header grammar on the wire, M2F-35, M2F-36, mixed clients, D = 2, invalid D |
+
+The agents (`tools/experiments/e3-m2f2g-capability-gate/`) are built by the same script: one BusinessAgent per business build and one
+AuthorityAgent per Authority build. PostgreSQL-backed enforcement-removal runs: `scripts/dev/e3-m2f2g-mutations.ps1` (`-DryRun` checks every
+anchor without writing or building; `-VerifyRestored` re-runs the same groups on the restored build). A setup failure in groups G and GS is
+recorded as a Setup check and stops that group; it is never a security result.

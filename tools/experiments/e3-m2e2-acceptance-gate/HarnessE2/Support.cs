@@ -9,13 +9,34 @@ using AuthorizationAuthority.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
+/// <summary>
+/// E3-M2f-2G (OA-M2f2-05, docs/security/E3_M2F_CONTRACT_CLOSURE.md §3): the business build a harness request models, and the envelope
+/// capability that build declares (CAP-S5: a build without the header is level 1). The Authority parses the header in its Api and passes
+/// the parsed value to the services; in-process requests pass that parsed value directly. The E3-M2e-2 scenarios test Authority rules
+/// with a business that can represent signed schema 2 and Envelope v2 faithfully, so they model the CURRENT build (E3-M2f-1 and later,
+/// level 2), named at every helper call by default and at every direct service call explicitly. Older builds are modelled only where a
+/// check is about them (group G), with <see cref="Undeclared"/> or <see cref="DeclaresOne"/>; real older builds run as separate
+/// processes (BusinessAgent) and send their own headers.
+/// </summary>
+internal sealed record BusinessBuild(string Name, AuthorizationAuthority.Application.Features.Content.ClientEnvelopeCapability? Declared)
+{
+    public static BusinessBuild Current { get; } = new("current business build (E3-M2f-1+), declares level 2", AuthorizationAuthority.Application.Features.Content.ClientEnvelopeCapability.Current);
+
+    /// <summary>A build before E3-M2f-1: no header (the Authority Api passes level 1; in-process the argument is null, the same as no header).</summary>
+    public static BusinessBuild Undeclared { get; } = new("pre-E3-M2f-1 business build, no header (level 1)", null);
+
+    /// <summary>A build that declares level 1 explicitly.</summary>
+    public static BusinessBuild DeclaresOne { get; } = new("business build declaring level 1", AuthorizationAuthority.Application.Features.Content.ClientEnvelopeCapability.Legacy);
+}
+
 /// <summary>Every DbContext the harness creates goes through <see cref="Target.Require"/>.</summary>
 internal sealed class Factory(DbContextOptions<AuthorityDbContext> options) : IDbContextFactory<AuthorityDbContext>
 {
-    public static Factory For(string connectionString, IInterceptor? interceptor = null)
+    public static Factory For(string connectionString, params IInterceptor?[] interceptors)
     {
         var builder = new DbContextOptionsBuilder<AuthorityDbContext>().UseNpgsql(Target.Require(connectionString), n => n.MigrationsHistoryTable("ef_migrations_history", AuthorityDbContext.SchemaName));
-        return new(interceptor is null ? builder.Options : builder.AddInterceptors(interceptor).Options);
+        var present = interceptors.Where(i => i is not null).Select(i => i!).ToArray();
+        return new(present.Length == 0 ? builder.Options : builder.AddInterceptors(present).Options);
     }
 
     public AuthorityDbContext CreateDbContext() => new(options);
