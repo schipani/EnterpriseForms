@@ -1,0 +1,12 @@
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AWipedArchiveOrSentinelIsAnArchiveRegression (46ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalVerificationFinding { OrganizationId = 01a1ea3c-9000-7e2d-ad8f-b0b72d91b1f1, StreamName = audit, FindingCode = ARCHIVE_REGRESSION, Subtype = , Severity = Security, FirstRevision = 5, LastRevision = 5, RunId = 01a1ea3c-a388-7658-a61a-54386de2a818, ObservedAtUtc = 2026-11-17 4:00:05 PM +00:00, EvidenceReferences = <>z__ReadOnlySingleElementList`1[System.String], Detail = the archived object at the verified revision is absent or differs from the checkpoint digest, SweepOutcome = Findings, Checkpoint = JournalCheckpointReference { CheckpointSequence = 1, VerifiedRevision = 5, CheckpointDigestHex = 54ea7df95055196c610756a1412715a97d8979b60ce2f0dff3ebf5dc476506e9 }, StopGeneration = , Identity = f2f8058dcc4353cfe817de97927e822d }]
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AWipedArchiveOrSentinelIsAnArchiveRegression() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:188
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 1
+  succeeded: 416
+  skipped: 0
+  duration: 2s 088ms

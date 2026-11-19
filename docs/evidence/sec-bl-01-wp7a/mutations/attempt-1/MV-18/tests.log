@@ -1,0 +1,25 @@
+failed AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(stream: "content") (996ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Inconclusive
+  Actual:   Findings
+    at AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationRaceTests.cs:65
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(stream: "audit") (3ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Inconclusive
+  Actual:   Findings
+    at AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationRaceTests.cs:65
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(stream: "authorization") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Inconclusive
+  Actual:   Findings
+    at AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationRaceTests.cs:65
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 3
+  succeeded: 414
+  skipped: 0
+  duration: 2s 611ms

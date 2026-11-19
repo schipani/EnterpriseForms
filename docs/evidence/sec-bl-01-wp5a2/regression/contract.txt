@@ -1,0 +1,6 @@
+Test run summary: Passed!
+  total: 958
+  failed: 0
+  succeeded: 946
+  skipped: 12
+  duration: 1m 04s 696ms

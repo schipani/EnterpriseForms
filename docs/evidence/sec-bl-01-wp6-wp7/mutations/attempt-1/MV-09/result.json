@@ -1,0 +1,27 @@
+{
+  "id": "MV-09",
+  "what": "CK-2: a successor may verify a lower revision (non-monotonic checkpoint)",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Verification/JournalVerificationCheckpoints.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Verification/JournalVerificationCheckpoints.cs": "28763dad1815548154a309325cdcdae253063ac1ed7b63689bec18c6f77867ed"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 43.8,
+    "exit": 2,
+    "seconds": 5.5,
+    "kind": "ip",
+    "total": 337,
+    "succeeded": 335,
+    "failed": [
+      "AuthorizationAuthority.Tests.VerificationCheckpointTests.ASuccessorMustLinkAdvanceMonotonicallyAndCarryAssurance",
+      "AuthorizationAuthority.Tests.VerificationCheckpointTests.CreateNextRefusesToAppendAfterAnInvalidRegressedOrInconclusiveDiscoveryOrOutOfOrder"
+    ]
+  },
+  "seconds": 49.3
+}

@@ -1,0 +1,12 @@
+SEC-BL-01 WP-5b content-stage SEC-P: build.txt (local paths scrubbed)
+
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  EnterpriseForms.Integrity -> <repo>\src\shared\EnterpriseForms.Integrity\bin\Release\net10.0\EnterpriseForms.Integrity.dll
+  EnterpriseForms.SecurityTests -> <repo>\tests\security\EnterpriseForms.SecurityTests\bin\Release\net10.0\EnterpriseForms.SecurityTests.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:03.39

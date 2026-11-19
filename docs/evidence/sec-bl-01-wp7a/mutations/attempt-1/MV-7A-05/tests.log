@@ -1,0 +1,55 @@
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(stream: "content") (661ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_SUCCESSOR_EVIDENCE"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:320
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(stream: "audit") (3ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_SUCCESSOR_EVIDENCE"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:320
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(stream: "authorization") (17ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_SUCCESSOR_EVIDENCE"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:320
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(stream: "authorization") (4ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_SUCCESSOR_EVIDENCE"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:226
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(stream: "audit") (1ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_SUCCESSOR_EVIDENCE"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:226
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(stream: "content") (1ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_SUCCESSOR_EVIDENCE"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:226
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 6
+  succeeded: 411
+  skipped: 0
+  duration: 2s 158ms

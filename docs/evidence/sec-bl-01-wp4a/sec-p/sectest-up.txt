@@ -1,0 +1,340 @@
+docker :  Image enterpriseforms/authority:local Building 
+At line:1 char:338
++ ... ure/docker; docker compose -p enterpriseforms-sectest -f compose.yaml ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( Image enterpri...local Building :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ Image enterpriseforms/api:local Building 
+ Image enterpriseforms/authority:local Building 
+ Image enterpriseforms/api:local Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 2.36kB done
+#1 DONE 0.0s
+
+#2 [authority internal] load build definition from Dockerfile.authority
+#2 transferring dockerfile: 1.82kB 0.0s done
+#2 DONE 0.1s
+
+#3 [business-migrate internal] load build definition from Dockerfile.api
+#3 transferring dockerfile: 1.67kB 0.0s done
+#3 DONE 0.1s
+
+#4 [business-migrate internal] load metadata for mcr.microsoft.com/dotnet/sdk:10.0
+#4 DONE 0.0s
+
+#5 [api internal] load metadata for mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra
+#5 DONE 0.3s
+
+#6 [authority internal] load .dockerignore
+#6 transferring context: 286B done
+#6 DONE 0.0s
+
+#7 [authority build  1/14] FROM mcr.microsoft.com/dotnet/sdk:10.0
+#7 DONE 0.0s
+
+#8 [authority runtime 1/3] FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra@sha256:cae5b962bfb786606def03d250c6a645cc98839095c89e806e4bd8978a68115b
+#8 DONE 0.0s
+
+#9 [authority internal] load build context
+#9 transferring context: 1.11MB 0.2s done
+#9 transferring context: 1.11MB 0.2s done
+#9 DONE 0.3s
+
+#10 [api internal] load build context
+#10 transferring context: 836.73kB 0.2s done
+#10 DONE 0.3s
+
+#11 [authority-migrate build  6/14] COPY src/authority/AuthorizationAuthority.Contracts/AuthorizationAuthority.Contracts.csproj src/authority/AuthorizationAuthority.Contracts/
+#11 CACHED
+
+#12 [authority-migrate build  9/14] COPY src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj src/authority/AuthorizationAuthority.Api/
+#12 CACHED
+
+#13 [authority-migrate build  4/14] COPY src/shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj src/shared/EnterpriseForms.Integrity/
+#13 CACHED
+
+#14 [authority-migrate build  7/14] COPY src/authority/AuthorizationAuthority.Application/AuthorizationAuthority.Application.csproj src/authority/AuthorizationAuthority.Application/
+#14 CACHED
+
+#15 [authority-migrate build 10/14] RUN dotnet restore src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj
+#15 CACHED
+
+#16 [authority-migrate build  2/14] WORKDIR /src
+#16 CACHED
+
+#17 [authority-migrate build  5/14] COPY src/authority/AuthorizationAuthority.Domain/AuthorizationAuthority.Domain.csproj src/authority/AuthorizationAuthority.Domain/
+#17 CACHED
+
+#18 [authority-migrate build  8/14] COPY src/authority/AuthorizationAuthority.Infrastructure/AuthorizationAuthority.Infrastructure.csproj src/authority/AuthorizationAuthority.Infrastructure/
+#18 CACHED
+
+#19 [authority-migrate build  3/14] COPY global.json Directory.Build.props Directory.Packages.props ./
+#19 CACHED
+
+#20 [authority-migrate build 11/14] COPY src/shared/ src/shared/
+#20 CACHED
+
+#21 [authority-migrate build 12/14] COPY src/authority/ src/authority/
+#21 ...
+
+#22 [business-migrate build 14/14] RUN dotnet publish src/backend/EnterpriseForms.Api/EnterpriseForms.Api.csproj -c Release -o /app/publish --no-restore -p:OpenApiGenerateDocumentsOnBuild=false
+#22 CACHED
+
+#23 [business-migrate build  4/14] COPY src/shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj src/shared/EnterpriseForms.Integrity/
+#23 CACHED
+
+#24 [business-migrate build 10/14] RUN dotnet restore src/backend/EnterpriseForms.Api/EnterpriseForms.Api.csproj
+#24 CACHED
+
+#16 [business-migrate build  2/14] WORKDIR /src
+#16 CACHED
+
+#25 [business-migrate build  8/14] COPY src/backend/EnterpriseForms.Infrastructure/EnterpriseForms.Infrastructure.csproj src/backend/EnterpriseForms.Infrastructure/
+#25 CACHED
+
+#26 [business-migrate runtime 2/3] WORKDIR /app
+#26 CACHED
+
+#27 [business-migrate build  3/14] COPY global.json Directory.Build.props Directory.Packages.props ./
+#27 CACHED
+
+#28 [business-migrate build 11/14] COPY src/shared/ src/shared/
+#28 CACHED
+
+#29 [business-migrate build 12/14] COPY src/backend/ src/backend/
+#29 CACHED
+
+#30 [business-migrate build 13/14] COPY contracts/ contracts/
+#30 CACHED
+
+#31 [business-migrate build  6/14] COPY src/backend/EnterpriseForms.Contracts/EnterpriseForms.Contracts.csproj src/backend/EnterpriseForms.Contracts/
+#31 CACHED
+
+#32 [business-migrate build  9/14] COPY src/backend/EnterpriseForms.Api/EnterpriseForms.Api.csproj src/backend/EnterpriseForms.Api/
+#32 CACHED
+
+#33 [business-migrate build  5/14] COPY src/backend/EnterpriseForms.Domain/EnterpriseForms.Domain.csproj src/backend/EnterpriseForms.Domain/
+#33 CACHED
+
+#34 [business-migrate build  7/14] COPY src/backend/EnterpriseForms.Application/EnterpriseForms.Application.csproj src/backend/EnterpriseForms.Application/
+#34 CACHED
+
+#35 [business-migrate runtime 3/3] COPY --from=build /app/publish ./
+#35 CACHED
+
+#36 [api] exporting to image
+#36 exporting layers done
+#36 writing image sha256:4b32cd164ff3a47983df24f249b7131bd6f988c513d46b2ba8866b2cca561e5c 0.0s done
+#36 naming to docker.io/enterpriseforms/api:local 0.0s done
+#36 DONE 0.1s
+
+#21 [authority build 12/14] COPY src/authority/ src/authority/
+#21 ...
+
+#37 [business-migrate] exporting to image
+#37 exporting layers done
+#37 writing image sha256:fefab7964bdf495357dcccb6e8b84992bbf77f6548e3ee0d690579de0a35daa8 0.0s done
+#37 naming to docker.io/enterpriseforms/api:local 0.0s done
+#37 DONE 0.1s
+
+#38 [api] resolving provenance for metadata file
+#38 DONE 0.0s
+
+#39 [business-migrate] resolving provenance for metadata file
+#39 DONE 0.0s
+
+#21 [authority-migrate build 12/14] COPY src/authority/ src/authority/
+#21 DONE 0.5s
+
+#40 [authority build 13/14] COPY contracts/ contracts/
+#40 DONE 0.1s
+
+#40 [authority-migrate build 13/14] COPY contracts/ contracts/
+#40 DONE 0.1s
+
+#41 [authority-migrate build 14/14] RUN dotnet publish src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj -c Release -o /app/publish --no-restore -p:OpenApiGenerateDocumentsOnBuild=false
+#41 9.925   EnterpriseForms.Integrity -> /src/src/shared/EnterpriseForms.Integrity/bin/Release/net10.0/EnterpriseForms.Integrity.dll
+#41 10.07   AuthorizationAuthority.Domain -> /src/src/authority/AuthorizationAuthority.Domain/bin/Release/net10.0/AuthorizationAuthority.Domain.dll
+#41 10.78   AuthorizationAuthority.Contracts -> /src/src/authority/AuthorizationAuthority.Contracts/bin/Release/net10.0/AuthorizationAuthority.Contracts.dll
+#41 19.54   AuthorizationAuthority.Application -> /src/src/authority/AuthorizationAuthority.Application/bin/Release/net10.0/AuthorizationAuthority.Application.dll
+#41 36.86   AuthorizationAuthority.Infrastructure -> /src/src/authority/AuthorizationAuthority.Infrastructure/bin/Release/net10.0/AuthorizationAuthority.Infrastructure.dll
+#41 41.04   AuthorizationAuthority.Api -> /src/src/authority/AuthorizationAuthority.Api/bin/Release/net10.0/AuthorizationAuthority.Api.dll
+#41 41.17   AuthorizationAuthority.Api -> /app/publish/
+#41 DONE 41.4s
+
+#41 [authority build 14/14] RUN dotnet publish src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj -c Release -o /app/publish --no-restore -p:OpenApiGenerateDocumentsOnBuild=false
+#41 DONE 41.4s
+
+#26 [authority runtime 2/3] WORKDIR /app
+#26 CACHED
+
+#26 [authority-migrate runtime 2/3] WORKDIR /app
+#26 CACHED
+
+#42 [authority-migrate runtime 3/3] COPY --from=build /app/publish ./
+#42 DONE 0.3s
+
+#42 [authority-migrate runtime 3/3] COPY --from=build /app/publish ./
+#42 DONE 0.3s
+
+#43 [authority] exporting to image
+#43 exporting layers
+#43 exporting layers 0.2s done
+#43 writing image sha256:524291ac9db2d9dcf7878c9980514f85d755be4296a73dcd3c98f0b0754cbff9 0.0s done
+#43 naming to docker.io/enterpriseforms/authority:local 0.0s done
+#43 DONE 0.3s
+
+#44 [authority-migrate] exporting to image
+#44 exporting layers 0.2s done
+#44 writing image sha256:0658397365afc1359ac090882de70e60bef7f676dcc0297b0ff9f19bfa0f5543 done
+#44 naming to docker.io/enterpriseforms/authority:local 0.0s done
+#44 DONE 0.3s
+
+#45 [authority] resolving provenance for metadata file
+#45 DONE 0.1s
+
+#46 [authority-migrate] resolving provenance for metadata file
+#46 DONE 0.0s
+ Image enterpriseforms/authority:local Built 
+ Image enterpriseforms/authority:local Built 
+ Image enterpriseforms/api:local Built 
+ Image enterpriseforms/api:local Built 
+ Network enterpriseforms-sectest_trust-edge Creating 
+ Network enterpriseforms-sectest_trust-edge Created 
+ Network enterpriseforms-sectest_authority-net Creating 
+ Network enterpriseforms-sectest_authority-net Created 
+ Network enterpriseforms-sectest_platform-signing Creating 
+ Network enterpriseforms-sectest_platform-signing Created 
+ Network enterpriseforms-sectest_platform-edge Creating 
+ Network enterpriseforms-sectest_platform-edge Created 
+ Network enterpriseforms-sectest_web-net Creating 
+ Network enterpriseforms-sectest_web-net Created 
+ Network enterpriseforms-sectest_business-net Creating 
+ Network enterpriseforms-sectest_business-net Created 
+ Volume enterpriseforms-sectest_dev-seed Creating 
+ Volume enterpriseforms-sectest_dev-seed Created 
+ Volume enterpriseforms-sectest_api-keyring Creating 
+ Volume enterpriseforms-sectest_api-keyring Created 
+ Container enterpriseforms-sectest-spicedb-db-1 Creating 
+ Container enterpriseforms-sectest-azurite-1 Creating 
+ Container enterpriseforms-sectest-business-db-1 Creating 
+ Container enterpriseforms-sectest-vault-1 Creating 
+ Container enterpriseforms-sectest-authority-db-1 Creating 
+ Container enterpriseforms-sectest-archive-store-1 Creating 
+ Container enterpriseforms-sectest-business-db-1 Created 
+ Container enterpriseforms-sectest-spicedb-db-1 Created 
+ Container enterpriseforms-sectest-spicedb-migrate-1 Creating 
+ Container enterpriseforms-sectest-business-migrate-1 Creating 
+ Container enterpriseforms-sectest-attacker-sql-1 Creating 
+ Container enterpriseforms-sectest-authority-db-1 Created 
+ Container enterpriseforms-sectest-authority-migrate-1 Creating 
+ Container enterpriseforms-sectest-azurite-1 Created 
+ Container enterpriseforms-sectest-vault-1 Created 
+ Container enterpriseforms-sectest-vault-transit-init-1 Creating 
+ Container enterpriseforms-sectest-archive-store-1 Created 
+ Container enterpriseforms-sectest-authority-migrate-1 Created 
+ Container enterpriseforms-sectest-spicedb-migrate-1 Created 
+ Container enterpriseforms-sectest-business-migrate-1 Created 
+ Container enterpriseforms-sectest-attacker-sql-1 Created 
+ Container enterpriseforms-sectest-spicedb-1 Creating 
+ Container enterpriseforms-sectest-vault-transit-init-1 Created 
+ Container enterpriseforms-sectest-vault-search-seal-init-1 Creating 
+ Container enterpriseforms-sectest-spicedb-1 Created 
+ Container enterpriseforms-sectest-vault-search-seal-init-1 Created 
+ Container enterpriseforms-sectest-authority-1 Creating 
+ Container enterpriseforms-sectest-authority-1 Created 
+ Container enterpriseforms-sectest-api-1 Creating 
+ Container enterpriseforms-sectest-api-1 Created 
+ Container enterpriseforms-sectest-azurite-1 Starting 
+ Container enterpriseforms-sectest-business-db-1 Starting 
+ Container enterpriseforms-sectest-archive-store-1 Starting 
+ Container enterpriseforms-sectest-authority-db-1 Starting 
+ Container enterpriseforms-sectest-spicedb-db-1 Starting 
+ Container enterpriseforms-sectest-vault-1 Starting 
+ Container enterpriseforms-sectest-archive-store-1 Started 
+ Container enterpriseforms-sectest-authority-db-1 Started 
+ Container enterpriseforms-sectest-authority-db-1 Waiting 
+ Container enterpriseforms-sectest-business-db-1 Started 
+ Container enterpriseforms-sectest-business-db-1 Waiting 
+ Container enterpriseforms-sectest-business-db-1 Waiting 
+ Container enterpriseforms-sectest-azurite-1 Started 
+ Container enterpriseforms-sectest-spicedb-db-1 Started 
+ Container enterpriseforms-sectest-spicedb-db-1 Waiting 
+ Container enterpriseforms-sectest-vault-1 Started 
+ Container enterpriseforms-sectest-vault-1 Waiting 
+ Container enterpriseforms-sectest-authority-db-1 Healthy 
+ Container enterpriseforms-sectest-authority-migrate-1 Starting 
+ Container enterpriseforms-sectest-business-db-1 Healthy 
+ Container enterpriseforms-sectest-attacker-sql-1 Starting 
+ Container enterpriseforms-sectest-business-db-1 Healthy 
+ Container enterpriseforms-sectest-business-migrate-1 Starting 
+ Container enterpriseforms-sectest-spicedb-db-1 Healthy 
+ Container enterpriseforms-sectest-spicedb-migrate-1 Starting 
+ Container enterpriseforms-sectest-authority-migrate-1 Started 
+ Container enterpriseforms-sectest-business-migrate-1 Started 
+ Container enterpriseforms-sectest-attacker-sql-1 Started 
+ Container enterpriseforms-sectest-spicedb-migrate-1 Started 
+ Container enterpriseforms-sectest-spicedb-migrate-1 Waiting 
+ Container enterpriseforms-sectest-spicedb-migrate-1 Exited 
+ Container enterpriseforms-sectest-spicedb-1 Starting 
+ Container enterpriseforms-sectest-spicedb-1 Started 
+ Container enterpriseforms-sectest-vault-1 Healthy 
+ Container enterpriseforms-sectest-vault-transit-init-1 Starting 
+ Container enterpriseforms-sectest-vault-transit-init-1 Started 
+ Container enterpriseforms-sectest-vault-transit-init-1 Waiting 
+ Container enterpriseforms-sectest-vault-transit-init-1 Exited 
+ Container enterpriseforms-sectest-vault-search-seal-init-1 Starting 
+ Container enterpriseforms-sectest-vault-search-seal-init-1 Started 
+ Container enterpriseforms-sectest-spicedb-1 Waiting 
+ Container enterpriseforms-sectest-vault-search-seal-init-1 Waiting 
+ Container enterpriseforms-sectest-vault-1 Waiting 
+ Container enterpriseforms-sectest-vault-transit-init-1 Waiting 
+ Container enterpriseforms-sectest-authority-db-1 Waiting 
+ Container enterpriseforms-sectest-authority-migrate-1 Waiting 
+ Container enterpriseforms-sectest-vault-1 Healthy 
+ Container enterpriseforms-sectest-vault-transit-init-1 Exited 
+ Container enterpriseforms-sectest-authority-migrate-1 Exited 
+ Container enterpriseforms-sectest-authority-db-1 Healthy 
+ Container enterpriseforms-sectest-spicedb-1 Healthy 
+ Container enterpriseforms-sectest-vault-search-seal-init-1 Exited 
+ Container enterpriseforms-sectest-authority-1 Starting 
+ Container enterpriseforms-sectest-authority-1 Started 
+ Container enterpriseforms-sectest-authority-1 Waiting 
+ Container enterpriseforms-sectest-business-db-1 Waiting 
+ Container enterpriseforms-sectest-business-migrate-1 Waiting 
+ Container enterpriseforms-sectest-business-migrate-1 Exited 
+ Container enterpriseforms-sectest-business-db-1 Healthy 
+ Container enterpriseforms-sectest-authority-1 Healthy 
+ Container enterpriseforms-sectest-api-1 Starting 
+ Container enterpriseforms-sectest-api-1 Started 
+ Container enterpriseforms-sectest-authority-db-1 Waiting 
+ Container enterpriseforms-sectest-authority-1 Waiting 
+ Container enterpriseforms-sectest-vault-1 Waiting 
+ Container enterpriseforms-sectest-api-1 Waiting 
+ Container enterpriseforms-sectest-spicedb-1 Waiting 
+ Container enterpriseforms-sectest-vault-transit-init-1 Waiting 
+ Container enterpriseforms-sectest-spicedb-db-1 Waiting 
+ Container enterpriseforms-sectest-business-db-1 Waiting 
+ Container enterpriseforms-sectest-attacker-sql-1 Waiting 
+ Container enterpriseforms-sectest-archive-store-1 Waiting 
+ Container enterpriseforms-sectest-business-migrate-1 Waiting 
+ Container enterpriseforms-sectest-azurite-1 Waiting 
+ Container enterpriseforms-sectest-vault-search-seal-init-1 Waiting 
+ Container enterpriseforms-sectest-spicedb-migrate-1 Waiting 
+ Container enterpriseforms-sectest-authority-migrate-1 Waiting 
+ Container enterpriseforms-sectest-authority-migrate-1 Exited 
+ Container enterpriseforms-sectest-spicedb-db-1 Healthy 
+ Container enterpriseforms-sectest-vault-1 Healthy 
+ Container enterpriseforms-sectest-business-db-1 Healthy 
+ Container enterpriseforms-sectest-vault-search-seal-init-1 Exited 
+ Container enterpriseforms-sectest-spicedb-1 Healthy 
+ Container enterpriseforms-sectest-vault-transit-init-1 Exited 
+ Container enterpriseforms-sectest-authority-db-1 Healthy 
+ Container enterpriseforms-sectest-authority-1 Healthy 
+ Container enterpriseforms-sectest-spicedb-migrate-1 Exited 
+ Container enterpriseforms-sectest-azurite-1 Healthy 
+ Container enterpriseforms-sectest-archive-store-1 Healthy 
+ Container enterpriseforms-sectest-business-migrate-1 Exited 
+ Container enterpriseforms-sectest-attacker-sql-1 Healthy 
+ Container enterpriseforms-sectest-api-1 Healthy 

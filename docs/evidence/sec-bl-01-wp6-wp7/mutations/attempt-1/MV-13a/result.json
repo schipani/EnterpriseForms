@@ -1,0 +1,28 @@
+{
+  "id": "MV-13a",
+  "what": "AS-2/DP-5: D+ skips the sentinel check",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/AuditDeliveryEnforcement.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/AuditDeliveryEnforcement.cs": "9406176b3c5736b0d26abab86070a9aad60935fd3c08475e57e638f9947190ec"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 46.2,
+    "exit": 2,
+    "seconds": 6.2,
+    "kind": "ip",
+    "total": 337,
+    "succeeded": 334,
+    "failed": [
+      "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AnAbsentSentinelRefusesAuditDeliveryWithoutATerminalStateAndDeliveryResumesOnceItExists",
+      "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AnAbsentSentinelRefusesAuditDeliveryWithoutATerminalStateAndDeliveryResumesOnceItExists",
+      "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AnAbsentSentinelRefusesAuditDeliveryWithoutATerminalStateAndDeliveryResumesOnceItExists"
+    ]
+  },
+  "seconds": 52.4
+}

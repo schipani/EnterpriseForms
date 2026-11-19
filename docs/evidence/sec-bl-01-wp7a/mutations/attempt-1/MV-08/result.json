@@ -1,0 +1,43 @@
+{
+  "id": "MV-08",
+  "what": "CK-1: a checkpoint is written despite findings",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs": "a7f8951ee5dac123ad2e601e6419f35836473c32f43dbbd9248b7fe60ac79f83"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 37.6,
+    "exit": 2,
+    "seconds": 3.9,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 397,
+    "failed": [
+      "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAConsistentlyRedigestedDeliveredRowThatIsNotSentAgainIsDetectedByTheVerifier",
+      "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAnAlteredDeliveredRowOutsideTheNewestEightIsDetectedByTheVerifier",
+      "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierDeletingADeliveredRowIsDetectedByTheVerifierAndTheKeyIsStillRecordedAgainUntilDetection",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ADeletionBelowTheCheckpointIsInvisibleToTheBoundedIncrementalSweepAndDetectedByTheFullSweep",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AMissingOrForeignRecordIsAFindingAndTheGapIsNoLongerAccepted",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ChangedEvidenceInsideTheAcceptedScopeIsANewFindingAndTheCheckpointDoesNotAdvance",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.AConsistentChainRewriteIsDetectedAtTheCheckpointAnchor",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.ADatabaseRolledBackBelowTheCheckpointIsBehindTheArchive",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.ADeletedArchiveObjectIsADiscontinuityAndADeletedAnchorIsARegression",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.AForgedAnchoredRowIsAFakeReceipt",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream:",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.AModifiedDeliveredRowIsAnAnchorMismatchAndADeletedRowIsAGap",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.ANonRechainedEditBelowTheCheckpointIsMissedIncrementallyAndFoundByTheFullSweep",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.AWipedArchiveOrSentinelIsAnArchiveRegression",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.AnOrganizationHeadThatDisagreesWithTheRowsIsReported",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.FindingsAreRecordedCreateOnlyAndAlertedOnceAndNothingIsQuarantinedOrRepaired",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.RewriteAndExtendIsDetectedByTheAnchorAndTheArchiveSideLink",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.TamperingInOneOrganizationAndStreamDoesNotAffectOthers"
+    ]
+  },
+  "seconds": 41.5
+}

@@ -1,0 +1,12 @@
+{
+  "CheckpointCount": 100,
+  "MeanCheckpointBytes": 617.2,
+  "MaximumCheckpointBytes": 620,
+  "TotalCheckpointBytes": 61719,
+  "WriteSeconds": 1.7,
+  "HeadAndPredecessorDiscoveryMilliseconds": 22,
+  "FullChainDiscoveryMilliseconds": 550,
+  "ListedObjects": 100,
+  "DefaultRatePerStreamPerDay": 289,
+  "Note": "Synthetic chain written directly through CreateNextAsync (no sweeps); measures storage and discovery only. Nothing was deleted or compacted."
+}

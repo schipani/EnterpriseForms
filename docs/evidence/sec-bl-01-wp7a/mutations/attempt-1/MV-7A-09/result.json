@@ -1,0 +1,26 @@
+{
+  "id": "MV-7A-09",
+  "what": "RV-2: the 30 s ceiling of the freshness bound is not enforced",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "976ea25a7d858f53e61578b81c8e2850f487e70dfbf98b6d3aa735690c0bfb36"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 38.0,
+    "exit": 2,
+    "seconds": 4.1,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 416,
+    "failed": [
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.TheCacheIsBoundedAndTheFreshnessBoundHasAHardCeiling"
+    ]
+  },
+  "seconds": 42.0
+}

@@ -135,8 +135,35 @@ services:
   archive-store:
     # TEST DOUBLE for the separately administered append-only security-event archive (G14). Azurite on authority-net:
     # reachable only by the authority. Not Azure immutable storage / Confidential Ledger evidence (ADR-PB-003 Level A).
+    # SEC-BL-01 N-1 / RST-1 (C-155): the archive is kept in /data (--location), the image's declared volume, so it has the same
+    # lifetime as the database volumes in every profile: overlays mount a named volume (development) or tmpfs (tests) there.
+    # Without --location Azurite wrote into the container layer and lost the archive on every recreate while AuthorityDb survived.
     image: mcr.microsoft.com/azure-storage/azurite:3.9.0
-    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--skipApiVersionCheck", "--loose"]
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--skipApiVersionCheck", "--loose", "--location", "/data"]
+    networks: [authority-net]
+
+  journal-verification-keygen:
+    # SEC-BL-01 WP-5a.1: generates the journal-verification store's account key once per stack (create-only: kept when it exists),
+    # into the journal-verification-keys volume (tmpfs in the disposable overlays, a named volume in development). No public default
+    # credential and no .env value: the key never leaves the stack's volume. Not independence: one Docker administrator controls it.
+    image: mcr.microsoft.com/azure-storage/azurite:3.9.0
+    entrypoint: ["node", "-e", 'const fs=require("fs");const p="/keys/journal-verification.key";try{fs.writeFileSync(p,require("crypto").randomBytes(64).toString("base64"),{flag:"wx",mode:0o644});console.log("journal-verification key generated")}catch(e){if(e.code!=="EEXIST")throw e;console.log("journal-verification key kept")}']
+    volumes: [journal-verification-keys:/keys]
+    network_mode: none
+    restart: "no"
+
+  journal-verification-store:
+    # SEC-BL-01 WP-2 (C-155, contract section 7.4), WP-5a.1: the separate journal-verification store (checkpoints, findings, accepted
+    # exceptions, the archive provisioning record), a SEPARATE Azurite instance with its own account and generated key (never the
+    # archive's). REQUIRED by D+ for durable findings in every Development/Testing stack (the Authority refuses to start without it).
+    # Configuration separation only: the same Development administrator controls it, so it gives no independence and no
+    # checkpoint-freshness assurance.
+    image: mcr.microsoft.com/azure-storage/azurite:3.9.0
+    entrypoint: ["sh", "-c", 'AZURITE_ACCOUNTS="${JOURNAL_VERIFICATION_ACCOUNT_NAME:-efjournalverification}:$$(cat /keys/journal-verification.key)" exec azurite-blob --blobHost 0.0.0.0 --skipApiVersionCheck --loose --location /data']
+    volumes: [journal-verification-keys:/keys:ro]
+    depends_on:
+      journal-verification-keygen:
+        condition: service_completed_successfully
     networks: [authority-net]
 
   azurite:
@@ -205,9 +232,14 @@ services:
     build:
       context: ../..
       dockerfile: infrastructure/docker/Dockerfile.authority
-    environment:
+    environment: &authority-environment
       ASPNETCORE_ENVIRONMENT: ${AUTHORITY_ENVIRONMENT:-Development}
       ASPNETCORE_URLS: http://0.0.0.0:8080
+      # SEC-BL-01 WP-5a.1: D+ records its findings durably in the separate journal-verification store (required; generated key file).
+      JournalVerificationCheckpointStore__Provider: Blob
+      JournalVerificationCheckpointStore__BlobServiceUri: http://journal-verification-store:10000/${JOURNAL_VERIFICATION_ACCOUNT_NAME:-efjournalverification}
+      JournalVerificationCheckpointStore__AccountName: ${JOURNAL_VERIFICATION_ACCOUNT_NAME:-efjournalverification}
+      JournalVerificationCheckpointStore__AccountKeyFile: /run/journal-verification/journal-verification.key
       # Phase C5 (D10): field-scoped contributor writes stay OFF unless explicitly set to exactly "true" (CI browser job only).
       Content__ShareContributorWritesEnabled: ${AUTHORITY_SHARE_CONTRIBUTOR_WRITES_ENABLED:-false}
       # RB-CARV-1 (contract §22): the content acceptance phase is mandatory deployment configuration (no default). The local
@@ -253,12 +285,37 @@ services:
         condition: service_completed_successfully
       archive-store:
         condition: service_started
+      journal-verification-store:
+        condition: service_started
+    volumes: [journal-verification-keys:/run/journal-verification:ro]
     networks: [authority-net, trust-edge]
     healthcheck:
       test: ["CMD", "dotnet", "AuthorizationAuthority.Api.dll", "--probe", "http://127.0.0.1:8080/internal/v1/health/ready"]
       interval: 5s
       timeout: 4s
       retries: 40
+
+  archive-provision:
+    # SEC-BL-01 WP-5a.1 (contract A-2 section 22.8): explicit, create-only provisioning of a DISPOSABLE archive before any Authority
+    # journal activity. Inactive by default (profile); only the security-test and integration overlays enable it. It refuses every
+    # archive that is not demonstrably new (record in the separate store, no sentinel, no container, no journal rows, fresh store) and
+    # never stamps a persistent development or production archive (those need an operator baseline). Idempotent on a provisioned stack.
+    image: enterpriseforms/authority:local
+    profiles: [archive-provisioning]
+    command: ["dotnet", "AuthorizationAuthority.Api.dll", "--journal-archive-provision"]
+    environment:
+      <<: *authority-environment
+      JournalArchiveProvisioning__DisposableStack: "true"
+    volumes: [journal-verification-keys:/run/journal-verification:ro]
+    depends_on:
+      authority-migrate:
+        condition: service_completed_successfully
+      archive-store:
+        condition: service_started
+      journal-verification-store:
+        condition: service_started
+    networks: [authority-net]
+    restart: "no"
 
   business-migrate:
     image: enterpriseforms/api:local
@@ -369,3 +426,5 @@ services:
 
 volumes:
   dev-seed: {}
+  # SEC-BL-01 WP-5a.1: the generated journal-verification store key (tmpfs-backed in the disposable overlays).
+  journal-verification-keys: {}

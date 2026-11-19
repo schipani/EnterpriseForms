@@ -12,7 +12,11 @@ services:
   spicedb-db:
     volumes: [spicedb-db-data:/var/lib/postgresql]
   archive-store:
+    # SEC-BL-01 N-1 (C-155): this volume is now actually used (compose.yaml passes --location /data); before, it was mounted but the
+    # archive lived in the container layer while authority-db-data persisted.
     volumes: [archive-store-data:/data]
+  journal-verification-store:
+    volumes: [journal-verification-store-data:/data]
   azurite:
     ports: ["127.0.0.1:10010:10000"]   # 10000 is commonly taken by other local Azurite instances
     volumes: [azurite-data:/data]
@@ -30,4 +34,5 @@ volumes:
   authority-db-data: {}
   spicedb-db-data: {}
   archive-store-data: {}
+  journal-verification-store-data: {}
   azurite-data: {}

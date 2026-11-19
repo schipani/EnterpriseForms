@@ -1,0 +1,12 @@
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheTriggersStopTheAdministratorUntilItBypassesThemWhichIsJ2 (6s 924ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheRuntimeCredentialCannotRewriteResetRenumberDeleteOrTruncateTheJournal (296ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheDedicatedVerifierLoginIsReadOnlyAndRunsTheVerifier (839ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08ForgedDeliveryStateByJ1OrJ2NeverReopensTheRealGate (763ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08LegitimateDeliveryStateTransitionsWorkAndInvalidOnesAreRefused (311ms)
+
+Test run summary: Passed! - <repo>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 5
+  failed: 0
+  succeeded: 5
+  skipped: 0
+  duration: 9s 697ms

@@ -1,0 +1,27 @@
+{
+  "id": "MV-05",
+  "what": "AE-2: the archive head determined by probing revisions up to the AuthorityDb head instead of enumeration",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalStreamComparer.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalStreamComparer.cs": "b0f99f91097841a5cd9695f03a7c6eb91e14efba0dde7bea00ef2b147401359b"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 39.0,
+    "exit": 2,
+    "seconds": 4.4,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 413,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalBaselineServiceTests.MissingArchiveObjectsForgedAnchoredRowsRedigestedRowsAndATruncatedTailAreReported",
+      "AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(stream:"
+    ]
+  },
+  "seconds": 43.4
+}

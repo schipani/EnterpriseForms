@@ -27,16 +27,20 @@ namespace AuthorizationAuthority.Infrastructure.Persistence;
 /// it writes any content-acceptance entity.
 /// </para>
 /// </summary>
-public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> contextFactory, ContentAcceptancePolicy contentAcceptance, AuthorityWorkSignal? workSignal = null, AuthorityWorkOptions? workOptions = null, ISecurityAlertSink? alerts = null) : IAuthorityStore
+public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> contextFactory, ContentAcceptancePolicy contentAcceptance, AuthorityWorkSignal? workSignal = null, AuthorityWorkOptions? workOptions = null, ISecurityAlertSink? alerts = null,
+    IJournalReceiptVerifier? journalReceipts = null) : IAuthorityStore
 {
     private readonly AuthorityWorkSignal? wakeup = workOptions?.CommitWakeupEnabled == true ? workSignal : null;
     private readonly ContentAcceptancePolicy policy = contentAcceptance ?? throw new ArgumentNullException(nameof(contentAcceptance));
+
+    // SEC-BL-01 E-6/E-7 (A-7 §27): without a composed verifier nothing counts as delivered (fail closed).
+    private readonly IJournalReceiptVerifier receipts = journalReceipts ?? NotComposedJournalReceiptVerifier.Instance;
 
     public async Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken)
     {
         var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken).ConfigureAwait(false);
-        return new AuthorityScope(context, transaction, wakeup, alerts, policy);
+        return new AuthorityScope(context, transaction, wakeup, alerts, policy, receipts);
     }
 
     public async Task<IAuthorityScope> BeginReadOnlySnapshotScopeAsync(CancellationToken cancellationToken)
@@ -44,7 +48,7 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, cancellationToken).ConfigureAwait(false);
         await context.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", cancellationToken).ConfigureAwait(false);
-        return new AuthorityScope(context, transaction, null, alerts, policy);
+        return new AuthorityScope(context, transaction, null, alerts, policy, receipts);
     }
 
     public async Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken cancellationToken)
@@ -69,7 +73,8 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
             .ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction, AuthorityWorkSignal? wakeup, ISecurityAlertSink? alerts, ContentAcceptancePolicy policy) : IAuthorityScope
+    private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction, AuthorityWorkSignal? wakeup, ISecurityAlertSink? alerts, ContentAcceptancePolicy policy,
+        IJournalReceiptVerifier journalReceiptVerifier) : IAuthorityScope
     {
         private bool committed;
         private bool authorizationWorkAppended;
@@ -332,8 +337,22 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
             context.JournalEntries.Where(j => j.OrganizationId == organizationId && j.ArchiveDeliveryState == ArchiveDeliveryStates.Pending)
                 .OrderBy(j => j.JournalStreamName).ThenBy(j => j.JournalStreamRevision).Take(limit).ToListAsync(cancellationToken);
 
+        // SEC-BL-01 WP-5a: the same query restricted to one stream or to every other stream (SELECT only; no grant change).
+        public Task<List<SecurityJournalEntry>> GetPendingJournalEntriesByStreamAsync(Guid organizationId, string streamName, bool includeStream, int limit, CancellationToken cancellationToken) =>
+            (includeStream
+                ? context.JournalEntries.Where(j => j.OrganizationId == organizationId && j.ArchiveDeliveryState == ArchiveDeliveryStates.Pending && j.JournalStreamName == streamName)
+                : context.JournalEntries.Where(j => j.OrganizationId == organizationId && j.ArchiveDeliveryState == ArchiveDeliveryStates.Pending && j.JournalStreamName != streamName))
+            .OrderBy(j => j.JournalStreamName).ThenBy(j => j.JournalStreamRevision).Take(limit).ToListAsync(cancellationToken);
+
         public Task<int> CountPendingArchiveAsync(Guid organizationId, string streamName, CancellationToken cancellationToken) =>
             context.JournalEntries.CountAsync(j => j.OrganizationId == organizationId && j.JournalStreamName == streamName && j.ArchiveDeliveryState != ArchiveDeliveryStates.Anchored, cancellationToken);
+
+        // SEC-BL-01 E-6 (A-7 §27 GT-1): the journal's own highest revision of the stream (index on organization, stream, revision); never a head column.
+        public Task<SecurityJournalEntry?> FindLatestJournalEntryAsync(Guid organizationId, string streamName, CancellationToken cancellationToken) =>
+            context.JournalEntries.Where(j => j.OrganizationId == organizationId && j.JournalStreamName == streamName).OrderByDescending(j => j.JournalStreamRevision).FirstOrDefaultAsync(cancellationToken);
+
+        // SEC-BL-01 E-6/E-7: the composed trusted receipt verifier, or the fail-closed one.
+        public IJournalReceiptVerifier JournalReceipts => journalReceiptVerifier;
 
         public Task<RecordContentHead?> FindContentHeadAsync(Guid organizationId, Guid formRecordId, bool lockForUpdate, CancellationToken cancellationToken) =>
             lockForUpdate

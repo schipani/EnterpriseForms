@@ -1,0 +1,18 @@
+failed AuthorizationAuthority.Tests.VerificationCheckpointTests.CreateNextRefusesToAppendAfterAnInvalidRegressedOrInconclusiveDiscoveryOrOutOfOrder (9ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Refused
+  Actual:   Created
+    at AuthorizationAuthority.Tests.VerificationCheckpointTests.CreateNextRefusesToAppendAfterAnInvalidRegressedOrInconclusiveDiscoveryOrOutOfOrder() in <clone>\tests\authority\AuthorizationAuthority.Tests\VerificationCheckpointTests.cs:213
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.VerificationCheckpointTests.ASuccessorMustLinkAdvanceMonotonicallyAndCarryAssurance (4ms)
+  Assert.NotNull() Failure: Value is null
+    at AuthorizationAuthority.Tests.VerificationCheckpointTests.ASuccessorMustLinkAdvanceMonotonicallyAndCarryAssurance() in <clone>\tests\authority\AuthorizationAuthority.Tests\VerificationCheckpointTests.cs:132
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 2
+  succeeded: 415
+  skipped: 0
+  duration: 2s 015ms

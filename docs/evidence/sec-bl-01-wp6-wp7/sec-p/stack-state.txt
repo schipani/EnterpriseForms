@@ -1,0 +1,5 @@
+SEC-BL-01 WP-7 SEC-P: stack-state.txt (local paths scrubbed)
+
+ERROR:  aggregate functions are not allowed in GROUP BY
+LINE 1: ...| coalesce(last_archive_error_code,'-') || '|' || count(*) F...
+                                                             ^

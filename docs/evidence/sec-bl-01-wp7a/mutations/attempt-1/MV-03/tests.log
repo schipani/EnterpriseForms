@@ -1,0 +1,48 @@
+failed AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(stream: "content") (1s 185ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Inconclusive
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationRaceTests.cs:65
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalBaselineServiceTests.MissingArchiveObjectsForgedAnchoredRowsRedigestedRowsAndATruncatedTailAreReported (27ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: []
+    at AuthorizationAuthority.Tests.JournalBaselineServiceTests.MissingArchiveObjectsForgedAnchoredRowsRedigestedRowsAndATruncatedTailAreReported() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalBaselineServiceTests.cs:182
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(stream: "audit") (5ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Inconclusive
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationRaceTests.cs:65
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(stream: "authorization") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Inconclusive
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationRaceTests.cs:65
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationRaceTests.TheSameRowWithNoArchivedObjectIsAFakeReceipt (21ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: []
+    at AuthorizationAuthority.Tests.JournalVerificationRaceTests.TheSameRowWithNoArchivedObjectIsAFakeReceipt() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationRaceTests.cs:88
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AForgedAnchoredRowIsAFakeReceipt (5ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AForgedAnchoredRowIsAFakeReceipt() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:139
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.FindingsAreRecordedCreateOnlyAndAlertedOnceAndNothingIsQuarantinedOrRepaired (11ms)
+  Assert.Single() Failure: The collection did not contain any matching items
+  Expected:   (predicate expression)
+  Collection: []
+    at AuthorizationAuthority.Tests.JournalVerifierTests.FindingsAreRecordedCreateOnlyAndAlertedOnceAndNothingIsQuarantinedOrRepaired() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:403
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 7
+  succeeded: 410
+  skipped: 0
+  duration: 3s 685ms

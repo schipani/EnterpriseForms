@@ -1,0 +1,883 @@
+{
+  "note": "SEC-BL-01 WP-5b mutation runs in a scratch clone (git clone --local plus every uncommitted working-tree file); --no-incremental builds; original bytes restored and SHA-256 verified after each.",
+  "wp5b_set": [
+    {
+      "id": "BASELINE",
+      "what": "no edit (the unmodified clone)",
+      "verdict": "PASS",
+      "restored": true,
+      "files": [],
+      "original_sha256": {},
+      "total": 310,
+      "failed_tests": [],
+      "seconds": 54.2
+    },
+    {
+      "id": "MV-5B-01",
+      "what": "the content stream is not D+-enabled",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/AuditDeliveryEnforcement.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/AuditDeliveryEnforcement.cs": "9406176b3c5736b0d26abab86070a9aad60935fd3c08475e57e638f9947190ec"
+      },
+      "total": 310,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.AStoppedContentRevisionIsNeverReleasedByRestartForgedResetOrOutage",
+        "AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.AnAuthorizedAnchoredRestoreReleasesTheRevisionWithoutChangingTheContentHead",
+        "AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.KnownLimitE7ForgingTheAnchoredStateReleasesTheRevisionButNothingIsDeliveredAndTheVerifierReportsIt",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AMarkerStoppedStreamLeavesTheOtherStreamsDeliveryUnchanged",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.DiscoveryFailuresAreNeverReadAsNoStopAndNeverFabricateAFinding",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AMarkerStoppedStreamLeavesTheOtherStreamsDeliveryUnchanged",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.DiscoveryFailuresAreNeverReadAsNoStopAndNeverFabricateAFinding",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AConflictingMarkerAtTheFailedRevisionIsReportedAndTheStreamStaysStopped",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.ACorruptedOrMalformedArchivedPredecessorPreventsTheAppend(corruption:",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.ACrashBetweenTheArchiveWriteAndTheRowUpdateIsCompletedIdempotently",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AForgedAnchoredPredecessorIsNotTrustedTheArchiveDecides",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AGenesisEntryAndItsSuccessorsAreDeliveredWithinOnePassAndAcrossPasses",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AGenesisRowCarryingAPreviousDigestOrAMismatchedColumnIsRefused",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AMarkerRemovedByAnArchiveActorIsReportedAndRecreatedTheStreamStaysStopped",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AMissingPredecessorPreventsTheAppend",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.ARechainedRowWithChangedHistoricalContentAndRecomputedDigestsIsRefused",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AResetOrForgedRowStateNeverResumesDeliveryAndTheFailedRowIsReMarkedFromTheRecords",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.ARowAfterAnExistingDigestMismatchIsHeldNotDeliveredAcrossTheGap",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AStoppedStreamDeliversNoLaterRevisionAndDoesNotCascade",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AnAbsentSentinelRefusesAuditDeliveryWithoutATerminalStateAndDeliveryResumesOnceItExists",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(tampering:",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AnArchiveOutageLeavesTheEntryPendingWithoutFindingAlertOrQuarantine(failing:",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AnArchivedSuccessorThatDiffersFromTheRowKeepsTheExistingConflictQuarantine",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AnEntryWhosePredecessorIsArchivedAndLinkedIsDelivered",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AnIncorrectPredecessorLinkIsRefused",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.ArchiveMarkerWriteUnavailableTheFindingAloneStopsTheStreamAndTheMarkerIsCompletedLater",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.BothStoresAvailableARefusalWritesTheMarkerAndTheFindingThenMarksTheRow",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.BothStoresUnavailableTheRefusalIsHeldInMemoryAndTheDurableStopIsNotEstablished",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.ConcurrentPassesDeliverEachEntryExactlyOnceAndInOrder",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.DiscoveryFailuresAreNeverReadAsNoStopAndNeverFabricateAFinding",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.FindingStoreUnavailableTheMarkerAloneStopsTheStreamAcrossRestartAndEvidenceReplacementAndRecoveryCompletesTheFinding",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.KnownLimitRemovingBothStopRecordsAndBothCommitmentCopiesLeavesNoRecord",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.NothingPendingReadsNothing",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.RepeatedPassesAndProcessorsCreateOneMarkerAndOneFinding",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.W2SDetectsEvidenceReplacedAfterATerminationBeforeAnyDurableStopRecord",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.PinningFailsClosedOnMissingOrContradictoryAnchors",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.RemovingBothStopRecordsNoLongerResumesDeliveryWhenTheEvidenceChanged",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt01AnAuthorizedFalseAlarmRecoveryDeliversTheRevisionAndPreservesTheStopRecords",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt02AnAuthorizedAnchoredRestoreCreatesThePredecessorAndDeliversTheRevision",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt03AnExecutionRecordOrAStatementAloneLiftsNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt04OneApprovalOrTwoFromTheSameApproverOrAnUnconfiguredKeyIsNotAuthorized",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt05AnEditedStatementOrAnApprovalOverAnotherDigestIsNotAuthorized",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt06ExpiredApprovalsAndAClosedWindowAreRefused",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt07ARejectionOrCancellationIsFinal(decision:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt08SeparationOfDutiesIsEnforced",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt09UnavailableModeRefusesAndSyntheticModeIsRefusedOutsideDevelopment",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt11ARetiredKeyStillVerifiesEarlierApprovalsButNoNewOnes",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt12RecordsCopiedToAnotherOrganizationOrRevisionResolveNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt13ADecisionIsSingleUseAndBoundToItsIdentifier",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt14ASecondRecoveryOfTheSameStopSetFails",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt15ANewFailureAfterRecoveryIsAGenerationOneStop",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt16RecoveryIsIsolatedByOrganizationAndStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt17EvidenceChangedBeforeExecutionFailsTheRecovery(change:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt18EvidenceChangedAfterExecutionIsAGenerationOneMismatch",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt19AnchoredRestoreNeedsATrustedCheckpointAtThePredecessor(defect:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt20AnchoredRestoreNeverOverwritesAPresentPredecessor",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt22ContradictoryOrUnavailableMandatoryEvidenceRefusesTheProposal",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt23AStopRecordIntegrityFindingRequiresContainment",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt24AStopRecordNotInTheStatementKeepsTheStreamStopped",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt25ConcurrentExecutionOfTheSameRecoveryIsIdempotent",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt27DerivedRecoveryStateSurvivesARestart",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt28AnEntryAboveALiftedRevisionIsHeldUntilTheRevisionIsDelivered",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt29ArchiveOutagesWriteNothingAndFabricateNoFinding",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt30VerificationStoreOutagesAreInconclusiveNeverALift",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt31ARestoreConflictFailsWithoutOverwritingOrLifting",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt32AuthorityDbStateNeverLiftsAStop",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt33ArchivePresenceOfTheFailedRevisionResolvesNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt35ResidualDeletingACancellationFromBothStoresAndForgingAnExecutionLifts",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt36ArchiveInstanceSubstitutionIsADurableNonRecoverableStop",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt37NoRecoveryUnderOrganizationQuarantine",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt38OtherStreamsAndDeferredStrategiesAreRefused",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt39NormalDeliveryWritesOneCommitmentPerRevisionPerStore",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt41ARestartWithUnchangedEvidenceReEvaluatesWithoutRecovery",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt42NoEvaluationWithoutADurableCommitment",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt43ContradictoryCommitmentCopiesStopTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt44KnownLimitRemovingTheCommitmentFromBothStoresBeforeEvaluation",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt45ARuleSetVersionDifferenceIsTreatedAsAChange",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.WithoutDurabilityTheAuditStreamIsNeverEvaluated",
+        "AuthorizationAuthority.Tests.DPlusStreamPhaseTests.EveryJournalStreamIsEnforcedAndTheSetIsFixed",
+        "AuthorizationAuthority.Tests.DPlusStreamPhaseTests.NoStreamIsDeliveredWithoutDPlus"
+      ],
+      "seconds": 44.9
+    },
+    {
+      "id": "MV-5B-02",
+      "what": "the authorization stream is not D+-enabled",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/AuditDeliveryEnforcement.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/AuditDeliveryEnforcement.cs": "9406176b3c5736b0d26abab86070a9aad60935fd3c08475e57e638f9947190ec"
+      },
+      "total": 310,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.ArchiveProcessorTests.ArchiveOutageKeepsTheEntryPendingWithoutQuarantine",
+        "AuthorizationAuthority.Tests.ArchiveProcessorTests.ArchivedBytesThatDifferFromTheJournalAreAConflictNotAnOverwrite",
+        "AuthorizationAuthority.Tests.ArchiveProcessorTests.BodyThatNoLongerMatchesItsDigestIsNeverArchivedAndQuarantinesTheOrganization",
+        "AuthorizationAuthority.Tests.ArchiveProcessorTests.CanonicalEntryIsAnchoredAndRedeliveryOfTheSameBytesIsIdempotent",
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.AnotherOrganizationIsUnaffected",
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.ConcurrentPermissionChangesRecoveryAndDeliveryIntroduceNoUnauthorizedAccess",
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.KnownLimitE6ForgingTheAnchoredStateReopensTheGateButDeliversNothing",
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.RecoveryNeverLiftsAQuarantine",
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.RevocationsStayEffectiveThroughContainmentAndRecoveryAndAccessReturnsOnlyAfterTheyAreDelivered",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AMarkerStoppedStreamLeavesTheOtherStreamsDeliveryUnchanged",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.DiscoveryFailuresAreNeverReadAsNoStopAndNeverFabricateAFinding",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AConflictingMarkerAtTheFailedRevisionIsReportedAndTheStreamStaysStopped",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.ACorruptedOrMalformedArchivedPredecessorPreventsTheAppend(corruption:",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.ACrashBetweenTheArchiveWriteAndTheRowUpdateIsCompletedIdempotently",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AForgedAnchoredPredecessorIsNotTrustedTheArchiveDecides",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AGenesisEntryAndItsSuccessorsAreDeliveredWithinOnePassAndAcrossPasses",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AGenesisRowCarryingAPreviousDigestOrAMismatchedColumnIsRefused",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AMarkerRemovedByAnArchiveActorIsReportedAndRecreatedTheStreamStaysStopped",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AMissingPredecessorPreventsTheAppend",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.ARechainedRowWithChangedHistoricalContentAndRecomputedDigestsIsRefused",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AResetOrForgedRowStateNeverResumesDeliveryAndTheFailedRowIsReMarkedFromTheRecords",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.ARowAfterAnExistingDigestMismatchIsHeldNotDeliveredAcrossTheGap",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AStoppedStreamDeliversNoLaterRevisionAndDoesNotCascade",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AnAbsentSentinelRefusesAuditDeliveryWithoutATerminalStateAndDeliveryResumesOnceItExists",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(tampering:",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AnArchiveOutageLeavesTheEntryPendingWithoutFindingAlertOrQuarantine(failing:",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AnArchivedSuccessorThatDiffersFromTheRowKeepsTheExistingConflictQuarantine",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AnEntryWhosePredecessorIsArchivedAndLinkedIsDelivered",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AnIncorrectPredecessorLinkIsRefused",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.ArchiveMarkerWriteUnavailableTheFindingAloneStopsTheStreamAndTheMarkerIsCompletedLater",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.BothStoresAvailableARefusalWritesTheMarkerAndTheFindingThenMarksTheRow",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.BothStoresUnavailableTheRefusalIsHeldInMemoryAndTheDurableStopIsNotEstablished",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.ConcurrentPassesDeliverEachEntryExactlyOnceAndInOrder",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.DiscoveryFailuresAreNeverReadAsNoStopAndNeverFabricateAFinding",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.FindingStoreUnavailableTheMarkerAloneStopsTheStreamAcrossRestartAndEvidenceReplacementAndRecoveryCompletesTheFinding",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.KnownLimitRemovingBothStopRecordsAndBothCommitmentCopiesLeavesNoRecord",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.NothingPendingReadsNothing",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.RepeatedPassesAndProcessorsCreateOneMarkerAndOneFinding",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.W2SDetectsEvidenceReplacedAfterATerminationBeforeAnyDurableStopRecord",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AMarkerStoppedStreamLeavesTheOtherStreamsDeliveryUnchanged",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.DiscoveryFailuresAreNeverReadAsNoStopAndNeverFabricateAFinding",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.PinningFailsClosedOnMissingOrContradictoryAnchors",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.RemovingBothStopRecordsNoLongerResumesDeliveryWhenTheEvidenceChanged",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt01AnAuthorizedFalseAlarmRecoveryDeliversTheRevisionAndPreservesTheStopRecords",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt02AnAuthorizedAnchoredRestoreCreatesThePredecessorAndDeliversTheRevision",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt03AnExecutionRecordOrAStatementAloneLiftsNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt04OneApprovalOrTwoFromTheSameApproverOrAnUnconfiguredKeyIsNotAuthorized",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt05AnEditedStatementOrAnApprovalOverAnotherDigestIsNotAuthorized",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt06ExpiredApprovalsAndAClosedWindowAreRefused",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt07ARejectionOrCancellationIsFinal(decision:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt08SeparationOfDutiesIsEnforced",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt09UnavailableModeRefusesAndSyntheticModeIsRefusedOutsideDevelopment",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt11ARetiredKeyStillVerifiesEarlierApprovalsButNoNewOnes",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt12RecordsCopiedToAnotherOrganizationOrRevisionResolveNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt13ADecisionIsSingleUseAndBoundToItsIdentifier",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt14ASecondRecoveryOfTheSameStopSetFails",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt15ANewFailureAfterRecoveryIsAGenerationOneStop",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt16RecoveryIsIsolatedByOrganizationAndStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt17EvidenceChangedBeforeExecutionFailsTheRecovery(change:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt18EvidenceChangedAfterExecutionIsAGenerationOneMismatch",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt19AnchoredRestoreNeedsATrustedCheckpointAtThePredecessor(defect:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt20AnchoredRestoreNeverOverwritesAPresentPredecessor",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt22ContradictoryOrUnavailableMandatoryEvidenceRefusesTheProposal",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt23AStopRecordIntegrityFindingRequiresContainment",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt24AStopRecordNotInTheStatementKeepsTheStreamStopped",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt25ConcurrentExecutionOfTheSameRecoveryIsIdempotent",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt27DerivedRecoveryStateSurvivesARestart",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt28AnEntryAboveALiftedRevisionIsHeldUntilTheRevisionIsDelivered",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt29ArchiveOutagesWriteNothingAndFabricateNoFinding",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt30VerificationStoreOutagesAreInconclusiveNeverALift",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt31ARestoreConflictFailsWithoutOverwritingOrLifting",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt32AuthorityDbStateNeverLiftsAStop",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt33ArchivePresenceOfTheFailedRevisionResolvesNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt35ResidualDeletingACancellationFromBothStoresAndForgingAnExecutionLifts",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt36ArchiveInstanceSubstitutionIsADurableNonRecoverableStop",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt37NoRecoveryUnderOrganizationQuarantine",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt38OtherStreamsAndDeferredStrategiesAreRefused",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt39NormalDeliveryWritesOneCommitmentPerRevisionPerStore",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt41ARestartWithUnchangedEvidenceReEvaluatesWithoutRecovery",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt42NoEvaluationWithoutADurableCommitment",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt43ContradictoryCommitmentCopiesStopTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt44KnownLimitRemovingTheCommitmentFromBothStoresBeforeEvaluation",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt45ARuleSetVersionDifferenceIsTreatedAsAChange",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.WithoutDurabilityTheAuditStreamIsNeverEvaluated",
+        "AuthorizationAuthority.Tests.DPlusStreamPhaseTests.EveryJournalStreamIsEnforcedAndTheSetIsFixed",
+        "AuthorizationAuthority.Tests.DPlusStreamPhaseTests.NoStreamIsDeliveredWithoutDPlus"
+      ],
+      "seconds": 45.8
+    },
+    {
+      "id": "MV-5B-03",
+      "what": "one shared batch for all streams (a stopped stream starves the others)",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs": "1957ba9e57e9b3eaef1aced7253aa1fd5edfe1e2f20d180067c4b89a2f9a67d2"
+      },
+      "total": 310,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch"
+      ],
+      "seconds": 43.0
+    },
+    {
+      "id": "MV-5B-04",
+      "what": "a D+ refusal ends the pass for every stream",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs": "1957ba9e57e9b3eaef1aced7253aa1fd5edfe1e2f20d180067c4b89a2f9a67d2"
+      },
+      "total": 310,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch",
+        "AuthorizationAuthority.Tests.DPlusStreamPhaseTests.NoStreamIsDeliveredWithoutDPlus"
+      ],
+      "seconds": 42.4
+    },
+    {
+      "id": "MV-5B-05",
+      "what": "recovery is accepted for any stream name (SR-PB-2 removed)",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusStreamRecoveryService.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusStreamRecoveryService.cs": "5e773972b9bda0a3ea6e9e173e6b179c5775d6a644cbfd880a407179f57788a6"
+      },
+      "total": 310,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt38OtherStreamsAndDeferredStrategiesAreRefused",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt38OtherStreamsAndDeferredStrategiesAreRefused",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt38OtherStreamsAndDeferredStrategiesAreRefused"
+      ],
+      "seconds": 47.4
+    },
+    {
+      "id": "MV-5B-06",
+      "what": "the recovery hint marks the row Anchored instead of Pending (delivery state granted by recovery)",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusStreamRecoveryService.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusStreamRecoveryService.cs": "5e773972b9bda0a3ea6e9e173e6b179c5775d6a644cbfd880a407179f57788a6"
+      },
+      "total": 310,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.ConcurrentPermissionChangesRecoveryAndDeliveryIntroduceNoUnauthorizedAccess",
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.RevocationsStayEffectiveThroughContainmentAndRecoveryAndAccessReturnsOnlyAfterTheyAreDelivered",
+        "AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.AnAuthorizedAnchoredRestoreReleasesTheRevisionWithoutChangingTheContentHead",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt01AnAuthorizedFalseAlarmRecoveryDeliversTheRevisionAndPreservesTheStopRecords",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt02AnAuthorizedAnchoredRestoreCreatesThePredecessorAndDeliversTheRevision",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt11ARetiredKeyStillVerifiesEarlierApprovalsButNoNewOnes",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt12RecordsCopiedToAnotherOrganizationOrRevisionResolveNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt14ASecondRecoveryOfTheSameStopSetFails",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt15ANewFailureAfterRecoveryIsAGenerationOneStop",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt16RecoveryIsIsolatedByOrganizationAndStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt18EvidenceChangedAfterExecutionIsAGenerationOneMismatch",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt24AStopRecordNotInTheStatementKeepsTheStreamStopped",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt25ConcurrentExecutionOfTheSameRecoveryIsIdempotent",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt27DerivedRecoveryStateSurvivesARestart",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt28AnEntryAboveALiftedRevisionIsHeldUntilTheRevisionIsDelivered",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt30VerificationStoreOutagesAreInconclusiveNeverALift",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt01AnAuthorizedFalseAlarmRecoveryDeliversTheRevisionAndPreservesTheStopRecords",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt02AnAuthorizedAnchoredRestoreCreatesThePredecessorAndDeliversTheRevision",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt11ARetiredKeyStillVerifiesEarlierApprovalsButNoNewOnes",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt12RecordsCopiedToAnotherOrganizationOrRevisionResolveNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt14ASecondRecoveryOfTheSameStopSetFails",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt15ANewFailureAfterRecoveryIsAGenerationOneStop",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt16RecoveryIsIsolatedByOrganizationAndStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt18EvidenceChangedAfterExecutionIsAGenerationOneMismatch",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt24AStopRecordNotInTheStatementKeepsTheStreamStopped",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt25ConcurrentExecutionOfTheSameRecoveryIsIdempotent",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt27DerivedRecoveryStateSurvivesARestart",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt28AnEntryAboveALiftedRevisionIsHeldUntilTheRevisionIsDelivered",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt30VerificationStoreOutagesAreInconclusiveNeverALift",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt01AnAuthorizedFalseAlarmRecoveryDeliversTheRevisionAndPreservesTheStopRecords",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt02AnAuthorizedAnchoredRestoreCreatesThePredecessorAndDeliversTheRevision",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt11ARetiredKeyStillVerifiesEarlierApprovalsButNoNewOnes",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt12RecordsCopiedToAnotherOrganizationOrRevisionResolveNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt14ASecondRecoveryOfTheSameStopSetFails",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt15ANewFailureAfterRecoveryIsAGenerationOneStop",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt16RecoveryIsIsolatedByOrganizationAndStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt18EvidenceChangedAfterExecutionIsAGenerationOneMismatch",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt24AStopRecordNotInTheStatementKeepsTheStreamStopped",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt25ConcurrentExecutionOfTheSameRecoveryIsIdempotent",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt27DerivedRecoveryStateSurvivesARestart",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt28AnEntryAboveALiftedRevisionIsHeldUntilTheRevisionIsDelivered",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt30VerificationStoreOutagesAreInconclusiveNeverALift",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:"
+      ],
+      "seconds": 46.0
+    },
+    {
+      "id": "MV-5B-07",
+      "what": "the organization gate ignores undelivered authorization entries",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Common/OrganizationGate.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Common/OrganizationGate.cs": "47964b03acdd4ac3a8b6cb8ff74e1a1aa174944c620a87e5adb86319a1a0d5be"
+      },
+      "total": 310,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.AnotherOrganizationIsUnaffected",
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.ConcurrentPermissionChangesRecoveryAndDeliveryIntroduceNoUnauthorizedAccess",
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.KnownLimitE6ForgingTheAnchoredStateReopensTheGateButDeliversNothing",
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.RecoveryNeverLiftsAQuarantine",
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.RevocationsStayEffectiveThroughContainmentAndRecoveryAndAccessReturnsOnlyAfterTheyAreDelivered"
+      ],
+      "seconds": 43.1
+    },
+    {
+      "id": "MV-5B-08",
+      "what": "EP-5: the row-digest comparison with the archived entry is skipped",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/DPlusCommitmentInspection.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/DPlusCommitmentInspection.cs": "b234c8535d5eada870c76fe4a2f36d855f42f409a3ffec2a39a516e4f7c5122f"
+      },
+      "total": 310,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusCommitmentVerificationTests.EveryCommitmentDefectIsReported(stream:"
+      ],
+      "seconds": 43.3
+    },
+    {
+      "id": "MV-5B-09",
+      "what": "EP-5: conflicting copies are not compared",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/DPlusCommitmentInspection.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/DPlusCommitmentInspection.cs": "b234c8535d5eada870c76fe4a2f36d855f42f409a3ffec2a39a516e4f7c5122f"
+      },
+      "total": 310,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusCommitmentVerificationTests.EveryCommitmentDefectIsReported(stream:"
+      ],
+      "seconds": 43.6
+    },
+    {
+      "id": "MV-5B-10",
+      "what": "EP-5: an archived revision without a commitment is not reported",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/DPlusCommitmentInspection.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/DPlusCommitmentInspection.cs": "b234c8535d5eada870c76fe4a2f36d855f42f409a3ffec2a39a516e4f7c5122f"
+      },
+      "total": 310,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusCommitmentVerificationTests.EveryCommitmentDefectIsReported(stream:"
+      ],
+      "seconds": 43.6
+    },
+    {
+      "id": "MV-5B-11",
+      "what": "EP-5: the verifier never inspects the journal-verification store copies",
+      "verdict": "INCONCLUSIVE (build failed)",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs": "03914f5aab5a7447d95b29f8ae7f996d7d03f685dfebb24523c363b955abccbd"
+      },
+      "total": null,
+      "failed_tests": [],
+      "seconds": 9.3
+    },
+    {
+      "id": "MV-5B-12",
+      "what": "SC-5: a missing D+ composition is reported ready",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Api/Composition/SigningProviderPolicy.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Api/Composition/SigningProviderPolicy.cs": "ef8022d39657d76ff39742c1a495b09df315ce8612123110555ea0484beccabf"
+      },
+      "total": 310,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusReadinessTests.AMissingDPlusCompositionIsAConfigurationErrorAndAComposedOneIsReady"
+      ],
+      "seconds": 46.0
+    },
+    {
+      "id": "RESTORED",
+      "what": "no edit (after every mutation was restored)",
+      "verdict": "PASS",
+      "restored": true,
+      "files": [],
+      "original_sha256": {},
+      "total": 310,
+      "failed_tests": [],
+      "seconds": 46.4
+    }
+  ],
+  "wp5b_rerun_mv_5b_11": [
+    {
+      "id": "BASELINE",
+      "what": "no edit (the unmodified clone)",
+      "verdict": "PASS",
+      "restored": true,
+      "files": [],
+      "original_sha256": {},
+      "total": 310,
+      "failed_tests": [],
+      "seconds": 45.3
+    },
+    {
+      "id": "MV-5B-11",
+      "what": "EP-5: the verifier never inspects the journal-verification store copies",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs": "03914f5aab5a7447d95b29f8ae7f996d7d03f685dfebb24523c363b955abccbd"
+      },
+      "total": 310,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusCommitmentVerificationTests.EveryCommitmentDefectIsReported(stream:",
+        "AuthorizationAuthority.Tests.DPlusCommitmentVerificationTests.WithoutTheStoreOnlyArchiveCopiesAreInspectedAndAStoreOutageIsInconclusive(stream:"
+      ],
+      "seconds": 40.6
+    },
+    {
+      "id": "RESTORED",
+      "what": "no edit (after every mutation was restored)",
+      "verdict": "PASS",
+      "restored": true,
+      "files": [],
+      "original_sha256": {},
+      "total": 310,
+      "failed_tests": [],
+      "seconds": 38.7
+    }
+  ],
+  "g14_r2_set": [
+    {
+      "id": "BASELINE",
+      "what": "no edit (the unmodified clone)",
+      "verdict": "PASS",
+      "restored": true,
+      "files": [],
+      "original_sha256": {},
+      "total": 279,
+      "failed_tests": [],
+      "seconds": 45.1
+    },
+    {
+      "id": "RESTORED",
+      "what": "no edit (after every mutation was restored)",
+      "verdict": "PASS",
+      "restored": true,
+      "files": [],
+      "original_sha256": {},
+      "total": 279,
+      "failed_tests": [],
+      "seconds": 45.2
+    },
+    {
+      "id": "SR-MV-01",
+      "what": "the lift rests on the execution record alone: no authorization (no approvals, rejections or cancellations) is required for the lift",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryLedger.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryLedger.cs": "b1ac2a3fa21a8c0bf008d7059c14606ed11bda5229a88cb095d489b5e64bc068"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt03AnExecutionRecordOrAStatementAloneLiftsNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt03AnExecutionRecordOrAStatementAloneLiftsNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt03AnExecutionRecordOrAStatementAloneLiftsNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:"
+      ],
+      "seconds": 44.9
+    },
+    {
+      "id": "SR-MV-02",
+      "what": "decision signatures are not verified (the ES256 check is removed from the verifier used on every pass and at execution)",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryApprovals.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryApprovals.cs": "207014cceb153f581233f645952ee01b16648c2b7ff9aa31c4ba8672ecb7f880"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt04OneApprovalOrTwoFromTheSameApproverOrAnUnconfiguredKeyIsNotAuthorized",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt04OneApprovalOrTwoFromTheSameApproverOrAnUnconfiguredKeyIsNotAuthorized",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt04OneApprovalOrTwoFromTheSameApproverOrAnUnconfiguredKeyIsNotAuthorized"
+      ],
+      "seconds": 40.8
+    },
+    {
+      "id": "SR-MV-03",
+      "what": "two approvals from the same approver id count as two",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryApprovals.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryApprovals.cs": "207014cceb153f581233f645952ee01b16648c2b7ff9aa31c4ba8672ecb7f880"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt04OneApprovalOrTwoFromTheSameApproverOrAnUnconfiguredKeyIsNotAuthorized",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt04OneApprovalOrTwoFromTheSameApproverOrAnUnconfiguredKeyIsNotAuthorized",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt04OneApprovalOrTwoFromTheSameApproverOrAnUnconfiguredKeyIsNotAuthorized"
+      ],
+      "seconds": 42.1
+    },
+    {
+      "id": "SR-MV-04",
+      "what": "the stop-set binding is ignored: any executed recovery of the (organization, stream) covers every stop record",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryLedger.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryLedger.cs": "b1ac2a3fa21a8c0bf008d7059c14606ed11bda5229a88cb095d489b5e64bc068"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt24AStopRecordNotInTheStatementKeepsTheStreamStopped",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt24AStopRecordNotInTheStatementKeepsTheStreamStopped",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt24AStopRecordNotInTheStatementKeepsTheStreamStopped"
+      ],
+      "seconds": 43.3
+    },
+    {
+      "id": "SR-MV-05",
+      "what": "an AuthorityDb row code DPLUS_RECOVERY_AUTHORIZED:* is treated as a lift",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs": "1957ba9e57e9b3eaef1aced7253aa1fd5edfe1e2f20d180067c4b89a2f9a67d2"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt24AStopRecordNotInTheStatementKeepsTheStreamStopped",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt24AStopRecordNotInTheStatementKeepsTheStreamStopped",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt24AStopRecordNotInTheStatementKeepsTheStreamStopped",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists"
+      ],
+      "seconds": 47.1
+    },
+    {
+      "id": "SR-MV-06",
+      "what": "archive presence of the failed revision resolves its stop records",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs": "1957ba9e57e9b3eaef1aced7253aa1fd5edfe1e2f20d180067c4b89a2f9a67d2"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt33ArchivePresenceOfTheFailedRevisionResolvesNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt33ArchivePresenceOfTheFailedRevisionResolvesNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt33ArchivePresenceOfTheFailedRevisionResolvesNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:"
+      ],
+      "seconds": 43.8
+    },
+    {
+      "id": "SR-MV-07",
+      "what": "the executor skips the fresh evidence-snapshot comparison",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusStreamRecoveryService.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusStreamRecoveryService.cs": "5e773972b9bda0a3ea6e9e173e6b179c5775d6a644cbfd880a407179f57788a6"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt17EvidenceChangedBeforeExecutionFailsTheRecovery(change:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt17EvidenceChangedBeforeExecutionFailsTheRecovery(change:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt17EvidenceChangedBeforeExecutionFailsTheRecovery(change:"
+      ],
+      "seconds": 41.7
+    },
+    {
+      "id": "SR-MV-08",
+      "what": "D+ skips the comparison with the statement expectation at the recovered revision",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs": "1957ba9e57e9b3eaef1aced7253aa1fd5edfe1e2f20d180067c4b89a2f9a67d2"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt18EvidenceChangedAfterExecutionIsAGenerationOneMismatch",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt18EvidenceChangedAfterExecutionIsAGenerationOneMismatch",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt18EvidenceChangedAfterExecutionIsAGenerationOneMismatch"
+      ],
+      "seconds": 40.9
+    },
+    {
+      "id": "SR-MV-09",
+      "what": "the execution record is written before the row hint (the lift can take effect before the hint and after a terminated hint write)",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusStreamRecoveryService.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusStreamRecoveryService.cs": "5e773972b9bda0a3ea6e9e173e6b179c5775d6a644cbfd880a407179f57788a6"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists"
+      ],
+      "seconds": 42.6
+    },
+    {
+      "id": "SR-MV-10",
+      "what": "stops and commitments always use generation 0 (the generation-0 marker key is reused after a recovery)",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs": "1957ba9e57e9b3eaef1aced7253aa1fd5edfe1e2f20d180067c4b89a2f9a67d2"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt01AnAuthorizedFalseAlarmRecoveryDeliversTheRevisionAndPreservesTheStopRecords",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt02AnAuthorizedAnchoredRestoreCreatesThePredecessorAndDeliversTheRevision",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt11ARetiredKeyStillVerifiesEarlierApprovalsButNoNewOnes",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt12RecordsCopiedToAnotherOrganizationOrRevisionResolveNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt14ASecondRecoveryOfTheSameStopSetFails",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt15ANewFailureAfterRecoveryIsAGenerationOneStop",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt16RecoveryIsIsolatedByOrganizationAndStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt18EvidenceChangedAfterExecutionIsAGenerationOneMismatch",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt25ConcurrentExecutionOfTheSameRecoveryIsIdempotent",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt27DerivedRecoveryStateSurvivesARestart",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt28AnEntryAboveALiftedRevisionIsHeldUntilTheRevisionIsDelivered",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt30VerificationStoreOutagesAreInconclusiveNeverALift",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt35ResidualDeletingACancellationFromBothStoresAndForgingAnExecutionLifts",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt01AnAuthorizedFalseAlarmRecoveryDeliversTheRevisionAndPreservesTheStopRecords",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt02AnAuthorizedAnchoredRestoreCreatesThePredecessorAndDeliversTheRevision",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt11ARetiredKeyStillVerifiesEarlierApprovalsButNoNewOnes",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt12RecordsCopiedToAnotherOrganizationOrRevisionResolveNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt14ASecondRecoveryOfTheSameStopSetFails",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt15ANewFailureAfterRecoveryIsAGenerationOneStop",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt16RecoveryIsIsolatedByOrganizationAndStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt18EvidenceChangedAfterExecutionIsAGenerationOneMismatch",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt25ConcurrentExecutionOfTheSameRecoveryIsIdempotent",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt27DerivedRecoveryStateSurvivesARestart",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt28AnEntryAboveALiftedRevisionIsHeldUntilTheRevisionIsDelivered",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt30VerificationStoreOutagesAreInconclusiveNeverALift",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt35ResidualDeletingACancellationFromBothStoresAndForgingAnExecutionLifts",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt01AnAuthorizedFalseAlarmRecoveryDeliversTheRevisionAndPreservesTheStopRecords",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt02AnAuthorizedAnchoredRestoreCreatesThePredecessorAndDeliversTheRevision",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt11ARetiredKeyStillVerifiesEarlierApprovalsButNoNewOnes",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt12RecordsCopiedToAnotherOrganizationOrRevisionResolveNothing",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt14ASecondRecoveryOfTheSameStopSetFails",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt15ANewFailureAfterRecoveryIsAGenerationOneStop",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt16RecoveryIsIsolatedByOrganizationAndStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt18EvidenceChangedAfterExecutionIsAGenerationOneMismatch",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt25ConcurrentExecutionOfTheSameRecoveryIsIdempotent",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt27DerivedRecoveryStateSurvivesARestart",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt28AnEntryAboveALiftedRevisionIsHeldUntilTheRevisionIsDelivered",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt30VerificationStoreOutagesAreInconclusiveNeverALift",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt35ResidualDeletingACancellationFromBothStoresAndForgingAnExecutionLifts"
+      ],
+      "seconds": 43.2
+    },
+    {
+      "id": "SR-MV-11",
+      "what": "W2-S: D+ evaluates when the commitment could not be established",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs": "1957ba9e57e9b3eaef1aced7253aa1fd5edfe1e2f20d180067c4b89a2f9a67d2"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt42NoEvaluationWithoutADurableCommitment",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt42NoEvaluationWithoutADurableCommitment",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt42NoEvaluationWithoutADurableCommitment"
+      ],
+      "seconds": 50.9
+    },
+    {
+      "id": "SR-MV-12",
+      "what": "W2-S: a differing or contradictory commitment is ignored (evaluated as if it matched)",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs": "1957ba9e57e9b3eaef1aced7253aa1fd5edfe1e2f20d180067c4b89a2f9a67d2"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.W2SDetectsEvidenceReplacedAfterATerminationBeforeAnyDurableStopRecord",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.W2SDetectsEvidenceReplacedAfterATerminationBeforeAnyDurableStopRecord",
+        "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.W2SDetectsEvidenceReplacedAfterATerminationBeforeAnyDurableStopRecord",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.RemovingBothStopRecordsNoLongerResumesDeliveryWhenTheEvidenceChanged",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt43ContradictoryCommitmentCopiesStopTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt45ARuleSetVersionDifferenceIsTreatedAsAChange",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.RemovingBothStopRecordsNoLongerResumesDeliveryWhenTheEvidenceChanged",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt43ContradictoryCommitmentCopiesStopTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt45ARuleSetVersionDifferenceIsTreatedAsAChange",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.RemovingBothStopRecordsNoLongerResumesDeliveryWhenTheEvidenceChanged",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt43ContradictoryCommitmentCopiesStopTheStream",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt45ARuleSetVersionDifferenceIsTreatedAsAChange"
+      ],
+      "seconds": 49.1
+    },
+    {
+      "id": "SR-MV-13",
+      "what": "rejections and cancellations are ignored",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryApprovals.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryApprovals.cs": "207014cceb153f581233f645952ee01b16648c2b7ff9aa31c4ba8672ecb7f880"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt07ARejectionOrCancellationIsFinal(decision:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt07ARejectionOrCancellationIsFinal(decision:",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt07ARejectionOrCancellationIsFinal(decision:"
+      ],
+      "seconds": 50.1
+    },
+    {
+      "id": "SR-MV-14",
+      "what": "SR-C1 accepts a present predecessor (an overwrite is attempted)",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusStreamRecoveryService.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusStreamRecoveryService.cs": "5e773972b9bda0a3ea6e9e173e6b179c5775d6a644cbfd880a407179f57788a6"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt20AnchoredRestoreNeverOverwritesAPresentPredecessor",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt20AnchoredRestoreNeverOverwritesAPresentPredecessor",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt20AnchoredRestoreNeverOverwritesAPresentPredecessor"
+      ],
+      "seconds": 46.5
+    },
+    {
+      "id": "SR-MV-15",
+      "what": "the synthetic approval mode is accepted outside Development/Testing",
+      "verdict": "DETECTED",
+      "restored": true,
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryApprovals.cs"
+      ],
+      "original_sha256": {
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryApprovals.cs": "207014cceb153f581233f645952ee01b16648c2b7ff9aa31c4ba8672ecb7f880"
+      },
+      "total": 279,
+      "failed_tests": [
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuditTests.Srt09UnavailableModeRefusesAndSyntheticModeIsRefusedOutsideDevelopment",
+        "AuthorizationAuthority.Tests.DPlusRecoveryAuthorizationTests.Srt09UnavailableModeRefusesAndSyntheticModeIsRefusedOutsideDevelopment",
+        "AuthorizationAuthority.Tests.DPlusRecoveryContentTests.Srt09UnavailableModeRefusesAndSyntheticModeIsRefusedOutsideDevelopment"
+      ],
+      "seconds": 46.2
+    }
+  ]
+}

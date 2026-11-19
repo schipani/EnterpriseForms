@@ -1,0 +1,62 @@
+2026-11-19T12:13:21.8634121+00:00 AC-DR-11 start: target rows 2000, other organizations 4 x 125, concurrency 8, chunk 10000
+2026-11-19T12:13:50.6738503+00:00 seed target: 2000/2000 rows, 29 s, 69 rows/s
+2026-11-19T12:13:52.6988900+00:00 seed other-1: 125/125 rows, 2 s, 62 rows/s
+2026-11-19T12:13:54.6391562+00:00 seed other-2: 125/125 rows, 2 s, 65 rows/s
+2026-11-19T12:13:56.6513656+00:00 seed other-3: 125/125 rows, 2 s, 62 rows/s
+2026-11-19T12:13:58.6712019+00:00 seed other-4: 125/125 rows, 2 s, 62 rows/s
+2026-11-19T12:14:38.4938118+00:00 baseline: Clean in 39.8 s; rows 2000, listed 4000, read 2000
+2026-11-19T12:15:02.6915610+00:00 incremental (idle): Clean [] inconclusive=[] 24179 ms, listed 0, read 1
+2026-11-19T12:15:17.0168417+00:00 D+ delivery: 200 entries in 14.2 s over 7 passes (71.0 ms per entry)
+2026-11-19T12:15:45.6043608+00:00 incremental (+200): Clean [] inconclusive=[] 28582 ms, listed 200, read 201
+2026-11-19T12:16:39.4680301+00:00 full: Clean [] inconclusive=[] 53854 ms, rows 2200, listed 4400, read 2201; peak working set 266416128
+2026-11-19T12:17:08.0767538+00:00 detection above the checkpoint (replaced newest object): Findings [ANCHOR_MISMATCH/@2210..2210, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2210..2210] inconclusive=[] in 27786 ms
+2026-11-19T12:18:02.5505080+00:00 detection below the checkpoint (replaced revision 1000), full sweep: Findings [ANCHOR_MISMATCH/@1000..1000, CHAIN_INTEGRITY_FAILURE/LINK_MISMATCH@1001..1001, ANCHOR_MISMATCH/@2210..2210, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@1000..1000, DPLUS_COMMITMENT_MISMATCH/PREDECESSOR_DIGEST@1001..1001, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2210..2210] inconclusive=[] in 54292 ms
+2026-11-19T12:18:30.5857752+00:00 detection of a forged receipt: Findings [ANCHOR_MISMATCH/@2210..2210, FAKE_RECEIPT/@2211..2211, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2210..2210] inconclusive=[] in 27946 ms
+2026-11-19T12:18:30.6047696+00:00 {
+  "TargetRows": 2000,
+  "OtherOrganizationRows": 500,
+  "Concurrency": 8,
+  "Chunk": 10000,
+  "SeedingSeconds": 36.8,
+  "TargetSeedingSeconds": 28.8,
+  "Baseline": {
+    "Seconds": 39.8,
+    "DatabaseRowsInspected": 2000,
+    "ArchiveObjectsListed": 4000,
+    "ArchiveObjectsRead": 2000
+  },
+  "IdleIncremental": {
+    "ElapsedMilliseconds": 24179,
+    "DatabaseRowsInspected": 1,
+    "ArchiveObjectsListed": 0,
+    "ArchiveObjectsRead": 1
+  },
+  "DPlusDelivery": {
+    "Entries": 200,
+    "Seconds": 14.21,
+    "MillisecondsPerEntry": 71,
+    "Passes": 7,
+    "PassP50Milliseconds": 2288.3,
+    "PassMaxMilliseconds": 2396.4
+  },
+  "Incremental": {
+    "ElapsedMilliseconds": 28582,
+    "DatabaseRowsInspected": 201,
+    "ArchiveObjectsListed": 200,
+    "ArchiveObjectsRead": 201
+  },
+  "Full": {
+    "ElapsedMilliseconds": 53854,
+    "DatabaseRowsInspected": 2200,
+    "ArchiveObjectsListed": 4400,
+    "ArchiveObjectsRead": 2201
+  },
+  "Detection": {
+    "AboveCheckpointIncrementalMilliseconds": 27786,
+    "BelowCheckpointFullMilliseconds": 54292,
+    "ForgedReceiptIncrementalMilliseconds": 27946,
+    "Note": "observed latency = configured interval (T_inc 5 min, T_full 24 h, \u00A78.6) \u002B the measured sweep duration"
+  },
+  "PeakWorkingSetBytes": 266416128,
+  "TotalSeconds": 308.7
+}

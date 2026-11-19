@@ -1,0 +1,19 @@
+Post-run journal delivery states on the disposable stack (stream, state, error code, rows):
+audit Anchored - 15
+authorization Anchored - 59
+content Anchored - 25
+quarantined organizations: 0 of 15
+
+Authority log, archive identity bootstrap (A-2):
+info: AuthorizationAuthority.Api.Composition.ArchiveIdentityBootstrapService[9410]
+      Archive identity bootstrap (SEC-BL-01 A-2): Created
+      Archive identity bootstrap (SEC-BL-01 A-2): Created
+warn: Microsoft.AspNetCore.Hosting.Diagnostics[15]
+info: AuthorizationAuthority.Api.Composition.ArchiveIdentityBootstrapService[9410]
+      Archive identity bootstrap (SEC-BL-01 A-2): Existing
+      Archive identity bootstrap (SEC-BL-01 A-2): Existing
+info: AuthorizationAuthority.Api.Composition.SpiceDbSchemaInitializer[1957827897]
+info: AuthorizationAuthority.Api.Composition.ArchiveIdentityBootstrapService[9410]
+      Archive identity bootstrap (SEC-BL-01 A-2): Existing
+      Archive identity bootstrap (SEC-BL-01 A-2): Existing
+warn: Microsoft.AspNetCore.Hosting.Diagnostics[15]

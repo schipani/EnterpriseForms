@@ -1,0 +1,20 @@
+{
+  "id": "BASELINE-PG",
+  "what": "no edit (PostgreSQL gate, read-only tests)",
+  "kind": "pg",
+  "files": [],
+  "original_sha256": {},
+  "restored": true,
+  "verdict": "PASS",
+  "result": {
+    "build": 0,
+    "build_seconds": 31.5,
+    "exit": 0,
+    "seconds": 25.1,
+    "kind": "pg",
+    "total": 3,
+    "succeeded": 3,
+    "failed": []
+  },
+  "seconds": 56.6
+}

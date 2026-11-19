@@ -1,0 +1,26 @@
+{
+  "id": "MV-7A-08",
+  "what": "RV-5: a generation g >= 1 commitment is accepted without a durable stop of generation g - 1",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "976ea25a7d858f53e61578b81c8e2850f487e70dfbf98b6d3aa735690c0bfb36"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 37.1,
+    "exit": 2,
+    "seconds": 4.2,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 414,
+    "failed": [
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream:"
+    ]
+  },
+  "seconds": 41.4
+}

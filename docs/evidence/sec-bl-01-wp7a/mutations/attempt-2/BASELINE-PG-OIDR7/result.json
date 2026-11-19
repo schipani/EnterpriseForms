@@ -1,0 +1,20 @@
+{
+  "id": "BASELINE-PG-OIDR7",
+  "what": "no edit (PostgreSQL gate, WP-7A OI-DR-7 tests)",
+  "kind": "pg",
+  "files": [],
+  "original_sha256": {},
+  "restored": true,
+  "verdict": "PASS",
+  "result": {
+    "build": 0,
+    "build_seconds": 33.2,
+    "exit": 0,
+    "seconds": 52.7,
+    "kind": "pg",
+    "total": 18,
+    "succeeded": 18,
+    "failed": []
+  },
+  "seconds": 85.9
+}

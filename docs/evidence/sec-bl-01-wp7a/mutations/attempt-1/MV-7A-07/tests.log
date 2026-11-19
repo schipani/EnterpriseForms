@@ -1,0 +1,43 @@
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(stream: "audit") (15ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_STOP_UNRESOLVED"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(stream: "authorization") (2ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_STOP_UNRESOLVED"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(stream: "content") (2ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_STOP_UNRESOLVED"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(stream: "authorization") (12ms)
+  stop-marker
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:244
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(stream: "audit") (4ms)
+  stop-marker
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:244
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(stream: "content") (2ms)
+  stop-marker
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:244
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 6
+  succeeded: 411
+  skipped: 0
+  duration: 2s 130ms

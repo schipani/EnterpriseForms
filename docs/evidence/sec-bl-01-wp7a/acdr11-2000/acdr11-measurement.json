@@ -1,0 +1,48 @@
+{
+  "TargetRows": 2000,
+  "OtherOrganizationRows": 500,
+  "Concurrency": 8,
+  "Chunk": 10000,
+  "SeedingSeconds": 36.8,
+  "TargetSeedingSeconds": 28.8,
+  "Baseline": {
+    "Seconds": 39.8,
+    "DatabaseRowsInspected": 2000,
+    "ArchiveObjectsListed": 4000,
+    "ArchiveObjectsRead": 2000
+  },
+  "IdleIncremental": {
+    "ElapsedMilliseconds": 24179,
+    "DatabaseRowsInspected": 1,
+    "ArchiveObjectsListed": 0,
+    "ArchiveObjectsRead": 1
+  },
+  "DPlusDelivery": {
+    "Entries": 200,
+    "Seconds": 14.21,
+    "MillisecondsPerEntry": 71,
+    "Passes": 7,
+    "PassP50Milliseconds": 2288.3,
+    "PassMaxMilliseconds": 2396.4
+  },
+  "Incremental": {
+    "ElapsedMilliseconds": 28582,
+    "DatabaseRowsInspected": 201,
+    "ArchiveObjectsListed": 200,
+    "ArchiveObjectsRead": 201
+  },
+  "Full": {
+    "ElapsedMilliseconds": 53854,
+    "DatabaseRowsInspected": 2200,
+    "ArchiveObjectsListed": 4400,
+    "ArchiveObjectsRead": 2201
+  },
+  "Detection": {
+    "AboveCheckpointIncrementalMilliseconds": 27786,
+    "BelowCheckpointFullMilliseconds": 54292,
+    "ForgedReceiptIncrementalMilliseconds": 27946,
+    "Note": "observed latency = configured interval (T_inc 5 min, T_full 24 h, \u00A78.6) \u002B the measured sweep duration"
+  },
+  "PeakWorkingSetBytes": 266416128,
+  "TotalSeconds": 308.7
+}

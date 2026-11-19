@@ -1,0 +1,62 @@
+[wp4] AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheDedicatedVerifierLoginIsReadOnlyAndRunsTheVerifier (8s 814ms)
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AllThreeStreamsTogetherAreCleanReadOnlyAndIsolatedUnderTampering (6s 062ms)
+  Assert.All() Failure: 18 out of 72 items in the collection did not pass.
+  [0]:  Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [4]:  Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [8]:  Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [12]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [16]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [20]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [24]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [28]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [32]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [36]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [40]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [44]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [48]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [52]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [56]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [60]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [64]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [68]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AllThreeStreamsTogetherAreCleanReadOnlyAndIsolatedUnderTampering() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7.cs:1216
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AllThreeStreamsTogetherAreCleanReadOnlyAndIsolatedUnderTampering() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7.cs:1221
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.TheSnapshotIsServerEnforcedReadOnlyAndIssuesOnlySelects (281ms)
+  Assert.Equal() Failure: Strings differ
+               (pos 1)
+  Expected: "on"
+  Actual:   "off"
+               (pos 1)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.TheSnapshotIsServerEnforcedReadOnlyAndIssuesOnlySelects() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.cs:229
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.TheSnapshotIsServerEnforcedReadOnlyAndIssuesOnlySelects() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.cs:232
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.TheSnapshotIsServerEnforcedReadOnlyAndIssuesOnlySelects() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.cs:240
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 3
+  failed: 2
+  succeeded: 1
+  skipped: 0
+  duration: 16s 063ms
+[wp4] containers and their anonymous volumes removed
+[wp4] exit code 2

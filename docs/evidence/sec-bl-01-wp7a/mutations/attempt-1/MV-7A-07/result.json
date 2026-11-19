@@ -1,0 +1,27 @@
+{
+  "id": "MV-7A-07",
+  "what": "RV-5: stop markers are ignored (newly established, unresolved or above a head)",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "976ea25a7d858f53e61578b81c8e2850f487e70dfbf98b6d3aa735690c0bfb36"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 35.4,
+    "exit": 2,
+    "seconds": 4.0,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 411,
+    "failed": [
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(stream:",
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(stream:"
+    ]
+  },
+  "seconds": 39.4
+}

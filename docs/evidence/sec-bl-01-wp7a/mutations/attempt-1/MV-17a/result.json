@@ -1,0 +1,27 @@
+{
+  "id": "MV-17a",
+  "what": "BL-2 (expressible variant): the baseline gains an AuthorityDb write dependency (IAuthorityScope)",
+  "kind": "arch",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalBaselineService.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalBaselineService.cs": "ceee2a1771833445c85c83af01da104236e1383b7e71c7a00e40bf49ab7f5912"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 41.1,
+    "exit": 2,
+    "seconds": 3.5,
+    "kind": "arch",
+    "total": 13,
+    "succeeded": 11,
+    "failed": [
+      "EnterpriseForms.ArchitectureTests.JournalVerificationBoundaryTests.TheBaselineAndVerifierCannotWriteAuthorityDbQuarantineSignOrDeliver",
+      "EnterpriseForms.ArchitectureTests.JournalVerificationBoundaryTests.TheVerifierAndTheBaselineHaveNoAuthorityDbWriteQuarantineSigningGateOrEntryArchiveWriteDependency"
+    ]
+  },
+  "seconds": 44.6
+}

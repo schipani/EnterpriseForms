@@ -1,0 +1,232 @@
+[wp4] AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "content", attack: "object-replaced") (8s 720ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    content object-replaced: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_ARCHIVE_MISMATCH
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "authorization", attack: "instance-replaced") (429ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    authorization instance-replaced: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_INSTANCE_MISMATCH
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "audit", attack: "instance-replaced") (332ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    audit instance-replaced: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_INSTANCE_MISMATCH
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "audit", attack: "generation-substituted") (346ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    audit generation-substituted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_COMMITMENT_MISMATCH
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "authorization", attack: "object-replaced") (346ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    authorization object-replaced: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_ARCHIVE_MISMATCH
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "content", attack: "generation-substituted") (353ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    content generation-substituted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_COMMITMENT_MISMATCH
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "authorization", attack: "generation-substituted") (359ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    authorization generation-substituted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_COMMITMENT_MISMATCH
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "content", attack: "object-deleted") (349ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    content object-deleted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_ARCHIVE_ABSENT
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "content", attack: "instance-replaced") (341ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    content instance-replaced: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_INSTANCE_MISMATCH
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "content", attack: "store-commitment-changed") (382ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    content store-commitment-changed: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_COMMITMENT_CONTRADICTORY
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "content", attack: "archive-commitment-deleted") (305ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    content archive-commitment-deleted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_COMMITMENT_MISSING
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "authorization", attack: "object-deleted") (344ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    authorization object-deleted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_ARCHIVE_ABSENT
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "audit", attack: "object-replaced") (350ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    audit object-replaced: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_ARCHIVE_MISMATCH
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "audit", attack: "archive-commitment-deleted") (357ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    audit archive-commitment-deleted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_COMMITMENT_MISSING
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "authorization", attack: "store-commitment-changed") (330ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    authorization store-commitment-changed: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_COMMITMENT_CONTRADICTORY
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "authorization", attack: "archive-commitment-deleted") (336ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    authorization archive-commitment-deleted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_COMMITMENT_MISSING
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "audit", attack: "store-commitment-changed") (340ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    audit store-commitment-changed: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_COMMITMENT_CONTRADICTORY
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream: "audit", attack: "object-deleted") (347ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:152
+    --- End of stack trace from previous location ---
+  Standard output
+    audit object-deleted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_VERIFIED entry=RECEIPT_VERIFIED; fresh process=RECEIPT_ARCHIVE_ABSENT
+    
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1WithAZeroBoundTheNextAccessIsRefusedOnRealStores(stream: "audit") (258ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1WithAZeroBoundTheNextAccessIsRefusedOnRealStores(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:177
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1WithAZeroBoundTheNextAccessIsRefusedOnRealStores(stream: "content") (275ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1WithAZeroBoundTheNextAccessIsRefusedOnRealStores(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:177
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1WithAZeroBoundTheNextAccessIsRefusedOnRealStores(stream: "authorization") (277ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1WithAZeroBoundTheNextAccessIsRefusedOnRealStores(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:177
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 21
+  failed: 21
+  succeeded: 0
+  skipped: 0
+  duration: 16s 800ms
+[wp4] containers and their anonymous volumes removed
+[wp4] exit code 2

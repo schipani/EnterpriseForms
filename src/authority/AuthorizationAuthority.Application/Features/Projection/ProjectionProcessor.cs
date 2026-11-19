@@ -35,9 +35,10 @@ public sealed class ProjectionProcessor(IAuthorityStore store, ISpiceDbProjectio
         }
 
         var journal = await scope.FindJournalEntryAsync(organizationId, JournalStreamNames.Authorization, target, cancellationToken).ConfigureAwait(false);
-        if (journal is null || journal.ArchiveDeliveryState != ArchiveDeliveryStates.Anchored)
+        if (journal is null || !(await scope.JournalReceipts.VerifyAsync(journal, cancellationToken).ConfigureAwait(false)).IsVerified)
         {
-            return ProjectionStepResult.AwaitingArchive; // gate stays closed until the body is independently durable
+            // Gate stays closed until the body is independently durable. E-6 (A-7 §27 GT-6): a trusted receipt, never the row's delivery state.
+            return ProjectionStepResult.AwaitingArchive;
         }
 
         if ((state.ProjectionAppliedRevision > 0 && journal.JournalPreviousDigest is not { Length: 32 }) || journal.JournalEventDigest is not { Length: 32 })

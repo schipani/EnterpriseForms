@@ -1,0 +1,71 @@
+failed AuthorizationAuthority.Tests.JournalBaselineServiceTests.MissingArchiveObjectsForgedAnchoredRowsRedigestedRowsAndATruncatedTailAreReported (50ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalBaselineFindingEntry { FindingCode = FAKE_RECEIPT, Subtype = , Severity = Security, FirstRevision = 2, LastRevision = 2, EvidenceReferences = <>z__ReadOnlyList`1[System.String], Detail = the row claims archival but the archive has no object at its key, CandidateExceptionClass = , AcceptedByExceptionId =  }]
+    at AuthorizationAuthority.Tests.JournalBaselineServiceTests.MissingArchiveObjectsForgedAnchoredRowsRedigestedRowsAndATruncatedTailAreReported() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalBaselineServiceTests.cs:175
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ChangedEvidenceInsideTheAcceptedScopeIsANewFindingAndTheCheckpointDoesNotAdvance (1s 190ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ChangedEvidenceInsideTheAcceptedScopeIsANewFindingAndTheCheckpointDoesNotAdvance() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:103
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.ADeletedArchiveObjectIsADiscontinuityAndADeletedAnchorIsARegression (50ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalVerificationFinding { OrganizationId = 01a1ea3c-9000-79e4-a622-62daa63b19b1, StreamName = audit, FindingCode = FAKE_RECEIPT, Subtype = , Severity = Security, FirstRevision = 7, LastRevision = 7, RunId = 01a1ea3c-af40-7818-b775-7e1ebb94fab7, ObservedAtUtc = 2026-11-17 4:00:08 PM +00:00, EvidenceReferences = <>z__ReadOnlySingleElementList`1[System.String], Detail = the row claims archival but the archive has no object at its key, SweepOutcome = Findings, Checkpoint = JournalCheckpointReference { CheckpointSequence = 1, VerifiedRevision = 5, CheckpointDigestHex = 25824595857f08658bb9c5a07a52b8d6e92a3d90b622d40b0fa36da09f8a1a24 }, StopGeneration = , Identity = 57289c3874fc82aff82911713abc40c7 }]
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:41
+    at AuthorizationAuthority.Tests.JournalVerifierTests.ADeletedArchiveObjectIsADiscontinuityAndADeletedAnchorIsARegression() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:149
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ADeletionBelowTheCheckpointIsInvisibleToTheBoundedIncrementalSweepAndDetectedByTheFullSweep (25ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalVerificationFinding { OrganizationId = 01a1ea3c-9000-7a52-9905-d4f1c36b15ec, StreamName = audit, FindingCode = FAKE_RECEIPT, Subtype = , Severity = Security, FirstRevision = 4, LastRevision = 4, RunId = 01a1ea3c-b710-7c6f-9b4b-3d3ef4b7f62d, ObservedAtUtc = 2026-11-17 4:00:10 PM +00:00, EvidenceReferences = <>z__ReadOnlySingleElementList`1[System.String], Detail = the row claims archival but the archive has no object at its key, SweepOutcome = Findings, Checkpoint = JournalCheckpointReference { CheckpointSequence = 2, VerifiedRevision = 10, CheckpointDigestHex = ced3b60348336038d26cdf1e701e079add7aded9a322f1eef0e0d0ad554499d6 }, StopGeneration = , Identity = e758b0a6ea07cc2d24678b5223e59ade }]
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ADeletionBelowTheCheckpointIsInvisibleToTheBoundedIncrementalSweepAndDetectedByTheFullSweep() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:397
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AMissingOrForeignRecordIsAFindingAndTheGapIsNoLongerAccepted (20ms)
+  Assert.True() Failure
+  Expected: True
+  Actual:   False
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AMissingOrForeignRecordIsAFindingAndTheGapIsNoLongerAccepted() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:121
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AConflictingRecordUnderTheSameIdentifierBlocksTheCheckpoint (11ms)
+  Assert.Equal() Failure: Strings differ
+              (pos 0)
+  Expected: "NotCreated:EXCEPTION_RECORD_CONFLICT"
+  Actual:   "Created"
+              (pos 0)
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AConflictingRecordUnderTheSameIdentifierBlocksTheCheckpoint() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:212
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AnAdditionalFindingOutsideTheAcceptedScopeIsReportedAndNotAccepted (19ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalVerificationFinding { OrganizationId = 01a1ea3c-9000-79b8-829e-4302e334e5b3, StreamName = audit, FindingCode = FAKE_RECEIPT, Subtype = , Severity = Security, FirstRevision = 6, LastRevision = 6, RunId = 01a1ea3c-af40-7a99-9c71-10ff14699ea1, ObservedAtUtc = 2026-11-17 4:00:08 PM +00:00, EvidenceReferences = <>z__ReadOnlySingleElementList`1[System.String], Detail = the row claims archival but the archive has no object at its key, SweepOutcome = Findings, Checkpoint = JournalCheckpointReference { CheckpointSequence = 1, VerifiedRevision = 5, CheckpointDigestHex = 3f53175f7d1c077599fe53d48c8c2f7b4b61d174c20cbdc8cd81ade6cb4c9648 }, StopGeneration = , Identity = e7e1f0fc11db7daaeedb2917c23568e0 }]
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AnAdditionalFindingOutsideTheAcceptedScopeIsReportedAndNotAccepted() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:151
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.LaterSweepsClassifyTheUnchangedAcceptedGapAsAnObservationAndAdvanceWhileStayingReduced (9ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Clean
+  Actual:   Findings
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.LaterSweepsClassifyTheUnchangedAcceptedGapAsAnObservationAndAdvanceWhileStayingReduced() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:84
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AnAcceptedLegacyGapIsStoredAsACreateOnlyRecordAndTheCheckpointCrossesItWithReducedAssurance (9ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Tuple ("ExceptionAccepted", "Reduced")
+  Actual:   Tuple ("Clean", "Full")
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AnAcceptedLegacyGapIsStoredAsACreateOnlyRecordAndTheCheckpointCrossesItWithReducedAssurance() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:50
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineReportsAChainFindingAndCreatesNothingWhenACarriedRecordChanged (11ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalBaselineFindingEntry { FindingCode = FAKE_RECEIPT, Subtype = , Severity = Security, FirstRevision = 3, LastRevision = 3, EvidenceReferences = <>z__ReadOnlyList`1[System.String], Detail = the row claims archival but the archive has no object at its key, CandidateExceptionClass = , AcceptedByExceptionId =  }]
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineReportsAChainFindingAndCreatesNothingWhenACarriedRecordChanged() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:350
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineCarriesEveryAcceptedExceptionNeverUpgradesAndMayAddNewOnes (7ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Tuple ("ExceptionAccepted", "Reduced")
+  Actual:   Tuple ("Failed", "None")
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineCarriesEveryAcceptedExceptionNeverUpgradesAndMayAddNewOnes() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:262
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 11
+  succeeded: 406
+  skipped: 0
+  duration: 3s 252ms

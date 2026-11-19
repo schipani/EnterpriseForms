@@ -1,0 +1,10 @@
+2026-11-19T10:37:46Z pg_rows=10000 enterpriseforms-secbl01-wp4-checkpoint-acdr11=81MiB / 15.24GiB,37.31% enterpriseforms-secbl01-wp4-archive-acdr11=137.4MiB / 15.24GiB,110.55% enterpriseforms-secbl01-wp4-postgres-acdr11=54.3MiB / 15.24GiB,0.10% 
+2026-11-19T10:39:49Z pg_rows=10000 enterpriseforms-secbl01-wp4-checkpoint-acdr11=85.07MiB / 15.24GiB,32.77% enterpriseforms-secbl01-wp4-archive-acdr11=193.1MiB / 15.24GiB,102.90% enterpriseforms-secbl01-wp4-postgres-acdr11=54.41MiB / 15.24GiB,0.00% 
+2026-11-19T10:41:52Z pg_rows=10000 enterpriseforms-secbl01-wp4-checkpoint-acdr11=99.41MiB / 15.24GiB,15.54% enterpriseforms-secbl01-wp4-archive-acdr11=203.5MiB / 15.24GiB,118.80% enterpriseforms-secbl01-wp4-postgres-acdr11=54.41MiB / 15.24GiB,0.00% 
+2026-11-19T10:43:55Z pg_rows=10000 enterpriseforms-secbl01-wp4-checkpoint-acdr11=136.1MiB / 15.24GiB,36.36% enterpriseforms-secbl01-wp4-archive-acdr11=176.1MiB / 15.24GiB,103.69% enterpriseforms-secbl01-wp4-postgres-acdr11=54.4MiB / 15.24GiB,0.00% 
+2026-11-19T10:45:58Z pg_rows=10000 enterpriseforms-secbl01-wp4-checkpoint-acdr11=130.9MiB / 15.24GiB,25.20% enterpriseforms-secbl01-wp4-archive-acdr11=216.2MiB / 15.24GiB,101.85% enterpriseforms-secbl01-wp4-postgres-acdr11=54.54MiB / 15.24GiB,0.00% 
+2026-11-19T10:48:01Z pg_rows=10000 enterpriseforms-secbl01-wp4-checkpoint-acdr11=113.1MiB / 15.24GiB,22.90% enterpriseforms-secbl01-wp4-archive-acdr11=546MiB / 15.24GiB,109.63% enterpriseforms-secbl01-wp4-postgres-acdr11=54.41MiB / 15.24GiB,0.00% 
+2026-11-19T10:48:38Z STOPPED pg_rows=20000 archive_loki_json_bytes=36853282 checkpoint_loki_json_bytes=17376222 archive_name_fields=40167
+enterpriseforms-secbl01-wp4-checkpoint-acdr11=147MiB / 15.24GiB
+enterpriseforms-secbl01-wp4-archive-acdr11=284.5MiB / 15.24GiB
+enterpriseforms-secbl01-wp4-postgres-acdr11=62.89MiB / 15.24GiB

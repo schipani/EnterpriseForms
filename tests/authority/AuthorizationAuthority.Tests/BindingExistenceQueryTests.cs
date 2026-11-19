@@ -67,7 +67,7 @@ public sealed class BindingExistenceQueryTests
         await using var context = new AuthorityDbContext(options);
         var scopeType = typeof(AuthorityStore).GetNestedType("AuthorityScope", BindingFlags.NonPublic)!;
         var scope = (IAuthorityScope)Activator.CreateInstance(scopeType, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null,
-            [context, null, null, null, ContentAcceptancePolicy.Resolve("ReleaseA", null)], null)!;
+            [context, null, null, null, ContentAcceptancePolicy.Resolve("ReleaseA", null), AuthorizationAuthority.Application.Common.Ports.NotComposedJournalReceiptVerifier.Instance], null)!;
         var organization = Guid.CreateVersion7();
 
         Assert.Equal(answer, await scope.OrganizationHasDataKeyBindingsAsync(organization, TestContext.Current.CancellationToken));

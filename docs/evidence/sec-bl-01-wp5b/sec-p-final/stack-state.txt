@@ -1,0 +1,8 @@
+Disposable security-test stack, WP-5b final stage (EnforcedStreams = audit, authorization, content; no non-D+ delivery path), fresh project
+enterpriseforms-sectest, down -v before and after. SEC-P01..SEC-P12: 13/13 (secp.txt). Provisioner: see archive-provision.log.
+
+Post-run journal delivery states (stream|state|error code|rows) and quarantine:
+﻿audit|Anchored|-|16
+authorization|Anchored|-|60
+content|Anchored|-|25
+quarantined 0 of 16

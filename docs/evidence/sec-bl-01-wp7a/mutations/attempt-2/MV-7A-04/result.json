@@ -1,0 +1,28 @@
+{
+  "id": "MV-7A-04",
+  "what": "RV-3: a refusal or an outage is reused within the bound (both guards: the reuse check and the removal of refused attestations; attempt 1 edited only the first, an equivalent mutant)",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "976ea25a7d858f53e61578b81c8e2850f487e70dfbf98b6d3aa735690c0bfb36"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 33.6,
+    "exit": 2,
+    "seconds": 4.1,
+    "kind": "ip",
+    "total": 424,
+    "succeeded": 415,
+    "failed": [
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.OutagesAreUnavailableAndNeverCached(stream:",
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(stream:",
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.EvidenceThatNeverVerifiedIsRefusedButNotWithdrawn(stream:"
+    ]
+  },
+  "seconds": 37.7
+}

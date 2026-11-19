@@ -1,0 +1,7 @@
+SEC-BL-01 WP-7A SEC-P: stack-state.txt (local paths scrubbed)
+
+audit|Anchored|-|16
+authorization|Anchored|-|59
+content|Anchored|-|24
+quarantined 0 of 16
+g08 triggers 2

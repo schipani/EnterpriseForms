@@ -45,6 +45,9 @@ services:
   archive-store:
     command: ["azurite-blob", "--blobHost", "0.0.0.0", "--skipApiVersionCheck", "--loose", "--location", "/data"]
     volumes: [archive-store-data:/data]
+  journal-verification-store:
+    # SEC-BL-01 RST-1 (C-155): same lifetime as authority-db-data and archive-store-data; backed up with every project volume.
+    volumes: [journal-verification-store-data:/data]
   azurite:
     command: ["azurite-blob", "--blobHost", "0.0.0.0", "--skipApiVersionCheck", "--loose", "--location", "/data"]
     volumes: [azurite-data:/data]
@@ -199,5 +202,6 @@ volumes:
   authority-db-data: {}
   spicedb-db-data: {}
   archive-store-data: {}
+  journal-verification-store-data: {}
   azurite-data: {}
   vault-data: {}

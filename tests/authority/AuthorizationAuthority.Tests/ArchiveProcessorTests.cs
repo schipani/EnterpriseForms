@@ -23,6 +23,17 @@ public sealed class ArchiveProcessorTests
 {
     private static readonly Guid Org = Guid.CreateVersion7();
 
+    /// <summary>
+    /// SEC-BL-01 WP-5b (A-6 §26): every stream is D+-enabled, so the processor needs its durability (pinned sentinel, record stores, finding store);
+    /// without it the stream is never evaluated (<see cref="ArchiveProcessor.DurabilityNotComposedCode"/>, fail closed).
+    /// </summary>
+    private static ArchiveProcessor DPlusProcessor(FakeStore store, InMemorySecurityEventArchive archive)
+    {
+        var stores = new DPlusTestStores();
+        stores.ProvisionAsync(archive, DateTimeOffset.UtcNow).GetAwaiter().GetResult();
+        return new ArchiveProcessor(store, archive, TimeProvider.System, null, new AuthorizationAuthority.Infrastructure.Archive.InMemoryJournalVerificationFindingStore(), stores.Durability);
+    }
+
     [Fact]
     public void JournalChainDigestIsTheSha256OfTheExactStoredBodyBytes()
     {
@@ -38,7 +49,7 @@ public sealed class ArchiveProcessorTests
         var store = new FakeStore(Org);
         var entry = store.AddPending(1);
         var archive = new InMemorySecurityEventArchive();
-        var processor = new ArchiveProcessor(store, archive, TimeProvider.System);
+        var processor = DPlusProcessor(store, archive);
 
         Assert.Equal(1, await processor.ProcessOrganizationAsync(Org, CancellationToken.None));
         Assert.Equal(ArchiveDeliveryStates.Anchored, entry.ArchiveDeliveryState);
@@ -57,7 +68,7 @@ public sealed class ArchiveProcessorTests
         var entry = store.AddPending(1);
         entry.JournalEventBodyJson = entry.JournalEventBodyJson.Replace("Test", "Tampered", StringComparison.Ordinal);
         var archive = new InMemorySecurityEventArchive();
-        var processor = new ArchiveProcessor(store, archive, TimeProvider.System);
+        var processor = DPlusProcessor(store, archive);
 
         Assert.Equal(0, await processor.ProcessOrganizationAsync(Org, CancellationToken.None));
         Assert.Equal(ArchiveDeliveryStates.VerificationFailed, entry.ArchiveDeliveryState);
@@ -75,7 +86,7 @@ public sealed class ArchiveProcessorTests
         var archive = new InMemorySecurityEventArchive();
         var other = System.Text.Encoding.UTF8.GetBytes("{\"forged\":true}");
         await archive.AppendAsync(Org, JournalStreamNames.Authorization, 1, other, SHA256.HashData(other), CancellationToken.None);
-        var processor = new ArchiveProcessor(store, archive, TimeProvider.System);
+        var processor = DPlusProcessor(store, archive);
 
         Assert.Equal(0, await processor.ProcessOrganizationAsync(Org, CancellationToken.None));
         Assert.Equal(ArchiveDeliveryStates.VerificationFailed, entry.ArchiveDeliveryState);
@@ -85,15 +96,25 @@ public sealed class ArchiveProcessorTests
     [Fact]
     public async Task ArchiveOutageKeepsTheEntryPendingWithoutQuarantine()
     {
+        // WP-5b: with D+ composed, an archive outage leaves the entry Pending with the outage message (no finding, no quarantine).
         var store = new FakeStore(Org);
         var entry = store.AddPending(1);
-        var processor = new ArchiveProcessor(store, new UnavailableSecurityEventArchive("paused"), TimeProvider.System);
+        var stores = new DPlusTestStores();
+        await stores.PinAsync("pinned-instance", DateTimeOffset.UtcNow);
+        var processor = new ArchiveProcessor(store, new UnavailableSecurityEventArchive("paused"), TimeProvider.System, null,
+            new AuthorizationAuthority.Infrastructure.Archive.InMemoryJournalVerificationFindingStore(), stores.Durability);
 
         Assert.Equal(0, await processor.ProcessOrganizationAsync(Org, CancellationToken.None));
         Assert.Equal(ArchiveDeliveryStates.Pending, entry.ArchiveDeliveryState);
         Assert.Equal("paused", entry.LastArchiveErrorCode);
         Assert.Equal(1, entry.ArchiveAttemptCount);
         Assert.False(store.State.IntegrityQuarantineEnabled);
+
+        // Without the D+ durability the stream is never evaluated (fail closed); nothing is delivered.
+        var archive = new InMemorySecurityEventArchive();
+        Assert.Equal(0, await new ArchiveProcessor(store, archive, TimeProvider.System).ProcessOrganizationAsync(Org, CancellationToken.None));
+        Assert.Equal((ArchiveDeliveryStates.Pending, ArchiveProcessor.DurabilityNotComposedCode), (entry.ArchiveDeliveryState, entry.LastArchiveErrorCode));
+        Assert.Null(await archive.ReadAsync(Org, JournalStreamNames.Authorization, 1, CancellationToken.None));
     }
 
     private sealed class FakeStore(Guid organizationId) : IAuthorityStore, IAuthorityScope

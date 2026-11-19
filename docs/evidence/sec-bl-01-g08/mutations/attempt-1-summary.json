@@ -1,0 +1,469 @@
+[
+  {
+    "id": "BASELINE",
+    "what": "no edit",
+    "files": [],
+    "original_sha256": {},
+    "restored": true,
+    "verdict": "PASS",
+    "result": {
+      "build": 0,
+      "build_seconds": 38.5,
+      "exit": 0,
+      "seconds": 3.6,
+      "kind": "ip",
+      "total": 41,
+      "succeeded": 41,
+      "failed": []
+    },
+    "seconds": 42.1
+  },
+  {
+    "id": "BASELINE-PG",
+    "what": "no edit (PostgreSQL gate)",
+    "files": [],
+    "original_sha256": {},
+    "restored": true,
+    "verdict": "PASS",
+    "result": {
+      "build": 0,
+      "build_seconds": 34.5,
+      "exit": 0,
+      "seconds": 21.5,
+      "kind": "pg",
+      "total": 5,
+      "succeeded": 5,
+      "failed": []
+    },
+    "seconds": 56.0
+  },
+  {
+    "id": "MV-G8-01",
+    "what": "E-6: the gate ignores the trusted receipt of the journal head",
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Common/OrganizationGate.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Application/Common/OrganizationGate.cs": "0f5f84c18bcd54519553d787a735adcd7de67baff9e9385092faab50f6c01e1e"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 38.1,
+      "exit": 2,
+      "seconds": 3.7,
+      "kind": "ip",
+      "total": 41,
+      "succeeded": 40,
+      "failed": [
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.E6ForgedDeliveryStateReceiptFieldsModeAndPositionNeverReopenTheGate"
+      ]
+    },
+    "seconds": 41.8
+  },
+  {
+    "id": "MV-G8-02",
+    "what": "E-6: the gate takes the head from the mutable organization revision column",
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Common/OrganizationGate.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Application/Common/OrganizationGate.cs": "0f5f84c18bcd54519553d787a735adcd7de67baff9e9385092faab50f6c01e1e"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 37.2,
+      "exit": 2,
+      "seconds": 3.8,
+      "kind": "ip",
+      "total": 41,
+      "succeeded": 40,
+      "failed": [
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.E6ForgedDeliveryStateReceiptFieldsModeAndPositionNeverReopenTheGate"
+      ]
+    },
+    "seconds": 41.0
+  },
+  {
+    "id": "MV-G8-03",
+    "what": "E-7: content release trusts the checkpoint row state",
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Content/ContentCheckpointReceipts.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Application/Features/Content/ContentCheckpointReceipts.cs": "500368c10624bf66a49d62329efb4598b8792f8ab5804e83f2af788355707014"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 37.1,
+      "exit": 2,
+      "seconds": 3.7,
+      "kind": "ip",
+      "total": 41,
+      "succeeded": 40,
+      "failed": [
+        "AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.E7ForgedDeliveryStateAndReceiptFieldsNeverReleaseTheRevision"
+      ]
+    },
+    "seconds": 40.8
+  },
+  {
+    "id": "MV-G8-04",
+    "what": "E-7: the checkpoint is not bound to the head",
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Content/ContentCheckpointReceipts.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Application/Features/Content/ContentCheckpointReceipts.cs": "500368c10624bf66a49d62329efb4598b8792f8ab5804e83f2af788355707014"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 34.6,
+      "exit": 2,
+      "seconds": 3.5,
+      "kind": "ip",
+      "total": 41,
+      "succeeded": 40,
+      "failed": [
+        "AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.E7AReceiptOfAnotherHeadNeverReleasesThisHead"
+      ]
+    },
+    "seconds": 38.2
+  },
+  {
+    "id": "MV-G8-05",
+    "what": "receipt: the archived object is not compared with the row digest",
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "2c928596c6710140539f3f06f39be389216e77fb23e6dde9efb423d1c53dbc93"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 38.5,
+      "exit": 2,
+      "seconds": 11.0,
+      "kind": "ip",
+      "total": 41,
+      "succeeded": 38,
+      "failed": [
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.EvidenceChangedAfterTheReceiptWasEstablishedIsNotVerifiedAndTheCacheIsNotStale(stream:"
+      ]
+    },
+    "seconds": 49.5
+  },
+  {
+    "id": "MV-G8-06",
+    "what": "receipt: the sentinel instance is not compared with the pin",
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "2c928596c6710140539f3f06f39be389216e77fb23e6dde9efb423d1c53dbc93"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 45.9,
+      "exit": 2,
+      "seconds": 4.6,
+      "kind": "ip",
+      "total": 41,
+      "succeeded": 38,
+      "failed": [
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.ArchiveInstanceSubstitutionAndAMissingPinAreNotAReceipt(stream:"
+      ]
+    },
+    "seconds": 50.6
+  },
+  {
+    "id": "MV-G8-07",
+    "what": "receipt: the W2-S commitment is not checked",
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "2c928596c6710140539f3f06f39be389216e77fb23e6dde9efb423d1c53dbc93"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 36.9,
+      "exit": 2,
+      "seconds": 3.4,
+      "kind": "ip",
+      "total": 41,
+      "succeeded": 35,
+      "failed": [
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.EvidenceIsNeverReusedAcrossOrganizationsOrStreams(stream:",
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.TheCommitmentAtTheHighestStopGenerationMustNameTheRowInBothStores(stream:"
+      ]
+    },
+    "seconds": 40.4
+  },
+  {
+    "id": "MV-G8-08",
+    "what": "receipt: an Anchored row is a receipt",
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "2c928596c6710140539f3f06f39be389216e77fb23e6dde9efb423d1c53dbc93"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 37.0,
+      "exit": 2,
+      "seconds": 3.6,
+      "kind": "ip",
+      "total": 41,
+      "succeeded": 13,
+      "failed": [
+        "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.E6ForgedDeliveryStateReceiptFieldsModeAndPositionNeverReopenTheGate",
+        "AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.E7ForgedDeliveryStateAndReceiptFieldsNeverReleaseTheRevision",
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.AGenuinelyDeliveredEntryHasAVerifiedReceiptBoundToTheInstanceAndGeneration(stream:",
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.ARestartReEstablishesReceiptsFromTheStoresOnly(stream:",
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.ArchiveInstanceSubstitutionAndAMissingPinAreNotAReceipt(stream:",
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.EvidenceChangedAfterTheReceiptWasEstablishedIsNotVerifiedAndTheCacheIsNotStale(stream:",
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.EvidenceIsNeverReusedAcrossOrganizationsOrStreams(stream:",
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.ForgedAnchoredStateReceiptIdentifiersDigestsAndTimestampsAreNotAReceipt(stream:",
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.OutagesAreUnavailableAndNeverCached(stream:",
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.RecoveryNeverFabricatesAReceipt",
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.TheCommitmentAtTheHighestStopGenerationMustNameTheRowInBothStores(stream:",
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.WithoutDPlusDurabilityNothingIsEverVerified"
+      ]
+    },
+    "seconds": 40.7
+  },
+  {
+    "id": "MV-G8-09",
+    "what": "receipt: the cache is not keyed by the row digest (stale receipts)",
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "2c928596c6710140539f3f06f39be389216e77fb23e6dde9efb423d1c53dbc93"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 34.6,
+      "exit": 2,
+      "seconds": 3.7,
+      "kind": "ip",
+      "total": 41,
+      "succeeded": 38,
+      "failed": [
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.EvidenceChangedAfterTheReceiptWasEstablishedIsNotVerifiedAndTheCacheIsNotStale(stream:"
+      ]
+    },
+    "seconds": 38.3
+  },
+  {
+    "id": "MV-G8-10",
+    "what": "receipt: an archive outage counts as delivered",
+    "files": [
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "2c928596c6710140539f3f06f39be389216e77fb23e6dde9efb423d1c53dbc93"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 35.2,
+      "exit": 2,
+      "seconds": 3.8,
+      "kind": "ip",
+      "total": 41,
+      "succeeded": 38,
+      "failed": [
+        "AuthorizationAuthority.Tests.TrustedJournalReceiptTests.OutagesAreUnavailableAndNeverCached(stream:"
+      ]
+    },
+    "seconds": 39.0
+  },
+  {
+    "id": "MV-G8-DB1",
+    "what": "trigger: immutable fields are not checked (body, digest)",
+    "files": [
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/JournalImmutabilitySql.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/JournalImmutabilitySql.cs": "d56e73cb788397be2a3e296f9e2a3ab0ce6609231ece30e4cb049b8adefaa599"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 34.2,
+      "exit": 2,
+      "seconds": 20.6,
+      "kind": "pg",
+      "total": 5,
+      "succeeded": 4,
+      "failed": [
+        "AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheTriggersStopTheAdministratorUntilItBypassesThemWhichIsJ2"
+      ]
+    },
+    "seconds": 54.8
+  },
+  {
+    "id": "MV-G8-DB2",
+    "what": "trigger: an Anchored entry is not final",
+    "files": [
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/JournalImmutabilitySql.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/JournalImmutabilitySql.cs": "d56e73cb788397be2a3e296f9e2a3ab0ce6609231ece30e4cb049b8adefaa599"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 35.8,
+      "exit": 2,
+      "seconds": 19.3,
+      "kind": "pg",
+      "total": 5,
+      "succeeded": 4,
+      "failed": [
+        "AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheRuntimeCredentialCannotRewriteResetRenumberDeleteOrTruncateTheJournal"
+      ]
+    },
+    "seconds": 55.1
+  },
+  {
+    "id": "MV-G8-DB3",
+    "what": "trigger: a VerificationFailed entry may change freely",
+    "files": [
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/JournalImmutabilitySql.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/JournalImmutabilitySql.cs": "d56e73cb788397be2a3e296f9e2a3ab0ce6609231ece30e4cb049b8adefaa599"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 35.2,
+      "exit": 2,
+      "seconds": 19.9,
+      "kind": "pg",
+      "total": 5,
+      "succeeded": 4,
+      "failed": [
+        "AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08LegitimateDeliveryStateTransitionsWorkAndInvalidOnesAreRefused"
+      ]
+    },
+    "seconds": 55.1
+  },
+  {
+    "id": "MV-G8-DB4",
+    "what": "trigger: deletion is not refused",
+    "files": [
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/JournalImmutabilitySql.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/JournalImmutabilitySql.cs": "d56e73cb788397be2a3e296f9e2a3ab0ce6609231ece30e4cb049b8adefaa599"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 35.3,
+      "exit": 2,
+      "seconds": 20.0,
+      "kind": "pg",
+      "total": 5,
+      "succeeded": 4,
+      "failed": [
+        "AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheTriggersStopTheAdministratorUntilItBypassesThemWhichIsJ2"
+      ]
+    },
+    "seconds": 55.3
+  },
+  {
+    "id": "MV-G8-DB5",
+    "what": "grant: the runtime role gets table-wide UPDATE on the journal",
+    "files": [
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityRuntimeGrants.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityRuntimeGrants.cs": "99fd326491526cb248ea3464d63b85796cdc44befad462daded2fbbbd6c9bf30"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 35.8,
+      "exit": 2,
+      "seconds": 19.5,
+      "kind": "pg",
+      "total": 5,
+      "succeeded": 4,
+      "failed": [
+        "AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheRuntimeCredentialCannotRewriteResetRenumberDeleteOrTruncateTheJournal"
+      ]
+    },
+    "seconds": 55.3
+  },
+  {
+    "id": "MV-G8-DB6",
+    "what": "grant: the verifier role can insert into the journal",
+    "files": [
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityRuntimeGrants.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityRuntimeGrants.cs": "99fd326491526cb248ea3464d63b85796cdc44befad462daded2fbbbd6c9bf30"
+    },
+    "restored": true,
+    "verdict": "SURVIVED",
+    "result": {
+      "build": 0,
+      "build_seconds": 35.2,
+      "exit": 0,
+      "seconds": 19.9,
+      "kind": "pg",
+      "total": 5,
+      "succeeded": 5,
+      "failed": []
+    },
+    "seconds": 55.2
+  },
+  {
+    "id": "RESTORED",
+    "what": "no edit (after every mutation was restored)",
+    "files": [],
+    "original_sha256": {},
+    "restored": true,
+    "verdict": "PASS",
+    "result": {
+      "build": 0,
+      "build_seconds": 37.4,
+      "exit": 0,
+      "seconds": 8.9,
+      "kind": "ip",
+      "total": 41,
+      "succeeded": 41,
+      "failed": []
+    },
+    "seconds": 46.3
+  }
+]

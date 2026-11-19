@@ -1,0 +1,107 @@
+{
+  "format": "DynamicForms/SecurityJournal/v1",
+  "purpose": "Known-answer vectors for the security-journal canonical envelope (SEC-BL-01 WP-1; contract docs/security/SEC_BL_01_DR_CONTRACT_CLOSURE.md section 4).",
+  "generator": "scripts/integrity/generate_journal_envelope_vectors.py",
+  "vectors": [
+    {
+      "id": "JEV1-AUDIT-GENESIS",
+      "description": "Revision 1 of a stream: previous_digest_hex is null (R-5). Whole-second time: no fraction is written.",
+      "organization_id": "019a5b2c-5ec1-7b01-8000-00000000000a",
+      "stream_name": "audit",
+      "stream_revision": 1,
+      "event_kind": "KnownAnswerVectorEvent",
+      "previous_vector_id": null,
+      "previous_digest_hex": null,
+      "created_on_utc": "2026-11-17T12:00:00+00:00",
+      "created_ticks_after_2026_11_17_12_00_utc": 0,
+      "body": {
+        "note_text": "genesis",
+        "counter_value": 1,
+        "flag_value": true,
+        "nullable_value": null
+      },
+      "expected_canonical_utf8": "{\"envelope_format\":\"DynamicForms/SecurityJournal/v1\",\"organization_id\":\"019a5b2c-5ec1-7b01-8000-00000000000a\",\"stream_name\":\"audit\",\"stream_revision\":1,\"event_kind\":\"KnownAnswerVectorEvent\",\"previous_digest_hex\":null,\"created_on_utc\":\"2026-11-17T12:00:00+00:00\",\"body\":{\"note_text\":\"genesis\",\"counter_value\":1,\"flag_value\":true,\"nullable_value\":null}}",
+      "expected_sha256_hex": "34fc707cd70ed8a2c230b2c3ebed7fafc2ee4408818dcafce942aeaabdbda540"
+    },
+    {
+      "id": "JEV1-AUDIT-SECOND",
+      "description": "Revision 2 links to the digest of revision 1 (R-7). Seven fraction digits; relaxed escaping keeps <, >, &, ' and \u00e9 unescaped.",
+      "organization_id": "019a5b2c-5ec1-7b01-8000-00000000000a",
+      "stream_name": "audit",
+      "stream_revision": 2,
+      "event_kind": "KnownAnswerVectorEvent",
+      "previous_vector_id": "JEV1-AUDIT-GENESIS",
+      "previous_digest_hex": "34fc707cd70ed8a2c230b2c3ebed7fafc2ee4408818dcafce942aeaabdbda540",
+      "created_on_utc": "2026-11-17T12:00:00.1234567+00:00",
+      "created_ticks_after_2026_11_17_12_00_utc": 1234567,
+      "body": {
+        "note_text": "second <&>' \u00e9",
+        "counter_value": 2,
+        "flag_value": false,
+        "nullable_value": "present"
+      },
+      "expected_canonical_utf8": "{\"envelope_format\":\"DynamicForms/SecurityJournal/v1\",\"organization_id\":\"019a5b2c-5ec1-7b01-8000-00000000000a\",\"stream_name\":\"audit\",\"stream_revision\":2,\"event_kind\":\"KnownAnswerVectorEvent\",\"previous_digest_hex\":\"34fc707cd70ed8a2c230b2c3ebed7fafc2ee4408818dcafce942aeaabdbda540\",\"created_on_utc\":\"2026-11-17T12:00:00.1234567+00:00\",\"body\":{\"note_text\":\"second <&>' \u00e9\",\"counter_value\":2,\"flag_value\":false,\"nullable_value\":\"present\"}}",
+      "expected_sha256_hex": "59b21e676b48be772b972a92779a9ecad34e175b5153dbf458c09ac2fe16b27e"
+    },
+    {
+      "id": "JEV1-AUDIT-THIRD",
+      "description": "Revision 3 links to revision 2. Fraction trimmed to one digit; quote and backslash are escaped.",
+      "organization_id": "019a5b2c-5ec1-7b01-8000-00000000000a",
+      "stream_name": "audit",
+      "stream_revision": 3,
+      "event_kind": "KnownAnswerVectorEvent",
+      "previous_vector_id": "JEV1-AUDIT-SECOND",
+      "previous_digest_hex": "59b21e676b48be772b972a92779a9ecad34e175b5153dbf458c09ac2fe16b27e",
+      "created_on_utc": "2026-11-17T12:00:01.5+00:00",
+      "created_ticks_after_2026_11_17_12_00_utc": 15000000,
+      "body": {
+        "note_text": "quote \" and backslash \\",
+        "counter_value": 3,
+        "flag_value": true,
+        "nullable_value": null
+      },
+      "expected_canonical_utf8": "{\"envelope_format\":\"DynamicForms/SecurityJournal/v1\",\"organization_id\":\"019a5b2c-5ec1-7b01-8000-00000000000a\",\"stream_name\":\"audit\",\"stream_revision\":3,\"event_kind\":\"KnownAnswerVectorEvent\",\"previous_digest_hex\":\"59b21e676b48be772b972a92779a9ecad34e175b5153dbf458c09ac2fe16b27e\",\"created_on_utc\":\"2026-11-17T12:00:01.5+00:00\",\"body\":{\"note_text\":\"quote \\\" and backslash \\\\\",\"counter_value\":3,\"flag_value\":true,\"nullable_value\":null}}",
+      "expected_sha256_hex": "c8291b15c38c145124f5a5b3f27dbeddc51dba03578ee7deafb6bace37c75ac7"
+    },
+    {
+      "id": "JEV1-AUTHORIZATION-GENESIS",
+      "description": "Another stream of the same organization starts its own chain at revision 1; a 64-bit integer beyond double precision is written exactly.",
+      "organization_id": "019a5b2c-5ec1-7b01-8000-00000000000a",
+      "stream_name": "authorization",
+      "stream_revision": 1,
+      "event_kind": "KnownAnswerVectorEvent",
+      "previous_vector_id": null,
+      "previous_digest_hex": null,
+      "created_on_utc": "2026-11-17T12:00:02+00:00",
+      "created_ticks_after_2026_11_17_12_00_utc": 20000000,
+      "body": {
+        "note_text": "authorization stream",
+        "counter_value": 9007199254740993,
+        "flag_value": false,
+        "nullable_value": null
+      },
+      "expected_canonical_utf8": "{\"envelope_format\":\"DynamicForms/SecurityJournal/v1\",\"organization_id\":\"019a5b2c-5ec1-7b01-8000-00000000000a\",\"stream_name\":\"authorization\",\"stream_revision\":1,\"event_kind\":\"KnownAnswerVectorEvent\",\"previous_digest_hex\":null,\"created_on_utc\":\"2026-11-17T12:00:02+00:00\",\"body\":{\"note_text\":\"authorization stream\",\"counter_value\":9007199254740993,\"flag_value\":false,\"nullable_value\":null}}",
+      "expected_sha256_hex": "138a581f757d7b0d0ff4009feaec40984d2890f5730f00a92be1644bcd655530"
+    },
+    {
+      "id": "JEV1-OTHER-ORGANIZATION-GENESIS",
+      "description": "Same body and time as JEV1-AUDIT-GENESIS for another organization: a different envelope and digest (organization binding).",
+      "organization_id": "019a5b2c-5ec1-7b01-8000-00000000000b",
+      "stream_name": "audit",
+      "stream_revision": 1,
+      "event_kind": "KnownAnswerVectorEvent",
+      "previous_vector_id": null,
+      "previous_digest_hex": null,
+      "created_on_utc": "2026-11-17T12:00:00+00:00",
+      "created_ticks_after_2026_11_17_12_00_utc": 0,
+      "body": {
+        "note_text": "genesis",
+        "counter_value": 1,
+        "flag_value": true,
+        "nullable_value": null
+      },
+      "expected_canonical_utf8": "{\"envelope_format\":\"DynamicForms/SecurityJournal/v1\",\"organization_id\":\"019a5b2c-5ec1-7b01-8000-00000000000b\",\"stream_name\":\"audit\",\"stream_revision\":1,\"event_kind\":\"KnownAnswerVectorEvent\",\"previous_digest_hex\":null,\"created_on_utc\":\"2026-11-17T12:00:00+00:00\",\"body\":{\"note_text\":\"genesis\",\"counter_value\":1,\"flag_value\":true,\"nullable_value\":null}}",
+      "expected_sha256_hex": "b14100bc95c91dbe94499aa6d5f8725ed8ea19a51af53a7e655e79a1942f9f24"
+    }
+  ]
+}

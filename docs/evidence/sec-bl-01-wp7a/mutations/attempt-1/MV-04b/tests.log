@@ -1,0 +1,40 @@
+failed AuthorizationAuthority.Tests.JournalChainRulesTests.R6AMissingFirstRevisionIsAGap (3ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: []
+    at AuthorizationAuthority.Tests.JournalChainRulesTests.R6AMissingFirstRevisionIsAGap() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalChainRulesTests.cs:250
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+failed AuthorizationAuthority.Tests.JournalChainRulesTests.R6AMissingRevisionIsAGapAndStopsTheContiguousPrefix (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: IntegrityFailure
+  Actual:   Valid
+    at AuthorizationAuthority.Tests.JournalChainRulesTests.R6AMissingRevisionIsAGapAndStopsTheContiguousPrefix() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalChainRulesTests.cs:232
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+failed AuthorizationAuthority.Tests.JournalChainRulesTests.R6AMissingTailIsAGapWhenTheExpectedLastRevisionIsKnown (0ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: []
+    at AuthorizationAuthority.Tests.JournalChainRulesTests.R6AMissingTailIsAGapWhenTheExpectedLastRevisionIsKnown() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalChainRulesTests.cs:242
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierDeletingADeliveredRowIsDetectedByTheVerifierAndTheKeyIsStillRecordedAgainUntilDetection (21ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.DetectedByTheFullSweepAsync(Verification v, Delivered d, String code, String subtype, Int64 revision) in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:204
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierDeletingADeliveredRowIsDetectedByTheVerifierAndTheKeyIsStillRecordedAgainUntilDetection() in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:228
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AModifiedDeliveredRowIsAnAnchorMismatchAndADeletedRowIsAGap (7ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AModifiedDeliveredRowIsAnAnchorMismatchAndADeletedRowIsAGap() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:129
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 5
+  succeeded: 412
+  skipped: 0
+  duration: 2s 120ms

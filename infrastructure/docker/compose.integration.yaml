@@ -11,7 +11,17 @@ services:
     tmpfs: [/data]
   archive-store:
     tmpfs: [/data]
+  journal-verification-store:
+    tmpfs: [/data]
+  archive-provision:
+    # SEC-BL-01 WP-5a.1: provision this disposable archive before the Authority starts (refuses anything not demonstrably new).
+    profiles: !reset []
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
   authority:
+    depends_on:
+      archive-provision:
+        condition: service_completed_successfully
     environment:
       ASPNETCORE_ENVIRONMENT: Testing
   api:

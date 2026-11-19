@@ -1,0 +1,79 @@
+passed AuthorizationAuthority.Tests.JournalBoundedListingAzuriteTests.ANonCanonicalNameInsideABoundedRangeIsReportedAndAMissingContainerIsNotAnEmptyArchive (1s 036ms)
+passed AuthorizationAuthority.Tests.JournalBoundedListingAzuriteTests.TheBlobAcceptedExceptionStoreIsCreateOnly (163ms)
+passed AuthorizationAuthority.Tests.JournalBoundedListingAzuriteTests.TheBoundedListingReturnsExactlyTheRevisionsAboveInOrderAcrossPages(after: 125, pageSize: 2) (2s 597ms)
+passed AuthorizationAuthority.Tests.JournalBoundedListingAzuriteTests.TheBoundedListingReturnsExactlyTheRevisionsAboveInOrderAcrossPages(after: 7, pageSize: 3) (2s 204ms)
+passed AuthorizationAuthority.Tests.JournalBoundedListingAzuriteTests.TheBoundedListingReturnsExactlyTheRevisionsAboveInOrderAcrossPages(after: 10, pageSize: 4) (2s 149ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.DPlusAStoppedAuditStreamLeavesAuthorizationAndContentDeliveryUnchanged (8s 740ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.DPlusTheMarkerAloneStopsTheStreamWhileTheFindingStoreIsUnreachableAcrossARestart (392ms)
+passed AuthorizationAuthority.Tests.JournalBoundedListingAzuriteTests.TheBoundedListingReturnsExactlyTheRevisionsAboveInOrderAcrossPages(after: 99, pageSize: 5) (1s 990ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G14R2AnchoredRestoreAndAGenerationOneStopOnRealStores (2s 751ms)
+passed AuthorizationAuthority.Tests.JournalBoundedListingAzuriteTests.TheBoundedListingReturnsExactlyTheRevisionsAboveInOrderAcrossPages(after: 0, pageSize: 2) (2s 154ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G14R2AuthorityDbForgeryAndDirectArchivePresenceNeverLiftOnRealStores (462ms)
+passed AuthorizationAuthority.Tests.JournalBoundedListingAzuriteTests.TheBoundedListingReturnsExactlyTheRevisionsAboveInOrderAcrossPages(after: 9, pageSize: 1000) (1s 897ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.DPlusAnUnreachableFindingStoreHoldsTheEntryPendingAndTheRealStoreRecordsItBeforeMarking (3s 327ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G14R2ArchiveInstanceSubstitutionOnRealStores (302ms)
+passed AuthorizationAuthority.Tests.JournalBoundedListingAzuriteTests.TheBoundedListingReturnsExactlyTheRevisionsAboveInOrderAcrossPages(after: 120, pageSize: 2) (1s 779ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.DPlusAValidAuditStreamKeepsDeliveringOnRealStores (440ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.TheSnapshotIsServerEnforcedReadOnlyAndIssuesOnlySelects (548ms)
+running... 17 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureCheckpointGrowth
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureCheckpointGrowth (33s 751ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.BaselineIncrementalAndFullSweepsOnRealStoresAdvanceTheChainWithoutWrites (1s 860ms)
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+[slow] still running after 1m 00s: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep (AuthorizationAuthority.Tests.dll|net10.0|x64)
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+[slow] still running after 2m 00s: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep (AuthorizationAuthority.Tests.dll|net10.0|x64)
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+[slow] still running after 4m 00s: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep (AuthorizationAuthority.Tests.dll|net10.0|x64)
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+[slow] still running after 8m 00s: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep (AuthorizationAuthority.Tests.dll|net10.0|x64)
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+running... 19 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureBaselineIncrementalAndFullSweep (15m 54s 619ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.AnAcceptedGapAndARebaselineWorkOnRealStoresWithoutWrites (4s 252ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.DPlusAnArchiveOutageLeavesTheEntryPendingAndRecoveryDeliversIt (3s 658ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.DPlusTheStopMarkerSurvivesRestartRowResetEvidenceReplacementAndMarkerDeletionOnRealStores (1s 052ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.ProvisioningAFreshDisposableArchiveOnRealStoresAndRefusingEveryEstablishedOrLostState (4s 065ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.DPlusACorruptedOrMissingArchivedPredecessorPreventsTheAppendAndStopsTheStream(damage: "corrupted") (773ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.DPlusACorruptedOrMissingArchivedPredecessorPreventsTheAppendAndStopsTheStream(damage: "missing") (806ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.TheSweepLockExcludesASecondSnapshotUntilTheFirstEnds (76ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G14R2EvidenceCommitmentsAndTheDD10SequenceOnRealStores (1s 502ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G14R2ConcurrentExecutionOnRealStoresIsIdempotent (2s 623ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G14R2AuthorizedFalseAlarmRecoveryOnRealStores (2s 350ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G14R2VerificationStoreOutageIsInconclusiveOnRealStores (6s 671ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.AdministratorSqlTamperingIsDetected(attack: "truncate") (2s 598ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.AdministratorSqlTamperingIsDetected(attack: "forged-anchored") (3s 185ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.AdministratorSqlTamperingIsDetected(attack: "delete") (2s 732ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.AdministratorSqlTamperingIsDetected(attack: "redigest") (3s 168ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G14R2RejectionIsFinalAndDeletingRecordsFromBothStoresReStopsOnRealStores (4s 416ms)
+
+Test run summary: Passed! - <repo>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 36
+  failed: 0
+  succeeded: 36
+  skipped: 0
+  duration: 17m 31s 725ms

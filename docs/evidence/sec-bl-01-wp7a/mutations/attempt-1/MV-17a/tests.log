@@ -1,0 +1,17 @@
+failed EnterpriseForms.ArchitectureTests.JournalVerificationBoundaryTests.TheBaselineAndVerifierCannotWriteAuthorityDbQuarantineSignOrDeliver (420ms)
+  forbidden dependency: AuthorizationAuthority.Application.Features.Journal.Reconciliation.JournalBaselineService
+    at EnterpriseForms.ArchitectureTests.JournalVerificationBoundaryTests.TheBaselineAndVerifierCannotWriteAuthorityDbQuarantineSignOrDeliver() in <clone>\tests\architecture\EnterpriseForms.ArchitectureTests\JournalVerificationBoundaryTests.cs:218
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+failed EnterpriseForms.ArchitectureTests.JournalVerificationBoundaryTests.TheVerifierAndTheBaselineHaveNoAuthorityDbWriteQuarantineSigningGateOrEntryArchiveWriteDependency (31ms)
+  forbidden dependency: AuthorizationAuthority.Application.Features.Journal.Reconciliation.JournalBaselineService
+    at EnterpriseForms.ArchitectureTests.JournalVerificationBoundaryTests.TheVerifierAndTheBaselineHaveNoAuthorityDbWriteQuarantineSigningGateOrEntryArchiveWriteDependency() in <clone>\tests\architecture\EnterpriseForms.ArchitectureTests\JournalVerificationBoundaryTests.cs:71
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+
+Test run summary: Failed! - <clone>\tests\architecture\EnterpriseForms.ArchitectureTests\bin\Debug\net10.0\EnterpriseForms.ArchitectureTests.dll (net10.0|x64)
+  total: 13
+  failed: 2
+  succeeded: 11
+  skipped: 0
+  duration: 1s 611ms

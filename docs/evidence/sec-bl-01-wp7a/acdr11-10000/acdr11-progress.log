@@ -1,0 +1,13 @@
+2026-11-19T12:18:47.2252973+00:00 AC-DR-11 start: target rows 10000, other organizations 4 x 625, concurrency 8, chunk 10000
+2026-11-19T12:23:46.9083204+00:00 seed target: 10000/10000 rows, 300 s, 33 rows/s
+2026-11-19T12:24:15.8546887+00:00 seed other-1: 625/625 rows, 29 s, 22 rows/s
+2026-11-19T12:24:46.6810573+00:00 seed other-2: 625/625 rows, 31 s, 20 rows/s
+2026-11-19T12:25:20.5302068+00:00 seed other-3: 625/625 rows, 34 s, 18 rows/s
+2026-11-19T12:25:54.7251015+00:00 seed other-4: 625/625 rows, 34 s, 18 rows/s
+2026-11-19T12:37:12.5800380+00:00 baseline: Clean in 677.8 s; rows 10000, listed 20000, read 10000
+2026-11-19T12:43:26.6531792+00:00 incremental (idle): Clean [] inconclusive=[] 374066 ms, listed 0, read 1
+2026-11-19T12:43:55.4527206+00:00 D+ delivery: 200 entries in 28.7 s over 7 passes (143.5 ms per entry)
+2026-11-19T12:50:23.8319584+00:00 incremental (+200): Clean [] inconclusive=[] 388374 ms, listed 200, read 201
+2026-11-19T13:04:19.2263971+00:00 full: Clean [] inconclusive=[] 835384 ms, rows 10200, listed 20400, read 10201; peak working set 328732672
+2026-11-19T13:10:41.6387954+00:00 detection above the checkpoint (replaced newest object): Findings [ANCHOR_MISMATCH/@10210..10210, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@10210..10210] inconclusive=[] in 380627 ms
+2026-11-19T13:25:06.9365010+00:00 detection below the checkpoint (replaced revision 5000), full sweep: Findings [ANCHOR_MISMATCH/@5000..5000, CHAIN_INTEGRITY_FAILURE/LINK_MISMATCH@5001..5001, ANCHOR_MISMATCH/@10210..10210, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@5000..5000, DPLUS_COMMITMENT_MISMATCH/PREDECESSOR_DIGEST@5001..5001, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@10210..10210, VERIFICATION_STALE/@..] inconclusive=[] in 865019 ms

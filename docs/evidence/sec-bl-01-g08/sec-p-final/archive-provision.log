@@ -1,0 +1,5 @@
+SEC-BL-01 G08 / E-6 / E-7 final SEC-P: archive-provision.log (local paths scrubbed)
+
+archive-provision-1  | Cannot load library libgssapi_krb5.so.2 
+archive-provision-1  | Error: libgssapi_krb5.so.2: cannot open shared object file: No such file or directory
+archive-provision-1  | archive provisioning Provisioned: archive provisioned

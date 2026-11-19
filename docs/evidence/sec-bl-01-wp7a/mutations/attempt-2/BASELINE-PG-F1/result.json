@@ -1,0 +1,20 @@
+{
+  "id": "BASELINE-PG-F1",
+  "what": "no edit (PostgreSQL gate, WP-7A F-1 tests)",
+  "kind": "pg",
+  "files": [],
+  "original_sha256": {},
+  "restored": true,
+  "verdict": "PASS",
+  "result": {
+    "build": 0,
+    "build_seconds": 33.1,
+    "exit": 0,
+    "seconds": 24.0,
+    "kind": "pg",
+    "total": 21,
+    "succeeded": 21,
+    "failed": []
+  },
+  "seconds": 57.1
+}

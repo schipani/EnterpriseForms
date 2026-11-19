@@ -43,6 +43,16 @@ public static class AuthorityInfrastructureRegistration
         // C-150 R56-B: committed authorization changes wake the work loop (transactional NOTIFY + in-process signal); the poll stays the fallback.
         services.AddSingleton(configuration.GetSection(AuthorityWorkOptions.SectionName).Get<AuthorityWorkOptions>() ?? new AuthorityWorkOptions());
         services.AddSingleton<AuthorityWorkSignal>();
+        // SEC-BL-01 E-6/E-7 (A-7 §27): the trusted delivery-receipt verifier over the archive and the D+ durability (record stores, instance pin).
+        // Without D+ durability composed it verifies nothing (fail closed), consistent with SC-5.
+        services.AddSingleton<AuthorizationAuthority.Application.Features.Journal.TrustedJournalReceipts>(sp => new AuthorizationAuthority.Application.Features.Journal.TrustedJournalReceipts(
+            sp.GetRequiredService<ISecurityEventArchive>(), sp.GetService<AuthorizationAuthority.Application.Features.Journal.Recovery.DPlusDurability>(),
+            // WP-7A (A-9 TR-6′ RV-2): the current-state freshness bound, validated (0..30 s) at construction; an invalid value refuses start.
+            new AuthorizationAuthority.Application.Features.Journal.TrustedJournalReceiptOptions
+            {
+                CurrentStateMaxAge = TimeSpan.FromMilliseconds(configuration.GetValue("JournalReceipts:CurrentStateMaxAgeMilliseconds", 1000)),
+            }));
+        services.AddSingleton<IJournalReceiptVerifier>(sp => sp.GetRequiredService<AuthorizationAuthority.Application.Features.Journal.TrustedJournalReceipts>());
         services.AddSingleton<IAuthorityStore, AuthorityStore>();
         services.AddSingleton<IContentAcceptanceRuleSchemaReader, ContentAcceptanceRuleSchemaReader>();
 

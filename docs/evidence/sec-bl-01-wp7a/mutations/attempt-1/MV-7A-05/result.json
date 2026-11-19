@@ -1,0 +1,27 @@
+{
+  "id": "MV-7A-05",
+  "what": "RV-4: successor evidence (object, commitments) above a claimed head is ignored",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "976ea25a7d858f53e61578b81c8e2850f487e70dfbf98b6d3aa735690c0bfb36"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 35.8,
+    "exit": 2,
+    "seconds": 3.8,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 411,
+    "failed": [
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(stream:",
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(stream:"
+    ]
+  },
+  "seconds": 39.7
+}

@@ -199,17 +199,33 @@ public sealed class DistributedConsistencyTests(StageAFixture fixture)
             var ok = await s.ReadAsync(s.Owner);
             Assert.Equal(HttpStatusCode.OK, ok.Status);
 
+            // WP-7A (contract A-9 TR-6', RV-2/RV-3): a receipt's current state is re-established at most 1 s after its last establishment and an
+            // outage is never "last known good", so an archive outage closes the gate: a command that needs the open gate is refused
+            // (AUTHORITY_NOT_READY) instead of being accepted on stale evidence. Before A-9 the cached receipt kept the gate open and the share was
+            // accepted (202, CommittedAwaitingProjection, not effective). Either outcome is non-effective; the test records which one occurred and,
+            // when refused, re-issues the share after the archive is back. The protected-byte assertions are unchanged.
+            var shareBody = new { recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "given_name" } };
+            var shareRefused = false;
             fixture.Stack.Pause("archive-store");
             try
             {
-                var share = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Owner), new { recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
+                var share = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Owner), shareBody);
                 s.Evidence.ObserveHttp("share while archive paused", share, "title", "command_status");
-                Assert.Equal(HttpStatusCode.Accepted, share.Status);
-                Assert.Contains("CommittedAwaitingProjection", share.Body, StringComparison.Ordinal);
+                if (share.Status == HttpStatusCode.ServiceUnavailable)
+                {
+                    Assert.Contains("AUTHORITY_NOT_READY", share.Body, StringComparison.Ordinal); // A-9: refused, never accepted on stale evidence
+                    shareRefused = true;
+                }
+                else
+                {
+                    Assert.Equal(HttpStatusCode.Accepted, share.Status);
+                    Assert.Contains("CommittedAwaitingProjection", share.Body, StringComparison.Ordinal);
+                }
+
                 var gate = await fixture.Authority.GateAsync(s.OrganizationId);
                 s.Evidence.Observe("gate during archive outage", gate.GetRawText());
                 Assert.Equal("AwaitingArchive", gate.GetProperty("projection_gate_state").GetString());
-                Assert.True(gate.GetProperty("pending_archive_entries").GetInt32() >= 1);
+                Assert.True(shareRefused || gate.GetProperty("pending_archive_entries").GetInt32() >= 1);
 
                 var readerDuring = await s.ReadAsync(s.Reader);
                 s.Evidence.ObserveHttp("reader read during archive outage", readerDuring);
@@ -225,17 +241,28 @@ public sealed class DistributedConsistencyTests(StageAFixture fixture)
             }
 
             var ready = await s.WaitGateReadyAsync(TimeSpan.FromSeconds(60));
+            if (shareRefused)
+            {
+                var reissued = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Owner), shareBody);
+                s.Evidence.ObserveHttp("share re-issued after the archive returned (refused during the outage, A-9)", reissued, "title", "command_status");
+                Assert.True(reissued.IsSuccess, "re-issued share: " + reissued.Status);
+                ready = await s.WaitGateReadyAsync(TimeSpan.FromSeconds(60));
+            }
+
             s.Evidence.AuthorityRevision = ready.GetProperty("authorization_revision").GetInt64();
             var readerAfter = await s.WaitReadableAsync(s.Reader);
             s.Evidence.ObserveHttp("reader read after archive receipt", readerAfter, "isCompleteProjection");
             Assert.Equal(HttpStatusCode.OK, readerAfter.Status);
 
             // Content checkpoint receipts gate reads of a new revision until archived.
+            var updateBody = new { expectedContentRevision = 1, values = new Dictionary<string, string> { ["case_note"] = "archived later" } };
+            var updateRefused = false;
             fixture.Stack.Pause("archive-store");
             try
             {
-                var update = await fixture.Api.PatchAsync($"/api/v1/form-records/{s.FormRecordId:D}", s.Token(s.Owner), new { expectedContentRevision = 1, values = new Dictionary<string, string> { ["case_note"] = "archived later" } });
-                s.Evidence.ObserveHttp("update while archive paused (commit allowed, release gated)", update, "contentRevision", "integrityStatus");
+                var update = await fixture.Api.PatchAsync($"/api/v1/form-records/{s.FormRecordId:D}", s.Token(s.Owner), updateBody);
+                s.Evidence.ObserveHttp("update while archive paused (commit allowed, release gated; or refused under A-9)", update, "contentRevision", "integrityStatus", "title");
+                updateRefused = update.Status == HttpStatusCode.ServiceUnavailable;
                 var readDuring = await s.ReadAsync(s.Owner);
                 s.Evidence.ObserveHttp("owner read of new revision during archive outage", readDuring, "title");
                 Assert.NotEqual(HttpStatusCode.OK, readDuring.Status);
@@ -244,6 +271,14 @@ public sealed class DistributedConsistencyTests(StageAFixture fixture)
             finally
             {
                 fixture.Stack.Unpause("archive-store");
+            }
+
+            if (updateRefused)
+            {
+                await s.WaitGateReadyAsync(TimeSpan.FromSeconds(60));
+                var reissued = await fixture.Api.PatchAsync($"/api/v1/form-records/{s.FormRecordId:D}", s.Token(s.Owner), updateBody);
+                s.Evidence.ObserveHttp("update re-issued after the archive returned (refused during the outage, A-9)", reissued, "contentRevision", "integrityStatus");
+                Assert.True(reissued.IsSuccess, "re-issued update: " + reissued.Status);
             }
 
             var finalRead = await s.WaitReadableAsync(s.Owner, TimeSpan.FromSeconds(60));

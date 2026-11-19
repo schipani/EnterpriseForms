@@ -1,0 +1,12 @@
+# SEC-BL-01 WP-4 (C-155): OPT-IN Development/Testing overlay that enables the Authority-hosted, alert-only scheduled verifier
+# (docs/security/SEC_BL_01_WP3_WP4_IMPLEMENTATION_RECORD.md). Add it explicitly, e.g.
+#   docker compose -f compose.yaml -f compose.dev-persistent.yaml -f compose.journal-verification.yaml --env-file .env up -d
+# WP-5a.1: the separate journal-verification store and its generated key are part of every stack now (compose.yaml; D+ requires them),
+# so this overlay only switches the verifier loop on. The verifier reads AuthorityDb with the runtime credential inside a
+# server-enforced read-only transaction (no dedicated read-only login exists: G08 change not authorized). Streams without a baseline
+# stay NOT_BASELINED; a baseline is a separate, explicitly authorized operator command (--journal-baseline). Configuration separation
+# only: no independence, no checkpoint-freshness assurance, not for persistent organization data without owner authorization.
+services:
+  authority:
+    environment:
+      JournalVerification__Enabled: "true"

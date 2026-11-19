@@ -161,3 +161,12 @@ Both stop the containers and keep the named volumes, which phases 2–4 cover: a
 * make the retired records readable.
 
 Docker Desktop on Windows does not isolate bridge networks by IP. The internal `authority-net` remains the isolation used, as in the existing stack.
+
+## 7. Journal-verification stores and coordinated reset (SEC-BL-01, 2026-11-17)
+
+Added by SEC-BL-01 WP-2 (C-155; `docs/security/SEC_BL_01_WP1_WP2_IMPLEMENTATION_RECORD.md` section 4). Development/Testing only.
+
+* The base `compose.yaml` now starts the archive's Azurite with `--location /data`, as this stack already did; the retired `compose.dev.yaml` therefore uses its `archive-store-data` volume for the first time (its earlier archive, if any, is in the container layer and is lost on the next recreation, as before).
+* A separate `journal-verification-store` Azurite (profile `journal-verification`, not started by default, unused until WP-4) has its own account and a non-default key (`JOURNAL_VERIFICATION_ACCOUNT_*`); here it keeps its data in `journal-verification-store-data`, which `backup` includes with every project volume.
+* **RST-1/RST-2:** `authority-db-data`, `archive-store-data` and `journal-verification-store-data` are kept or reset **together**. A partial reset produces genuine verification findings that are not suppressed. Check before and after any volume operation with `python -I scripts/dev/check-journal-store-coupling.py` (read-only).
+* **Verifier (SEC-BL-01 WP-4, opt-in):** `compose.journal-verification.yaml` starts the checkpoint store and enables the Authority-hosted, alert-only verifier; it refuses to render without a non-default `JOURNAL_VERIFICATION_ACCOUNT_KEY`. A stream is verified only after a baseline, which is a separate operator command (`--journal-baseline`, Development/Testing only) and is **not** to be run on this stack's organization data without owner authorization.

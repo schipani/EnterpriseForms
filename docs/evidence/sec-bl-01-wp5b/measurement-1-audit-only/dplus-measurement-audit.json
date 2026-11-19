@@ -1,0 +1,155 @@
+{
+  "measurement": "SEC-BL-01 WP-5b D\u002B/W2-S delivery cost",
+  "enforced_streams": "audit",
+  "stores": "PostgreSQL 18.0 \u002B Azurite 3.9.0 (two instances), loopback, single process",
+  "measured_utc": "2026-11-19T00:25:17.8607817\u002B00:00",
+  "drain": [
+    {
+      "backlog_per_stream": 32,
+      "entries_total": 96,
+      "delivered": 96,
+      "passes": 2,
+      "wall_ms": 3145.7,
+      "entries_per_second": 30.5,
+      "ms_per_entry": 32.767,
+      "pass_ms_p50": 468.5,
+      "pass_ms_p95": 2667.8,
+      "store_operations_total": 231,
+      "store_operations_per_entry": 2.406,
+      "operations_per_entry_by_method": {
+        "archive.AppendAsync": 1,
+        "archive.CreateMetaAsync": 0.333,
+        "archive.ListMetaAsync": 0.01,
+        "archive.ReadIdentityAsync": 0.01,
+        "archive.ReadMetaAsync": 0.333,
+        "archive.ReadStopMarkersAsync": 0.01,
+        "checkpoints.ReadAsync": 0.01,
+        "findings.ListAsync": 0.01,
+        "provisioning.ReadRecordAsync": 0.01,
+        "store.CreateAsync": 0.333,
+        "store.ListAsync": 0.01,
+        "store.ReadAsync": 0.333
+      },
+      "commitments_archive": {
+        "objects": 32,
+        "bytes": 23480
+      },
+      "commitments_store": {
+        "objects": 32,
+        "bytes": 23480
+      },
+      "commitment_bytes_per_entry": 489.2
+    },
+    {
+      "backlog_per_stream": 256,
+      "entries_total": 768,
+      "delivered": 768,
+      "passes": 16,
+      "wall_ms": 19461.3,
+      "entries_per_second": 39.5,
+      "ms_per_entry": 25.34,
+      "pass_ms_p50": 502.4,
+      "pass_ms_p95": 2324.4,
+      "store_operations_total": 1855,
+      "store_operations_per_entry": 2.415,
+      "operations_per_entry_by_method": {
+        "archive.AppendAsync": 1,
+        "archive.CreateMetaAsync": 0.333,
+        "archive.ListMetaAsync": 0.01,
+        "archive.ReadEntryAsync": 0.009,
+        "archive.ReadIdentityAsync": 0.01,
+        "archive.ReadMetaAsync": 0.333,
+        "archive.ReadStopMarkersAsync": 0.01,
+        "checkpoints.ReadAsync": 0.01,
+        "findings.ListAsync": 0.01,
+        "provisioning.ReadRecordAsync": 0.01,
+        "store.CreateAsync": 0.333,
+        "store.ListAsync": 0.01,
+        "store.ReadAsync": 0.333
+      },
+      "commitments_archive": {
+        "objects": 256,
+        "bytes": 189397
+      },
+      "commitments_store": {
+        "objects": 256,
+        "bytes": 189397
+      },
+      "commitment_bytes_per_entry": 493.2
+    },
+    {
+      "backlog_per_stream": 2048,
+      "entries_total": 6144,
+      "delivered": 6144,
+      "passes": 128,
+      "wall_ms": 188460.4,
+      "entries_per_second": 32.6,
+      "ms_per_entry": 30.674,
+      "pass_ms_p50": 981,
+      "pass_ms_p95": 2623.5,
+      "store_operations_total": 14847,
+      "store_operations_per_entry": 2.417,
+      "operations_per_entry_by_method": {
+        "archive.AppendAsync": 1,
+        "archive.CreateMetaAsync": 0.333,
+        "archive.ListMetaAsync": 0.01,
+        "archive.ReadEntryAsync": 0.01,
+        "archive.ReadIdentityAsync": 0.01,
+        "archive.ReadMetaAsync": 0.333,
+        "archive.ReadStopMarkersAsync": 0.01,
+        "checkpoints.ReadAsync": 0.01,
+        "findings.ListAsync": 0.01,
+        "provisioning.ReadRecordAsync": 0.01,
+        "store.CreateAsync": 0.333,
+        "store.ListAsync": 0.01,
+        "store.ReadAsync": 0.333
+      },
+      "commitments_archive": {
+        "objects": 2048,
+        "bytes": 1518318
+      },
+      "commitments_store": {
+        "objects": 2048,
+        "bytes": 1518318
+      },
+      "commitment_bytes_per_entry": 494.2
+    }
+  ],
+  "steady_state": {
+    "iterations": 40,
+    "entries_per_pass": 3,
+    "pass_ms_p50": 187.6,
+    "pass_ms_p95": 342.7,
+    "pass_ms_max": 454.3,
+    "operations_per_pass": 15,
+    "operations_per_pass_by_method": {
+      "archive.AppendAsync": 3,
+      "archive.CreateMetaAsync": 1,
+      "archive.ListMetaAsync": 1,
+      "archive.ReadEntryAsync": 1,
+      "archive.ReadIdentityAsync": 1,
+      "archive.ReadMetaAsync": 1,
+      "archive.ReadStopMarkersAsync": 1,
+      "checkpoints.ReadAsync": 1,
+      "findings.ListAsync": 1,
+      "provisioning.ReadRecordAsync": 1,
+      "store.CreateAsync": 1,
+      "store.ListAsync": 1,
+      "store.ReadAsync": 1
+    }
+  },
+  "discovery": {
+    "clean_stream": {
+      "pass_ms_p50": 176.5,
+      "pass_ms_p95": 255.8,
+      "operations_per_pass": 13
+    },
+    "after_one_executed_recovery": {
+      "pass_ms_p50": 291.9,
+      "pass_ms_p95": 400.9,
+      "operations_per_pass": 12
+    },
+    "recovery_records_archive": 7,
+    "stop_records_archive": 1
+  }
+}

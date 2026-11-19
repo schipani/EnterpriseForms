@@ -1,0 +1,121 @@
+{
+  "measurement": "SEC-BL-01 G08 / E-6 / E-7 trusted delivery receipt cost",
+  "stores": "PostgreSQL 18.0 \u002B Azurite 3.9.0 (two instances), loopback, single process",
+  "measured_utc": "2026-11-19T12:10:22.4441673\u002B00:00",
+  "authorization_entries": 64,
+  "iterations": 200,
+  "gate": {
+    "before_pending_count_only": {
+      "samples": 200,
+      "p50_ms": 1.974,
+      "p95_ms": 2.415,
+      "p99_ms": 2.637,
+      "mean_ms": 1.991
+    },
+    "after_warm_receipt_cached": {
+      "samples": 200,
+      "p50_ms": 4.117,
+      "p95_ms": 5.04,
+      "p99_ms": 5.834,
+      "mean_ms": 6.913
+    },
+    "after_cold_receipt_established": {
+      "samples": 200,
+      "p50_ms": 126.177,
+      "p95_ms": 150.053,
+      "p99_ms": 170.283,
+      "mean_ms": 129.984
+    },
+    "warm_incremental_p50_ms": 2.143,
+    "cold_store_operations_per_verification": 10,
+    "cold_store_operations_by_method": {
+      "archive.ListMetaAsync": 2,
+      "archive.ReadEntryAsync": 2,
+      "archive.ReadIdentityAsync": 1,
+      "archive.ReadStopMarkersAsync": 1,
+      "checkpoints.ReadAsync": 1,
+      "provisioning.ReadRecordAsync": 1,
+      "store.ListAsync": 2
+    }
+  },
+  "new_head_refresh": {
+    "first_evaluation_after_delivery": {
+      "samples": 20,
+      "p50_ms": 126.346,
+      "p95_ms": 169.528,
+      "p99_ms": 849.652,
+      "mean_ms": 166.65
+    },
+    "second_evaluation": {
+      "samples": 20,
+      "p50_ms": 3.523,
+      "p95_ms": 4.968,
+      "p99_ms": 4.978,
+      "mean_ms": 3.803
+    },
+    "note": "each new head is AwaitingArchive until delivered (asserted), then needs exactly one receipt establishment"
+  },
+  "concurrency_warm": {
+    "workers": 16,
+    "evaluations": 400,
+    "wall_ms": 422,
+    "evaluations_per_second": 947.8,
+    "latency": {
+      "samples": 400,
+      "p50_ms": 7.288,
+      "p95_ms": 12.264,
+      "p99_ms": 13.603,
+      "mean_ms": 8.001
+    }
+  },
+  "concurrency_cold": {
+    "workers": 16,
+    "evaluations": 400,
+    "wall_ms": 50563.6,
+    "evaluations_per_second": 7.9,
+    "latency": {
+      "samples": 400,
+      "p50_ms": 1947.025,
+      "p95_ms": 2208.702,
+      "p99_ms": 3197.987,
+      "mean_ms": 2015.766
+    }
+  },
+  "content_release_check": {
+    "before_row_state_only": {
+      "samples": 200,
+      "p50_ms": 1.907,
+      "p95_ms": 2.541,
+      "p99_ms": 3.212,
+      "mean_ms": 1.968
+    },
+    "after_warm": {
+      "samples": 200,
+      "p50_ms": 1.966,
+      "p95_ms": 2.727,
+      "p99_ms": 3.448,
+      "mean_ms": 2.06
+    },
+    "after_cold": {
+      "samples": 200,
+      "p50_ms": 89.943,
+      "p95_ms": 116.701,
+      "p99_ms": 133.561,
+      "mean_ms": 93.29
+    },
+    "binding_only_in_process": {
+      "samples": 200,
+      "p50_ms": 0.002,
+      "p95_ms": 0.003,
+      "p99_ms": 0.005,
+      "mean_ms": 0.004
+    },
+    "note": "checkpoint lookup \u002B release decision only; HMAC/manifest verification of the content itself is unchanged and not included"
+  },
+  "cache": {
+    "shared_verifier_cached_receipts": 22,
+    "shared_verifier_store_verifications": 23,
+    "limit": 200000,
+    "current_state_max_age_ms": 1000
+  }
+}

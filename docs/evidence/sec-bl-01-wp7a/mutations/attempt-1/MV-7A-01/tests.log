@@ -1,0 +1,397 @@
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(stream: "content") (754ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_SUCCESSOR_EVIDENCE"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:320
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(stream: "audit") (5ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_SUCCESSOR_EVIDENCE"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:320
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(stream: "authorization") (6ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_SUCCESSOR_EVIDENCE"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:320
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.RestoredEvidenceStaysRefusedUntilARestart(stream: "content") (8ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.RestoredEvidenceStaysRefusedUntilARestart(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:206
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.RestoredEvidenceStaysRefusedUntilARestart(stream: "authorization") (2ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.RestoredEvidenceStaysRefusedUntilARestart(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:206
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.RestoredEvidenceStaysRefusedUntilARestart(stream: "audit") (4ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_EVIDENCE_WITHDRAWN"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.RestoredEvidenceStaysRefusedUntilARestart(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:206
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "audit", attack: "instance-replaced") (10ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "authorization", attack: "instance-replaced") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "authorization", attack: "commitment-archive-deleted") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "authorization", attack: "generation-substituted") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "content", attack: "sentinel-deleted") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "authorization", attack: "object-replaced") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "audit", attack: "generation-substituted") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "audit", attack: "commitment-store-deleted") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "authorization", attack: "commitment-store-deleted") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "authorization", attack: "commitment-modified") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "audit", attack: "commitment-archive-deleted") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "content", attack: "commitment-modified") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "content", attack: "commitment-archive-deleted") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "audit", attack: "sentinel-deleted") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "content", attack: "instance-replaced") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "authorization", attack: "object-deleted") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "authorization", attack: "pin-record-deleted") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "content", attack: "generation-substituted") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "audit", attack: "object-deleted") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "content", attack: "object-deleted") (3ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "content", attack: "pin-record-deleted") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "content", attack: "object-replaced") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "content", attack: "commitment-store-deleted") (14ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "audit", attack: "object-replaced") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "authorization", attack: "sentinel-deleted") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "audit", attack: "commitment-modified") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream: "audit", attack: "pin-record-deleted") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:186
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(stream: "audit") (21ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_STOP_UNRESOLVED"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(stream: "authorization") (3ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_STOP_UNRESOLVED"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(stream: "content") (1ms)
+  Assert.Equal() Failure: Strings differ
+                      (pos 8)
+  Expected: "RECEIPT_STOP_UNRESOLVED"
+  Actual:   "RECEIPT_VERIFIED"
+                      (pos 8)
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(stream: "authorization") (23ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Tuple (Unavailable, "RECEIPT_STORE_UNAVAILABLE")
+  Actual:   Tuple (Verified, "RECEIPT_VERIFIED")
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:297
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(stream: "content") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Tuple (Unavailable, "RECEIPT_STORE_UNAVAILABLE")
+  Actual:   Tuple (Verified, "RECEIPT_VERIFIED")
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:297
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(stream: "audit") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Tuple (Unavailable, "RECEIPT_STORE_UNAVAILABLE")
+  Actual:   Tuple (Verified, "RECEIPT_VERIFIED")
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:297
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "authorization", attack: "commitment-modified") (14ms)
+  commitment-modified
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "audit", attack: "object-replaced") (12ms)
+  object-replaced
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "authorization", attack: "sentinel-deleted") (1ms)
+  sentinel-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "audit", attack: "commitment-archive-deleted") (2ms)
+  commitment-archive-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "content", attack: "object-replaced") (2ms)
+  object-replaced
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "authorization", attack: "pin-record-deleted") (2ms)
+  pin-record-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "audit", attack: "instance-replaced") (2ms)
+  instance-replaced
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "content", attack: "commitment-modified") (2ms)
+  commitment-modified
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "content", attack: "commitment-store-deleted") (2ms)
+  commitment-store-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "authorization", attack: "instance-replaced") (2ms)
+  instance-replaced
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "audit", attack: "commitment-modified") (2ms)
+  commitment-modified
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "audit", attack: "generation-substituted") (11ms)
+  generation-substituted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "audit", attack: "object-deleted") (2ms)
+  object-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "content", attack: "instance-replaced") (2ms)
+  instance-replaced
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "content", attack: "generation-substituted") (2ms)
+  generation-substituted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "authorization", attack: "commitment-archive-deleted") (3ms)
+  commitment-archive-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "content", attack: "commitment-archive-deleted") (2ms)
+  commitment-archive-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "authorization", attack: "object-deleted") (1ms)
+  object-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "authorization", attack: "commitment-store-deleted") (12ms)
+  commitment-store-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "authorization", attack: "generation-substituted") (1ms)
+  generation-substituted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "authorization", attack: "object-replaced") (2ms)
+  object-replaced
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "content", attack: "pin-record-deleted") (1ms)
+  pin-record-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "audit", attack: "commitment-store-deleted") (7ms)
+  commitment-store-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "content", attack: "sentinel-deleted") (1ms)
+  sentinel-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "audit", attack: "pin-record-deleted") (1ms)
+  pin-record-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "content", attack: "object-deleted") (1ms)
+  object-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream: "audit", attack: "sentinel-deleted") (1ms)
+  sentinel-deleted
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnUnchangedHeadIsReEstablishedAfterEveryBound(stream: "authorization") (3ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnUnchangedHeadIsReEstablishedAfterEveryBound(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:336
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnUnchangedHeadIsReEstablishedAfterEveryBound(stream: "audit") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnUnchangedHeadIsReEstablishedAfterEveryBound(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:336
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnUnchangedHeadIsReEstablishedAfterEveryBound(stream: "content") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnUnchangedHeadIsReEstablishedAfterEveryBound(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:336
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(stream: "authorization") (13ms)
+  archive-commitment
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:244
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(stream: "audit") (2ms)
+  archive-commitment
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:244
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(stream: "content") (2ms)
+  archive-commitment
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:244
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 72
+  succeeded: 345
+  skipped: 0
+  duration: 2s 675ms

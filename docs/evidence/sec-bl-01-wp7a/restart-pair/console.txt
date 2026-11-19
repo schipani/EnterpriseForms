@@ -1,0 +1,22 @@
+SEC-BL-01 WP-7A: scripts/dev/sec-bl-01-wp2-azurite-integration.ps1 (local paths scrubbed)
+
+[wp2] phase before-restart: JournalVerificationAzuriteIntegrationTests
+
+Test run summary: Passed! - <repo>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 9
+  failed: 0
+  succeeded: 9
+  skipped: 0
+  duration: 10s 538ms
+[wp2] restarting both Azurite containers (same containers, same anonymous /data volumes)
+[wp2] phase after-restart: JournalVerificationAzuritePersistenceTests
+
+Test run summary: Passed! - <repo>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 1
+  failed: 0
+  succeeded: 1
+  skipped: 0
+  duration: 5s 673ms
+[wp2] containers and their anonymous volumes removed
+[wp2] exit codes: before-restart=0 after-restart=0
+exit 0

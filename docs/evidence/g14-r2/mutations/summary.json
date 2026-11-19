@@ -1,0 +1,289 @@
+{
+  "driver": "scripts/dev/g14-r2-mutations.py",
+  "layer": "IP (scratch clone, --no-incremental build, classes DPlusRecoveryTests + AuditDeliveryEnforcementTests)",
+  "results": [
+    {
+      "id": "BASELINE",
+      "attempt": "BASELINE",
+      "what": "no edit (the unmodified clone)",
+      "files": [],
+      "verdict": "PASS",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [],
+      "build_exit": 0
+    },
+    {
+      "id": "RESTORED",
+      "attempt": "RESTORED",
+      "what": "no edit (after every mutation was restored)",
+      "files": [],
+      "verdict": "PASS",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-01",
+      "attempt": "SR-MV-01",
+      "what": "the lift rests on the execution record alone: no authorization (no approvals, rejections or cancellations) is required for the lift",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryLedger.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt03AnExecutionRecordOrAStatementAloneLiftsNothing",
+        "DPlusRecoveryTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "DPlusRecoveryTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-02",
+      "attempt": "SR-MV-02",
+      "what": "decision signatures are not verified (the ES256 check is removed from the verifier used on every pass and at execution)",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryApprovals.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt04OneApprovalOrTwoFromTheSameApproverOrAnUnconfiguredKeyIsNotAuthorized"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-03",
+      "attempt": "SR-MV-03",
+      "what": "two approvals from the same approver id count as two",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryApprovals.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt04OneApprovalOrTwoFromTheSameApproverOrAnUnconfiguredKeyIsNotAuthorized"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-04",
+      "attempt": "SR-MV-04",
+      "what": "the stop-set binding is ignored: any executed recovery of the (organization, stream) covers every stop record",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryLedger.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt24AStopRecordNotInTheStatementKeepsTheStreamStopped"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-05",
+      "attempt": "SR-MV-05",
+      "what": "an AuthorityDb row code DPLUS_RECOVERY_AUTHORIZED:* is treated as a lift",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt24AStopRecordNotInTheStatementKeepsTheStreamStopped",
+        "DPlusRecoveryTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-06",
+      "attempt": "SR-MV-06",
+      "what": "archive presence of the failed revision resolves its stop records",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "DPlusRecoveryTests.Srt33ArchivePresenceOfTheFailedRevisionResolvesNothing",
+        "DPlusRecoveryTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-07",
+      "attempt": "SR-MV-07",
+      "what": "the executor skips the fresh evidence-snapshot comparison",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusStreamRecoveryService.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt17EvidenceChangedBeforeExecutionFailsTheRecovery(change:"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-08",
+      "attempt": "SR-MV-08",
+      "what": "D+ skips the comparison with the statement expectation at the recovered revision",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt18EvidenceChangedAfterExecutionIsAGenerationOneMismatch"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-09",
+      "attempt": "SR-MV-09",
+      "what": "the execution record is written before the row hint (the lift can take effect before the hint and after a terminated hint write)",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusStreamRecoveryService.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-10",
+      "attempt": "SR-MV-10",
+      "what": "stops and commitments always use generation 0 (the generation-0 marker key is reused after a recovery)",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt01AnAuthorizedFalseAlarmRecoveryDeliversTheRevisionAndPreservesTheStopRecords",
+        "DPlusRecoveryTests.Srt02AnAuthorizedAnchoredRestoreCreatesThePredecessorAndDeliversTheRevision",
+        "DPlusRecoveryTests.Srt10RemovingAnApproverKeyAfterRecoveryReStopsTheStream",
+        "DPlusRecoveryTests.Srt11ARetiredKeyStillVerifiesEarlierApprovalsButNoNewOnes",
+        "DPlusRecoveryTests.Srt12RecordsCopiedToAnotherOrganizationOrRevisionResolveNothing",
+        "DPlusRecoveryTests.Srt14ASecondRecoveryOfTheSameStopSetFails",
+        "DPlusRecoveryTests.Srt15ANewFailureAfterRecoveryIsAGenerationOneStop",
+        "DPlusRecoveryTests.Srt16RecoveryIsIsolatedByOrganizationAndStream",
+        "DPlusRecoveryTests.Srt18EvidenceChangedAfterExecutionIsAGenerationOneMismatch",
+        "DPlusRecoveryTests.Srt25ConcurrentExecutionOfTheSameRecoveryIsIdempotent",
+        "DPlusRecoveryTests.Srt26AnInterruptedExecutionLiftsNothingUntilTheExecutionRecordExists",
+        "DPlusRecoveryTests.Srt27DerivedRecoveryStateSurvivesARestart",
+        "DPlusRecoveryTests.Srt28AnEntryAboveALiftedRevisionIsHeldUntilTheRevisionIsDelivered",
+        "DPlusRecoveryTests.Srt30VerificationStoreOutagesAreInconclusiveNeverALift",
+        "DPlusRecoveryTests.Srt34DeletingRecoveryRecordsFromBothStoresReStopsTheStream(record:",
+        "DPlusRecoveryTests.Srt35ResidualDeletingACancellationFromBothStoresAndForgingAnExecutionLifts"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-10",
+      "attempt": "SR-MV-10-attempt1-build-failed",
+      "what": "stops and commitments always use generation 0 (the generation-0 marker key is reused after a recovery)",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "verdict": "INCONCLUSIVE (build failed)",
+      "restored": true,
+      "total": null,
+      "failed_tests": [],
+      "build_exit": 1
+    },
+    {
+      "id": "SR-MV-11",
+      "attempt": "SR-MV-11",
+      "what": "W2-S: D+ evaluates when the commitment could not be established",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt42NoEvaluationWithoutADurableCommitment"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-12",
+      "attempt": "SR-MV-12",
+      "what": "W2-S: a differing or contradictory commitment is ignored (evaluated as if it matched)",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/ArchiveProcessor.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "AuditDeliveryEnforcementTests.W2SDetectsEvidenceReplacedAfterATerminationBeforeAnyDurableStopRecord",
+        "DPlusRecoveryTests.RemovingBothStopRecordsNoLongerResumesDeliveryWhenTheEvidenceChanged",
+        "DPlusRecoveryTests.Srt43ContradictoryCommitmentCopiesStopTheStream",
+        "DPlusRecoveryTests.Srt45ARuleSetVersionDifferenceIsTreatedAsAChange"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-13",
+      "attempt": "SR-MV-13",
+      "what": "rejections and cancellations are ignored",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryApprovals.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt07ARejectionOrCancellationIsFinal(decision:"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-14",
+      "attempt": "SR-MV-14",
+      "what": "SR-C1 accepts a present predecessor (an overwrite is attempted)",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusStreamRecoveryService.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt20AnchoredRestoreNeverOverwritesAPresentPredecessor"
+      ],
+      "build_exit": 0
+    },
+    {
+      "id": "SR-MV-15",
+      "attempt": "SR-MV-15",
+      "what": "the synthetic approval mode is accepted outside Development/Testing",
+      "files": [
+        "src/authority/AuthorizationAuthority.Application/Features/Journal/Recovery/DPlusRecoveryApprovals.cs"
+      ],
+      "verdict": "DETECTED",
+      "restored": true,
+      "total": 94,
+      "failed_tests": [
+        "DPlusRecoveryTests.Srt09UnavailableModeRefusesAndSyntheticModeIsRefusedOutsideDevelopment"
+      ],
+      "build_exit": 0
+    }
+  ]
+}

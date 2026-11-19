@@ -1,0 +1,9 @@
+Running tests from <repo>\tests\architecture\EnterpriseForms.ArchitectureTests\bin\Debug\net10.0\EnterpriseForms.ArchitectureTests.dll (net10.0|x64)
+<repo>\tests\architecture\EnterpriseForms.ArchitectureTests\bin\Debug\net10.0\EnterpriseForms.ArchitectureTests.dll (net10.0|x64) passed (1m 01s 910ms)
+
+Test run summary: Passed!
+  total: 224
+  failed: 0
+  succeeded: 224
+  skipped: 0
+  duration: 1m 03s 843ms

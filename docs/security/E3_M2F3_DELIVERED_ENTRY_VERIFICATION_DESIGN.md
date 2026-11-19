@@ -9,6 +9,7 @@
 | Nature | Source inspection at `b50264e` plus the executed FU-M2f3-01 characterization tests. Statements about the proposed design are design claims, **not verified behaviour**; nothing here was implemented or measured |
 | Review | Owner-led. Not an independent security review |
 | Owner decision 2026-11-17 (Option A) | Preserved as a **candidate architecture for future consideration**; not approved and not to be implemented under E3-M2f-3. Tracked with M2F3-43 (FAILED) and R-FU-1 as **SEC-BL-01** (`SECURITY_BACKLOG.md`); OD-DV-1..7 remain open |
+| Owner decision 2026-11-17 (C-155), later the same day | After the owner-commissioned Design D Security Review and D-R Contract Readiness Report, the owner **approved the D-R architectural dispositions** (OD-DV-1..7, Q-1..Q-8, N-1..N-5) and authorized WP-0 (documentation only). **Design D as written below is superseded by D-R**; the authoritative contract is `SEC_BL_01_DR_CONTRACT_CLOSURE.md`. The text of §1–§9 is kept unchanged as the historical candidate; dated notes mark where it is corrected; §10 summarizes the amendments. Approved directions only: nothing is implemented, SEC-BL-01 and PD-15 stay **open** |
 
 ---
 
@@ -24,6 +25,8 @@
 | **Platform journal rollback check** (`PlatformJournal.RefusalAsync`, C8 M2) | Reads the archive at `head + 1`; if it exists, the platform journal is behind the archive (restore or rollback) and platform operations are refused | Platform journal only; not applied to organization streams. It is the closest existing precedent for an archive-anchored check |
 | **Confidential Ledger** | Specified by G14 and PB-12 for compact anchors | **No ledger anchoring of journal heads is implemented** in the Authority |
 | **Search-access journal verifier** (`SearchAccessJournalVerifier`) | Verifies authorization-stream events one by one against a checkpoint digest (digest, envelope fields, chain link) | Authorization stream only; the checkpoint lives in AuthorityDb |
+
+*(Note 2026-11-17, C-155, correction D-1/D-4: "class A4" above means assumption A4 of `E3_M2F3_CONTRACT_CLOSURE.md` §5.4, not attacker class A4 of the E-3 design §7. For SEC-BL-01 the attackers are J1–J6 (`SEC_BL_01_DR_CONTRACT_CLOSURE.md` §2): rewriting rows, digests, links and the organization head needs only **J1**, the Authority runtime database credential (table-wide UPDATE and INSERT, `AuthorityRuntimeGrants`); deletion needs J2.)*
 
 ## 2. Precise current coverage (seven cases)
 
@@ -90,6 +93,8 @@ The envelope digest of entry *k* covers `previous_digest_hex`, which is the dige
 | Isolation | Per organization; a finding affects only that organization; no state of any other organization is read or written |
 | Not covered | The undelivered tail (R-M2f3-6); a compromised archive or archive administrator; a compromised verifier identity; evidence never written (crash windows, D-5) |
 
+*(Note 2026-11-17, C-155, correction D-5: the Detection and Latency claims above do **not** hold for design D as written. **W-1 (rewrite-and-extend):** `ArchiveProcessor` delivers a pending row without checking its link to the archived predecessor, so a J1 actor can consistently rewrite delivered rows and let the next genuine append, which chains onto the forged history, be delivered; a full walk anchored only at the archive head then passes. **W-2 (forged row below a delivered anchor):** a forged row marked `Anchored` is never delivered, later genuine rows chain onto it and are delivered, and a walk that reads the archive only at its ends cannot see that the archive lacks that revision. D-R closes both with mandatory delivery-time chain enforcement (D+), complete archive enumeration and a byte comparison of every archived revision (`SEC_BL_01_DR_CONTRACT_CLOSURE.md` §5, §6.2, §8).)*
+
 ### 4.4 Privileges, storage, operations
 
 | Item | Requirement |
@@ -99,6 +104,8 @@ The envelope digest of entry *k* covers `previous_digest_hex`, which is the dige
 | Storage | One checkpoint object per organization and stream per successful walk (about 200 bytes); findings rare. Retention follows the archive's legal-hold and retention policy |
 | Operational cost | Not measured. A full walk reads N audit rows per organization (millions for the mature-organization case of E3-M2f-3G); archive reads O(log N) per sweep. Must be benchmarked on disposable PostgreSQL and Azure before periods are fixed |
 | Monitoring | Sweep lag, last verified revision per organization, findings, archive unavailability (the walk is inconclusive, never "verified", when the archive cannot be read) |
+
+*(Note 2026-11-17, C-155, correction D-5: the AuthorityDb row above lists only SELECT; the runtime role also holds table-wide **UPDATE and INSERT** on `security_journal_entries` (no DELETE, no immutability trigger), which is why J1 suffices for alteration and insertion. D-R requires a **dedicated** read-only verifier identity (OD-DV-5) and a separately controlled checkpoint store; a separate Blob container under the same credential is not independent (contract §7.4, §8.5). Journal immutability hardening is the separate G08 increment M-6 (contract §11).)*
 
 ## 5. Tampering versus legitimate restore divergence
 
@@ -143,6 +150,24 @@ The FU-M2f3-01 expected-gap tests would become detection tests against D; a D ga
 | OD-DV-6 | Periods and targets: `T_inc`, `T_full`, maximum walk duration, and the detection-latency objective, after measurement |
 | OD-DV-7 | Whether to pursue D+ (chain check at delivery) as separate hardening of R-M2f3-6 |
 
+*(Note 2026-11-17, C-155: OD-DV-1..OD-DV-7 were decided by the owner as recorded in `SEC_BL_01_DR_CONTRACT_CLOSURE.md` §1. In particular OD-DV-7: D+ is **mandatory** (not optional hardening) for every stream once that stream is authorized for D+; it does not close R-M2f3-6.)*
+
 ## 9. Not claimed
 
 No implementation, test or measurement of design D or D+; no change to M2F3-43, any security contract or any product code; no G14 recovery, BD-1 or BD-2 design; no claim that the development archives are independent; no Azure, persistent or production evidence; no independent review.
+
+## 10. D-R amendments (owner decision C-155, 2026-11-17)
+
+Summary only; `SEC_BL_01_DR_CONTRACT_CLOSURE.md` is authoritative.
+
+| Area | Design D (above) | D-R |
+|---|---|---|
+| Delivery-time chain check | Optional hardening "D+" (§4, OD-DV-7) | **M-1, mandatory** once a stream is authorized: predecessor existence, link, envelope/column consistency, genesis, sentinel; refusal stops that stream's delivery; outages retry; phased: `audit` first (P1), `authorization`/`content` after a separate owner gate (P2). Interim conflict CF-1 recorded (contract §5) |
+| Archive coverage | Galloping head search, archive reads at the walk ends only | **M-2:** complete prefix enumeration (unexpected objects, gaps, duplicates, objects beyond the head) and byte comparison of every archived revision in range; probing is never a completeness proof (contract §6.2, §8) |
+| Progress marker | Create-only checkpoint in an archive namespace; discovery unspecified | **M-3:** separately controlled checkpoint store, monotonic sequence, checkpoint chain; production head anchored in Confidential Ledger. Rollback classes: corruption (detected), rollback with an independent anchor (production only), rollback without one (**undetectable**, Development/Testing) (contract §7) |
+| Findings | TAMPER, TAMPER_OR_RESTORE_COLLISION, BEHIND_ARCHIVE | **M-4:** security findings (`CHAIN_INTEGRITY_FAILURE` subtypes, `ANCHOR_MISMATCH`, `FAKE_RECEIPT`, `ARCHIVE_REGRESSION`, `ARCHIVE_DISCONTINUITY`, `ARCHIVE_UNEXPECTED_OBJECT`, `ARCHIVE_DUPLICATE`, `BEHIND_ARCHIVE`, checkpoint findings) versus operational findings (`DELIVERY_LAG`, unavailability, staleness) and Inconclusive sweeps (contract §9) |
+| Baseline | Not specified | **M-5:** full reconciliation; outcomes CLEAN, EXCEPTION_ACCEPTED (reduced assurance, carried forward), FAILED, INCONCLUSIVE; never repairs (contract §10) |
+| Response | Alert-only by default; quarantine per OD-DV-3 | Verifier alert-only; D+ stops the stream; **no new automatic quarantine**; `ARCHIVE_CHAIN_BREAK` reserved, not activated (contract §9.4) |
+| Attackers | "Privileged AuthorityDb writer (A4)" | J1–J6 and JP with per-class guarantees; no protection when one actor controls evidence and anchor (contract §2) |
+| Journal hardening | — | **M-6**, a separate G08 increment, design analysis only (contract §11) |
+| Acceptance | Outline (§7) | ADV-01..ADV-20, MV-01..MV-18, EG-1..EG-3, two PostgreSQL runs of record, SEC-P01..SEC-P12 and M2F3-31/-43/-54/-57 regressions (contract §13) |

@@ -233,8 +233,10 @@ public sealed class CapabilityRefusalEvidenceNoSummaryTests
             }
         }
 
-        // 12. Archive delivery appends nothing to the journal either.
-        Assert.Empty(await ledger.Run("archive", () => new ArchiveProcessor(world.Store, new InMemorySecurityEventArchive(), world.Clock).ProcessOrganizationAsync(org, Ct), null));
+        // 12. Archive delivery appends nothing to the journal either (WP-5a: to a provisioned archive, so D+ delivers).
+        var archive = new InMemorySecurityEventArchive();
+        await world.ProvisionArchiveAsync(archive);
+        Assert.Empty(await ledger.Run("archive", () => new ArchiveProcessor(world.Store, archive, world.Clock, durability: world.DPlus.Durability).ProcessOrganizationAsync(org, Ct), null));
 
         // ---- the whole history ----
         var written = ledger.Steps.SelectMany(s => s.Added).ToList();

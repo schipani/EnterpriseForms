@@ -1,0 +1,28 @@
+{
+  "id": "MV-12",
+  "what": "DP-7: D+ treats an archive outage on the predecessor read as \"absent\"",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/AuditDeliveryEnforcement.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/AuditDeliveryEnforcement.cs": "9406176b3c5736b0d26abab86070a9aad60935fd3c08475e57e638f9947190ec"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 44.7,
+    "exit": 2,
+    "seconds": 5.4,
+    "kind": "ip",
+    "total": 337,
+    "succeeded": 334,
+    "failed": [
+      "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AnArchiveOutageLeavesTheEntryPendingWithoutFindingAlertOrQuarantine(failing:",
+      "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AnArchiveOutageLeavesTheEntryPendingWithoutFindingAlertOrQuarantine(failing:",
+      "AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AnArchiveOutageLeavesTheEntryPendingWithoutFindingAlertOrQuarantine(failing:"
+    ]
+  },
+  "seconds": 50.0
+}

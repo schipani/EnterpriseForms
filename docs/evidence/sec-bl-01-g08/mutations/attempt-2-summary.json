@@ -1,0 +1,71 @@
+[
+  {
+    "id": "BASELINE-PG",
+    "what": "no edit (PostgreSQL gate)",
+    "files": [],
+    "original_sha256": {},
+    "restored": true,
+    "verdict": "PASS",
+    "result": {
+      "build": 0,
+      "build_seconds": 36.2,
+      "exit": 0,
+      "seconds": 20.9,
+      "kind": "pg",
+      "total": 5,
+      "succeeded": 5,
+      "failed": []
+    },
+    "seconds": 57.1
+  },
+  {
+    "id": "MV-G8-DB5",
+    "what": "grant: the runtime role gets table-wide UPDATE on the journal",
+    "files": [
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityRuntimeGrants.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityRuntimeGrants.cs": "99fd326491526cb248ea3464d63b85796cdc44befad462daded2fbbbd6c9bf30"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 36.2,
+      "exit": 2,
+      "seconds": 20.6,
+      "kind": "pg",
+      "total": 5,
+      "succeeded": 4,
+      "failed": [
+        "AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheRuntimeCredentialCannotRewriteResetRenumberDeleteOrTruncateTheJournal"
+      ]
+    },
+    "seconds": 56.9
+  },
+  {
+    "id": "MV-G8-DB6",
+    "what": "grant: the verifier role can insert into the journal",
+    "files": [
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityRuntimeGrants.cs"
+    ],
+    "original_sha256": {
+      "src/authority/AuthorizationAuthority.Infrastructure/Persistence/AuthorityRuntimeGrants.cs": "99fd326491526cb248ea3464d63b85796cdc44befad462daded2fbbbd6c9bf30"
+    },
+    "restored": true,
+    "verdict": "DETECTED",
+    "result": {
+      "build": 0,
+      "build_seconds": 36.3,
+      "exit": 2,
+      "seconds": 20.5,
+      "kind": "pg",
+      "total": 5,
+      "succeeded": 4,
+      "failed": [
+        "AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheDedicatedVerifierLoginIsReadOnlyAndRunsTheVerifier"
+      ]
+    },
+    "seconds": 56.8
+  }
+]

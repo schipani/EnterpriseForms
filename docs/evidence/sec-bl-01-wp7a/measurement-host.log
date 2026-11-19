@@ -1,0 +1,33 @@
+﻿start 2026-11-19T11:25:01.4536741Z
+[wp4] AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests
+[wp4] containers and their anonymous volumes removed
+[wp4] exit code 0
+measurement exit 0 2026-11-19T12:12:15.1358936Z
+[wp4] AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests
+[wp4] containers and their anonymous volumes removed
+[wp4] exit code 0
+maxage0 exit 0 2026-11-19T12:13:06.7267870Z
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization
+[slow] still running after 1m 00s: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization (AuthorizationAuthority.Tests.dll|net10.0|x64)
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization
+[slow] still running after 2m 00s: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization (AuthorizationAuthority.Tests.dll|net10.0|x64)
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization
+[slow] still running after 4m 00s: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization (AuthorizationAuthority.Tests.dll|net10.0|x64)
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.MeasureAcDr11ScaleOrganization (5m 15s 797ms)
+
+Test run summary: Passed! - <user-profile>\AppData\Local\Temp\secbl01-acdr11-bin-eba5dc9a2a80490a8451579560d8f34c\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 1
+  failed: 0
+  succeeded: 1
+  skipped: 0
+  duration: 5m 16s 611ms
+exit 0
+acdr11 2000 exit 0 2026-11-19T12:18:33.6244544Z
+acdr11 10000 exit -1 2026-11-19T13:26:22.0056620Z

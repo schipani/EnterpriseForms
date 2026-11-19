@@ -1,0 +1,26 @@
+{
+  "id": "MV-7A-06",
+  "what": "GT-2/RV-4 (integrated): the gate asks for an entry receipt instead of a stream-head receipt",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Common/OrganizationGate.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Common/OrganizationGate.cs": "143efa1d33f8888e3a18992671fe860ae4133f673db31e7a1a4125863f6f70ad"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 34.1,
+    "exit": 2,
+    "seconds": 3.8,
+    "kind": "ip",
+    "total": 424,
+    "succeeded": 423,
+    "failed": [
+      "AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.TheGateRefusesAHeadWhoseSuccessorIsArchived"
+    ]
+  },
+  "seconds": 37.9
+}

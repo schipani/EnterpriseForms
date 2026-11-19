@@ -86,7 +86,9 @@ public sealed class CapabilityRefusalEvidenceRecorderTests
         var (world, org, recorder, _) = Setup();
         await Refuse(recorder, org);
         Assert.Equal(ArchiveDeliveryStates.Pending, Assert.Single(world.Journal).ArchiveDeliveryState);
-        Assert.Equal(1, await new ArchiveProcessor(world.Store, new InMemorySecurityEventArchive(), world.Clock).ProcessOrganizationAsync(org, Ct));
+        var archive = new InMemorySecurityEventArchive();
+        await world.ProvisionArchiveAsync(archive); // WP-5a: sentinel and the archived predecessor (D+ on the audit stream)
+        Assert.Equal(1, await new ArchiveProcessor(world.Store, archive, world.Clock, durability: world.DPlus.Durability).ProcessOrganizationAsync(org, Ct));
         Assert.Equal(ArchiveDeliveryStates.Anchored, Assert.Single(world.Journal).ArchiveDeliveryState); // D-3: delivery completed
         Assert.False(world.Organizations[org].IntegrityQuarantineEnabled);
     }

@@ -1,0 +1,7 @@
+Disposable security-test stack, WP-5a.2 (fresh project; down -v afterwards).
+
+Post-run journal delivery states (stream, state, error code, rows):
+audit Anchored - 15
+authorization Anchored - 59
+content Anchored - 25
+quarantined 0 of 15

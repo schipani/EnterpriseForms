@@ -1,0 +1,42 @@
+authorization commitment-disagrees below v: incremental Clean [] inconclusive=[]; full Findings [DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2..2] inconclusive=[]
+audit deleted below v: incremental Clean [] inconclusive=[]; full Findings [ARCHIVE_DISCONTINUITY/@2..2, FAKE_RECEIPT/@2..2] inconclusive=[]
+authorization digest-substituted below v: incremental Clean [] inconclusive=[]; full Findings [ANCHOR_MISMATCH/@2..2, CHAIN_INTEGRITY_FAILURE/ENVELOPE_COLUMN_MISMATCH@2..2, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2..2, DPLUS_COMMITMENT_MISMATCH/PREDECESSOR_DIGEST@3..3] inconclusive=[]
+authorization identity-substituted below v: incremental Clean [] inconclusive=[]; full Findings [ANCHOR_MISMATCH/@2..2, CHAIN_INTEGRITY_FAILURE/ENVELOPE_COLUMN_MISMATCH@2..2, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2..2, DPLUS_COMMITMENT_MISMATCH/PREDECESSOR_DIGEST@3..3] inconclusive=[]
+content deleted below v: incremental Clean [] inconclusive=[]; full Findings [ARCHIVE_DISCONTINUITY/@2..2, FAKE_RECEIPT/@2..2] inconclusive=[]
+audit commitment-disagrees below v: incremental Clean [] inconclusive=[]; full Findings [DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2..2] inconclusive=[]
+content digest-substituted below v: incremental Clean [] inconclusive=[]; full Findings [ANCHOR_MISMATCH/@2..2, CHAIN_INTEGRITY_FAILURE/ENVELOPE_COLUMN_MISMATCH@2..2, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2..2, DPLUS_COMMITMENT_MISMATCH/PREDECESSOR_DIGEST@3..3] inconclusive=[]
+content replaced below v: incremental Clean [] inconclusive=[]; full Findings [ANCHOR_MISMATCH/@2..2, CHAIN_INTEGRITY_FAILURE/LINK_MISMATCH@3..3, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2..2, DPLUS_COMMITMENT_MISMATCH/PREDECESSOR_DIGEST@3..3] inconclusive=[]
+audit row-disagrees below v: incremental Clean [] inconclusive=[]; full Findings [CHAIN_INTEGRITY_FAILURE/BODY_DIGEST_MISMATCH@2..2, ANCHOR_MISMATCH/@2..2] inconclusive=[]
+authorization row-disagrees below v: incremental Clean [] inconclusive=[]; full Findings [CHAIN_INTEGRITY_FAILURE/BODY_DIGEST_MISMATCH@2..2, ANCHOR_MISMATCH/@2..2] inconclusive=[]
+authorization replaced below v: incremental Clean [] inconclusive=[]; full Findings [ANCHOR_MISMATCH/@2..2, CHAIN_INTEGRITY_FAILURE/LINK_MISMATCH@3..3, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2..2, DPLUS_COMMITMENT_MISMATCH/PREDECESSOR_DIGEST@3..3] inconclusive=[]
+authorization deleted below v: incremental Clean [] inconclusive=[]; full Findings [ARCHIVE_DISCONTINUITY/@2..2, FAKE_RECEIPT/@2..2] inconclusive=[]
+content commitment-disagrees below v: incremental Clean [] inconclusive=[]; full Findings [DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2..2] inconclusive=[]
+audit replaced below v: incremental Clean [] inconclusive=[]; full Findings [ANCHOR_MISMATCH/@2..2, CHAIN_INTEGRITY_FAILURE/LINK_MISMATCH@3..3, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2..2, DPLUS_COMMITMENT_MISMATCH/PREDECESSOR_DIGEST@3..3] inconclusive=[]
+content row-disagrees below v: incremental Clean [] inconclusive=[]; full Findings [CHAIN_INTEGRITY_FAILURE/BODY_DIGEST_MISMATCH@2..2, ANCHOR_MISMATCH/@2..2] inconclusive=[]
+audit digest-substituted below v: incremental Clean [] inconclusive=[]; full Findings [ANCHOR_MISMATCH/@2..2, CHAIN_INTEGRITY_FAILURE/ENVELOPE_COLUMN_MISMATCH@2..2, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2..2, DPLUS_COMMITMENT_MISMATCH/PREDECESSOR_DIGEST@3..3] inconclusive=[]
+content identity-substituted below v: incremental Clean [] inconclusive=[]; full Findings [ANCHOR_MISMATCH/@2..2, CHAIN_INTEGRITY_FAILURE/ENVELOPE_COLUMN_MISMATCH@2..2, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2..2, DPLUS_COMMITMENT_MISMATCH/PREDECESSOR_DIGEST@3..3] inconclusive=[]
+audit identity-substituted below v: incremental Clean [] inconclusive=[]; full Findings [ANCHOR_MISMATCH/@2..2, CHAIN_INTEGRITY_FAILURE/ENVELOPE_COLUMN_MISMATCH@2..2, DPLUS_COMMITMENT_MISMATCH/ROW_DIGEST@2..2, DPLUS_COMMITMENT_MISMATCH/PREDECESSOR_DIGEST@3..3] inconclusive=[]
+J2 phase 1 (before commitment): gate=Ready; full sweep Clean [] inconclusive=[]
+J2 phase 2 (after commitment, before delivery): gate=AwaitingArchive; incremental sweep Findings [DPLUS_COMMITMENT_MISMATCH/BEYOND_HEAD@3..3] inconclusive=[]
+J2 phase 3 (after delivery): long-lived first evaluation=Ready; closed after 821 ms (bound 1000 ms); fresh gate=AwaitingArchive; incremental sweep Findings [BEHIND_ARCHIVE/@3..3, DPLUS_COMMITMENT_MISMATCH/BEYOND_HEAD@3..3] inconclusive=[]
+phase 3 exposed through a fresh attestation: True
+authorization recovered head: JournalReceiptVerdict { Status = Verified, Code = RECEIPT_VERIFIED, StopGeneration = 1, ArchiveInstanceId = archive-01a1f372d83f722793b348f949f8a7a4, IsVerified = True }
+content recovered head: JournalReceiptVerdict { Status = Verified, Code = RECEIPT_VERIFIED, StopGeneration = 1, ArchiveInstanceId = archive-01a1f372e1e47d73b91277ae0d4e4121, IsVerified = True }
+audit object-deleted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_ARCHIVE_ABSENT
+content instance-replaced: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_INSTANCE_MISMATCH
+content store-commitment-changed: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_COMMITMENT_CONTRADICTORY
+audit archive-commitment-deleted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_COMMITMENT_MISSING
+audit store-commitment-changed: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_COMMITMENT_CONTRADICTORY
+authorization object-deleted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_ARCHIVE_ABSENT
+audit instance-replaced: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_INSTANCE_MISMATCH
+audit object-replaced: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_ARCHIVE_MISMATCH
+authorization instance-replaced: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_INSTANCE_MISMATCH
+authorization store-commitment-changed: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_COMMITMENT_CONTRADICTORY
+audit generation-substituted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_COMMITMENT_MISMATCH
+content object-replaced: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_ARCHIVE_MISMATCH
+content generation-substituted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_COMMITMENT_MISMATCH
+authorization object-replaced: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_ARCHIVE_MISMATCH
+authorization archive-commitment-deleted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_COMMITMENT_MISSING
+content archive-commitment-deleted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_COMMITMENT_MISSING
+content object-deleted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_ARCHIVE_ABSENT
+authorization generation-substituted: within bound=RECEIPT_VERIFIED; past bound head=RECEIPT_EVIDENCE_WITHDRAWN entry=RECEIPT_EVIDENCE_WITHDRAWN; fresh process=RECEIPT_COMMITMENT_MISMATCH

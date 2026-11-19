@@ -1,0 +1,22 @@
+{
+  "id": "BASELINE-ARCH",
+  "what": "no edit (architecture)",
+  "kind": "arch",
+  "files": [],
+  "original_sha256": {},
+  "restored": true,
+  "verdict": "FAIL",
+  "result": {
+    "build": 0,
+    "build_seconds": 72.1,
+    "exit": 2,
+    "seconds": 12.9,
+    "kind": "arch",
+    "total": 13,
+    "succeeded": 12,
+    "failed": [
+      "EnterpriseForms.ArchitectureTests.JournalVerificationBoundaryTests.TheVerifierAndTheBaselineHaveNoAuthorityDbWriteQuarantineSigningGateOrEntryArchiveWriteDependency"
+    ]
+  },
+  "seconds": 85.0
+}

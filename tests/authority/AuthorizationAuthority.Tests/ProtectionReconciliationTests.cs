@@ -210,7 +210,7 @@ public sealed partial class ProtectionReconciliationTests
             head.CommittedManifestRoot = manifest.MerkleRoot;
             head.SignatureKeyVersion = 1;
             State.AdvanceContentIntegrityRevision(ContentRevisionProjectionAction.AdvanceWithDerivation);
-            var checkpoint = JournalChain.Append(State, JournalStreamNames.Content, State.ContentIntegrityRevision, "ContentHeadCommitted", new { form_record_id = record, committed_content_revision = revision }, null, operation, TimeProvider.System);
+            var checkpoint = JournalChain.Append(State, JournalStreamNames.Content, State.ContentIntegrityRevision, "ContentHeadCommitted", new { form_record_id = record, committed_content_revision = revision, committed_operation_id = operation, manifest_root_hex = Convert.ToHexStringLower(manifest.MerkleRoot) }, null, operation, TimeProvider.System);
             checkpoint.ArchiveDeliveryState = ArchiveDeliveryStates.Anchored;
             Store.Journal.Add(checkpoint);
             Accepted[record] = staged;

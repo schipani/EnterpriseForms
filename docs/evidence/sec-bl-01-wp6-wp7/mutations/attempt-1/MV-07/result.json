@@ -1,0 +1,18 @@
+{
+  "id": "MV-07",
+  "what": "CK-11: the trusted anchor digest is taken from AuthorityDb (the row at v) instead of the checkpoint store",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs": "03914f5aab5a7447d95b29f8ae7f996d7d03f685dfebb24523c363b955abccbd"
+  },
+  "restored": true,
+  "verdict": "INCONCLUSIVE (build failed)",
+  "result": {
+    "build": 1,
+    "build_seconds": 9.8
+  },
+  "seconds": 9.8
+}
