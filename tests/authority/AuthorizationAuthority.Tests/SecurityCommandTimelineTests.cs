@@ -322,9 +322,36 @@ public sealed partial class SecurityCommandTimelineTests : IDisposable
         Assert.Equal((AuthorityErrorCodes.AuditViewForbidden, 403), (denied.ErrorCode, denied.HttpStatusCode));
         Assert.Equal(readsBefore, store.TimelineReads); // nothing was read for a denied caller
 
+        // CodeQL #4 remediation: the AC-8.3 route cannot request the timeline mode (its former wire value is undefined and refused),
+        // so an AC-8.3 allow alone never serves a timeline page.
         var direct = await Assert.ThrowsAsync<AuthorityException>(() => new AuditAccessService(store, new ViewAuditCheck(store, [Auditor]), new Unlimited(), new AuditAccessOptions(), telemetry, TimeProvider.System)
-            .AuthorizeAsync(Actor(Auditor), new AuditAccessRequest(Org, AuditAccessKind.CommandTimelinePage, new string('a', 64), 10, null, Guid.CreateVersion7()), Ct));
-        Assert.Equal(422, direct.HttpStatusCode); // an AC-8.3 allow alone never serves a timeline page
+            .AuthorizeAsync(Actor(Auditor), new AuditAccessRequest(Org, (AuditAccessKind)2, new string('a', 64), 10, null, Guid.CreateVersion7()), Ct));
+        Assert.Equal(422, direct.HttpStatusCode);
+    }
+
+    /// <summary>
+    /// CodeQL #4 remediation: the timeline request carries no access kind, and a caller-supplied <c>access_kind</c> property is
+    /// not bound; the mode recorded is always the server's CommandTimelinePage with served_by authority.
+    /// </summary>
+    [Fact]
+    public async Task TheTimelineModeIsSetByTheServerAndACallerSuppliedKindIsNotBound()
+    {
+        Assert.DoesNotContain(typeof(SecurityCommandTimelineRequest).GetProperties(), p => p.PropertyType == typeof(AuditAccessKind) || (p.Name.Contains("Kind", StringComparison.Ordinal) && p.Name != "Kinds"));
+        Command("RegisterTeam", "Effective", T0, committed: 2);
+        var options = new JsonSerializerOptions();
+        AuthorizationAuthority.Api.Composition.AuthorityJson.Configure(options);
+        foreach (var supplied in new[] { "ExplorerPage", "EventDetail" })
+        {
+            var json = $$"""{"organization_id":"{{Org}}","after":null,"page_size":10,"kinds":null,"states":null,"from":null,"to":null,"correlation_id":"{{Guid.CreateVersion7()}}","access_kind":"{{supplied}}"}""";
+            var request = JsonSerializer.Deserialize<SecurityCommandTimelineRequest>(json, options)!;
+            var page = await Service().ReadAsync(Actor(Auditor), request, Ct);
+            Assert.Equal("authority", page.ServedBy);
+        }
+
+        var recorded = store.Journal.Where(j => j.JournalEventKind == AuditAccessService.AuthorizedEventKind)
+            .Select(j => JsonDocument.Parse(j.JournalEventBodyJson).RootElement.GetProperty("body"))
+            .Select(b => (b.GetProperty("access_kind").GetString(), b.GetProperty("served_by").GetString())).ToList();
+        Assert.Equal([("CommandTimelinePage", "authority"), ("CommandTimelinePage", "authority")], recorded);
     }
 
     [Fact]

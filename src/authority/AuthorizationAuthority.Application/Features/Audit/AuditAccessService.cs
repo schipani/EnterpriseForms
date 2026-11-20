@@ -46,41 +46,36 @@ public sealed partial class AuditAccessService(IAuthorityStore store, IOrganizat
     [GeneratedRegex("^[0-9a-f]{64}$", RegexOptions.CultureInvariant)]
     private static partial Regex FilterDigestPattern();
 
+    /// <summary>
+    /// AC-8.3: an explorer page or an event detail for the business audit explorer. The wire kind selects only between those two
+    /// modes (<see cref="ExplorerScope"/>); no request value can select the timeline mode, which only
+    /// <see cref="AuthorizeAndReadTimelineAsync{T}"/> sets.
+    /// </summary>
     public async Task<AuditAccessDecision> AuthorizeAsync(VerifiedActor actor, AuditAccessRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(actor);
-        Validate(request);
-        if (request.AccessKind == AuditAccessKind.CommandTimelinePage)
-        {
-            // AC-8.2 pages are read inside the access transaction (AuthorizeAndReadAsync); an allow alone never serves one.
-            throw AuthorityException.Invalid("audit access: a command timeline page is authorized and read by the timeline endpoint only");
-        }
-
-        var (decision, _) = await AuthorizeCoreAsync<object?>(actor, request, null, cancellationToken).ConfigureAwait(false);
+        var scope = ExplorerScope(request);
+        var (decision, _) = await AuthorizeCoreAsync<object?>(actor, scope, null, cancellationToken).ConfigureAwait(false);
         return decision;
     }
 
     /// <summary>
     /// C8 M4-3 (AC-8.2, contract §5.2): the §5.3 protocol with the page read inside the same AuthorityDb transaction, under the
     /// organization lock and the TC-3 bounds, after the revision comparison and before the evidence is appended. The page and the
-    /// entry come from one AuthorityDb snapshot (not SpiceDB); a page is returned only when the entry committed.
+    /// entry come from one AuthorityDb snapshot (not SpiceDB); a page is returned only when the entry committed. The mode is
+    /// always <see cref="AuditAccessMode.CommandTimelinePage"/>, set here and never taken from the request.
     /// </summary>
-    public async Task<(AuditAccessDecision Decision, T Page)> AuthorizeAndReadAsync<T>(VerifiedActor actor, AuditAccessRequest request,
+    public async Task<(AuditAccessDecision Decision, T Page)> AuthorizeAndReadTimelineAsync<T>(VerifiedActor actor, AuditTimelineAccess request,
         Func<IAuthorityScope, OrganizationAuthorizationState, CancellationToken, Task<T>> read, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(actor);
         ArgumentNullException.ThrowIfNull(read);
-        Validate(request);
-        if (request.AccessKind != AuditAccessKind.CommandTimelinePage)
-        {
-            throw AuthorityException.Invalid("audit access: only a command timeline page is read by the Authority");
-        }
-
-        var (decision, page) = await AuthorizeCoreAsync(actor, request, read, cancellationToken).ConfigureAwait(false);
+        var scope = TimelineScope(request);
+        var (decision, page) = await AuthorizeCoreAsync(actor, scope, read, cancellationToken).ConfigureAwait(false);
         return (decision, page!);
     }
 
-    private async Task<(AuditAccessDecision Decision, T? Page)> AuthorizeCoreAsync<T>(VerifiedActor actor, AuditAccessRequest request,
+    private async Task<(AuditAccessDecision Decision, T? Page)> AuthorizeCoreAsync<T>(VerifiedActor actor, AccessScope request,
         Func<IAuthorityScope, OrganizationAuthorizationState, CancellationToken, Task<T>>? read, CancellationToken cancellationToken)
     {
         if (!rateLimiter.TryAcquire(request.OrganizationId, actor))
@@ -120,19 +115,52 @@ public sealed partial class AuditAccessService(IAuthorityStore store, IOrganizat
         throw new AuthorityException(AuthorityErrorCodes.AuditEvidenceBusy, 503, true, "audit evidence could not be recorded within the bounded attempts; nothing was served");
     }
 
-    private static void Validate(AuditAccessRequest request)
+    /// <summary>
+    /// The audit-explorer route's mode: ExplorerPage or EventDetail only. Any other wire value (including an undefined numeric
+    /// value) is refused before any check, so a caller can never reach the timeline mode, or a mode without its shape rules.
+    /// </summary>
+    private static AccessScope ExplorerScope(AuditAccessRequest? request)
     {
-        if (request is null || request.OrganizationId == Guid.Empty || request.CorrelationId == Guid.Empty || !Enum.IsDefined(request.AccessKind)
-            || request.FilterDigest is null || !FilterDigestPattern().IsMatch(request.FilterDigest))
+        if (request is null || request.FilterDigest is null)
         {
             throw AuthorityException.Invalid("audit access: organization, correlation id, a known access kind and a 64-character lower-case hex filter digest are required");
         }
 
-        var valid = request.AccessKind switch
+        var mode = request.AccessKind switch
         {
-            AuditAccessKind.ExplorerPage => request.PageSize is >= 1 and <= MaximumPageSize && request.AuditEventId is null,
-            AuditAccessKind.EventDetail => request.PageSize == 1 && request.AuditEventId is { } id && id != Guid.Empty,
-            AuditAccessKind.CommandTimelinePage => request.PageSize is >= 1 and <= MaximumPageSize && request.AuditEventId is null,
+            AuditAccessKind.ExplorerPage => AuditAccessMode.ExplorerPage,
+            AuditAccessKind.EventDetail => AuditAccessMode.EventDetail,
+            _ => throw AuthorityException.Invalid("audit access: the access kind must be ExplorerPage or EventDetail"),
+        };
+        var scope = new AccessScope(mode, request.OrganizationId, request.FilterDigest, request.PageSize, request.AuditEventId, request.CorrelationId);
+        ValidateShape(scope);
+        return scope;
+    }
+
+    private static AccessScope TimelineScope(AuditTimelineAccess? request)
+    {
+        if (request is null || request.FilterDigest is null)
+        {
+            throw AuthorityException.Invalid("audit access: organization, correlation id and a 64-character lower-case hex filter digest are required");
+        }
+
+        var scope = new AccessScope(AuditAccessMode.CommandTimelinePage, request.OrganizationId, request.FilterDigest, request.PageSize, null, request.CorrelationId);
+        ValidateShape(scope);
+        return scope;
+    }
+
+    private static void ValidateShape(AccessScope scope)
+    {
+        if (scope.OrganizationId == Guid.Empty || scope.CorrelationId == Guid.Empty || !FilterDigestPattern().IsMatch(scope.FilterDigest))
+        {
+            throw AuthorityException.Invalid("audit access: organization, correlation id, a known access kind and a 64-character lower-case hex filter digest are required");
+        }
+
+        var valid = scope.Mode switch
+        {
+            AuditAccessMode.ExplorerPage => scope.PageSize is >= 1 and <= MaximumPageSize && scope.AuditEventId is null,
+            AuditAccessMode.EventDetail => scope.PageSize == 1 && scope.AuditEventId is { } id && id != Guid.Empty,
+            AuditAccessMode.CommandTimelinePage => scope.PageSize is >= 1 and <= MaximumPageSize && scope.AuditEventId is null,
             _ => false,
         };
         if (!valid)
@@ -141,7 +169,7 @@ public sealed partial class AuditAccessService(IAuthorityStore store, IOrganizat
         }
     }
 
-    private async Task<RecordOutcome<T>> TryRecordAsync<T>(VerifiedActor actor, AuditAccessRequest request, PermissionDecision decision,
+    private async Task<RecordOutcome<T>> TryRecordAsync<T>(VerifiedActor actor, AccessScope request, PermissionDecision decision,
         Func<IAuthorityScope, OrganizationAuthorizationState, CancellationToken, Task<T>>? read, CancellationToken cancellationToken)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -171,10 +199,16 @@ public sealed partial class AuditAccessService(IAuthorityStore store, IOrganizat
 
             // AC-8.2: the page is read here, in this transaction and under this lock, before the evidence; it is discarded unless the
             // entry below commits.
-            var page = read is null ? default : await read(scope, state, token).ConfigureAwait(false);
-            object body = read is null ? new
+            var timeline = request.Mode == AuditAccessMode.CommandTimelinePage;
+            if (timeline != (read is not null))
             {
-                access_kind = request.AccessKind.ToString(),
+                throw new InvalidOperationException("audit access: the timeline mode and the page reader go together");
+            }
+
+            var page = read is null ? default : await read(scope, state, token).ConfigureAwait(false);
+            object body = !timeline ? new
+            {
+                access_kind = request.Mode.ToString(),
                 actor_authority_user_id = bound.AuthorityUserId,
                 actor_identity_binding_id = bound.Binding.IdentityBindingId,
                 authorization_revision = decision.AuthorizationRevision,
@@ -187,7 +221,7 @@ public sealed partial class AuditAccessService(IAuthorityStore store, IOrganizat
             }
             : new
             {
-                access_kind = request.AccessKind.ToString(),
+                access_kind = request.Mode.ToString(),
                 actor_authority_user_id = bound.AuthorityUserId,
                 actor_identity_binding_id = bound.Binding.IdentityBindingId,
                 authorization_revision = decision.AuthorizationRevision,
@@ -221,7 +255,7 @@ public sealed partial class AuditAccessService(IAuthorityStore store, IOrganizat
     }
 
     /// <summary>Best effort: a busy lock, a moved state or any failure skips the entry (counted); the 403 never depends on it.</summary>
-    private async Task RecordDeniedAsync(VerifiedActor actor, AuditAccessRequest request, PermissionDecision decision, CancellationToken cancellationToken)
+    private async Task RecordDeniedAsync(VerifiedActor actor, AccessScope request, PermissionDecision decision, CancellationToken cancellationToken)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromMilliseconds(options.TransactionTimeoutMilliseconds));
@@ -245,7 +279,7 @@ public sealed partial class AuditAccessService(IAuthorityStore store, IOrganizat
             var bound = await ActorResolver.BindAsync(scope, request.OrganizationId, actor, deadline.Token).ConfigureAwait(false);
             AuditJournal.Append(scope, state, DeniedEventKind, new
             {
-                access_kind = request.AccessKind.ToString(),
+                access_kind = request.Mode.ToString(),
                 actor_authority_user_id = bound.AuthorityUserId,
                 authorization_revision = decision.AuthorizationRevision,
                 denial_code = decision.DenialReasonCode ?? AuthorityErrorCodes.Forbidden,
@@ -263,6 +297,9 @@ public sealed partial class AuditAccessService(IAuthorityStore store, IOrganizat
 
     private static AuthorityException Unavailable(string detail) => new(AuthorityErrorCodes.AuditEvidenceUnavailable, 503, true, detail);
 
+    /// <summary>The server-determined access mode and request shape; the mode is set by the entry point, never by a caller.</summary>
+    private sealed record AccessScope(AuditAccessMode Mode, Guid OrganizationId, string FilterDigest, int PageSize, Guid? AuditEventId, Guid CorrelationId);
+
     private sealed record RecordOutcome<T>(long? JournalRevision, TimeSpan Hold, string? Reason, T? Page)
     {
         public static RecordOutcome<T> Recorded(long journalRevision, TimeSpan hold, T? page) => new(journalRevision, hold, null, page);
@@ -270,6 +307,22 @@ public sealed partial class AuditAccessService(IAuthorityStore store, IOrganizat
         public static RecordOutcome<T> Failed(string reason) => new(null, TimeSpan.Zero, reason, default);
     }
 }
+
+/// <summary>
+/// The internal audit-access mode, recorded as <c>access_kind</c>. Not a wire type: the explorer route maps its two wire kinds onto
+/// the first two members, and only the timeline entry point uses <see cref="CommandTimelinePage"/>.
+/// </summary>
+public enum AuditAccessMode
+{
+    ExplorerPage,
+
+    EventDetail,
+
+    CommandTimelinePage,
+}
+
+/// <summary>The timeline's audit-access request (no access kind: the mode is fixed by <see cref="AuditAccessService.AuthorizeAndReadTimelineAsync{T}"/>).</summary>
+public sealed record AuditTimelineAccess(Guid OrganizationId, string FilterDigest, int PageSize, Guid CorrelationId);
 
 /// <summary>The permission check the audit-access protocol runs (implemented by <see cref="PermissionCheckService"/>).</summary>
 public interface IOrganizationPermissionCheck

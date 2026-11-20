@@ -36,8 +36,8 @@ public sealed class SecurityCommandTimelineService(AuditAccessService access)
     {
         ArgumentNullException.ThrowIfNull(actor);
         var filter = Validate(request);
-        var accessRequest = new AuditAccessRequest(request.OrganizationId, AuditAccessKind.CommandTimelinePage, filter.Digest, request.PageSize, null, request.CorrelationId);
-        var (decision, page) = await access.AuthorizeAndReadAsync(actor, accessRequest, (scope, state, token) => ReadPageAsync(scope, state, filter, request.PageSize, token), cancellationToken).ConfigureAwait(false);
+        var accessRequest = new AuditTimelineAccess(request.OrganizationId, filter.Digest, request.PageSize, request.CorrelationId);
+        var (decision, page) = await access.AuthorizeAndReadTimelineAsync(actor, accessRequest, (scope, state, token) => ReadPageAsync(scope, state, filter, request.PageSize, token), cancellationToken).ConfigureAwait(false);
         return new SecurityCommandTimelinePage(page.Items, page.After, decision.AuditJournalRevision, decision.AuthorizationRevision, AuditAccessService.ServedByAuthority, AuditAccessService.NotAttested);
     }
 

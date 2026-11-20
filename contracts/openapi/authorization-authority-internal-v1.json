@@ -3356,8 +3356,7 @@
       "AuditAccessKind": {
         "enum": [
           "ExplorerPage",
-          "EventDetail",
-          "CommandTimelinePage"
+          "EventDetail"
         ]
       },
       "AuditAccessRequest": {
