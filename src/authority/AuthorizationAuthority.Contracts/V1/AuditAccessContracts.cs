@@ -5,7 +5,10 @@ namespace AuthorizationAuthority.Contracts.V1;
 // commits an AuditAccessAuthorized entry in the organization's audit stream before it answers; only that answer lets the
 // business serve audit data. The entry states authorization, never delivery, and carries no business-reported result count.
 
-/// <summary>The kind of audit read being authorized.</summary>
+/// <summary>
+/// The kind of audit read being authorized: an explorer page or an event detail only. The AC-8.2 security-command timeline has its
+/// own endpoint, which sets its access mode itself; it cannot be requested through this kind.
+/// </summary>
 public enum AuditAccessKind
 {
     /// <summary>One page of the audit explorer (PG-054).</summary>

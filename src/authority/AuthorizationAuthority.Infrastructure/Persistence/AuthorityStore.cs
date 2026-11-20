@@ -74,7 +74,7 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
     }
 
     private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction, AuthorityWorkSignal? wakeup, ISecurityAlertSink? alerts, ContentAcceptancePolicy policy,
-        IJournalReceiptVerifier journalReceiptVerifier) : IAuthorityScope, IAuditAccessScope
+        IJournalReceiptVerifier journalReceiptVerifier) : IAuthorityScope, IAuditAccessScope, ISecurityCommandTimelineScope
     {
         private bool committed;
         private bool authorizationWorkAppended;
@@ -257,6 +257,102 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
             {
                 return OrganizationLockAttempt.LockBusy; // the transaction is aborted; the caller disposes the scope
             }
+        }
+
+        /// <summary>
+        /// C8 M4-3 (AC-8.2): command rows newest first after the keyset position, filtered and limited in SQL
+        /// (index <c>ix_security_commands_org_created</c>). A command-row position uses a row comparison on (time, id).
+        /// </summary>
+        public Task<List<SecurityCommand>> GetTimelineCommandsAsync(Guid organizationId, TimelineRange range, IReadOnlyCollection<string> kinds, IReadOnlyCollection<string>? states, int limit, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(range);
+            var kindList = kinds.ToList();
+            IQueryable<SecurityCommand> query = range.After is { IsCommand: true } commandPosition
+                ? context.SecurityCommands.FromSqlInterpolated($"SELECT * FROM authority.security_commands WHERE organization_id = {organizationId} AND (command_created_on, security_command_id) < ({commandPosition.OccurredOn}, {commandPosition.CommandId})")
+                : context.SecurityCommands.Where(c => c.OrganizationId == organizationId);
+            query = query.AsNoTracking().Where(c => kindList.Contains(c.CommandKindName));
+            if (range.After is { IsCommand: false } entryPosition)
+            {
+                var at = entryPosition.OccurredOn;
+                query = query.Where(c => c.CommandCreatedOn < at); // command rows rank above audit entries at an equal time
+            }
+
+            if (states is not null)
+            {
+                var stateList = states.ToList();
+                query = query.Where(c => stateList.Contains(c.CommandStateName));
+            }
+
+            if (range.From is { } from)
+            {
+                query = query.Where(c => c.CommandCreatedOn >= from);
+            }
+
+            if (range.To is { } to)
+            {
+                query = query.Where(c => c.CommandCreatedOn < to);
+            }
+
+            return query.OrderByDescending(c => c.CommandCreatedOn).ThenByDescending(c => c.SecurityCommandId).Take(limit).ToListAsync(cancellationToken);
+        }
+
+        /// <summary>C8 M4-3 (AC-8.2): allowlisted audit-stream entries newest first after the keyset position (index <c>ix_journal_org_created</c>).</summary>
+        public Task<List<SecurityJournalEntry>> GetTimelineAuditEntriesAsync(Guid organizationId, TimelineRange range, IReadOnlyCollection<string> kinds, int limit, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(range);
+            var kindList = kinds.ToList();
+            var query = context.JournalEntries.AsNoTracking()
+                .Where(e => e.OrganizationId == organizationId && e.JournalStreamName == JournalStreamNames.Audit && kindList.Contains(e.JournalEventKind));
+            if (range.After is { IsCommand: true } commandPosition)
+            {
+                var at = commandPosition.OccurredOn;
+                query = query.Where(e => e.JournalCreatedOn <= at); // audit entries rank below command rows at an equal time
+            }
+            else if (range.After is { } entryPosition)
+            {
+                var at = entryPosition.OccurredOn;
+                var revision = entryPosition.StreamRevision;
+                query = query.Where(e => e.JournalCreatedOn < at || (e.JournalCreatedOn == at && e.JournalStreamRevision < revision));
+            }
+
+            if (range.From is { } from)
+            {
+                query = query.Where(e => e.JournalCreatedOn >= from);
+            }
+
+            if (range.To is { } to)
+            {
+                query = query.Where(e => e.JournalCreatedOn < to);
+            }
+
+            return query.OrderByDescending(e => e.JournalCreatedOn).ThenByDescending(e => e.JournalStreamRevision).Take(limit).ToListAsync(cancellationToken);
+        }
+
+        /// <summary>C8 M4-3: authorization-stream entries at the given revisions (unique index <c>uq_journal_stream_revision</c>).</summary>
+        public Task<List<SecurityJournalEntry>> GetAuthorizationEntriesAsync(Guid organizationId, IReadOnlyCollection<long> streamRevisions, CancellationToken cancellationToken)
+        {
+            var revisions = streamRevisions.ToList();
+            return context.JournalEntries.AsNoTracking()
+                .Where(e => e.OrganizationId == organizationId && e.JournalStreamName == JournalStreamNames.Authorization && revisions.Contains(e.JournalStreamRevision))
+                .ToListAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// C8 M4-3: rejection entries naming one of the commands, inside the bounded time window (index <c>ix_journal_org_created</c>);
+        /// only the named command id (<c>body.security_command_id</c> of the journal envelope) is compared in SQL, the body is otherwise
+        /// not interpreted here.
+        /// </summary>
+        public Task<List<SecurityJournalEntry>> GetRejectionEntriesAsync(Guid organizationId, IReadOnlyCollection<string> kinds, IReadOnlyCollection<Guid> commandIds, DateTimeOffset windowStart, DateTimeOffset windowEnd, CancellationToken cancellationToken)
+        {
+            var kindArray = kinds.ToArray();
+            var idArray = commandIds.Select(id => id.ToString("D")).ToArray();
+            return context.JournalEntries.FromSqlInterpolated($"""
+                SELECT * FROM authority.security_journal_entries
+                WHERE organization_id = {organizationId} AND journal_stream_name = {JournalStreamNames.Audit}
+                  AND journal_created_on >= {windowStart} AND journal_created_on <= {windowEnd}
+                  AND journal_event_kind = ANY({kindArray})
+                  AND (journal_event_body_json::jsonb -> 'body' ->> 'security_command_id') = ANY({idArray})
+                """).AsNoTracking().Take(commandIds.Count * 2).ToListAsync(cancellationToken);
         }
 
         private static bool IsLockNotAvailable(Exception? exception)

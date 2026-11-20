@@ -2149,6 +2149,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/security/audit/security-commands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** AC-8.2: a page (at most 50) of the organization's security-command timeline for Security Auditors: command rows in every state, including Rejected and FailedReconciliation, and allowlisted audit-stream entries, newest first. Filters are one kind code, one state code and dates. Read and served by the Authorization Authority after it recorded the access (AuditAccessAuthorized, served_by authority); envelopes carry identifiers and codes only, with withheld fields named but never shown. Journal-backed items show their journal evidence; command-row-only items are not cryptographically verified. */
+        get: operations["ReadSecurityCommandTimeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3894,6 +3911,52 @@ export interface components {
         SecurityAuditorReasonCodesResponse: {
             appointment: components["schemas"]["SecurityAuditorReasonCodeResponse"][];
             removal: components["schemas"]["SecurityAuditorReasonCodeResponse"][];
+        };
+        SecurityCommandTimelineDetailResponse: {
+            key: string;
+            kind: string;
+            value: null | string;
+            values: null | string[];
+            displayName: null | string;
+        };
+        SecurityCommandTimelineEvidenceResponse: {
+            stream: string;
+            /** Format: int64 */
+            streamRevision: number | string;
+            entryDigestHex: string;
+            archiveState: string;
+            receiptReferencePresent: boolean;
+        };
+        SecurityCommandTimelineItemResponse: {
+            source: string;
+            kind: string;
+            /** Format: date-time */
+            occurredOn: string;
+            /** Format: uuid */
+            commandId: null | string;
+            commandState: null | string;
+            /** Format: int64 */
+            committedAuthorizationRevision: null | number | string;
+            rejectionCode: null | string;
+            /** Format: uuid */
+            actorUserId: null | string;
+            actorDisplayName: null | string;
+            /** Format: date-time */
+            effectiveOn: null | string;
+            evidenceBasis: string;
+            reportedBy: string;
+            evidence: null | components["schemas"]["SecurityCommandTimelineEvidenceResponse"];
+            details: components["schemas"]["SecurityCommandTimelineDetailResponse"][];
+            withheldFields: string[];
+        };
+        SecurityCommandTimelinePageResponse: {
+            items: components["schemas"]["SecurityCommandTimelineItemResponse"][];
+            nextCursor: null | string;
+            /** Format: int32 */
+            pageSize: number | string;
+            orderingStatement: string;
+            evidenceStatement: string;
+            accessEvidence: components["schemas"]["AuditAccessEvidenceResponse"];
         };
         SecurityIncidentBucketResponse: {
             bucketStartDate: string;
@@ -8337,6 +8400,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditEventDetailResponse"];
+                };
+            };
+        };
+    };
+    ReadSecurityCommandTimeline: {
+        parameters: {
+            query?: {
+                kind?: string;
+                state?: string;
+                from?: string;
+                to?: string;
+                pageSize?: number | string;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityCommandTimelinePageResponse"];
                 };
             };
         };

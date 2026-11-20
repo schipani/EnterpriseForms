@@ -34,7 +34,7 @@ public sealed class AuthorityClientOptions
 /// independently. Every non-2xx response maps to <see cref="AuthorityClientException"/>; transport failures map to
 /// AUTHORITY_UNAVAILABLE (fail closed). There is no method that can request an arbitrary signature.
 /// </summary>
-public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, IOrganizationRosterAuthority, IOwnerRecoveryNoticeAuthority, ITestStackIdentityAuthority, IAuditAccessAuthority, ISearchIndexAdministrationAuthority, IIndexedSearchAuthority, IIndexedRecordListAuthority
+public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, IOrganizationRosterAuthority, IOwnerRecoveryNoticeAuthority, ITestStackIdentityAuthority, IAuditAccessAuthority, ISecurityCommandTimelineAuthority, ISearchIndexAdministrationAuthority, IIndexedSearchAuthority, IIndexedRecordListAuthority
 {
     public const string HttpClientName = "trust-authority";
 
@@ -116,6 +116,9 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
 
     public Task<AuthorityAuditAccessDecision> AuthorizeAuditAccessAsync(DelegatedUserContext user, AuditAccessQuery query, CancellationToken cancellationToken) =>
         SendAsync<AuthorityAuditAccessDecision>(HttpMethod.Post, "internal/v1/organizations/audit/access", user, query, null, cancellationToken);
+
+    public Task<AuthorityTimelinePage> ReadSecurityCommandTimelineAsync(DelegatedUserContext user, AuthorityTimelineQuery query, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityTimelinePage>(HttpMethod.Post, "internal/v1/organizations/audit/security-command-timeline", user, query, null, cancellationToken);
 
     public Task<AuthoritySecurityAdministratorRoster> GetSecurityAdministratorsAsync(DelegatedUserContext user, SecurityAdministratorRosterQuery query, CancellationToken cancellationToken) =>
         SendAsync<AuthoritySecurityAdministratorRoster>(HttpMethod.Post, "internal/v1/security-administrators", user, query, null, cancellationToken);

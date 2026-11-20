@@ -348,6 +348,30 @@ public interface IAuditAccessAuthority
     Task<AuthorityAuditAccessDecision> AuthorizeAuditAccessAsync(DelegatedUserContext user, AuditAccessQuery query, CancellationToken cancellationToken);
 }
 
+// ---- C8 M4-3 (AC-8.2): the security-command timeline (mirrors AuthorizationAuthority.Contracts.V1 SecurityCommandTimeline*) ----
+
+/// <summary>After is the Authority's keyset position (the business wraps it in its protected cursor); kinds and states are codes.</summary>
+public sealed record AuthorityTimelineQuery(Guid OrganizationId, string? After, int PageSize, IReadOnlyList<string>? Kinds, IReadOnlyList<string>? States, DateTimeOffset? From, DateTimeOffset? To, Guid CorrelationId);
+
+/// <summary>One page read and served by the Authority after its AuditAccessAuthorized entry committed (ServedBy "authority", Delivery "not_attested").</summary>
+public sealed record AuthorityTimelinePage(List<AuthorityTimelineEntry> Items, string? After, long AuditJournalRevision, long AuthorizationRevision, string ServedBy, string Delivery);
+
+public sealed record AuthorityTimelineEntry(string Source, string Kind, DateTimeOffset OccurredOn, Guid? CommandId, string? CommandState, long? CommittedAuthorizationRevision, string? RejectionCode,
+    Guid? ActorUserId, DateTimeOffset? EffectiveOn, string EvidenceBasis, string ReportedBy, AuthorityTimelineEvidence? Evidence, List<AuthorityTimelineDetail> Details, List<string> WithheldFields);
+
+public sealed record AuthorityTimelineEvidence(string Stream, long StreamRevision, string EntryDigestHex, string ArchiveState, bool ReceiptReferencePresent);
+
+public sealed record AuthorityTimelineDetail(string Key, string Kind, string? Value, List<string>? Values);
+
+/// <summary>
+/// C8 M4-3: the only source of the security-command timeline. The Authority checks view_audit, reads the page inside its audit-access
+/// transaction and commits evidence before answering; the business renders it and stores nothing (R-5: no business delivery row).
+/// </summary>
+public interface ISecurityCommandTimelineAuthority
+{
+    Task<AuthorityTimelinePage> ReadSecurityCommandTimelineAsync(DelegatedUserContext user, AuthorityTimelineQuery query, CancellationToken cancellationToken);
+}
+
 /// <summary>Owner message 7: the Authority's Security Administrator roster (narrow port; used by Organizations, and read-only by SecurityOperations to list and validate incident investigators).</summary>
 public interface ISecurityAdministratorAuthority
 {

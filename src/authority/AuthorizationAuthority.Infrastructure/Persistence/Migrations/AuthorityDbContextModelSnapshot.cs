@@ -1248,6 +1248,9 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_journal_stream_revision");
 
+                    b.HasIndex("OrganizationId", "JournalCreatedOn", "JournalStreamName", "JournalStreamRevision")
+                        .HasDatabaseName("ix_journal_org_created");
+
                     b.ToTable("security_journal_entries", "authority", t =>
                         {
                             t.HasCheckConstraint("ck_journal_archive_state", "archive_delivery_state IN ('Pending','Anchored','VerificationFailed')");
@@ -4873,6 +4876,9 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganizationId", "CommittedAuthorizationRevision")
                         .HasDatabaseName("ix_security_commands_org_revision");
+
+                    b.HasIndex("OrganizationId", "CommandCreatedOn", "SecurityCommandId")
+                        .HasDatabaseName("ix_security_commands_org_created");
 
                     b.ToTable("security_commands", "authority", t =>
                         {

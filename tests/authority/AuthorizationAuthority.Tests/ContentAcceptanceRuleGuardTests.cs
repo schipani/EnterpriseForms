@@ -242,11 +242,18 @@ public sealed class ContentAcceptanceRuleGuardTests
         Assert.DoesNotContain(migrations, f => File.ReadAllText(f).Contains("ck_content_operation_rule_floor", StringComparison.Ordinal)); // OD-M2-21: M2b-1F is a separate release
         Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix + "1", ContentAcceptanceRuleSql.UpSql, StringComparison.Ordinal);
         var ids = migrations.Select(Path.GetFileNameWithoutExtension).Where(n => n is not null && !n.EndsWith(".Designer", StringComparison.Ordinal) && n != "AuthorityDbContextModelSnapshot").Order(StringComparer.Ordinal).ToList();
+        // C8 M4-3 (C-165 R-4): the two additive timeline indexes are the latest migration; they create indexes only and install no floor.
+        Assert.Equal("20261120081859_AuthoritySecurityCommandTimelineIndexes", ids[^1]);
+        var timelineIndexes = File.ReadAllText(migrations.Single(f => Path.GetFileName(f) == "20261120081859_AuthoritySecurityCommandTimelineIndexes.cs"));
+        Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix, timelineIndexes, StringComparison.Ordinal);
+        Assert.DoesNotContain("migrationBuilder.Sql(", timelineIndexes, StringComparison.Ordinal);
+        Assert.Equal(2, timelineIndexes.Split("migrationBuilder.CreateIndex(").Length - 1);
+
         // SEC-BL-01 G08 (A-7 §27): the journal immutability migration follows the ledger migration and installs no floor either.
-        Assert.Equal(JournalImmutabilitySql.MigrationId, ids[^1]);
+        Assert.Equal(JournalImmutabilitySql.MigrationId, ids[^2]);
         Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix, JournalImmutabilitySql.UpSql + JournalImmutabilitySql.DownSql, StringComparison.Ordinal);
-        Assert.Equal(ContentDataKeyLedgerSql.MigrationId, ids[^2]); // E3-M2e: the ledger migration follows the CARV migration and installs no floor (AM-1)
-        Assert.Equal(ContentAcceptanceRuleSql.MigrationId, ids[^3]);
+        Assert.Equal(ContentDataKeyLedgerSql.MigrationId, ids[^3]); // E3-M2e: the ledger migration follows the CARV migration and installs no floor (AM-1)
+        Assert.Equal(ContentAcceptanceRuleSql.MigrationId, ids[^4]);
         Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix, ContentDataKeyLedgerSql.TriggersSql, StringComparison.Ordinal);
         Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix, ContentDataKeyLedgerSql.LockTimeoutSql + ContentDataKeyLedgerSql.DownGuardSql, StringComparison.Ordinal);
     }

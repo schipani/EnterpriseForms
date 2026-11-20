@@ -79,6 +79,7 @@ public sealed class AuditAccessServiceTests : IDisposable
         using var body = JsonDocument.Parse(entry.JournalEventBodyJson);
         var root = Body(body);
         Assert.Equal("ExplorerPage", root.GetProperty("access_kind").GetString());
+        Assert.False(root.TryGetProperty("served_by", out _)); // the timeline mode's marker is never written for this route
         Assert.Equal(Auditor, root.GetProperty("actor_authority_user_id").GetGuid());
         Assert.Equal(7, root.GetProperty("authorization_revision").GetInt64());
         Assert.Equal(7, root.GetProperty("projection_revision").GetInt64());
@@ -246,6 +247,38 @@ public sealed class AuditAccessServiceTests : IDisposable
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, refused.ErrorCode);
         Assert.Equal(0, check.Calls);
         Assert.Empty(store.Journal);
+    }
+
+    /// <summary>
+    /// CodeQL #4 remediation: the wire kind is caller-supplied, so it may only choose between the two explorer modes. The former
+    /// timeline member (numeric 2) and any other undefined value are refused before the permission check, the lock and any entry.
+    /// </summary>
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(-1)]
+    [InlineData(int.MaxValue)]
+    public async Task TheExplorerRouteCannotSelectTheTimelineOrAnyOtherMode(int rawKind)
+    {
+        var check = new StoreCheck(store, auditors);
+        var request = new AuditAccessRequest(Org, (AuditAccessKind)rawKind, Digest, 10, null, Guid.CreateVersion7());
+        var refused = await RefusedAsync(() => Service(check: check).AuthorizeAsync(Actor(Auditor), request, Ct));
+        Assert.Equal((AuthorityErrorCodes.InvalidCommand, 422), (refused.ErrorCode, refused.HttpStatusCode));
+        Assert.Equal(0, check.Calls);
+        Assert.Empty(store.AppliedAuditAccessTimeouts); // no transaction was opened
+        Assert.Empty(store.Journal);
+    }
+
+    /// <summary>The wire contract cannot express the timeline mode at all: the enum has the two explorer kinds only, and the
+    /// Authority's JSON options refuse the former member's name.</summary>
+    [Fact]
+    public void TheWireKindHasOnlyTheExplorerKindsAndRefusesTheTimelineName()
+    {
+        Assert.Equal(["ExplorerPage", "EventDetail"], Enum.GetNames<AuditAccessKind>());
+        var options = new JsonSerializerOptions();
+        AuthorizationAuthority.Api.Composition.AuthorityJson.Configure(options);
+        var json = $$"""{"organization_id":"{{Org}}","access_kind":"CommandTimelinePage","filter_digest":"{{Digest}}","page_size":10,"audit_event_id":null,"correlation_id":"{{Guid.CreateVersion7()}}"}""";
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<AuditAccessRequest>(json, options));
     }
 
     [Fact]

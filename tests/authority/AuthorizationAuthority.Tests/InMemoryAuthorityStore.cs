@@ -89,6 +89,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
     /// <summary>C8 M4-2: when false, scopes do not implement IAuditAccessScope (a store that cannot bound the transaction).</summary>
     public bool SupportsAuditAccess { get; set; } = true;
+
+    /// <summary>C8 M4-3: timeline source reads (commands and audit entries) issued by the timeline service.</summary>
+    public int TimelineReads { get; set; }
     public List<PublishedFormVersion> PublishedVersions { get; } = [];
     public List<FieldSearchApproval> Approvals { get; } = [];
     public List<OrganizationProtectionPolicy> Policies { get; } = [];
@@ -159,8 +162,42 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         return Task.FromResult<IReadOnlyList<OrganizationChangeMarker>>(Organizations.OrderBy(o => o.OrganizationId).Select(o => new OrganizationChangeMarker(o.OrganizationId, o.AuthorizationRevision, o.ContentIntegrityRevision, o.AuditJournalRevision)).ToList());
     }
 
-    private sealed class AuditAccessScope(InMemoryAuthorityStore owner) : Scope(owner), IAuditAccessScope
+    private sealed class AuditAccessScope(InMemoryAuthorityStore owner) : Scope(owner), IAuditAccessScope, ISecurityCommandTimelineScope
     {
+        // C8 M4-3: the same filters, order and limits as the PostgreSQL store (AuthorityStore), over the in-memory lists.
+        public Task<List<SecurityCommand>> GetTimelineCommandsAsync(Guid organizationId, TimelineRange range, IReadOnlyCollection<string> kinds, IReadOnlyCollection<string>? states, int limit, CancellationToken cancellationToken)
+        {
+            Store.TimelineReads++;
+            var rows = Store.Commands.Where(c => c.OrganizationId == organizationId && kinds.Contains(c.CommandKindName)
+                    && (states is null || states.Contains(c.CommandStateName))
+                    && (range.From is null || c.CommandCreatedOn >= range.From) && (range.To is null || c.CommandCreatedOn < range.To)
+                    && (range.After is not { } after || (after.IsCommand
+                        ? c.CommandCreatedOn < after.OccurredOn || (c.CommandCreatedOn == after.OccurredOn && string.CompareOrdinal(c.SecurityCommandId.ToString("D"), after.CommandId.ToString("D")) < 0)
+                        : c.CommandCreatedOn < after.OccurredOn)))
+                .OrderByDescending(c => c.CommandCreatedOn).ThenByDescending(c => c.SecurityCommandId.ToString("D"), StringComparer.Ordinal).Take(limit).ToList();
+            return Task.FromResult(rows);
+        }
+
+        public Task<List<SecurityJournalEntry>> GetTimelineAuditEntriesAsync(Guid organizationId, TimelineRange range, IReadOnlyCollection<string> kinds, int limit, CancellationToken cancellationToken)
+        {
+            Store.TimelineReads++;
+            var rows = Store.Journal.Where(e => e.OrganizationId == organizationId && e.JournalStreamName == JournalStreamNames.Audit && kinds.Contains(e.JournalEventKind)
+                    && (range.From is null || e.JournalCreatedOn >= range.From) && (range.To is null || e.JournalCreatedOn < range.To)
+                    && (range.After is not { } after || (after.IsCommand
+                        ? e.JournalCreatedOn <= after.OccurredOn
+                        : e.JournalCreatedOn < after.OccurredOn || (e.JournalCreatedOn == after.OccurredOn && e.JournalStreamRevision < after.StreamRevision))))
+                .OrderByDescending(e => e.JournalCreatedOn).ThenByDescending(e => e.JournalStreamRevision).Take(limit).ToList();
+            return Task.FromResult(rows);
+        }
+
+        public Task<List<SecurityJournalEntry>> GetAuthorizationEntriesAsync(Guid organizationId, IReadOnlyCollection<long> streamRevisions, CancellationToken cancellationToken) =>
+            Task.FromResult(Store.Journal.Where(e => e.OrganizationId == organizationId && e.JournalStreamName == JournalStreamNames.Authorization && streamRevisions.Contains(e.JournalStreamRevision)).ToList());
+
+        public Task<List<SecurityJournalEntry>> GetRejectionEntriesAsync(Guid organizationId, IReadOnlyCollection<string> kinds, IReadOnlyCollection<Guid> commandIds, DateTimeOffset windowStart, DateTimeOffset windowEnd, CancellationToken cancellationToken) =>
+            Task.FromResult(Store.Journal.Where(e => e.OrganizationId == organizationId && e.JournalStreamName == JournalStreamNames.Audit && kinds.Contains(e.JournalEventKind)
+                && e.JournalCreatedOn >= windowStart && e.JournalCreatedOn <= windowEnd
+                && Application.Features.Audit.SecurityCommandTimelineCatalog.NamedCommandId(e.JournalEventBodyJson) is { } id && commandIds.Contains(id)).ToList());
+
         public Task ApplyAuditAccessTimeoutsAsync(int statementTimeoutMilliseconds, int transactionTimeoutMilliseconds, CancellationToken cancellationToken)
         {
             Store.AppliedAuditAccessTimeouts.Add((statementTimeoutMilliseconds, transactionTimeoutMilliseconds));

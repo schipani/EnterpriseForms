@@ -17,6 +17,9 @@ public static class AuditAccessEndpoints
 {
     public const string Route = InternalApi.Prefix + "/organizations/audit/access";
 
+    /// <summary>C8 M4-3 (AC-8.2): the security-command timeline, read and served by the Authority under the same protocol.</summary>
+    public const string TimelineRoute = InternalApi.Prefix + "/organizations/audit/security-command-timeline";
+
     public static IEndpointRouteBuilder MapAuditAccessEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost(Route, static async Task<Ok<AuditAccessDecision>> (AuditAccessRequest request, HttpContext context, AuditAccessService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
@@ -34,6 +37,22 @@ public static class AuditAccessEndpoints
             .RequireAuthorization(InternalAuthentication.WorkloadPolicy)
             .WithName("AuthorizeAuditAccess")
             .WithSummary("AC-8.3: authorizes one audit-explorer page or event detail for the delegated user (view_audit, Security Auditors) and commits an AuditAccessAuthorized entry (actor, kind, filter digest, authorization revision, delivery not_attested; no result counts) in the organization's audit stream before answering. The organization lock is taken NOWAIT with bounded retries (503 AUDIT_EVIDENCE_BUSY), and a failed or unknown commit is 503 AUDIT_EVIDENCE_UNAVAILABLE: no allow without committed evidence.");
+
+        endpoints.MapPost(TimelineRoute, static async Task<Ok<SecurityCommandTimelinePage>> (SecurityCommandTimelineRequest request, HttpContext context, SecurityCommandTimelineService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
+            {
+                var actor = InternalAuthentication.RequireActor(context, validator);
+                var page = await service.ReadAsync(actor, request, cancellationToken).ConfigureAwait(false);
+                context.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(page);
+            })
+            .WithTags("Audit")
+            .Produces<ErrorResponse>(StatusCodes.Status403Forbidden)
+            .Produces<ErrorResponse>(StatusCodes.Status422UnprocessableEntity)
+            .Produces<ErrorResponse>(StatusCodes.Status429TooManyRequests)
+            .Produces<ErrorResponse>(StatusCodes.Status503ServiceUnavailable)
+            .RequireAuthorization(InternalAuthentication.WorkloadPolicy)
+            .WithName("ReadSecurityCommandTimeline")
+            .WithSummary("AC-8.2: one page of the organization's security-command timeline for the delegated Security Auditor (view_audit): command rows in every state, including Rejected and FailedReconciliation, and allowlisted audit-stream entries, newest first. Each envelope is built field by field from an allowlist; free text, notes, step-up evidence, share scopes, identity identifiers, rejection details and matched or evaluated counts are never returned. The page is read inside the AC-8.3 audit-access transaction (NOWAIT organization lock, bounded) and returned only after its AuditAccessAuthorized entry (served_by authority, delivery not_attested) committed.");
         return endpoints;
     }
 
@@ -48,6 +67,7 @@ public static class AuditAccessEndpoints
         services.AddSingleton<IOrganizationPermissionCheck>(sp => sp.GetRequiredService<PermissionCheckService>());
         services.AddSingleton<IAuditAccessRateLimiter, AuditAccessRateLimiter>();
         services.AddSingleton<AuditAccessService>();
+        services.AddSingleton<SecurityCommandTimelineService>();
         return services;
     }
 }
