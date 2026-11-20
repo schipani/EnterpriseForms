@@ -19,6 +19,9 @@ public sealed class CapabilityRefusalEvidenceRecorderBoundaryTests
     private const string Index = "AuthorizationAuthority.Infrastructure/Persistence/CapabilityRefusalEvidenceIndex.cs";
     private const string Store = "AuthorizationAuthority.Infrastructure/Persistence/AuthorityStore.cs";
     private const string Floor = "AuthorizationAuthority.Application/Features/Content/EnvelopeCapabilityFloor.cs";
+
+    /// <summary>C8 M4-3 (C-165, PD-09 option B): the one approved reader of the kind, the security-command timeline allowlist (restricted fields).</summary>
+    private const string TimelineCatalog = "AuthorizationAuthority.Application/Features/Audit/SecurityCommandTimelineCatalog.cs";
     private static readonly string Authority = RepositoryPaths.Combine("src", "authority");
 
     private static string Source(string relative) =>
@@ -41,7 +44,12 @@ public sealed class CapabilityRefusalEvidenceRecorderBoundaryTests
     [Fact]
     public void OnlyTheRecorderAppendsTheEvidenceKind()
     {
-        Assert.Equal(new[] { Index, Lookup, Recorder }.Order(StringComparer.Ordinal), FilesContaining("CapabilityRefusalEvidence.EventKind"));
+        Assert.Equal(new[] { Index, Lookup, Recorder, TimelineCatalog }.Order(StringComparer.Ordinal), FilesContaining("CapabilityRefusalEvidence.EventKind"));
+        var catalog = Source(TimelineCatalog); // a reader only: no append, journal-entry or store path of any kind
+        foreach (var writePath in new[] { "Append(", "AddJournalEntry", "JournalChain", "IAuthorityScope", "SaveChanges" })
+        {
+            Assert.DoesNotContain(writePath, catalog, StringComparison.Ordinal);
+        }
         var recorder = Source(Recorder);
         Assert.Single(Regex.Matches(recorder, @"AuditJournal\.Append\("));
         Assert.Contains("AuditJournal.Append(scope, locked, CapabilityRefusalEvidence.EventKind, body, clock)", recorder, StringComparison.Ordinal);

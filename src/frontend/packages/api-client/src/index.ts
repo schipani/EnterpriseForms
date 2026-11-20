@@ -243,6 +243,12 @@ export type AuditExplorerQuery = {
 export type AuditExplorerPageResponse = S["AuditExplorerPageResponse"];
 export type AuditExplorerEventResponse = S["AuditExplorerEventResponse"];
 export type AuditEventDetailResponse = S["AuditEventDetailResponse"];
+
+/** C8 M4-3 security-command timeline (AC-8.2): one kind code, one state code and ISO dates; `cursor` is the previous page's `nextCursor`. */
+export type SecurityCommandTimelineQuery = { kind?: string; state?: string; from?: string; to?: string; pageSize?: number; cursor?: string };
+export type SecurityCommandTimelinePageResponse = S["SecurityCommandTimelinePageResponse"];
+export type SecurityCommandTimelineItemResponse = S["SecurityCommandTimelineItemResponse"];
+export type SecurityCommandTimelineDetailResponse = S["SecurityCommandTimelineDetailResponse"];
 export type AuditMetadataItemResponse = S["AuditMetadataItemResponse"];
 export type AuditWithheldMetadataResponse = S["AuditWithheldMetadataResponse"];
 
@@ -298,6 +304,9 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       events: (query: AuditExplorerQuery, signal?: AbortSignal) => read<AuditExplorerPageResponse>("audit.events", undefined, query, "interactive-read", signal),
       /** PG-055: one event, redacted by the server's catalog. */
       event: (auditEventId: string, signal?: AbortSignal) => read<AuditEventDetailResponse>("audit.event", { auditEventId }, undefined, "interactive-read", signal),
+      /** AC-8.2: read and served by the Authority after it recorded the access (Security Auditors only). */
+      securityCommands: (query: SecurityCommandTimelineQuery, signal?: AbortSignal) =>
+        read<SecurityCommandTimelinePageResponse>("audit.securityCommands", undefined, query, "interactive-read", signal),
     },
     forms: {
       list: (signal?: AbortSignal) => read<FormDefinitionSummaryResponse[]>("forms.list", undefined, undefined, "interactive-read", signal),

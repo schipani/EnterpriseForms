@@ -13,6 +13,9 @@ public enum AuditAccessKind
 
     /// <summary>The detail of one audit event (PG-055).</summary>
     EventDetail,
+
+    /// <summary>C8 M4-3 (AC-8.2): one page of the security-command timeline, read and served by the Authority itself.</summary>
+    CommandTimelinePage,
 }
 
 /// <param name="OrganizationId">The caller's organization (bound again to the delegated user by the Authority).</param>

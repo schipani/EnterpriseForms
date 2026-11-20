@@ -6039,6 +6039,78 @@
           }
         }
       }
+    },
+    "/api/v1/security/audit/security-commands": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "AC-8.2: a page (at most 50) of the organization's security-command timeline for Security Auditors: command rows in every state, including Rejected and FailedReconciliation, and allowlisted audit-stream entries, newest first. Filters are one kind code, one state code and dates. Read and served by the Authorization Authority after it recorded the access (AuditAccessAuthorized, served_by authority); envelopes carry identifiers and codes only, with withheld fields named but never shown. Journal-backed items show their journal evidence; command-row-only items are not cryptographically verified.",
+        "operationId": "ReadSecurityCommandTimeline",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityCommandTimelinePageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -12897,6 +12969,227 @@
             "items": {
               "$ref": "#/components/schemas/SecurityAuditorReasonCodeResponse"
             }
+          }
+        }
+      },
+      "SecurityCommandTimelineDetailResponse": {
+        "required": [
+          "key",
+          "kind",
+          "value",
+          "values",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "values": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SecurityCommandTimelineEvidenceResponse": {
+        "required": [
+          "stream",
+          "streamRevision",
+          "entryDigestHex",
+          "archiveState",
+          "receiptReferencePresent"
+        ],
+        "type": "object",
+        "properties": {
+          "stream": {
+            "type": "string"
+          },
+          "streamRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "entryDigestHex": {
+            "type": "string"
+          },
+          "archiveState": {
+            "type": "string"
+          },
+          "receiptReferencePresent": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SecurityCommandTimelineItemResponse": {
+        "required": [
+          "source",
+          "kind",
+          "occurredOn",
+          "commandId",
+          "commandState",
+          "committedAuthorizationRevision",
+          "rejectionCode",
+          "actorUserId",
+          "actorDisplayName",
+          "effectiveOn",
+          "evidenceBasis",
+          "reportedBy",
+          "evidence",
+          "details",
+          "withheldFields"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "commandId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "commandState": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "committedAuthorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "rejectionCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "actorUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "actorDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "effectiveOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "evidenceBasis": {
+            "type": "string"
+          },
+          "reportedBy": {
+            "type": "string"
+          },
+          "evidence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityCommandTimelineEvidenceResponse"
+              }
+            ]
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityCommandTimelineDetailResponse"
+            }
+          },
+          "withheldFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SecurityCommandTimelinePageResponse": {
+        "required": [
+          "items",
+          "nextCursor",
+          "pageSize",
+          "orderingStatement",
+          "evidenceStatement",
+          "accessEvidence"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityCommandTimelineItemResponse"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "orderingStatement": {
+            "type": "string"
+          },
+          "evidenceStatement": {
+            "type": "string"
+          },
+          "accessEvidence": {
+            "$ref": "#/components/schemas/AuditAccessEvidenceResponse"
           }
         }
       },

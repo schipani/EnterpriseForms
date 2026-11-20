@@ -6,6 +6,7 @@ import { Link, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { formatInstant } from "../components/auditExplorerModel";
 import { ErrorPanel } from "../../support";
+import { AuditViewTabs } from "../components/AuditViewTabs";
 import {
   AUDIT_CATEGORIES,
   AUDIT_OUTCOMES,
@@ -78,6 +79,7 @@ export function AuditExplorerPage() {
         }
       />
       <div className="flex flex-col gap-4">
+        <AuditViewTabs current="events" />
         <StatusMessage tone="info" title="What this log can and cannot tell you">
           These events are held in the application database and are not independently verified: a database administrator could add, change or delete them, and they have no archive receipt yet. Each page you open is authorized and recorded by the Authorization Authority. Events are newest first by the time they were recorded, which is not necessarily the order in which changes were committed.
         </StatusMessage>

@@ -8,6 +8,10 @@
   limited owner-authorized run (§41.6); not independently reviewed. TC-3 approved as configurable bounded settings and retained
   (F-M42-V1, option 1); the record-time index and its 1M-row measurement deferred, not waived. AC-8.2, AC-8.4, AC-8.5 and PG-052
   remain unbuilt.
+- **M4-3 (C-165–C-167, 2026-11-20):** AC-8.2 implemented with the C-165 amendments to §5.2 and §7 (below) and accepted by the
+  owner for Development/Testing (C-167; `docs/PHASE_C8_STATUS.md` §42); `SecurityCommandTimelineTests` (Stage B) executed in a
+  limited owner-authorized run under C-166 (4/4 on the final run, after corrections F-M43-V1 and F-M43-V2; §42.6); not
+  independently reviewed. T10/T20 unit-only. AC-8.4, AC-8.5 and PG-052 remain unbuilt.
 - **Baseline:** `main` = `c245200` (PR #50, merged 2026-11-04 09:50 UTC; it includes C8 M1–M3 and AC-7). Branch
   `phase-c8/m4-governance-audit` was created from that commit and is local only (not pushed, no PR).
 - **Audience:** the project owner (final acceptance) and the independent Authority reviewer (AC-8 joins the
@@ -208,7 +212,16 @@ The optional `reason_note` is journaled in the authorization stream for the comm
   * membership and provisioning approvals and rejections, owner recovery, `ProtectionReconciliationAttested`, `SecurityAlertRaised`, platform-plane reads, `*CommandRejected`, `AuditAccessAuthorized`;
   * `FieldSearchExecuted` with snapshot, form, user, field ids, operator names, condition count, outcome and revision. **Matched and evaluated counts are withheld** (D8-67a; evaluated counts are withheld as a conservative extension, because they reveal the size of a user's visible set).
 - **Never included:** free-text `reason` values, `reason_note`, share field or document scope lists, step-up evidence, predicates, and the kinds `RegisterRecord`, `UnlinkChildRecord`, form registration and publication, and the whole content stream.
-- **Construction:** envelopes are built field by field inside the Authority, never from a raw body. Keyset `(journal_created_on, stream, stream_revision)`, wrapped in the business opaque cursor.
+- **Construction:** envelopes are built field by field inside the Authority, never from a raw body. Keyset `(journal_created_on, stream, stream_revision)`, wrapped in the business opaque cursor. *(Superseded by amendment C-165 below.)*
+
+**Amendment C-165 (owner-approved, 2026-11-20; supersedes the conflicting statements above):**
+- **R-1, unit and keyset.** The timeline unit is the **command row** (every state), merged with allowlisted audit-stream entries. Order and keyset are `(event time, source, key)` descending, where command rows rank above audit-stream entries at an equal time and the key is the command id or the audit-stream revision; the business wraps the Authority's position in its opaque cursor. A command row is **journal-backed** when its authorization-stream entry (committed commands, at the committed revision, naming the command) or its audit-stream rejection entry (rejected role, membership and field-search commands) exists; otherwise it is **command-row-only**. Command-row-only is expected for most rejected commands, which are not journaled; it is not presented as evidence of tampering, and a command row is not presented as cryptographically verified. Journal-backed states only that an entry naming the command was found: a command item's kind, state, revision and details are read from the mutable command row and are not compared with that entry, and the read does not re-verify the journal chain (wording clarified after the C-166 Stage B review). The four `*CommandRejected` audit kinds are attached as the evidence of their command row and never appear as separate items (no duplicates).
+- **R-2, classification.** Added: `UpdateShareScope` (record id, share id; never the scope) and `PublishFormSecurityRevision` (form id, field id, required protection mode, field classification, protection policy revision; no keys or cryptographic material). Excluded: `RegisterPublishedFormVersion` (form publication) and the operator-plane command rows already recorded by allowlisted audit-stream entries (`ApproveOrganizationMembership`, `BootstrapOrganization`, `ProvisionFirstSecurityAdministrator`, `RecoverSecurityAdministrator`, `InitializeOrganization`, `RecoverOrganizationOwners`). Every command kind is classified exactly once; an exhaustive test (enum and every literal the Authority writes) fails on an unclassified kind.
+- **PD-09, option B.** `EnvelopeCapabilityRefused` is an allowlisted audit-stream kind with `refusal_code`, `workload_name`, `entry_point`, `client_capability_level` and `evidence_database_time_utc` only (`refusal_observed_on_utc` withheld), marked as recorded on a business-runtime report (R-M2f3-5).
+- **TC-4** confirmed: `UpdateFormUsers` is included (form id, added and removed principals).
+- **R-5.** The Authority reads and serves the page; its `AuditAccessAuthorized` entry carries `access_kind: CommandTimelinePage`, `served_by: "authority"` and `delivery: "not_attested"` (authorization recorded, client receipt not claimed). The business writes no delivery row.
+- **Field rules.** Each shown field has a declared shape (identifier, code, count, flag, timestamp, digest, principal, or lists); any other value is dropped. Prohibited classes (free-text reasons and notes, step-up evidence, share scopes, identity identifiers, rejection details, matched and evaluated counts, coverage statements) are listed by a fixed name under `withheldFields`, never with their value or length. `ProtectionReconciliationAttested` shows identifiers, direction, completeness and revisions, not its record counts. A committed `TransferOwnership` shows the previous owner from the owner edge its journal entry removed; `ReclassifyField` shows the target classification only (the previous one is not recorded by the command).
+- **Bounds.** Filters (kinds, states, time range), keyset and limits are applied in SQL inside the AC-8.3 transaction; TC-3 timeouts, retries and rate limits apply unchanged.
 
 ### 5.3 AC-8.3 Audit-access evidence (revision-compared record; no cross-store atomicity)
 
@@ -347,7 +360,7 @@ Each action has a label, category, description policy (`Catalog` | `StoredSafe`)
 | Business | `ix_audit_events_tenant_correlation (tenant_id, correlation_identifier)` | M4-2 |
 | Business | `ix_audit_events_tenant_record_time (…)` only if `EXPLAIN (ANALYZE, BUFFERS)` on a seeded 1M-row organization requires it | M4-2 (measured) |
 | Business | No table, no grant change | — |
-| AuthorityDb | None | — |
+| AuthorityDb | `ix_security_commands_org_created (organization_id, command_created_on, security_command_id)` and `ix_journal_org_created (organization_id, journal_created_on, journal_stream_name, journal_stream_revision)` (amendment C-165, R-4; additive; migration `AuthoritySecurityCommandTimelineIndexes`) | M4-3 |
 | SpiceDB | Additive relation and permission | M4-1 |
 
 **M4-1 has no business migration.** All migrations are additive and are tested on the disposable security-test stack first.
@@ -473,7 +486,7 @@ Each milestone ends with local verification, a signed commit, a status-log secti
 - **TC-1:** the reason-code lists (§5.1).
 - **TC-2:** evaluated search counts withheld together with matched counts (§5.2).
 - **TC-3:** proposed lock and timeout values and rate limits (§5.3), to be measured and tuned.
-- **TC-4:** `UpdateFormUsers` included in the timeline as a governance command (§5.2).
+- **TC-4:** `UpdateFormUsers` included in the timeline as a governance command (§5.2). *Confirmed by the owner (C-165).*
 - **TC-5:** delivery outcome recorded only in the business projection, labelled business-reported; the Authority records authorization only (§5.3).
 
 ### 10.3 Independent reviewer approvals still required

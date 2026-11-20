@@ -489,6 +489,8 @@ Content bodies, signed bytes, leaves, ciphertext; keys, HMAC material, key refer
 
 No API reads the audit stream; no permission changes (PD-09). Readers remain AuthorityDb and archive administrators under G08/PB-10 controls. M4-2 decides tenant visibility of this kind later.
 
+*(Note 2026-11-20, C-165, PD-09 option B: the C8 M4-3 security-command timeline (AC-8.2) shows this kind to Security Auditors (view_audit) with `refusal_code`, `workload_name`, `entry_point`, `client_capability_level` and `evidence_database_time_utc` only, marked as recorded on a business-runtime report; `refusal_observed_on_utc` is withheld. The recorder remains the sole producer; no permission was added. `PHASE_C8_M4_AC8_SECURITY_CONTRACT.md` §5.2, amendment C-165.)*
+
 ---
 
 ## 10. Test and mutation matrix (to be executed only in authorized increments)

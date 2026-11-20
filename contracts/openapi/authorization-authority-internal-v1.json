@@ -384,6 +384,77 @@
         }
       }
     },
+    "/internal/v1/organizations/audit/security-command-timeline": {
+      "post": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "AC-8.2: one page of the organization's security-command timeline for the delegated Security Auditor (view_audit): command rows in every state, including Rejected and FailedReconciliation, and allowlisted audit-stream entries, newest first. Each envelope is built field by field from an allowlist; free text, notes, step-up evidence, share scopes, identity identifiers, rejection details and matched or evaluated counts are never returned. The page is read inside the AC-8.3 audit-access transaction (NOWAIT organization lock, bounded) and returned only after its AuditAccessAuthorized entry (served_by authority, delivery not_attested) committed.",
+        "operationId": "ReadSecurityCommandTimeline",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityCommandTimelineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityCommandTimelinePage"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/verifier/protection-coverage": {
       "post": {
         "tags": [
@@ -3285,7 +3356,8 @@
       "AuditAccessKind": {
         "enum": [
           "ExplorerPage",
-          "EventDetail"
+          "EventDetail",
+          "CommandTimelinePage"
         ]
       },
       "AuditAccessRequest": {
@@ -11698,6 +11770,287 @@
               "null",
               "string"
             ],
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityCommandTimelineDetail": {
+        "required": [
+          "key",
+          "kind",
+          "value",
+          "values"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "values": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SecurityCommandTimelineEntry": {
+        "required": [
+          "source",
+          "kind",
+          "occurred_on",
+          "command_id",
+          "command_state",
+          "committed_authorization_revision",
+          "rejection_code",
+          "actor_user_id",
+          "effective_on",
+          "evidence_basis",
+          "reported_by",
+          "evidence",
+          "details",
+          "withheld_fields"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "occurred_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "command_state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "committed_authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "rejection_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "actor_user_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "effective_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "evidence_basis": {
+            "type": "string"
+          },
+          "reported_by": {
+            "type": "string"
+          },
+          "evidence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityCommandTimelineEvidence"
+              }
+            ]
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityCommandTimelineDetail"
+            }
+          },
+          "withheld_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SecurityCommandTimelineEvidence": {
+        "required": [
+          "stream",
+          "stream_revision",
+          "entry_digest_hex",
+          "archive_state",
+          "receipt_reference_present"
+        ],
+        "type": "object",
+        "properties": {
+          "stream": {
+            "type": "string"
+          },
+          "stream_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "entry_digest_hex": {
+            "type": "string"
+          },
+          "archive_state": {
+            "type": "string"
+          },
+          "receipt_reference_present": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SecurityCommandTimelinePage": {
+        "required": [
+          "items",
+          "after",
+          "audit_journal_revision",
+          "authorization_revision",
+          "served_by",
+          "delivery"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityCommandTimelineEntry"
+            }
+          },
+          "after": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "audit_journal_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "served_by": {
+            "type": "string"
+          },
+          "delivery": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityCommandTimelineRequest": {
+        "required": [
+          "organization_id",
+          "after",
+          "page_size",
+          "kinds",
+          "states",
+          "from",
+          "to",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "after": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "page_size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "kinds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "states": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "correlation_id": {
+            "type": "string",
             "format": "uuid"
           }
         }
