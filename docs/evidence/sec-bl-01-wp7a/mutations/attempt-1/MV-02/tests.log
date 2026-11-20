@@ -1,0 +1,56 @@
+failed AuthorizationAuthority.Tests.JournalVerifierTests.TamperingInOneOrganizationAndStreamDoesNotAffectOthers (32ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Inconclusive
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.TamperingInOneOrganizationAndStreamDoesNotAffectOthers() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:343
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalBaselineServiceTests.MissingArchiveObjectsForgedAnchoredRowsRedigestedRowsAndATruncatedTailAreReported (69ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalBaselineFindingEntry { FindingCode = CHAIN_INTEGRITY_FAILURE, Subtype = LINK_MISMATCH, Severity = Security, FirstRevision = 3, LastRevision = 3, EvidenceReferences = <>z__ReadOnlyList`1[System.String], Detail = AuthorityDb row: previous digest differs from SHA-256 of the predecessor, CandidateExceptionClass = , AcceptedByExceptionId =  }]
+    at AuthorizationAuthority.Tests.JournalBaselineServiceTests.MissingArchiveObjectsForgedAnchoredRowsRedigestedRowsAndATruncatedTailAreReported() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalBaselineServiceTests.cs:190
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AChangedAnchorAndADatabaseArchiveMismatchAboveTheCheckpointAreStillDetectedByTheBoundedSweep (50ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalVerificationFinding { OrganizationId = 01a1ea3c-9000-7e2c-8106-83c73cce95cf, StreamName = audit, FindingCode = CHAIN_INTEGRITY_FAILURE, Subtype = BODY_DIGEST_MISMATCH, Severity = Security, FirstRevision = 12, LastRevision = 12, RunId = 01a1ea3c-c2c8-7672-8251-54e433ece08e, ObservedAtUtc = 2026-11-17 4:00:13 PM +00:00, EvidenceReferences = <>z__ReadOnlySingleElementList`1[System.String], Detail = AuthorityDb row: SHA-256 of the stored body differs from the stored digest, SweepOutcome = Findings, Checkpoint = JournalCheckpointReference { CheckpointSequence = 1, VerifiedRevision = 10, CheckpointDigestHex = dba1a9b5e16ff0ac7d5804ffd125e9d109b2a4aac96bb9cfa5a73e541b3c1691 }, StopGeneration = , Identity = 3807cff687ceb2329e4929a736ba2474 }]
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AChangedAnchorAndADatabaseArchiveMismatchAboveTheCheckpointAreStillDetectedByTheBoundedSweep() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:424
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream: "audit") (25ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Inconclusive
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:174
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream: "authorization") (7ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Inconclusive
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:174
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream: "content") (6ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Inconclusive
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:174
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalBaselineServiceTests.AnArchivedObjectThatDiffersFromTheRowFailsTheBaseline (4ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalBaselineFindingEntry { FindingCode = CHAIN_INTEGRITY_FAILURE, Subtype = LINK_MISMATCH, Severity = Security, FirstRevision = 4, LastRevision = 4, EvidenceReferences = <>z__ReadOnlyList`1[System.String], Detail = archived object: previous digest differs from SHA-256 of the predecessor, CandidateExceptionClass = , AcceptedByExceptionId =  }]
+    at AuthorizationAuthority.Tests.JournalBaselineServiceTests.AnArchivedObjectThatDiffersFromTheRowFailsTheBaseline() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalBaselineServiceTests.cs:165
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AModifiedDeliveredRowIsAnAnchorMismatchAndADeletedRowIsAGap (34ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalVerificationFinding { OrganizationId = 01a1ea3c-9000-7f25-8fd6-88fd8c79fa5f, StreamName = audit, FindingCode = CHAIN_INTEGRITY_FAILURE, Subtype = LINK_MISMATCH, Severity = Security, FirstRevision = 8, LastRevision = 8, RunId = 01a1ea3c-af40-7323-849a-195a2ebd00b6, ObservedAtUtc = 2026-11-17 4:00:08 PM +00:00, EvidenceReferences = <>z__ReadOnlySingleElementList`1[System.String], Detail = AuthorityDb row: previous digest differs from SHA-256 of the predecessor, SweepOutcome = Findings, Checkpoint = JournalCheckpointReference { CheckpointSequence = 1, VerifiedRevision = 5, CheckpointDigestHex = 2dd6865e4210c33a838e67fd15c752f87d6df81c2090216a6373fb87f0e88434 }, StopGeneration = , Identity = 2eb8b4171c110bbd1191134bfa5c4065 }]
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:41
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AModifiedDeliveredRowIsAnAnchorMismatchAndADeletedRowIsAGap() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:122
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 8
+  succeeded: 409
+  skipped: 0
+  duration: 3s 614ms

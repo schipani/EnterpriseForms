@@ -128,7 +128,8 @@ public sealed class UnavailableMacProvider(string reason) : IIntegrityMacProvide
 /// content acceptance rule fence matches this build (<see cref="ContentAcceptanceRuleGuard"/>). E3-M2f-2 (INV-4): a ready detail also states that
 /// the envelope capability floor is enforced and the effective deployment floor (supporting evidence only, never proof of the build).
 /// </summary>
-public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbProjection spiceDb, ISecurityEventArchive archive, IDbContextFactory<AuthorityDbContext> contextFactory, AuthorizationAuthority.Application.Common.ProjectionMarkerTransitionState transition, ContentAcceptanceRuleGuard contentAcceptanceRules, AuthorizationAuthority.Application.Features.Content.EnvelopeCapabilityFloor? envelopeCapabilityFloor = null)
+public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbProjection spiceDb, ISecurityEventArchive archive, IDbContextFactory<AuthorityDbContext> contextFactory, AuthorizationAuthority.Application.Common.ProjectionMarkerTransitionState transition, ContentAcceptanceRuleGuard contentAcceptanceRules, AuthorizationAuthority.Application.Features.Content.EnvelopeCapabilityFloor? envelopeCapabilityFloor = null,
+    AuthorizationAuthority.Application.Features.Journal.Recovery.DPlusDurability? dplusDurability = null)
 {
     public async Task<(bool Ready, string Detail)> CheckAsync(CancellationToken cancellationToken)
     {
@@ -169,6 +170,14 @@ public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbP
             return (false, archiveDetail);
         }
 
+        // SEC-BL-01 WP-5b (C-157 SC-5, amendment A-6 §26): every journal stream is D+-enabled or about to be, and D+ cannot evaluate anything without
+        // its durability (W2-S commitment stores, instance pin, recovery records). A usable archive without it is a CONFIGURATION error: delivery
+        // of D+ streams would never happen (the authorization gate would stay closed). Reported as not ready, never bypassed or downgraded.
+        if (DPlusReadiness.Check(dplusDurability) is { Ready: false } dplus)
+        {
+            return (false, dplus.Detail!);
+        }
+
         var capabilityDetail = (envelopeCapabilityFloor ?? AuthorizationAuthority.Application.Features.Content.EnvelopeCapabilityFloor.Default).Description;
         return transition.Completed ? (true, $"{providerDetail}; {spiceDetail}; {archiveDetail}; projection markers verified; {rulesDetail}; {capabilityDetail}") : (false, "ProjectionMarkerTransitionPending");
     }
@@ -188,4 +197,15 @@ public sealed class SigningProviderStartupGuard(SigningProviderPolicy policy) : 
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+}
+
+/// <summary>
+/// SEC-BL-01 WP-5b (C-157 SC-5, amendment A-6 §26.6): readiness of the D+ composition. A host whose archive is usable but whose D+ durability
+/// (journal-verification record store, instance pin, recovery verifier) is not composed can never deliver a D+ stream, so it is reported as a
+/// configuration error (not an outage and not an integrity failure). Never bypassed and never downgraded.
+/// </summary>
+public static class DPlusReadiness
+{
+    public static (bool Ready, string? Detail) Check(AuthorizationAuthority.Application.Features.Journal.Recovery.DPlusDurability? durability) =>
+        durability is null ? (false, AuthorizationAuthority.Application.Features.Journal.ArchiveProcessor.DurabilityNotComposedCode) : (true, null);
 }

@@ -1,0 +1,20 @@
+[wp4] AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AJ2RevocationDeletionPhasesOnTheRealGate (10s 071ms)
+  Assert.Equal() Failure: Values differ
+  Expected: AwaitingArchive
+  Actual:   Ready
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AJ2RevocationDeletionPhasesOnTheRealGate() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:380
+    --- End of stack trace from previous location ---
+  Standard output
+    J2 phase 1 (before commitment): gate=Ready; full sweep Clean [] inconclusive=[]
+    J2 phase 2 (after commitment, before delivery): gate=Ready; incremental sweep Findings [DPLUS_COMMITMENT_MISMATCH/BEYOND_HEAD@3..3] inconclusive=[]
+    
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 1
+  failed: 1
+  succeeded: 0
+  skipped: 0
+  duration: 11s 003ms
+[wp4] containers and their anonymous volumes removed
+[wp4] exit code 2

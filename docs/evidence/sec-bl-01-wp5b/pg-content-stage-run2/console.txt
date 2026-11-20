@@ -1,0 +1,21 @@
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BAStopSurvivesRestartAndForgedDeliveryStateOnRealStores(stream: "content") (6s 918ms)
+skipped AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BAStopSurvivesRestartAndForgedDeliveryStateOnRealStores(stream: "authorization") (0ms)
+  authorization is not D+-enabled in this phase
+skipped AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement (0ms)
+  SECBL01_DPLUS_MEASURE=1 not set (opt-in measurement; run scripts/dev/sec-bl-01-wp4-pg-azurite-gate.ps1 -Measure)
+skipped AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BAnAuthorizedAnchoredRestoreDeliversTheStoppedStreamOnRealStores(stream: "authorization") (0ms)
+  authorization is not D+-enabled in this phase
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BAnAuthorizedAnchoredRestoreDeliversTheStoppedStreamOnRealStores(stream: "content") (1s 561ms)
+skipped AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BTheVerifierComparesRealCommitmentsWithTheArchive(stream: "authorization") (0ms)
+  authorization is not D+-enabled in this phase
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BTheVerifierComparesRealCommitmentsWithTheArchive(stream: "content") (953ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BAValidStreamDeliversWithCommitmentsInBothStores(stream: "content") (460ms)
+skipped AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BAValidStreamDeliversWithCommitmentsInBothStores(stream: "authorization") (0ms)
+  authorization is not D+-enabled in this phase
+
+Test run summary: Passed! - <repo>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 9
+  failed: 0
+  succeeded: 4
+  skipped: 5
+  duration: 10s 417ms

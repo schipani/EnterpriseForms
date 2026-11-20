@@ -1,0 +1,22 @@
+{
+    "run":  "pg-run-2",
+    "command":  "scripts/dev/sec-bl-01-wp4-pg-azurite-gate.ps1 -Class AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests,AuthorizationAuthority.Tests.JournalBoundedListingAzuriteTests,AuthorizationAuthority.Tests.JournalVerificationAzuriteIntegrationTests -PerformanceRows 2000 -CheckpointCount 100 -EvidenceDirectory \u003cdir\u003e",
+    "started_utc":  "2026-11-19T05:08:29.8833100Z",
+    "ended_utc":  "2026-11-19T05:18:49.3784313Z",
+    "exit_code":  0,
+    "total":  167,
+    "succeeded":  164,
+    "failed":  0,
+    "skipped":  3,
+    "failed_tests":  [
+
+                     ],
+    "assembly_sha256":  {
+                            "AuthorizationAuthority.Tests.dll":  "91e1e420cffd3583b388ac38e75b9440ed1722dd11b43520374929f045b660fb",
+                            "AuthorizationAuthority.Application.dll":  "4dc1df26851bcd64810e1572f8565684979ea548a806dd5adb26b9db3b1cf2a4",
+                            "AuthorizationAuthority.Infrastructure.dll":  "6da1d2e7f99e81007426605516a4b3add94425518488e7a976ab00407675ffe4",
+                            "AuthorizationAuthority.Domain.dll":  "b7640ec690f101834d9099d933ca3a21949a3fbb471e24d0cb066781882eaa27"
+                        },
+    "console_sha256":  "e2b1e2e937e5f61b70bb925b7e7617b832f8abc7d792c1253ebbeed01f1fe492",
+    "stack":  "postgres:18.0 + two azurite:3.9.0 (archive; separately keyed journal-verification store), 127.0.0.1, per-run credentials, removed afterwards"
+}

@@ -53,6 +53,12 @@ public sealed class Program
         var measureSeal = SealThroughputCommand.Requested(args, out var sealCount, out var sealConcurrency, out args);
         // E-5: Development/Testing operator command, run on the composed host (same store and signing provider), then exits.
         var activateKey = IntegrityKeyActivationCommand.Requested(args, out var activation, out args);
+        // SEC-BL-01 WP-3: Development/Testing baseline reconciliation, run on the composed host, then exits.
+        var runBaseline = JournalBaselineCommand.Requested(args, out var baselineArguments, out args);
+        // SEC-BL-01 WP-5a.1: explicit provisioning of a disposable Development/Testing archive, run on the composed host, then exits.
+        var provisionArchive = ArchiveProvisioningCommand.Requested(args, out args);
+        // SEC-BL-01 G14-R2: controlled audit-stream recovery command line (Development/Testing; no HTTP endpoint), then exits.
+        var runRecovery = JournalRecoveryCommand.Requested(args, out var recoveryArguments, out args);
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.ConfigureHttpJsonOptions(options => AuthorityJson.Configure(options.SerializerOptions));
@@ -125,6 +131,8 @@ public sealed class Program
         builder.Services.AddSingleton<AuthorizationAuthority.Application.Features.Catalogue.ProtectionReconciliationService>();
         builder.Services.AddSingleton<SpiceDbSchemaInitializer>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<SpiceDbSchemaInitializer>());
+        // SEC-BL-01 WP-5a.1: refuse to start before the work loop when D+ would have no durable finding store (Development/Testing).
+        builder.Services.AddDPlusStartupValidation();
         builder.Services.AddHostedService<AuthorityWorkLoop>();
         // C-150 R56-B: every instance listens for committed authorization changes (any instance's commit wakes all loops).
         var authorityWork = builder.Configuration.GetSection(AuthorizationAuthority.Application.Common.AuthorityWorkOptions.SectionName).Get<AuthorizationAuthority.Application.Common.AuthorityWorkOptions>() ?? new AuthorizationAuthority.Application.Common.AuthorityWorkOptions();
@@ -136,6 +144,8 @@ public sealed class Program
         // C8 M4 S1 (S2): periodic projection-integrity check; it complements, never replaces, the decision-time protocol.
         builder.Services.AddSingleton(builder.Configuration.GetSection(ProjectionIntegrityOptions.SectionName).Get<ProjectionIntegrityOptions>() ?? new ProjectionIntegrityOptions());
         builder.Services.AddHostedService<ProjectionIntegrityMonitorLoop>();
+        // SEC-BL-01 WP-3/WP-4: baseline and alert-only scheduled journal verifier; Development/Testing only, off unless configured.
+        builder.Services.AddJournalVerification(builder.Configuration, builder.Environment);
 
         var app = builder.Build();
         if (measureSeal)
@@ -146,6 +156,21 @@ public sealed class Program
         if (activateKey)
         {
             return IntegrityKeyActivationCommand.Run(app.Services, app.Environment, activation);
+        }
+
+        if (runBaseline)
+        {
+            return JournalBaselineCommand.Run(app.Services, app.Environment, baselineArguments);
+        }
+
+        if (provisionArchive)
+        {
+            return ArchiveProvisioningCommand.Run(app.Services, app.Environment, app.Configuration);
+        }
+
+        if (runRecovery)
+        {
+            return JournalRecoveryCommand.Run(app.Services, app.Environment, recoveryArguments);
         }
 
 

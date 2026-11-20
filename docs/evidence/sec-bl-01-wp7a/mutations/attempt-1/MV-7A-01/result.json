@@ -1,0 +1,33 @@
+{
+  "id": "MV-7A-01",
+  "what": "RV-2: the freshness bound is ignored (a verified attestation answers for the process lifetime: the pre-remediation TR-6)",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "976ea25a7d858f53e61578b81c8e2850f487e70dfbf98b6d3aa735690c0bfb36"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 36.8,
+    "exit": 2,
+    "seconds": 4.5,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 345,
+    "failed": [
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ANewlyEstablishedStopAtOrBelowTheEntryIsRefusedUntilResolved(stream:",
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AStreamHeadWithSuccessorEvidenceIsRefusedAndTheRefusalIsPositionalOnly(stream:",
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(stream:",
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnUnchangedHeadIsReEstablishedAfterEveryBound(stream:",
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.ConcurrentAccessesShareOneEstablishmentAndANewHeadIsNeverAnsweredByTheOld(stream:",
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream:",
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream:",
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.RestoredEvidenceStaysRefusedUntilARestart(stream:"
+    ]
+  },
+  "seconds": 41.3
+}

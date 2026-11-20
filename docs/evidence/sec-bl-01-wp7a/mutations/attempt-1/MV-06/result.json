@@ -1,0 +1,26 @@
+{
+  "id": "MV-06",
+  "what": "VF-11: an unavailable archive is treated as verified (its operational finding and inconclusive reasons dropped)",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs": "a7f8951ee5dac123ad2e601e6419f35836473c32f43dbbd9248b7fe60ac79f83"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 37.8,
+    "exit": 2,
+    "seconds": 3.9,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 416,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalVerifierTests.ArchiveAndCheckpointStoreOutagesAreInconclusiveWithOperationalFindings"
+    ]
+  },
+  "seconds": 41.7
+}

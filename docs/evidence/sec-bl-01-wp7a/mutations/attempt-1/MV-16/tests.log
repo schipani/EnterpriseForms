@@ -1,0 +1,95 @@
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ADeletionBelowTheCheckpointIsInvisibleToTheBoundedIncrementalSweepAndDetectedByTheFullSweep (38ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ADeletionBelowTheCheckpointIsInvisibleToTheBoundedIncrementalSweepAndDetectedByTheFullSweep() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:396
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusCommitmentVerificationTests.EveryCommitmentDefectIsReported(stream: "audit") (16ms)
+  audit/missing (both copies removed): expected MISSING@3; got []
+    at AuthorizationAuthority.Tests.DPlusCommitmentVerificationTests.EveryCommitmentDefectIsReported(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusCommitmentVerificationTests.cs:155
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAnAlteredDeliveredRowOutsideTheNewestEightIsDetectedByTheVerifier (951ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.DetectedByTheFullSweepAsync(Verification v, Delivered d, String code, String subtype, Int64 revision) in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:204
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAnAlteredDeliveredRowOutsideTheNewestEightIsDetectedByTheVerifier() in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:279
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.StopMarkerVerifierTests.AnInvalidMarkerAndAnUnexpectedMetaObjectAreReportedByTheFullSweep (20ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.StopMarkerVerifierTests.AnInvalidMarkerAndAnUnexpectedMetaObjectAreReportedByTheFullSweep() in <clone>\tests\authority\AuthorizationAuthority.Tests\StopMarkerVerifierTests.cs:50
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.ANonRechainedEditBelowTheCheckpointIsMissedIncrementallyAndFoundByTheFullSweep (23ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.ANonRechainedEditBelowTheCheckpointIsMissedIncrementallyAndFoundByTheFullSweep() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:220
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusCommitmentVerificationTests.EveryCommitmentDefectIsReported(stream: "content") (4ms)
+  content/missing (both copies removed): expected MISSING@3; got []
+    at AuthorizationAuthority.Tests.DPlusCommitmentVerificationTests.EveryCommitmentDefectIsReported(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusCommitmentVerificationTests.cs:155
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusCommitmentVerificationTests.EveryCommitmentDefectIsReported(stream: "authorization") (3ms)
+  authorization/missing (both copies removed): expected MISSING@3; got []
+    at AuthorizationAuthority.Tests.DPlusCommitmentVerificationTests.EveryCommitmentDefectIsReported(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusCommitmentVerificationTests.cs:155
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AMissingOrForeignRecordIsAFindingAndTheGapIsNoLongerAccepted (58ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalVerificationFinding { OrganizationId = 01a1ea3c-9000-7e24-83b2-ead87a234482, StreamName = audit, FindingCode = ACCEPTED_EXCEPTION_RECORD_INVALID, Subtype = , Severity = Security, FirstRevision = , LastRevision = , RunId = 01a1ea3c-a388-7150-b511-f2e48986ea80, ObservedAtUtc = 2026-11-17 4:00:05 PM +00:00, EvidenceReferences = <>z__ReadOnlySingleElementList`1[System.String], Detail = a checkpoint names an accepted exception whose record is missing, invalid or for another scope, SweepOutcome = Findings, Checkpoint = JournalCheckpointReference { CheckpointSequence = 1, VerifiedRevision = 5, CheckpointDigestHex = 7deb2b2a7df29812ea09a8ef73544657f31635ec09c655b53453daa4f8c5d251 }, StopGeneration = , Identity = 51f6fbadc49847a00bcb500bf4bbd42e }]
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AMissingOrForeignRecordIsAFindingAndTheGapIsNoLongerAccepted() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:125
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAConsistentlyRedigestedDeliveredRowThatIsNotSentAgainIsDetectedByTheVerifier (23ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.DetectedByTheFullSweepAsync(Verification v, Delivered d, String code, String subtype, Int64 revision) in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:204
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAConsistentlyRedigestedDeliveredRowThatIsNotSentAgainIsDetectedByTheVerifier() in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:251
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierDeletingADeliveredRowIsDetectedByTheVerifierAndTheKeyIsStillRecordedAgainUntilDetection (10ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.DetectedByTheFullSweepAsync(Verification v, Delivered d, String code, String subtype, Int64 revision) in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:204
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierDeletingADeliveredRowIsDetectedByTheVerifierAndTheKeyIsStillRecordedAgainUntilDetection() in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:228
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream: "audit") (8ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:174
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream: "authorization") (4ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:174
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream: "content") (16ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:174
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AFullSweepRunsOnAllThreeStreams (12ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 3
+  Actual:   1
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AFullSweepRunsOnAllThreeStreams() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:106
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.LaterSweepsClassifyTheUnchangedAcceptedGapAsAnObservationAndAdvanceWhileStayingReduced (19ms)
+  Assert.Single() Failure: The collection was empty
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.LaterSweepsClassifyTheUnchangedAcceptedGapAsAnObservationAndAdvanceWhileStayingReduced() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:86
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 15
+  succeeded: 402
+  skipped: 0
+  duration: 2s 684ms

@@ -1,0 +1,26 @@
+{
+  "id": "MV-18",
+  "what": "VF-8: FAKE_RECEIPT raised without the second read",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalStreamComparer.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalStreamComparer.cs": "b0f99f91097841a5cd9695f03a7c6eb91e14efba0dde7bea00ef2b147401359b"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 39.0,
+    "exit": 2,
+    "seconds": 4.4,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 414,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(stream:"
+    ]
+  },
+  "seconds": 43.4
+}

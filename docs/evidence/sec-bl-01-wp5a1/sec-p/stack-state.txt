@@ -1,0 +1,13 @@
+Disposable security-test stack, WP-5a.1 (fresh project, down -v before and after).
+
+journal-verification-keygen: journal-verification key generated
+archive-provision (first run, before the Authority started): archive provisioning Provisioned: archive provisioned
+archive-provision (rerun on the running stack after SEC-P): archive provisioning AlreadyProvisioned: archive already provisioned (record and sentinel agree); exit 0
+
+Post-run journal delivery states (stream, state, error code, rows):
+audit Anchored - 15
+authorization Anchored - 59
+content Anchored - 25
+quarantined organizations: 0 of 15
+
+Earlier attempt in this increment: archive-provision failed closed (AccountKeyFile cannot be read) because a tmpfs-driver named volume is mounted as a separate tmpfs per container; the overlays now use the base named volume, removed with down -v.

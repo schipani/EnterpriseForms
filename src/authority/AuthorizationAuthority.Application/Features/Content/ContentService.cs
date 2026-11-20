@@ -1039,9 +1039,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
 
         var checkpointJournal = await FindContentJournalForHeadAsync(scope, state.OrganizationId, head, cancellationToken).ConfigureAwait(false);
-        if (checkpointJournal is null || checkpointJournal.ArchiveDeliveryState != ArchiveDeliveryStates.Anchored)
+        if (!await ContentCheckpointReceipts.IsDeliveredAsync(scope, head, checkpointJournal, cancellationToken).ConfigureAwait(false))
         {
-            return Failed("AWAITING_ARCHIVE", head.CommittedContentRevision, head.CommittedOperationId, at: head);
+            return Failed("AWAITING_ARCHIVE", head.CommittedContentRevision, head.CommittedOperationId, at: head); // E-7: trusted receipt, not the row state
         }
 
         var key = await scope.FindKeyRegistrationAsync(state.OrganizationId, IntegrityKeyPurposes.RowIntegrityV1, cancellationToken).ConfigureAwait(false)
@@ -1137,9 +1137,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         // Protected bytes are never released before the content checkpoint holds its archive receipt (SEC-P12).
         var checkpointJournal = await FindContentJournalForHeadAsync(scope, state.OrganizationId, head, cancellationToken).ConfigureAwait(false);
-        if (checkpointJournal is null || checkpointJournal.ArchiveDeliveryState != ArchiveDeliveryStates.Anchored)
+        if (!await ContentCheckpointReceipts.IsDeliveredAsync(scope, head, checkpointJournal, cancellationToken).ConfigureAwait(false))
         {
-            throw AuthorityException.NotReady("AwaitingArchive");
+            throw AuthorityException.NotReady("AwaitingArchive"); // E-7: trusted receipt, not the row state
         }
 
         // Target manifest: the current head, or (historic document versions) the accepted manifest of an earlier operation of the

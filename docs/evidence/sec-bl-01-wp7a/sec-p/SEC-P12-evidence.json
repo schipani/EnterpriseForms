@@ -1,0 +1,123 @@
+{
+  "test_id": "SEC-P12",
+  "scenario": "Mandatory audit archive unavailable: operations requiring independently durable evidence stay non-effective; protected bytes are not released without the receipt",
+  "outcome": "PASS",
+  "commit_sha": "a9b32dee5853b8178f7d1146a0817829e8404d65",
+  "image_fingerprint": "sha256:25e4803e38d94556404b41ed16161b7998d01721fb5290fbccb4527597c5fd6c (api=sha256:1c5b053874e9b317151af14555c3a457c7e2da11f9ef6814f6d16b3c8168c808;authority=sha256:e9a3e9ccfe23a11a5d7170c5792ed6fd60d520ca2be55822eca6aad66e2442f1)",
+  "started_at_utc": "2026-11-19T11:21:02.9275187\u002B00:00",
+  "executed_at_utc": "2026-11-19T11:21:38.1953891\u002B00:00",
+  "authority_revision": 4,
+  "content_revision": 2,
+  "failure_detail": null,
+  "observations": [
+    {
+      "at": "2026-11-19T11:21:03.4858170\u002B00:00",
+      "step": "bootstrap organization",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "authorization_revision": "1",
+        "integrity_key_name": "org-01a1f389e4cf72fb937cd837e7c721bc-row-integrity-v1",
+        "signing_key_version": "1"
+      }
+    },
+    {
+      "at": "2026-11-19T11:21:04.9990361\u002B00:00",
+      "step": "create form definition",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formDefinitionId": "4ba48d24-6414-84bd-ab22-706d4609b056",
+        "authorizationRevision": "2"
+      }
+    },
+    {
+      "at": "2026-11-19T11:21:07.6189612\u002B00:00",
+      "step": "create record",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "c8441908-f44e-87bb-b92a-13be7e2dba98",
+        "contentRevision": "1",
+        "committedOperationId": "0600a143-26ae-8ed2-9091-79fe1812fe2f",
+        "authorizationRevision": "3",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-11-19T11:21:24.4581812\u002B00:00",
+      "step": "share while archive paused",
+      "status": 202,
+      "error_code": "COMMAND_PENDING",
+      "fields": {
+        "title": "COMMAND_PENDING",
+        "command_status": "CommittedAwaitingProjection"
+      }
+    },
+    {
+      "at": "2026-11-19T11:21:24.4752798\u002B00:00",
+      "step": "gate during archive outage",
+      "detail": "{\u0022organization_id\u0022:\u002201a1f389-e4cf-72fb-937c-d837e7c721bc\u0022,\u0022authorization_revision\u0022:4,\u0022projection_applied_revision\u0022:3,\u0022content_integrity_revision\u0022:1,\u0022projection_gate_state\u0022:\u0022AwaitingArchive\u0022,\u0022pending_archive_entries\u0022:1,\u0022integrity_quarantine_enabled\u0022:false}"
+    },
+    {
+      "at": "2026-11-19T11:21:24.4940065\u002B00:00",
+      "step": "reader read during archive outage",
+      "status": 503,
+      "error_code": "AUTHORITY_NOT_READY",
+      "fields": {}
+    },
+    {
+      "at": "2026-11-19T11:21:24.5112006\u002B00:00",
+      "step": "owner read during archive outage (gate closed)",
+      "status": 503,
+      "error_code": "AUTHORITY_NOT_READY",
+      "fields": {}
+    },
+    {
+      "at": "2026-11-19T11:21:25.7736346\u002B00:00",
+      "step": "reader read after archive receipt",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "isCompleteProjection": "false"
+      }
+    },
+    {
+      "at": "2026-11-19T11:21:31.5247368\u002B00:00",
+      "step": "update while archive paused (commit allowed, release gated; or refused under A-9)",
+      "status": 503,
+      "error_code": "AUTHORITY_NOT_READY",
+      "fields": {
+        "title": "AUTHORITY_NOT_READY"
+      }
+    },
+    {
+      "at": "2026-11-19T11:21:36.5634583\u002B00:00",
+      "step": "owner read of new revision during archive outage",
+      "status": 503,
+      "error_code": "AUTHORITY_NOT_READY",
+      "fields": {
+        "title": "AUTHORITY_NOT_READY"
+      }
+    },
+    {
+      "at": "2026-11-19T11:21:37.8162164\u002B00:00",
+      "step": "update re-issued after the archive returned (refused during the outage, A-9)",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "contentRevision": "2",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-11-19T11:21:38.1949849\u002B00:00",
+      "step": "owner read after content checkpoint archived",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "contentRevision": "2"
+      }
+    }
+  ]
+}

@@ -304,9 +304,10 @@ public sealed partial class SearchAccessValueProjectionStackTests(StageBFixture 
             await EditAsync(w, w.S.Clerk, record, new() { ["exhibit_count"] = "2" });
             var head = long.Parse(fixture.Stack.AuthorityObserverSql($"SELECT content_integrity_revision FROM organization_authorization_states WHERE organization_id = '{org:D}';").Trim().Split('\n')[0].Trim(), CultureInfo.InvariantCulture);
             var where = $"organization_id = '{org:D}' AND journal_stream_name = 'content' AND journal_stream_revision = {head}";
-            fixture.Stack.AuthorityAdministratorSql(tamper == "body"
+            // SEC-BL-01 G08 (A-7 §27): a J2 administrator tamper, bypassing the journal triggers explicitly.
+            fixture.Stack.AuthorityAdministratorSql("SET session_replication_role = replica; " + (tamper == "body"
                 ? $"UPDATE authority.security_journal_entries SET journal_event_body_json = replace(journal_event_body_json, '\"committed_content_revision\"', '\"committed_content_revisioN\"') WHERE {where};"
-                : $"UPDATE authority.security_journal_entries SET journal_stream_revision = journal_stream_revision + 1000000 WHERE {where};");
+                : $"UPDATE authority.security_journal_entries SET journal_stream_revision = journal_stream_revision + 1000000 WHERE {where};"));
             Assert.Equal("Quarantined", (await CatchUpAsync(org)).GetProperty("outcome_name").GetString());
             var status = await StatusAsync(org);
             Assert.Equal(("Quarantined", expectedCode), (status.GetProperty("status_name").GetString(), status.GetProperty("quarantine_reason_code").GetString()));

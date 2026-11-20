@@ -1,0 +1,38 @@
+{
+  "id": "MV-17b",
+  "what": "BL-2 (expressible variant): the baseline repairs missing archived evidence from AuthorityDb rows before comparing",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalBaselineService.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalBaselineService.cs": "ceee2a1771833445c85c83af01da104236e1383b7e71c7a00e40bf49ab7f5912"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 38.2,
+    "exit": 2,
+    "seconds": 4.3,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 404,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AConflictingRecordUnderTheSameIdentifierBlocksTheCheckpoint",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AMissingOrForeignRecordIsAFindingAndTheGapIsNoLongerAccepted",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineCarriesEveryAcceptedExceptionNeverUpgradesAndMayAddNewOnes",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineReportsAChainFindingAndCreatesNothingWhenACarriedRecordChanged",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineThatWouldMoveTheVerifiedRevisionBackwardIsRejected",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AnAcceptedLegacyGapIsStoredAsACreateOnlyRecordAndTheCheckpointCrossesItWithReducedAssurance",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ChangedEvidenceInsideTheAcceptedScopeIsANewFindingAndTheCheckpointDoesNotAdvance",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.LaterSweepsClassifyTheUnchangedAcceptedGapAsAnObservationAndAdvanceWhileStayingReduced",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.NoFindingIsEverAcceptedWithoutADisposition",
+      "AuthorizationAuthority.Tests.JournalBaselineServiceTests.ADispositionOutsideTheFindingScopeIsNotAppliedAndIsReportedUnused",
+      "AuthorizationAuthority.Tests.JournalBaselineServiceTests.ALegacyRowWithoutAnOwnerDispositionFailsTheBaselineAndIsOnlyACandidateException",
+      "AuthorizationAuthority.Tests.JournalBaselineServiceTests.AnOwnerDispositionCoveringTheExactScopeGivesExceptionAcceptedWithReducedAssuranceAndProvenance",
+      "AuthorizationAuthority.Tests.JournalBaselineServiceTests.MissingArchiveObjectsForgedAnchoredRowsRedigestedRowsAndATruncatedTailAreReported"
+    ]
+  },
+  "seconds": 42.6
+}

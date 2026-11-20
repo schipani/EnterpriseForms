@@ -1,0 +1,29 @@
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+[slow] still running after 1m 00s: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement (AuthorizationAuthority.Tests.dll|net10.0|x64)
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+[slow] still running after 2m 00s: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement (AuthorizationAuthority.Tests.dll|net10.0|x64)
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+[slow] still running after 4m 00s: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement (AuthorizationAuthority.Tests.dll|net10.0|x64)
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+[slow] still running after 8m 00s: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement (AuthorizationAuthority.Tests.dll|net10.0|x64)
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP5BDPlusDeliveryMeasurement (8m 59s 790ms)
+
+Test run summary: Passed! - <repo>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 1
+  failed: 0
+  succeeded: 1
+  skipped: 0
+  duration: 9m 00s 409ms

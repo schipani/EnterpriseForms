@@ -14,7 +14,7 @@ public static class AuthorityRuntimeGrants
 
     private static readonly string[] AppendOnlyTables =
     [
-        "security_commands", "security_journal_entries", "authority_relationship_edges", "projection_outbox_events",
+        "security_commands", "authority_relationship_edges", "projection_outbox_events",
         "record_manifest_commits", "record_manifest_leaves", "content_integrity_checkpoints", "content_candidate_leaves",
         "search_catalogue_snapshot_entries", "published_form_versions", "protection_census_results", "protection_reconciliation_attestations",
         "platform_journal_entries", "platform_operator_evidence_uses",
@@ -28,6 +28,21 @@ public static class AuthorityRuntimeGrants
         "platform_operators", "platform_operator_change_proposals", "platform_operator_approvals", "platform_journal_heads",
         "organization_onboarding_requests", "organization_onboarding_owners", "organization_onboarding_approvals",
         "organization_owner_recovery_cases", "organization_owner_recovery_subjects", "organization_owner_recovery_approvals", "organization_recovered_owner_probations",
+    ];
+
+    /// <summary>
+    /// SEC-BL-01 G08 (C-158, A-7 §27 G8-5): the security journal. The runtime may read and insert it and update only the delivery columns
+    /// (<see cref="JournalImmutabilitySql.RuntimeUpdatableColumns"/>); immutable fields and delivery-state transitions are enforced by triggers.
+    /// </summary>
+    public const string JournalTable = "security_journal_entries";
+
+    /// <summary>SEC-BL-01 G08 (A-7 §27 G8-6, OI-DR-2): the NOLOGIN read-only role of the journal verifier. Created here; holds no credential.</summary>
+    public const string JournalVerifierRole = "authority_journal_verifier";
+
+    /// <summary>G08: the organization head columns the journal verifier reads (column-level SELECT; nothing else of the organization state).</summary>
+    public static readonly string[] JournalVerifierOrganizationColumns =
+    [
+        "organization_id", "authorization_revision", "latest_security_journal_digest", "content_integrity_revision", "latest_content_journal_digest", "audit_journal_revision", "latest_audit_journal_digest",
     ];
 
     /// <summary>IX-1: the NOLOGIN read-only role of the future indexed-search query path (IX-3). Created here; holds no credential.</summary>
@@ -46,12 +61,15 @@ public static class AuthorityRuntimeGrants
     ];
 
     /// <summary>Every table the runtime role may touch; a model table missing here is a startup defect caught by the unit test, not in Docker.</summary>
-    public static IReadOnlyCollection<string> GrantedTables => [.. AppendOnlyTables, .. InsertOnlyTables, .. MutableTables, .. Configurations.SearchIndexSchema.DerivedTables, .. Configurations.SearchIndexSchema.StateTables, .. Configurations.SearchIndexSchema.ResultTables, .. Configurations.SearchAccessSchema.AllTables];
+    public static IReadOnlyCollection<string> GrantedTables => [JournalTable, .. AppendOnlyTables, .. InsertOnlyTables, .. MutableTables, .. Configurations.SearchIndexSchema.DerivedTables, .. Configurations.SearchIndexSchema.StateTables, .. Configurations.SearchIndexSchema.ResultTables, .. Configurations.SearchAccessSchema.AllTables];
 
     /// <param name="searchReaderLogin">IX-3: the LOGIN user of the indexed-search query path (created by the cluster bootstrap with its
     /// own credential, never by a migration); it is made a member of <see cref="SearchReaderRole"/> and gets the reader's role settings.
     /// Null or empty: no reader login (the query path is then unconfigured and fails closed).</param>
-    public static void Apply(DbContext context, string runtimeRole, string? searchReaderLogin = null)
+    /// <param name="journalVerifierLogin">SEC-BL-01 G08 (OI-DR-2): the LOGIN user of the journal verifier (created by the cluster bootstrap with its
+    /// own credential); it is made a member of <see cref="JournalVerifierRole"/>. Null or empty: none (the verifier then uses the runtime credential
+    /// in a server-enforced read-only transaction, as before).</param>
+    public static void Apply(DbContext context, string runtimeRole, string? searchReaderLogin = null, string? journalVerifierLogin = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         if (!System.Text.RegularExpressions.Regex.IsMatch(runtimeRole, "^[a-z_][a-z0-9_]{0,62}$"))
@@ -62,6 +80,12 @@ public static class AuthorityRuntimeGrants
         if (!string.IsNullOrEmpty(searchReaderLogin) && (!System.Text.RegularExpressions.Regex.IsMatch(searchReaderLogin, "^[a-z_][a-z0-9_]{0,62}$") || searchReaderLogin == runtimeRole || searchReaderLogin == SearchReaderRole))
         {
             throw new ArgumentException("the search reader login must be a plain lowercase identifier distinct from the runtime role and the reader role", nameof(searchReaderLogin));
+        }
+
+        if (!string.IsNullOrEmpty(journalVerifierLogin) && (!System.Text.RegularExpressions.Regex.IsMatch(journalVerifierLogin, "^[a-z_][a-z0-9_]{0,62}$") || journalVerifierLogin == runtimeRole
+            || journalVerifierLogin == JournalVerifierRole || journalVerifierLogin == searchReaderLogin || journalVerifierLogin == SearchReaderRole))
+        {
+            throw new ArgumentException("the journal verifier login must be a plain lowercase identifier distinct from the runtime, reader and verifier roles", nameof(journalVerifierLogin));
         }
 
         var schema = AuthorityDbContext.SchemaName;
@@ -81,6 +105,9 @@ public static class AuthorityRuntimeGrants
             statements.Add($"GRANT SELECT, INSERT, UPDATE ON {schema}.{table} TO {runtimeRole}");
         }
 
+        // G08 (A-7 §27 G8-5): read and append the journal; update only the delivery columns. No DELETE or TRUNCATE.
+        statements.Add($"GRANT SELECT, INSERT ON {schema}.{JournalTable} TO {runtimeRole}");
+        statements.Add($"GRANT UPDATE ({string.Join(", ", JournalImmutabilitySql.RuntimeUpdatableColumns)}) ON {schema}.{JournalTable} TO {runtimeRole}");
         statements.Add($"GRANT SELECT ON {schema}.ef_migrations_history TO {runtimeRole}");
         foreach (var table in InsertOnlyTables)
         {
@@ -92,11 +119,34 @@ public static class AuthorityRuntimeGrants
         {
             statements.AddRange(SearchReaderLoginStatements(searchReaderLogin));
         }
+
+        statements.AddRange(JournalVerifierStatements(journalVerifierLogin));
         foreach (var statement in statements)
         {
 #pragma warning disable EF1002 // identifiers are validated by regex above and come from configuration, never from request input
             context.Database.ExecuteSqlRaw(statement);
 #pragma warning restore EF1002
+        }
+    }
+
+    /// <summary>
+    /// SEC-BL-01 G08 (A-7 §27 G8-6, OI-DR-2): the journal verifier's read-only role: schema usage, SELECT on the journal and the platform journal,
+    /// and column-level SELECT on the organization head columns. No INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES or TRIGGER anywhere; not a member
+    /// of the runtime role. The login (if configured) only inherits this role and defaults to read-only transactions.
+    /// </summary>
+    public static IEnumerable<string> JournalVerifierStatements(string? journalVerifierLogin)
+    {
+        var schema = AuthorityDbContext.SchemaName;
+        yield return $"DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{JournalVerifierRole}') THEN CREATE ROLE {JournalVerifierRole} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; END IF; END $$";
+        yield return $"REVOKE ALL ON ALL TABLES IN SCHEMA {schema} FROM {JournalVerifierRole}";
+        yield return $"GRANT USAGE ON SCHEMA {schema} TO {JournalVerifierRole}";
+        yield return $"GRANT SELECT ON {schema}.{JournalTable} TO {JournalVerifierRole}";
+        yield return $"GRANT SELECT ON {schema}.platform_journal_entries TO {JournalVerifierRole}";
+        yield return $"GRANT SELECT ({string.Join(", ", JournalVerifierOrganizationColumns)}) ON {schema}.organization_authorization_states TO {JournalVerifierRole}";
+        if (!string.IsNullOrEmpty(journalVerifierLogin))
+        {
+            yield return $"GRANT {JournalVerifierRole} TO {journalVerifierLogin}";
+            yield return $"ALTER ROLE {journalVerifierLogin} SET default_transaction_read_only = on";
         }
     }
 

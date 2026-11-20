@@ -1,0 +1,79 @@
+[wp4] AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheDedicatedVerifierLoginIsReadOnlyAndRunsTheVerifier (2s 782ms)
+  Xunit.MicrosoftTestingPlatform.XunitException: Npgsql.PostgresException : 3F000: schema "authority" does not exist
+    at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)
+    at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+    at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+    at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)
+    at Npgsql.NpgsqlDataReader.NextResult()
+    at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+    at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)
+    at Npgsql.NpgsqlCommand.ExecuteNonQuery(Boolean async, CancellationToken cancellationToken)
+    at Npgsql.NpgsqlCommand.ExecuteNonQuery()
+    at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteNonQuery(RelationalCommandParameterObject parameterObject)
+    at Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRaw(DatabaseFacade databaseFacade, String sql, IEnumerable`1 parameters)
+    at Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRaw(DatabaseFacade databaseFacade, String sql, Object[] parameters)
+    at AuthorizationAuthority.Infrastructure.Persistence.AuthorityRuntimeGrants.Apply(DbContext context, String runtimeRole, String searchReaderLogin, String journalVerifierLogin) in <clone>\src\authority\AuthorizationAuthority.Infrastructure\Persistence\AuthorityRuntimeGrants.cs:127
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheDedicatedVerifierLoginIsReadOnlyAndRunsTheVerifier() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.G08.cs:177
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheDedicatedVerifierLoginIsReadOnlyAndRunsTheVerifier() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.G08.cs:178
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AllThreeStreamsTogetherAreCleanReadOnlyAndIsolatedUnderTampering (16s 108ms)
+  Assert.All() Failure: 18 out of 72 items in the collection did not pass.
+  [0]:  Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [4]:  Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [8]:  Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [12]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [16]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [20]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [24]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [28]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [32]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [36]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [40]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [44]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [48]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [52]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [56]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [60]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [64]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+  [68]: Item:  "SET TRANSACTION READ WRITE"
+        Error: SET TRANSACTION READ WRITE
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AllThreeStreamsTogetherAreCleanReadOnlyAndIsolatedUnderTampering() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7.cs:1216
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AllThreeStreamsTogetherAreCleanReadOnlyAndIsolatedUnderTampering() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7.cs:1221
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.TheSnapshotIsServerEnforcedReadOnlyAndIssuesOnlySelects (324ms)
+  Assert.Equal() Failure: Strings differ
+               (pos 1)
+  Expected: "on"
+  Actual:   "off"
+               (pos 1)
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.TheSnapshotIsServerEnforcedReadOnlyAndIssuesOnlySelects() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.cs:229
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.TheSnapshotIsServerEnforcedReadOnlyAndIssuesOnlySelects() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.cs:232
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.TheSnapshotIsServerEnforcedReadOnlyAndIssuesOnlySelects() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.cs:240
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 3
+  failed: 3
+  succeeded: 0
+  skipped: 0
+  duration: 20s 733ms
+[wp4] containers and their anonymous volumes removed
+[wp4] exit code 2

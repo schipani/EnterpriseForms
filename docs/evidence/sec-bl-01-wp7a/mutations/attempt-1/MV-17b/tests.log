@@ -1,0 +1,93 @@
+failed AuthorizationAuthority.Tests.JournalBaselineServiceTests.ADispositionOutsideTheFindingScopeIsNotAppliedAndIsReportedUnused (673ms)
+  Xunit.MicrosoftTestingPlatform.XunitException: AuthorizationAuthority.Application.Common.Ports.ArchiveConflictException : archived body differs
+    at AuthorizationAuthority.Infrastructure.Archive.InMemorySecurityEventArchive.AppendAsync(Guid organizationId, String streamName, Int64 streamRevision, ReadOnlyMemory`1 eventBody, Byte[] expectedDigest, CancellationToken cancellationToken) in <clone>\src\authority\AuthorizationAuthority.Infrastructure\Archive\BlobSecurityEventArchive.cs:456
+    at AuthorizationAuthority.Application.Features.Journal.Reconciliation.JournalBaselineService.RunAsync(JournalBaselineRequest request, CancellationToken cancellationToken) in <clone>\src\authority\AuthorizationAuthority.Application\Features\Journal\Reconciliation\JournalBaselineService.cs:143
+    at AuthorizationAuthority.Application.Features.Journal.Reconciliation.JournalBaselineService.RunAsync(JournalBaselineRequest request, CancellationToken cancellationToken) in <clone>\src\authority\AuthorizationAuthority.Application\Features\Journal\Reconciliation\JournalBaselineService.cs:247
+    at AuthorizationAuthority.Tests.JournalBaselineServiceTests.ADispositionOutsideTheFindingScopeIsNotAppliedAndIsReportedUnused() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalBaselineServiceTests.cs:150
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalBaselineServiceTests.MissingArchiveObjectsForgedAnchoredRowsRedigestedRowsAndATruncatedTailAreReported (121ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: []
+    at AuthorizationAuthority.Tests.JournalBaselineServiceTests.MissingArchiveObjectsForgedAnchoredRowsRedigestedRowsAndATruncatedTailAreReported() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalBaselineServiceTests.cs:175
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalBaselineServiceTests.AnOwnerDispositionCoveringTheExactScopeGivesExceptionAcceptedWithReducedAssuranceAndProvenance (8ms)
+  Xunit.MicrosoftTestingPlatform.XunitException: AuthorizationAuthority.Application.Common.Ports.ArchiveConflictException : archived body differs
+    at AuthorizationAuthority.Infrastructure.Archive.InMemorySecurityEventArchive.AppendAsync(Guid organizationId, String streamName, Int64 streamRevision, ReadOnlyMemory`1 eventBody, Byte[] expectedDigest, CancellationToken cancellationToken) in <clone>\src\authority\AuthorizationAuthority.Infrastructure\Archive\BlobSecurityEventArchive.cs:456
+    at AuthorizationAuthority.Application.Features.Journal.Reconciliation.JournalBaselineService.RunAsync(JournalBaselineRequest request, CancellationToken cancellationToken) in <clone>\src\authority\AuthorizationAuthority.Application\Features\Journal\Reconciliation\JournalBaselineService.cs:143
+    at AuthorizationAuthority.Application.Features.Journal.Reconciliation.JournalBaselineService.RunAsync(JournalBaselineRequest request, CancellationToken cancellationToken) in <clone>\src\authority\AuthorizationAuthority.Application\Features\Journal\Reconciliation\JournalBaselineService.cs:247
+    at AuthorizationAuthority.Tests.JournalBaselineServiceTests.AnOwnerDispositionCoveringTheExactScopeGivesExceptionAcceptedWithReducedAssuranceAndProvenance() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalBaselineServiceTests.cs:131
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ChangedEvidenceInsideTheAcceptedScopeIsANewFindingAndTheCheckpointDoesNotAdvance (1s 016ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ChangedEvidenceInsideTheAcceptedScopeIsANewFindingAndTheCheckpointDoesNotAdvance() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:103
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalBaselineServiceTests.ALegacyRowWithoutAnOwnerDispositionFailsTheBaselineAndIsOnlyACandidateException (5ms)
+  Xunit.MicrosoftTestingPlatform.XunitException: AuthorizationAuthority.Application.Common.Ports.ArchiveConflictException : archived body differs
+    at AuthorizationAuthority.Infrastructure.Archive.InMemorySecurityEventArchive.AppendAsync(Guid organizationId, String streamName, Int64 streamRevision, ReadOnlyMemory`1 eventBody, Byte[] expectedDigest, CancellationToken cancellationToken) in <clone>\src\authority\AuthorizationAuthority.Infrastructure\Archive\BlobSecurityEventArchive.cs:456
+    at AuthorizationAuthority.Application.Features.Journal.Reconciliation.JournalBaselineService.RunAsync(JournalBaselineRequest request, CancellationToken cancellationToken) in <clone>\src\authority\AuthorizationAuthority.Application\Features\Journal\Reconciliation\JournalBaselineService.cs:143
+    at AuthorizationAuthority.Application.Features.Journal.Reconciliation.JournalBaselineService.RunAsync(JournalBaselineRequest request, CancellationToken cancellationToken) in <clone>\src\authority\AuthorizationAuthority.Application\Features\Journal\Reconciliation\JournalBaselineService.cs:247
+    at AuthorizationAuthority.Tests.JournalBaselineServiceTests.ALegacyRowWithoutAnOwnerDispositionFailsTheBaselineAndIsOnlyACandidateException() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalBaselineServiceTests.cs:116
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineThatWouldMoveTheVerifiedRevisionBackwardIsRejected (47ms)
+  Assert.Equal() Failure: Strings differ
+              (pos 0)
+  Expected: "NotCreated:REBASELINE_REVISION_REGRESSION"
+  Actual:   "Created"
+              (pos 0)
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineThatWouldMoveTheVerifiedRevisionBackwardIsRejected() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:302
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.NoFindingIsEverAcceptedWithoutADisposition (4ms)
+  Assert.Equal() Failure: Strings differ
+              (pos 0)
+  Expected: "Failed"
+  Actual:   "Clean"
+              (pos 0)
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.NoFindingIsEverAcceptedWithoutADisposition() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:164
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AMissingOrForeignRecordIsAFindingAndTheGapIsNoLongerAccepted (7ms)
+  Assert.True() Failure
+  Expected: True
+  Actual:   False
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AMissingOrForeignRecordIsAFindingAndTheGapIsNoLongerAccepted() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:121
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AConflictingRecordUnderTheSameIdentifierBlocksTheCheckpoint (5ms)
+  Assert.Equal() Failure: Strings differ
+              (pos 0)
+  Expected: "NotCreated:EXCEPTION_RECORD_CONFLICT"
+  Actual:   "Created"
+              (pos 0)
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AConflictingRecordUnderTheSameIdentifierBlocksTheCheckpoint() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:212
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.LaterSweepsClassifyTheUnchangedAcceptedGapAsAnObservationAndAdvanceWhileStayingReduced (9ms)
+  Assert.Single() Failure: The collection was empty
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.LaterSweepsClassifyTheUnchangedAcceptedGapAsAnObservationAndAdvanceWhileStayingReduced() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:86
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AnAcceptedLegacyGapIsStoredAsACreateOnlyRecordAndTheCheckpointCrossesItWithReducedAssurance (12ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Tuple ("ExceptionAccepted", "Reduced")
+  Actual:   Tuple ("Clean", "Full")
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AnAcceptedLegacyGapIsStoredAsACreateOnlyRecordAndTheCheckpointCrossesItWithReducedAssurance() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:50
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineReportsAChainFindingAndCreatesNothingWhenACarriedRecordChanged (4ms)
+  Assert.Equal() Failure: Strings differ
+              (pos 0)
+  Expected: "Failed"
+  Actual:   "Clean"
+              (pos 0)
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineReportsAChainFindingAndCreatesNothingWhenACarriedRecordChanged() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:349
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineCarriesEveryAcceptedExceptionNeverUpgradesAndMayAddNewOnes (6ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Tuple ("ExceptionAccepted", "Reduced")
+  Actual:   Tuple ("Clean", "Full")
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineCarriesEveryAcceptedExceptionNeverUpgradesAndMayAddNewOnes() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:262
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 13
+  succeeded: 404
+  skipped: 0
+  duration: 2s 513ms

@@ -1,0 +1,25 @@
+SEC-BL-01 WP-7A SEC-P: secp.txt (local paths scrubbed)
+
+Running tests from <repo>\tests\security\EnterpriseForms.SecurityTests\bin\Release\net10.0\EnterpriseForms.SecurityTests.dll (net10.0|x64)
+failed EnterpriseForms.SecurityTests.Tests.DistributedConsistencyTests.SecP12_ArchiveOutageKeepsCommandsNonEffectiveAndContentUnreleased (12s 376ms)
+  from <repo>\tests\security\EnterpriseForms.SecurityTests\bin\Release\net10.0\EnterpriseForms.SecurityTests.dll (net10.0|x64)
+  Assert.Equal() Failure: Values differ
+  Expected: Accepted
+  Actual:   ServiceUnavailable
+    at EnterpriseForms.SecurityTests.Tests.DistributedConsistencyTests.<>c__DisplayClass5_0.<<SecP12_ArchiveOutageKeepsCommandsNonEffectiveAndContentUnreleased>b__0>d.MoveNext() in <repo>\tests\security\EnterpriseForms.SecurityTests\Tests\DistributedConsistencyTests.cs:207
+    --- End of stack trace from previous location ---
+    at EnterpriseForms.SecurityTests.Harness.ScenarioRunner.RunAsync(Scenario scenario, Func`1 body) in <repo>\tests\security\EnterpriseForms.SecurityTests\Harness\Scenario.cs:182
+    at EnterpriseForms.SecurityTests.Tests.DistributedConsistencyTests.SecP12_ArchiveOutageKeepsCommandsNonEffectiveAndContentUnreleased() in <repo>\tests\security\EnterpriseForms.SecurityTests\Tests\DistributedConsistencyTests.cs:195
+    --- End of stack trace from previous location ---
+<repo>\tests\security\EnterpriseForms.SecurityTests\bin\Release\net10.0\EnterpriseForms.SecurityTests.dll (net10.0|x64) failed with 1 error(s) (3m 19s 020ms)
+Exit code: 2
+
+Test run summary: Failed!
+  total: 13
+  failed: 1
+  succeeded: 12
+  skipped: 0
+  duration: 3m 20s 065ms
+Test run completed with non-success exit code: 2 (see: https://aka.ms/testingplatform/exitcodes)
+secp exit 2
+compose up exit 0, started 2026-11-19T11:09:42.9480947Z

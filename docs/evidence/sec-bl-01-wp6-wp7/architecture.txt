@@ -1,0 +1,8 @@
+[slow] still running after 1m 00s: EnterpriseForms.ArchitectureTests.EnvelopeV2IsolationTests.OnlyTheApprovedDecryptionServicesReachEnvelopeV2AndOnlyThroughTheProductReader (EnterpriseForms.ArchitectureTests.dll|net10.0|x64)
+
+Test run summary: Passed! - <user-profile>\Documents\Visual Studio Code\EnterpriseForms\tests\architecture\EnterpriseForms.ArchitectureTests\bin\Debug\net10.0\EnterpriseForms.ArchitectureTests.dll (net10.0|x64)
+  total: 227
+  failed: 0
+  succeeded: 227
+  skipped: 0
+  duration: 2m 30s 968ms

@@ -1,0 +1,20 @@
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AConsistentChainRewriteIsDetectedAtTheCheckpointAnchor (20ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AConsistentChainRewriteIsDetectedAtTheCheckpointAnchor() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:208
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.RewriteAndExtendIsDetectedByTheAnchorAndTheArchiveSideLink (16ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalVerificationFinding { OrganizationId = 01a1ea3c-9000-7900-a361-ea8ee2419a55, StreamName = audit, FindingCode = CHAIN_INTEGRITY_FAILURE, Subtype = LINK_MISMATCH, Severity = Security, FirstRevision = 6, LastRevision = 6, RunId = 01a1ea3c-baf8-71da-8133-4e81f6381078, ObservedAtUtc = 2026-11-17 4:00:11 PM +00:00, EvidenceReferences = System.String[], Detail = archived object: previous digest differs from SHA-256 of the predecessor, SweepOutcome = Findings, Checkpoint = JournalCheckpointReference { CheckpointSequence = 1, VerifiedRevision = 5, CheckpointDigestHex = fb704e1a022a877e2f9d065f40ed545cc793c953c0b82146a26965529a80c7f8 }, StopGeneration = , Identity = 561b0bf38dec3716a4ca0fdac0722eaa }]
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:41
+    at AuthorizationAuthority.Tests.JournalVerifierTests.RewriteAndExtendIsDetectedByTheAnchorAndTheArchiveSideLink() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:239
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 2
+  succeeded: 415
+  skipped: 0
+  duration: 2s 205ms

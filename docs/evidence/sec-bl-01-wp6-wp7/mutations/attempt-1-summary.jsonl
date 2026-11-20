@@ -1,0 +1,25 @@
+{"id": "BASELINE", "verdict": "PASS", "restored": true, "failed": 0, "total": 337, "seconds": 64.9}
+{"id": "BASELINE-ARCH", "verdict": "FAIL", "restored": true, "failed": 1, "total": 13, "seconds": 85.0}
+{"id": "MV-01", "verdict": "DETECTED", "restored": true, "failed": 2, "total": 337, "seconds": 57.1}
+{"id": "MV-02", "verdict": "DETECTED", "restored": true, "failed": 5, "total": 337, "seconds": 54.6}
+{"id": "MV-03", "verdict": "DETECTED", "restored": true, "failed": 5, "total": 337, "seconds": 65.9}
+{"id": "MV-04a", "verdict": "DETECTED", "restored": true, "failed": 11, "total": 337, "seconds": 97.8}
+{"id": "MV-04b", "verdict": "DETECTED", "restored": true, "failed": 5, "total": 337, "seconds": 57.9}
+{"id": "MV-05", "verdict": "DETECTED", "restored": true, "failed": 2, "total": 337, "seconds": 54.0}
+{"id": "MV-06", "verdict": "DETECTED", "restored": true, "failed": 1, "total": 337, "seconds": 52.8}
+{"id": "MV-07", "verdict": "INCONCLUSIVE (build failed)", "restored": true, "failed": 0, "total": null, "seconds": 9.8}
+{"id": "MV-08", "verdict": "DETECTED", "restored": true, "failed": 17, "total": 337, "seconds": 55.0}
+{"id": "MV-09", "verdict": "DETECTED", "restored": true, "failed": 2, "total": 337, "seconds": 49.3}
+{"id": "MV-10", "verdict": "DETECTED", "restored": true, "failed": 57, "total": 337, "seconds": 49.7}
+{"id": "MV-11", "verdict": "DETECTED", "restored": true, "failed": 1, "total": 337, "seconds": 49.8}
+{"id": "MV-12", "verdict": "DETECTED", "restored": true, "failed": 3, "total": 337, "seconds": 50.0}
+{"id": "MV-13a", "verdict": "DETECTED", "restored": true, "failed": 3, "total": 337, "seconds": 52.4}
+{"id": "MV-13b", "verdict": "DETECTED", "restored": true, "failed": 1, "total": 337, "seconds": 49.8}
+{"id": "MV-14", "verdict": "DETECTED", "restored": true, "failed": 5, "total": 337, "seconds": 52.0}
+{"id": "MV-15a", "verdict": "DETECTED", "restored": true, "failed": 2, "total": 13, "seconds": 57.0}
+{"id": "MV-16", "verdict": "DETECTED", "restored": true, "failed": 10, "total": 337, "seconds": 49.7}
+{"id": "MV-17a", "verdict": "DETECTED", "restored": true, "failed": 2, "total": 13, "seconds": 53.3}
+{"id": "MV-17b", "verdict": "DETECTED", "restored": true, "failed": 13, "total": 337, "seconds": 49.9}
+{"id": "MV-18", "verdict": "DETECTED", "restored": true, "failed": 1, "total": 337, "seconds": 54.3}
+{"id": "MV-X1", "verdict": "SURVIVED", "restored": true, "failed": 0, "total": 337, "seconds": 48.3}
+{"id": "RESTORED", "verdict": "PASS", "restored": true, "failed": 0, "total": 337, "seconds": 47.5}

@@ -1,0 +1,27 @@
+{
+  "id": "MV-01",
+  "what": "VF-6: drop the anchor at v (incremental first-entry anchor and the full-walk row-at-v comparison)",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalStreamComparer.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalStreamComparer.cs": "97ec2fbbcd090f87693f219e2fbe3a903e81ec4c5dcf50b3e7be0fed19265647"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 51.4,
+    "exit": 2,
+    "seconds": 5.7,
+    "kind": "ip",
+    "total": 337,
+    "succeeded": 335,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalVerifierTests.AConsistentChainRewriteIsDetectedAtTheCheckpointAnchor",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.RewriteAndExtendIsDetectedByTheAnchorAndTheArchiveSideLink"
+    ]
+  },
+  "seconds": 57.1
+}

@@ -1,0 +1,28 @@
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream: "audit") (16ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:174
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream: "authorization") (3ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:174
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream: "content") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Clean
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:40
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:174
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 3
+  succeeded: 414
+  skipped: 0
+  duration: 2s 306ms

@@ -1,0 +1,19 @@
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AConsistentChainRewriteIsDetectedAtTheCheckpointAnchor (16ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalVerificationFinding { OrganizationId = 01a1ea3c-9000-794b-96fe-9c4b6715fedc, StreamName = audit, FindingCode = ARCHIVE_REGRESSION, Subtype = , Severity = Security, FirstRevision = 5, LastRevision = 5, RunId = 01a1ea3c-b710-7b11-8f23-df5c73d11254, ObservedAtUtc = 2026-11-17 4:00:10 PM +00:00, EvidenceReferences = <>z__ReadOnlySingleElementList`1[System.String], Detail = the archived object at the verified revision is absent or differs from the checkpoint digest, SweepOutcome = Findings, Checkpoint = JournalCheckpointReference { CheckpointSequence = 1, VerifiedRevision = 5, CheckpointDigestHex = eb33f45c1162e10779c24270a40b090b8c255070c83e52c04004c40713df01cf }, StopGeneration = , Identity = 8cb051137b18974d8ca7b729e6d6822a }]
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:41
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AConsistentChainRewriteIsDetectedAtTheCheckpointAnchor() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:208
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.RewriteAndExtendIsDetectedByTheAnchorAndTheArchiveSideLink (13ms)
+  Assert.Contains() Failure: Filter not matched in collection
+  Collection: [JournalVerificationFinding { OrganizationId = 01a1ea3c-9000-7d27-9c20-fc436d079597, StreamName = audit, FindingCode = ARCHIVE_REGRESSION, Subtype = , Severity = Security, FirstRevision = 5, LastRevision = 5, RunId = 01a1ea3c-baf8-7aa5-9fb0-8b6a0bcf6545, ObservedAtUtc = 2026-11-17 4:00:11 PM +00:00, EvidenceReferences = <>z__ReadOnlySingleElementList`1[System.String], Detail = the archived object at the verified revision is absent or differs from the checkpoint digest, SweepOutcome = Findings, Checkpoint = JournalCheckpointReference { CheckpointSequence = 1, VerifiedRevision = 5, CheckpointDigestHex = 8561dd5a16a786b0f60d16b4f29593a21beb7416a4ed7f7d489470813562e41e }, StopGeneration = , Identity = ae3cae2599d39c16b02dc600fe982618 }]
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:41
+    at AuthorizationAuthority.Tests.JournalVerifierTests.RewriteAndExtendIsDetectedByTheAnchorAndTheArchiveSideLink() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:239
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 2
+  succeeded: 415
+  skipped: 0
+  duration: 3s 168ms

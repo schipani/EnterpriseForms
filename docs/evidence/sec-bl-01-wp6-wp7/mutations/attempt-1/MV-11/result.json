@@ -1,0 +1,26 @@
+{
+  "id": "MV-11",
+  "what": "R-4/DP-2: the envelope previous digest is not compared with the previous-digest column",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Verification/JournalChainRules.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Verification/JournalChainRules.cs": "afb4f154b935722e9aa0b2a9ad7f57fc1ccd3f39a202c338b0e57be0529d687a"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 44.2,
+    "exit": 2,
+    "seconds": 5.5,
+    "kind": "ip",
+    "total": 337,
+    "succeeded": 336,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalChainRulesTests.R4APreviousDigestColumnThatDiffersFromTheEnvelopeIsAColumnMismatch"
+    ]
+  },
+  "seconds": 49.8
+}

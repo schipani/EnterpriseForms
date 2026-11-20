@@ -1,0 +1,24 @@
+{
+  "id": "MV-7A-03",
+  "what": "RV-6: a changed evidence identity (instance, generation, commitment bytes) is accepted when the new evidence verifies",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "976ea25a7d858f53e61578b81c8e2850f487e70dfbf98b6d3aa735690c0bfb36"
+  },
+  "restored": true,
+  "verdict": "SURVIVED",
+  "result": {
+    "build": 0,
+    "build_seconds": 36.2,
+    "exit": 0,
+    "seconds": 3.9,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 417,
+    "failed": []
+  },
+  "seconds": 40.1
+}

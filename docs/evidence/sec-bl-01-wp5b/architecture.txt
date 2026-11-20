@@ -1,0 +1,8 @@
+SEC-BL-01 WP-5b final stage: architecture suite (run of record; a first run failed 1 test, the audit-only phase assertion, updated to the A-6 stream set).
+
+Test run summary: Passed!
+  total: 224
+  failed: 0
+  succeeded: 224
+  skipped: 0
+  duration: 50s 187ms

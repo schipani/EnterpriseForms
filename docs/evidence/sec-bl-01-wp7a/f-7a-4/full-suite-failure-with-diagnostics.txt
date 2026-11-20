@@ -1,0 +1,90 @@
+SEC-BL-01 WP-7A F-7A-4: one failing full-suite run (diagnostic build; local paths scrubbed). Bisect results are in the WP-7A record section 8.
+
+failed AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.ConcurrentPermissionChangesRecoveryAndDeliveryIntroduceNoUnauthorizedAccess (1s 295ms)
+  Assert.All() Failure: 21 out of 22 items in the collection did not pass.
+  [1]:  Item:  SecurityJournalEntry { ArchiveAttemptCount = 2, ArchiveDeliveryState = "VerificationFailed", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "VerificationFailed"
+                          ↑ (pos 0)
+  [2]:  Item:  SecurityJournalEntry { ArchiveAttemptCount = 34, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "Pending"
+                          ↑ (pos 0)
+  [3]:  Item:  SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "Pending"
+                          ↑ (pos 0)
+  [4]:  Item:  SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "Pending"
+                          ↑ (pos 0)
+  [5]:  Item:  SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "Pending"
+                          ↑ (pos 0)
+  [6]:  Item:  SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "Pending"
+                          ↑ (pos 0)
+  [7]:  Item:  SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "Pending"
+                          ↑ (pos 0)
+  [8]:  Item:  SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "Pending"
+                          ↑ (pos 0)
+  [9]:  Item:  SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "Pending"
+                          ↑ (pos 0)
+  [10]: Item:  SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "Pending"
+                          ↑ (pos 0)
+  [11]: Item:  SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "Pending"
+                          ↑ (pos 0)
+  [12]: Item:  SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "Pending"
+                          ↑ (pos 0)
+  [13]: Item:  SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "Pending"
+                          ↑ (pos 0)
+  [14]: Item:  SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Failure: Strings differ
+                          ↓ (pos 0)
+               Expected: "Anchored"
+               Actual:   "Pending"
+                          ↑ (pos 0)
+  [15]: Item:  SecurityJournalEntry { ArchiveAttemptCount = 0, ArchiveDeliveryState = "Pending", ArchiveReceiptDigest = null, ArchiveReceiptReference = null, ContentChangeOperationId = null, ··· }
+        Error: Assert.Equal() Fa

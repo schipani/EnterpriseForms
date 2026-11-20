@@ -1,0 +1,13 @@
+SEC-BL-01 WP-7A SEC-P: secp.txt (local paths scrubbed)
+
+Running tests from <repo>\tests\security\EnterpriseForms.SecurityTests\bin\Release\net10.0\EnterpriseForms.SecurityTests.dll (net10.0|x64)
+<repo>\tests\security\EnterpriseForms.SecurityTests\bin\Release\net10.0\EnterpriseForms.SecurityTests.dll (net10.0|x64) passed (3m 41s 123ms)
+
+Test run summary: Passed!
+  total: 13
+  failed: 0
+  succeeded: 13
+  skipped: 0
+  duration: 3m 42s 482ms
+secp exit 0
+compose up exit 0, started 2026-11-19T11:18:56.6127832Z

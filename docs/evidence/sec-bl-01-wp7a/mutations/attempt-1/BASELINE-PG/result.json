@@ -1,0 +1,22 @@
+{
+  "id": "BASELINE-PG",
+  "what": "no edit (PostgreSQL gate, read-only tests)",
+  "kind": "pg",
+  "files": [],
+  "original_sha256": {},
+  "restored": true,
+  "verdict": "FAIL",
+  "result": {
+    "build": 0,
+    "build_seconds": 34.3,
+    "exit": 2,
+    "seconds": 23.3,
+    "kind": "pg",
+    "total": 3,
+    "succeeded": 2,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheDedicatedVerifierLoginIsReadOnlyAndRunsTheVerifier"
+    ]
+  },
+  "seconds": 57.6
+}

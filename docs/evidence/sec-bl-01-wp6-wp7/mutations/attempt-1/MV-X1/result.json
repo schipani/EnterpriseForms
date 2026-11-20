@@ -1,0 +1,24 @@
+{
+  "id": "MV-X1",
+  "what": "GT-6 (integrated): the projection processor applies an authorization entry on its row state, without a trusted receipt",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Projection/ProjectionProcessor.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Projection/ProjectionProcessor.cs": "77c8483591571f2e3d2639a32af41d51b90b3d4243a9a2158a67babc52d18a36"
+  },
+  "restored": true,
+  "verdict": "SURVIVED",
+  "result": {
+    "build": 0,
+    "build_seconds": 42.9,
+    "exit": 0,
+    "seconds": 5.4,
+    "kind": "ip",
+    "total": 337,
+    "succeeded": 337,
+    "failed": []
+  },
+  "seconds": 48.3
+}

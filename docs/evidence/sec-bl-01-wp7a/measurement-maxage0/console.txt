@@ -1,0 +1,130 @@
+running... 0 completed, 0 failed | active: AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08ReceiptMeasurement
+{
+  "measurement": "SEC-BL-01 G08 / E-6 / E-7 trusted delivery receipt cost",
+  "stores": "PostgreSQL 18.0 \u002B Azurite 3.9.0 (two instances), loopback, single process",
+  "measured_utc": "2026-11-19T12:12:33.0875835\u002B00:00",
+  "authorization_entries": 64,
+  "iterations": 200,
+  "gate": {
+    "before_pending_count_only": {
+      "samples": 200,
+      "p50_ms": 2.188,
+      "p95_ms": 2.619,
+      "p99_ms": 3.53,
+      "mean_ms": 2.249
+    },
+    "after_warm_receipt_cached": {
+      "samples": 200,
+      "p50_ms": 21.511,
+      "p95_ms": 28.118,
+      "p99_ms": 62.882,
+      "mean_ms": 22.913
+    },
+    "after_cold_receipt_established": {
+      "samples": 200,
+      "p50_ms": 20.652,
+      "p95_ms": 30.166,
+      "p99_ms": 60.179,
+      "mean_ms": 22.504
+    },
+    "warm_incremental_p50_ms": 19.323,
+    "cold_store_operations_per_verification": 10,
+    "cold_store_operations_by_method": {
+      "archive.ListMetaAsync": 2,
+      "archive.ReadEntryAsync": 2,
+      "archive.ReadIdentityAsync": 1,
+      "archive.ReadStopMarkersAsync": 1,
+      "checkpoints.ReadAsync": 1,
+      "provisioning.ReadRecordAsync": 1,
+      "store.ListAsync": 2
+    }
+  },
+  "new_head_refresh": {
+    "first_evaluation_after_delivery": {
+      "samples": 20,
+      "p50_ms": 19.405,
+      "p95_ms": 23.836,
+      "p99_ms": 26.05,
+      "mean_ms": 19.629
+    },
+    "second_evaluation": {
+      "samples": 20,
+      "p50_ms": 20.716,
+      "p95_ms": 29.482,
+      "p99_ms": 29.875,
+      "mean_ms": 21.66
+    },
+    "note": "each new head is AwaitingArchive until delivered (asserted), then needs exactly one receipt establishment"
+  },
+  "concurrency_warm": {
+    "workers": 16,
+    "evaluations": 400,
+    "wall_ms": 5371.1,
+    "evaluations_per_second": 74.5,
+    "latency": {
+      "samples": 400,
+      "p50_ms": 199.881,
+      "p95_ms": 302.886,
+      "p99_ms": 340,
+      "mean_ms": 206.097
+    }
+  },
+  "concurrency_cold": {
+    "workers": 16,
+    "evaluations": 400,
+    "wall_ms": 5457.7,
+    "evaluations_per_second": 73.3,
+    "latency": {
+      "samples": 400,
+      "p50_ms": 206.216,
+      "p95_ms": 266.742,
+      "p99_ms": 276.897,
+      "mean_ms": 210.966
+    }
+  },
+  "content_release_check": {
+    "before_row_state_only": {
+      "samples": 200,
+      "p50_ms": 1.986,
+      "p95_ms": 2.353,
+      "p99_ms": 2.583,
+      "mean_ms": 2.028
+    },
+    "after_warm": {
+      "samples": 200,
+      "p50_ms": 11.596,
+      "p95_ms": 15.626,
+      "p99_ms": 59.627,
+      "mean_ms": 13.264
+    },
+    "after_cold": {
+      "samples": 200,
+      "p50_ms": 11.823,
+      "p95_ms": 22.313,
+      "p99_ms": 57.366,
+      "mean_ms": 14.103
+    },
+    "binding_only_in_process": {
+      "samples": 200,
+      "p50_ms": 0.002,
+      "p95_ms": 0.003,
+      "p99_ms": 0.005,
+      "mean_ms": 0.004
+    },
+    "note": "checkpoint lookup \u002B release decision only; HMAC/manifest verification of the content itself is unchanged and not included"
+  },
+  "cache": {
+    "shared_verifier_cached_receipts": 22,
+    "shared_verifier_store_verifications": 803,
+    "limit": 200000,
+    "current_state_max_age_ms": 0
+  }
+}
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08ReceiptMeasurement (43s 335ms)
+
+Test run summary: Passed! - <repo>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 1
+  failed: 0
+  succeeded: 1
+  skipped: 0
+  duration: 44s 113ms

@@ -8,6 +8,19 @@ namespace AuthorizationAuthority.Application.Common;
 /// <summary>
 /// Per-organization fail-closed gate (A3): protected Allow is prohibited while any committed revision is not applied to
 /// SpiceDB, while any authorization-stream journal entry lacks its archive receipt, or while the organization is quarantined.
+/// <para>
+/// SEC-BL-01 E-6 (C-158, A-7 §27 GT-1..GT-5): the archive condition no longer rests on mutable AuthorityDb fields. The latest authorization
+/// entry is read from the journal itself (GT-1) and must carry a <b>trusted delivery receipt</b> (<see cref="IJournalReceiptVerifier"/>: the
+/// archived object equals the row, the archive is the pinned instance, and the W2-S commitment names the row; GT-2). Under D+ an entry is archived
+/// only after its predecessor (DP-9), so a verified head proves the whole prefix was delivered. The pending count stays as a cheap pre-check
+/// (GT-3). The enforcement mode column is mutable AuthorityDb state, so it can no longer waive the requirement (GT-4). Every request reads the
+/// head; only the receipt of a new head reaches the external stores (cached by row digest, GT-5), so a new revocation is never served from cache.
+/// </para>
+/// <para>
+/// WP-7A (C-160, A-9 TR-6′): the head's receipt is a <b>stream-head</b> receipt: its current state is re-established at most the configured
+/// freshness bound before the evaluation, and it is refused while any successor evidence exists outside AuthorityDb (an archived object,
+/// evidence commitment or stop marker above the head), so a deleted or hidden newer entry closes the gate (RV-4).
+/// </para>
 /// </summary>
 public static class OrganizationGate
 {
@@ -19,8 +32,13 @@ public static class OrganizationGate
         }
 
         // Archive receipts precede projection (G14): report the earliest blocker; either one keeps the gate closed.
-        if (string.Equals(state.CheckpointEnforcementModeName, CheckpointEnforcementModes.RequiredBeforeEffective, StringComparison.Ordinal)
-            && await scope.CountPendingArchiveAsync(state.OrganizationId, JournalStreamNames.Authorization, cancellationToken).ConfigureAwait(false) > 0)
+        if (await scope.CountPendingArchiveAsync(state.OrganizationId, JournalStreamNames.Authorization, cancellationToken).ConfigureAwait(false) > 0)
+        {
+            return ProjectionGateState.AwaitingArchive;
+        }
+
+        if (await scope.FindLatestJournalEntryAsync(state.OrganizationId, JournalStreamNames.Authorization, cancellationToken).ConfigureAwait(false) is { } head
+            && !(await scope.JournalReceipts.VerifyStreamHeadAsync(head, cancellationToken).ConfigureAwait(false)).IsVerified)
         {
             return ProjectionGateState.AwaitingArchive;
         }

@@ -1,0 +1,61 @@
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.EvidenceThatNeverVerifiedIsRefusedButNotWithdrawn(stream: "content") (9ms)
+  Assert.True() Failure
+  Expected: True
+  Actual:   False
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.EvidenceThatNeverVerifiedIsRefusedButNotWithdrawn(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:365
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.EvidenceThatNeverVerifiedIsRefusedButNotWithdrawn(stream: "audit") (2ms)
+  Assert.True() Failure
+  Expected: True
+  Actual:   False
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.EvidenceThatNeverVerifiedIsRefusedButNotWithdrawn(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:365
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.EvidenceThatNeverVerifiedIsRefusedButNotWithdrawn(stream: "authorization") (6ms)
+  Assert.True() Failure
+  Expected: True
+  Actual:   False
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.EvidenceThatNeverVerifiedIsRefusedButNotWithdrawn(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:365
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptTests.OutagesAreUnavailableAndNeverCached(stream: "audit") (69ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptTests.OutagesAreUnavailableAndNeverCached(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptTests.cs:149
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptTests.OutagesAreUnavailableAndNeverCached(stream: "content") (5ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptTests.OutagesAreUnavailableAndNeverCached(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptTests.cs:149
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptTests.OutagesAreUnavailableAndNeverCached(stream: "authorization") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptTests.OutagesAreUnavailableAndNeverCached(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptTests.cs:149
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(stream: "authorization") (21ms)
+  Assert.True() Failure
+  Expected: True
+  Actual:   False
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:312
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(stream: "content") (3ms)
+  Assert.True() Failure
+  Expected: True
+  Actual:   False
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:312
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(stream: "audit") (2ms)
+  Assert.True() Failure
+  Expected: True
+  Actual:   False
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.AnOutageIsNeverLastKnownGood(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptValidityTests.cs:312
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 424
+  failed: 9
+  succeeded: 415
+  skipped: 0
+  duration: 2s 359ms

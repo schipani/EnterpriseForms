@@ -23,6 +23,13 @@ services:
     tmpfs: [/data]
   archive-store:
     tmpfs: [/data]
+  journal-verification-store:
+    tmpfs: [/data]
+  archive-provision:
+    # SEC-BL-01 WP-5a.1: provision this disposable archive before the Authority starts (refuses anything not demonstrably new).
+    profiles: !reset []
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
   authority:
     environment:
       ASPNETCORE_ENVIRONMENT: Testing
@@ -133,6 +140,9 @@ services:
     restart: unless-stopped          # SEC-P09: the process terminates at the armed crash point and is restarted here
     depends_on:
       vault-search-seal-init:
+        condition: service_completed_successfully
+      # SEC-BL-01 WP-5a.1: the disposable archive is provisioned before the Authority starts.
+      archive-provision:
         condition: service_completed_successfully
     ports: ["127.0.0.1:5190:8080"]   # harness reaches the operator plane and internal contract directly (loopback only)
     # C8 M2 Stage 3: the Platform Console reaches the Authority over its own network (never trust-edge, which the business shares).

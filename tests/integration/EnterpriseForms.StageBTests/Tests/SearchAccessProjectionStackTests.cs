@@ -397,7 +397,8 @@ public sealed class SearchAccessProjectionStackTests(StageBFixture fixture)
                      $"UPDATE authority.security_journal_entries SET journal_stream_revision = {head} WHERE {where} AND journal_stream_revision = {head - 1}; " +
                      $"UPDATE authority.security_journal_entries SET journal_stream_revision = {head - 1} WHERE {where} AND journal_stream_revision = -1;",
             };
-            fixture.Stack.AuthorityAdministratorSql(sql);
+            // SEC-BL-01 G08 (A-7 §27): the journal triggers refuse these rewrites; the tamper is a J2 administrator, which bypasses them explicitly.
+            fixture.Stack.AuthorityAdministratorSql("SET session_replication_role = replica; " + sql);
             var caught = await CatchUpAsync(org);
             Assert.Equal("Quarantined", caught.GetProperty("outcome_name").GetString());
             var status = await StatusAsync(org);

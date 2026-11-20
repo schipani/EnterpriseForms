@@ -1,0 +1,26 @@
+{
+  "id": "MV-7A-05-PG",
+  "what": "RV-4 on real stores: successor evidence ignored; the J2 revocation-deletion phases on the real gate",
+  "kind": "pg",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "976ea25a7d858f53e61578b81c8e2850f487e70dfbf98b6d3aa735690c0bfb36"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 35.8,
+    "exit": 2,
+    "seconds": 18.5,
+    "kind": "pg",
+    "total": 1,
+    "succeeded": 0,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AJ2RevocationDeletionPhasesOnTheRealGate"
+    ]
+  },
+  "seconds": 54.3
+}

@@ -1,0 +1,26 @@
+{
+  "id": "MV-13b",
+  "what": "AS-2/AS-3: the verifier skips the sentinel check",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs": "a7f8951ee5dac123ad2e601e6419f35836473c32f43dbbd9248b7fe60ac79f83"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 34.5,
+    "exit": 2,
+    "seconds": 3.6,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 416,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalVerifierTests.AWipedArchiveOrSentinelIsAnArchiveRegression"
+    ]
+  },
+  "seconds": 38.2
+}

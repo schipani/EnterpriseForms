@@ -1,0 +1,143 @@
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAnAlteredDeliveredRowOutsideTheNewestEightIsDetectedByTheVerifier (838ms)
+  Assert.Null() Failure: Value is not null
+  Expected: null
+  Actual:   JournalCheckpointReference { CheckpointSequence = 3, VerifiedRevision = 10, CheckpointDigestHex = ac5fa699c14bad39b2202f19ace474e5665cebde5eec18f495609883e2a29c97 }
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.DetectedByTheFullSweepAsync(Verification v, Delivered d, String code, String subtype, Int64 revision) in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:207
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAnAlteredDeliveredRowOutsideTheNewestEightIsDetectedByTheVerifier() in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:279
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ChangedEvidenceInsideTheAcceptedScopeIsANewFindingAndTheCheckpointDoesNotAdvance (829ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ChangedEvidenceInsideTheAcceptedScopeIsANewFindingAndTheCheckpointDoesNotAdvance() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:106
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.ADatabaseRolledBackBelowTheCheckpointIsBehindTheArchive (825ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:42
+    at AuthorizationAuthority.Tests.JournalVerifierTests.ADatabaseRolledBackBelowTheCheckpointIsBehindTheArchive() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:252
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ADeletionBelowTheCheckpointIsInvisibleToTheBoundedIncrementalSweepAndDetectedByTheFullSweep (11ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Inconclusive
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ADeletionBelowTheCheckpointIsInvisibleToTheBoundedIncrementalSweepAndDetectedByTheFullSweep() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:396
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.ADeletedArchiveObjectIsADiscontinuityAndADeletedAnchorIsARegression (4ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:42
+    at AuthorizationAuthority.Tests.JournalVerifierTests.ADeletedArchiveObjectIsADiscontinuityAndADeletedAnchorIsARegression() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:149
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.ANonRechainedEditBelowTheCheckpointIsMissedIncrementallyAndFoundByTheFullSweep (6ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:42
+    at AuthorizationAuthority.Tests.JournalVerifierTests.ANonRechainedEditBelowTheCheckpointIsMissedIncrementallyAndFoundByTheFullSweep() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:220
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AMissingOrForeignRecordIsAFindingAndTheGapIsNoLongerAccepted (16ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Findings
+  Actual:   Inconclusive
+    at AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AMissingOrForeignRecordIsAFindingAndTheGapIsNoLongerAccepted() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalAcceptedExceptionTests.cs:123
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AWipedArchiveOrSentinelIsAnArchiveRegression (15ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:42
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AWipedArchiveOrSentinelIsAnArchiveRegression() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:187
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAConsistentlyRedigestedDeliveredRowThatIsNotSentAgainIsDetectedByTheVerifier (21ms)
+  Assert.Null() Failure: Value is not null
+  Expected: null
+  Actual:   JournalCheckpointReference { CheckpointSequence = 3, VerifiedRevision = 3, CheckpointDigestHex = 6e8b11f32797c6194563f0e04400c8b23c59288cc9da5da4d6de49a1b48599d9 }
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.DetectedByTheFullSweepAsync(Verification v, Delivered d, String code, String subtype, Int64 revision) in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:207
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAConsistentlyRedigestedDeliveredRowThatIsNotSentAgainIsDetectedByTheVerifier() in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:251
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.TamperingInOneOrganizationAndStreamDoesNotAffectOthers (11ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:42
+    at AuthorizationAuthority.Tests.JournalVerifierTests.TamperingInOneOrganizationAndStreamDoesNotAffectOthers() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:343
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierDeletingADeliveredRowIsDetectedByTheVerifierAndTheKeyIsStillRecordedAgainUntilDetection (7ms)
+  Assert.Null() Failure: Value is not null
+  Expected: null
+  Actual:   JournalCheckpointReference { CheckpointSequence = 3, VerifiedRevision = 3, CheckpointDigestHex = 7b27476cd99b94ba266c069c945f896f0fdbbfc06593bacecf176a878faaba14 }
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.DetectedByTheFullSweepAsync(Verification v, Delivered d, String code, String subtype, Int64 revision) in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:207
+    at AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierDeletingADeliveredRowIsDetectedByTheVerifierAndTheKeyIsStillRecordedAgainUntilDetection() in <clone>\tests\authority\AuthorizationAuthority.Tests\CapabilityRefusalEvidenceRemovalTests.cs:228
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AnOrganizationHeadThatDisagreesWithTheRowsIsReported (10ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:42
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AnOrganizationHeadThatDisagreesWithTheRowsIsReported() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:261
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream: "audit") (4ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:42
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:174
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream: "authorization") (3ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:42
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:174
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream: "content") (2ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:42
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(String stream) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:174
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AConsistentChainRewriteIsDetectedAtTheCheckpointAnchor (5ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:42
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AConsistentChainRewriteIsDetectedAtTheCheckpointAnchor() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:208
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AModifiedDeliveredRowIsAnAnchorMismatchAndADeletedRowIsAGap (4ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:42
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AModifiedDeliveredRowIsAnAnchorMismatchAndADeletedRowIsAGap() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:122
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.RewriteAndExtendIsDetectedByTheAnchorAndTheArchiveSideLink (5ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:42
+    at AuthorizationAuthority.Tests.JournalVerifierTests.RewriteAndExtendIsDetectedByTheAnchorAndTheArchiveSideLink() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:239
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.AForgedAnchoredRowIsAFakeReceipt (3ms)
+  Assert.StartsWith() Failure: String start does not match
+  String:         "Created"
+  Expected start: "NotCreated"
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AssertFinding(JournalVerificationRun run, String code, Nullable`1 first, String subtype) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:42
+    at AuthorizationAuthority.Tests.JournalVerifierTests.AForgedAnchoredRowIsAFakeReceipt() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:139
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerifierTests.FindingsAreRecordedCreateOnlyAndAlertedOnceAndNothingIsQuarantinedOrRepaired (9ms)
+  Assert.Equal() Failure: Values differ
+  Expected: Tuple (01a1ea3c-a770-74da-8f61-297745c86b71, "Findings", 1)
+  Actual:   Tuple (01a1ea3c-a770-74da-8f61-297745c86b71, "Findings", 2)
+    at AuthorizationAuthority.Tests.JournalVerifierTests.FindingsAreRecordedCreateOnlyAndAlertedOnceAndNothingIsQuarantinedOrRepaired() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerifierTests.cs:404
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 20
+  succeeded: 397
+  skipped: 0
+  duration: 2s 096ms

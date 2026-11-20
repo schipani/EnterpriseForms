@@ -1,0 +1,50 @@
+{
+  "Rows": 2000,
+  "Increment": 500,
+  "SeedingSecondsIncludingArchiveUploads": 23.2,
+  "Baseline": {
+    "Milliseconds": 11765,
+    "DatabaseRowsInspected": 2000,
+    "ArchiveObjectsListed": 4000,
+    "ArchiveObjectsRead": 2000,
+    "RowBatches": 2
+  },
+  "Incremental": [
+    {
+      "Label": "BoundedA",
+      "BoundedListing": true,
+      "ElapsedMilliseconds": 3362,
+      "DatabaseRowsInspected": 501,
+      "ArchiveObjectsListed": 500,
+      "ArchiveObjectsRead": 501,
+      "VerifiedRevision": 2500
+    },
+    {
+      "Label": "Unbounded",
+      "BoundedListing": false,
+      "ElapsedMilliseconds": 3199,
+      "DatabaseRowsInspected": 501,
+      "ArchiveObjectsListed": 3000,
+      "ArchiveObjectsRead": 501,
+      "VerifiedRevision": 3000
+    },
+    {
+      "Label": "BoundedB",
+      "BoundedListing": true,
+      "ElapsedMilliseconds": 4260,
+      "DatabaseRowsInspected": 501,
+      "ArchiveObjectsListed": 500,
+      "ArchiveObjectsRead": 501,
+      "VerifiedRevision": 3500
+    }
+  ],
+  "Full": {
+    "ElapsedMilliseconds": 922,
+    "DatabaseRowsInspected": 3500,
+    "ArchiveObjectsListed": 7000,
+    "ArchiveObjectsRead": 1
+  },
+  "ManagedBytesAllocatedDuringRuns": 331287864,
+  "PeakWorkingSetBytes": 259862528,
+  "DetectionLatencyNote": "A-1: newly delivered rows \u003C= T_inc \u002B incremental duration; any change at or below the checkpoint other than the anchor \u003C= T_full \u002B full-sweep duration"
+}

@@ -1,0 +1,400 @@
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.BothStoresAvailableARefusalWritesTheMarkerAndTheFindingThenMarksTheRow (552ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.BothStoresAvailableARefusalWritesTheMarkerAndTheFindingThenMarksTheRow() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:377
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.TrustedJournalReceiptTests.RecoveryNeverFabricatesAReceipt (558ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.TrustedJournalReceiptTests.RecoveryNeverFabricatesAReceipt() in <clone>\tests\authority\AuthorizationAuthority.Tests\TrustedJournalReceiptTests.cs:270
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.FindingStoreUnavailableTheMarkerAloneStopsTheStreamAcrossRestartAndEvidenceReplacementAndRecoveryCompletesTheFinding (22ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   2
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.FindingStoreUnavailableTheMarkerAloneStopsTheStreamAcrossRestartAndEvidenceReplacementAndRecoveryCompletesTheFinding() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:395
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.BothStoresUnavailableTheRefusalIsHeldInMemoryAndTheDurableStopIsNotEstablished (5ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.BothStoresUnavailableTheRefusalIsHeldInMemoryAndTheDurableStopIsNotEstablished() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:443
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AForgedAnchoredPredecessorIsNotTrustedTheArchiveDecides (3ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AForgedAnchoredPredecessorIsNotTrustedTheArchiveDecides() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:251
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AMarkerStoppedStreamLeavesTheOtherStreamsDeliveryUnchanged (3ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AMarkerStoppedStreamLeavesTheOtherStreamsDeliveryUnchanged() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:622
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.ArchiveMarkerWriteUnavailableTheFindingAloneStopsTheStreamAndTheMarkerIsCompletedLater (5ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.ArchiveMarkerWriteUnavailableTheFindingAloneStopsTheStreamAndTheMarkerIsCompletedLater() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:419
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AStoppedStreamDeliversNoLaterRevisionAndDoesNotCascade (3ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AStoppedStreamDeliversNoLaterRevisionAndDoesNotCascade() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:311
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.BothStoresAvailableARefusalWritesTheMarkerAndTheFindingThenMarksTheRow (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.BothStoresAvailableARefusalWritesTheMarkerAndTheFindingThenMarksTheRow() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:377
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AMissingPredecessorPreventsTheAppend (4ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AMissingPredecessorPreventsTheAppend() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:182
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.RepeatedPassesAndProcessorsCreateOneMarkerAndOneFinding (3ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.RepeatedPassesAndProcessorsCreateOneMarkerAndOneFinding() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:636
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.ARowAfterAnExistingDigestMismatchIsHeldNotDeliveredAcrossTheGap (3ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.ARowAfterAnExistingDigestMismatchIsHeldNotDeliveredAcrossTheGap() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:336
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.ARowAfterAnExistingDigestMismatchIsHeldNotDeliveredAcrossTheGap (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.ARowAfterAnExistingDigestMismatchIsHeldNotDeliveredAcrossTheGap() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:336
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.ArchiveMarkerWriteUnavailableTheFindingAloneStopsTheStreamAndTheMarkerIsCompletedLater (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.ArchiveMarkerWriteUnavailableTheFindingAloneStopsTheStreamAndTheMarkerIsCompletedLater() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:419
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch (19ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   34
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:672
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.RevocationsStayEffectiveThroughContainmentAndRecoveryAndAccessReturnsOnlyAfterTheyAreDelivered (710ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.StoppedAfterGrantAsync() in <clone>\tests\authority\AuthorizationAuthority.Tests\AuthorizationStreamGateDPlusTests.cs:93
+    at AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.RevocationsStayEffectiveThroughContainmentAndRecoveryAndAccessReturnsOnlyAfterTheyAreDelivered() in <clone>\tests\authority\AuthorizationAuthority.Tests\AuthorizationStreamGateDPlusTests.cs:128
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AStoppedStreamDeliversNoLaterRevisionAndDoesNotCascade (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AStoppedStreamDeliversNoLaterRevisionAndDoesNotCascade() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:311
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AForgedAnchoredPredecessorIsNotTrustedTheArchiveDecides (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AForgedAnchoredPredecessorIsNotTrustedTheArchiveDecides() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:251
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AMissingPredecessorPreventsTheAppend (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AMissingPredecessorPreventsTheAppend() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:182
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.ArchiveMarkerWriteUnavailableTheFindingAloneStopsTheStreamAndTheMarkerIsCompletedLater (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.ArchiveMarkerWriteUnavailableTheFindingAloneStopsTheStreamAndTheMarkerIsCompletedLater() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:419
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.FindingStoreUnavailableTheMarkerAloneStopsTheStreamAcrossRestartAndEvidenceReplacementAndRecoveryCompletesTheFinding (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   2
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.FindingStoreUnavailableTheMarkerAloneStopsTheStreamAcrossRestartAndEvidenceReplacementAndRecoveryCompletesTheFinding() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:395
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.KnownLimitRemovingBothStopRecordsAndBothCommitmentCopiesLeavesNoRecord (7ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.KnownLimitRemovingBothStopRecordsAndBothCommitmentCopiesLeavesNoRecord() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:575
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.RepeatedPassesAndProcessorsCreateOneMarkerAndOneFinding (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.RepeatedPassesAndProcessorsCreateOneMarkerAndOneFinding() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:636
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AMarkerRemovedByAnArchiveActorIsReportedAndRecreatedTheStreamStaysStopped (6ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AMarkerRemovedByAnArchiveActorIsReportedAndRecreatedTheStreamStaysStopped() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:507
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(tampering: "foreign") (20ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(String tampering) in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:525
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.BothStoresUnavailableTheRefusalIsHeldInMemoryAndTheDurableStopIsNotEstablished (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.BothStoresUnavailableTheRefusalIsHeldInMemoryAndTheDurableStopIsNotEstablished() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:443
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(tampering: "altered") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(String tampering) in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:525
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(tampering: "non-canonical-name") (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(String tampering) in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:525
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.BothStoresAvailableARefusalWritesTheMarkerAndTheFindingThenMarksTheRow (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.BothStoresAvailableARefusalWritesTheMarkerAndTheFindingThenMarksTheRow() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:377
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AForgedAnchoredPredecessorIsNotTrustedTheArchiveDecides (9ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AForgedAnchoredPredecessorIsNotTrustedTheArchiveDecides() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:251
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch (5ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   34
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:672
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.KnownLimitRemovingBothStopRecordsAndBothCommitmentCopiesLeavesNoRecord (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.KnownLimitRemovingBothStopRecordsAndBothCommitmentCopiesLeavesNoRecord() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:575
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.RecoveryNeverLiftsAQuarantine (48ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.StoppedAfterGrantAsync() in <clone>\tests\authority\AuthorizationAuthority.Tests\AuthorizationStreamGateDPlusTests.cs:93
+    at AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.RecoveryNeverLiftsAQuarantine() in <clone>\tests\authority\AuthorizationAuthority.Tests\AuthorizationStreamGateDPlusTests.cs:163
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch (49ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 2
+  Actual:   34
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AStoppedStreamDoesNotHoldTheOtherStreamsEvenBeyondOneBatch() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:672
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AResetOrForgedRowStateNeverResumesDeliveryAndTheFailedRowIsReMarkedFromTheRecords (30ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   2
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AResetOrForgedRowStateNeverResumesDeliveryAndTheFailedRowIsReMarkedFromTheRecords() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:489
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AStoppedStreamDeliversNoLaterRevisionAndDoesNotCascade (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AStoppedStreamDeliversNoLaterRevisionAndDoesNotCascade() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:311
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.FindingStoreUnavailableTheMarkerAloneStopsTheStreamAcrossRestartAndEvidenceReplacementAndRecoveryCompletesTheFinding (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   2
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.FindingStoreUnavailableTheMarkerAloneStopsTheStreamAcrossRestartAndEvidenceReplacementAndRecoveryCompletesTheFinding() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:395
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.BothStoresUnavailableTheRefusalIsHeldInMemoryAndTheDurableStopIsNotEstablished (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.BothStoresUnavailableTheRefusalIsHeldInMemoryAndTheDurableStopIsNotEstablished() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:443
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.W2SDetectsEvidenceReplacedAfterATerminationBeforeAnyDurableStopRecord (4ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.W2SDetectsEvidenceReplacedAfterATerminationBeforeAnyDurableStopRecord() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:472
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AMarkerStoppedStreamLeavesTheOtherStreamsDeliveryUnchanged (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AMarkerStoppedStreamLeavesTheOtherStreamsDeliveryUnchanged() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:622
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AResetOrForgedRowStateNeverResumesDeliveryAndTheFailedRowIsReMarkedFromTheRecords (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   2
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AResetOrForgedRowStateNeverResumesDeliveryAndTheFailedRowIsReMarkedFromTheRecords() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:489
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.ARowAfterAnExistingDigestMismatchIsHeldNotDeliveredAcrossTheGap (11ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.ARowAfterAnExistingDigestMismatchIsHeldNotDeliveredAcrossTheGap() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:336
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.ConcurrentPermissionChangesRecoveryAndDeliveryIntroduceNoUnauthorizedAccess (60ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.StoppedAfterGrantAsync() in <clone>\tests\authority\AuthorizationAuthority.Tests\AuthorizationStreamGateDPlusTests.cs:93
+    at AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.ConcurrentPermissionChangesRecoveryAndDeliveryIntroduceNoUnauthorizedAccess() in <clone>\tests\authority\AuthorizationAuthority.Tests\AuthorizationStreamGateDPlusTests.cs:201
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.KnownLimitRemovingBothStopRecordsAndBothCommitmentCopiesLeavesNoRecord (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.KnownLimitRemovingBothStopRecordsAndBothCommitmentCopiesLeavesNoRecord() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:575
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.W2SDetectsEvidenceReplacedAfterATerminationBeforeAnyDurableStopRecord (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.W2SDetectsEvidenceReplacedAfterATerminationBeforeAnyDurableStopRecord() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:472
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.RepeatedPassesAndProcessorsCreateOneMarkerAndOneFinding (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.RepeatedPassesAndProcessorsCreateOneMarkerAndOneFinding() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:636
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AMarkerRemovedByAnArchiveActorIsReportedAndRecreatedTheStreamStaysStopped (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AMarkerRemovedByAnArchiveActorIsReportedAndRecreatedTheStreamStaysStopped() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:507
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(tampering: "altered") (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(String tampering) in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:525
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(tampering: "foreign") (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(String tampering) in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:525
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuthorizationTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(tampering: "non-canonical-name") (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(String tampering) in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:525
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.F7A4ADeliveryPassBetweenTheRowHintAndTheExecutionRecordHoldsTheStreamUntilTheExecutorIsReRun (38ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.StoppedAfterGrantAsync() in <clone>\tests\authority\AuthorizationAuthority.Tests\AuthorizationStreamGateDPlusTests.cs:93
+    at AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.F7A4ADeliveryPassBetweenTheRowHintAndTheExecutionRecordHoldsTheStreamUntilTheExecutorIsReRun() in <clone>\tests\authority\AuthorizationAuthority.Tests\AuthorizationStreamGateDPlusTests.cs:285
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.E6ForgedDeliveryStateReceiptFieldsModeAndPositionNeverReopenTheGate (33ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.StoppedAfterGrantAsync() in <clone>\tests\authority\AuthorizationAuthority.Tests\AuthorizationStreamGateDPlusTests.cs:93
+    at AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.E6ForgedDeliveryStateReceiptFieldsModeAndPositionNeverReopenTheGate() in <clone>\tests\authority\AuthorizationAuthority.Tests\AuthorizationStreamGateDPlusTests.cs:378
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AResetOrForgedRowStateNeverResumesDeliveryAndTheFailedRowIsReMarkedFromTheRecords (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   2
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AResetOrForgedRowStateNeverResumesDeliveryAndTheFailedRowIsReMarkedFromTheRecords() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:489
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AMarkerStoppedStreamLeavesTheOtherStreamsDeliveryUnchanged (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AMarkerStoppedStreamLeavesTheOtherStreamsDeliveryUnchanged() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:622
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(tampering: "non-canonical-name") (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(String tampering) in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:525
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AMissingPredecessorPreventsTheAppend (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AMissingPredecessorPreventsTheAppend() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:182
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(tampering: "foreign") (2ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(String tampering) in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:525
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementContentTests.AMarkerRemovedByAnArchiveActorIsReportedAndRecreatedTheStreamStaysStopped (1ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AMarkerRemovedByAnArchiveActorIsReportedAndRecreatedTheStreamStaysStopped() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:507
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(tampering: "altered") (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.AnAlteredOrUnexpectedMarkerKeepsTheStreamStoppedAndIsReported(String tampering) in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:525
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.DPlusDeliveryEnforcementAuditTests.W2SDetectsEvidenceReplacedAfterATerminationBeforeAnyDurableStopRecord (0ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.DPlusDeliveryEnforcementTests.W2SDetectsEvidenceReplacedAfterATerminationBeforeAnyDurableStopRecord() in <clone>\tests\authority\AuthorizationAuthority.Tests\DPlusDeliveryEnforcementTests.cs:472
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.AnotherOrganizationIsUnaffected (33ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.StoppedAfterGrantAsync() in <clone>\tests\authority\AuthorizationAuthority.Tests\AuthorizationStreamGateDPlusTests.cs:93
+    at AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.AnotherOrganizationIsUnaffected() in <clone>\tests\authority\AuthorizationAuthority.Tests\AuthorizationStreamGateDPlusTests.cs:182
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.AnAuthorizedAnchoredRestoreReleasesTheRevisionWithoutChangingTheContentHead (1s 143ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.StopAtRevisionTwoAsync() in <clone>\tests\authority\AuthorizationAuthority.Tests\ContentStreamDPlusReadabilityTests.cs:77
+    at AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.AnAuthorizedAnchoredRestoreReleasesTheRevisionWithoutChangingTheContentHead() in <clone>\tests\authority\AuthorizationAuthority.Tests\ContentStreamDPlusReadabilityTests.cs:110
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.E7ForgedDeliveryStateAndReceiptFieldsNeverReleaseTheRevision (16ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.StopAtRevisionTwoAsync() in <clone>\tests\authority\AuthorizationAuthority.Tests\ContentStreamDPlusReadabilityTests.cs:77
+    at AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.E7ForgedDeliveryStateAndReceiptFieldsNeverReleaseTheRevision() in <clone>\tests\authority\AuthorizationAuthority.Tests\ContentStreamDPlusReadabilityTests.cs:156
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.AStoppedContentRevisionIsNeverReleasedByRestartForgedResetOrOutage (12ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.StopAtRevisionTwoAsync() in <clone>\tests\authority\AuthorizationAuthority.Tests\ContentStreamDPlusReadabilityTests.cs:77
+    at AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.AStoppedContentRevisionIsNeverReleasedByRestartForgedResetOrOutage() in <clone>\tests\authority\AuthorizationAuthority.Tests\ContentStreamDPlusReadabilityTests.cs:87
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 64
+  succeeded: 353
+  skipped: 0
+  duration: 2s 091ms

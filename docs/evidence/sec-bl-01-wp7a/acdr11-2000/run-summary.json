@@ -1,0 +1,13 @@
+{
+    "command":  "scripts/dev/sec-bl-01-acdr11-scale-run.ps1 -Rows 2000 -Concurrency 8 -Chunk 10000 -EvidenceDirectory \u003cdir\u003e",
+    "started_utc":  "2026-11-19T12:13:08.4928657Z",
+    "ended_utc":  "2026-11-19T12:18:33.4463182Z",
+    "exit_code":  0,
+    "assembly_sha256":  {
+                            "AuthorizationAuthority.Tests.dll":  "7630dfaa4fa0272ea83163cfb941798f6bc3a6ccfdb2b2634df97ae7febbd3a2",
+                            "AuthorizationAuthority.Application.dll":  "c82007920e8177d6ef635a033c72101f59898e4742e8257abf927a24c56df363",
+                            "AuthorizationAuthority.Infrastructure.dll":  "4a7f5867ecd1a6bb069657fccc1802826ec01ed7cd547104e82995b1f3a45794",
+                            "AuthorizationAuthority.Domain.dll":  "e298b4c9890591a0eae63a55655c3954e03630834e0f428f1f33bf85df56134c"
+                        },
+    "stack":  "postgres:18.0 + two azurite:3.9.0 (archive; separately keyed journal-verification store), 127.0.0.1, per-run credentials, removed afterwards"
+}

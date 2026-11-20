@@ -1,0 +1,36 @@
+{
+  "id": "MV-04a",
+  "what": "AE-4: skip the archive gap check",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalStreamComparer.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalStreamComparer.cs": "b0f99f91097841a5cd9695f03a7c6eb91e14efba0dde7bea00ef2b147401359b"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 51.5,
+    "exit": 2,
+    "seconds": 5.4,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 406,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AConflictingRecordUnderTheSameIdentifierBlocksTheCheckpoint",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ADeletionBelowTheCheckpointIsInvisibleToTheBoundedIncrementalSweepAndDetectedByTheFullSweep",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AMissingOrForeignRecordIsAFindingAndTheGapIsNoLongerAccepted",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineCarriesEveryAcceptedExceptionNeverUpgradesAndMayAddNewOnes",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ARebaselineReportsAChainFindingAndCreatesNothingWhenACarriedRecordChanged",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AnAcceptedLegacyGapIsStoredAsACreateOnlyRecordAndTheCheckpointCrossesItWithReducedAssurance",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AnAdditionalFindingOutsideTheAcceptedScopeIsReportedAndNotAccepted",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ChangedEvidenceInsideTheAcceptedScopeIsANewFindingAndTheCheckpointDoesNotAdvance",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.LaterSweepsClassifyTheUnchangedAcceptedGapAsAnObservationAndAdvanceWhileStayingReduced",
+      "AuthorizationAuthority.Tests.JournalBaselineServiceTests.MissingArchiveObjectsForgedAnchoredRowsRedigestedRowsAndATruncatedTailAreReported",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.ADeletedArchiveObjectIsADiscontinuityAndADeletedAnchorIsARegression"
+    ]
+  },
+  "seconds": 56.9
+}

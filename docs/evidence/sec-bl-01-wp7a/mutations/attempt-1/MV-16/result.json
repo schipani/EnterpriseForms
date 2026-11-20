@@ -1,0 +1,36 @@
+{
+  "id": "MV-16",
+  "what": "VF-12/VF-13: the full sweep is skipped (a full sweep runs as an incremental one)",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs": "a7f8951ee5dac123ad2e601e6419f35836473c32f43dbbd9248b7fe60ac79f83"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 37.9,
+    "exit": 2,
+    "seconds": 4.4,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 402,
+    "failed": [
+      "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAConsistentlyRedigestedDeliveredRowThatIsNotSentAgainIsDetectedByTheVerifier",
+      "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAnAlteredDeliveredRowOutsideTheNewestEightIsDetectedByTheVerifier",
+      "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierDeletingADeliveredRowIsDetectedByTheVerifierAndTheKeyIsStillRecordedAgainUntilDetection",
+      "AuthorizationAuthority.Tests.DPlusCommitmentVerificationTests.EveryCommitmentDefectIsReported(stream:",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ADeletionBelowTheCheckpointIsInvisibleToTheBoundedIncrementalSweepAndDetectedByTheFullSweep",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AMissingOrForeignRecordIsAFindingAndTheGapIsNoLongerAccepted",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.LaterSweepsClassifyTheUnchangedAcceptedGapAsAnObservationAndAdvanceWhileStayingReduced",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.AFullSweepRunsOnAllThreeStreams",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.AHistoricalArchivedObjectReplacedBelowTheCheckpointIsFoundByTheFullSweepOnly(stream:",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.ANonRechainedEditBelowTheCheckpointIsMissedIncrementallyAndFoundByTheFullSweep",
+      "AuthorizationAuthority.Tests.StopMarkerVerifierTests.AnInvalidMarkerAndAnUnexpectedMetaObjectAreReportedByTheFullSweep"
+    ]
+  },
+  "seconds": 42.4
+}

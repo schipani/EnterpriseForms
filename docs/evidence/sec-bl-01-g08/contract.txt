@@ -1,0 +1,75 @@
+SEC-BL-01 G08 / E-6 / E-7 final: contract suite.
+
+skipped EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.TheApplicationCannotCreateAKeyByEncryptingUnderAnUnprovisionedOrganization (0ms)
+skipped EnterpriseForms.Api.ContractTests.EnvelopeV2ReaderVaultIntegrationTests.TheVerifiedDocumentReaderOpensAVaultWrappedV2VersionAndRefusesAForeignOrganization (0ms)
+skipped EnterpriseForms.Api.ContractTests.KeyActivationVaultIntegrationTests.AnIncorrectActivationThatDropsVersionOneFailsClosedAndCorrectingItRecoversTheData (0ms)
+skipped EnterpriseForms.Api.ContractTests.KeyActivationVaultIntegrationTests.TheVersionScriptProvisionedVersionTwoWithoutActivatingIt (0ms)
+skipped EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.InvalidCredentialsAndAnUnreachableVaultFailClosed (0ms)
+skipped EnterpriseForms.Api.ContractTests.EnvelopeV2ReaderVaultIntegrationTests.TheVerifiedFieldReaderOpensVaultWrappedV1AndV2RowsWithOneUnwrapPerDataKeyGroup (0ms)
+skipped EnterpriseForms.Api.ContractTests.KeyActivationVaultIntegrationTests.TheBusinessTokenCannotProvisionActivateOrRetireVersions (0ms)
+skipped EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.TheBusinessTokenHasNoAdministrativeExportOrAuthorityCapability (0ms)
+skipped EnterpriseForms.Api.ContractTests.EnvelopeV2ReaderVaultIntegrationTests.TheExactVaultKeyVersionIsUsedAndARetiredVersionIsNotReplacedByTheCurrentOne (0ms)
+skipped EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.RealVaultWrapsAndUnwrapsUnderTheScriptProvisionedKeys (0ms)
+skipped EnterpriseForms.Api.ContractTests.KeyActivationVaultIntegrationTests.ActivatingVersionTwoChangesOnlyThatOrganizationAndPurposeAndKeepsVersionOneReadable (0ms)
+skipped EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.RealVaultRejectsCrossOrganizationCrossPurposeAndVersionSubstitution (0ms)
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+      SpiceDB schema write failed, retrying: WriteSchema failed: Cancelled
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+      SpiceDB schema write failed, retrying: WriteSchema failed: Unavailable
+Test run summary: Passed! - <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+  total: 958
+  failed: 0
+  succeeded: 946
+  skipped: 12
+  duration: 1m 05s 979ms

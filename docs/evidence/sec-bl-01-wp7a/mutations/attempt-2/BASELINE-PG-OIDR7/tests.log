@@ -1,0 +1,28 @@
+[wp4] AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "authorization", attack: "deleted") (10s 466ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "authorization", attack: "commitment-disagrees") (1s 864ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "content", attack: "row-disagrees") (1s 829ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "audit", attack: "deleted") (2s 036ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "audit", attack: "row-disagrees") (1s 856ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "audit", attack: "digest-substituted") (1s 998ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "content", attack: "commitment-disagrees") (1s 612ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "audit", attack: "replaced") (1s 717ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "content", attack: "deleted") (1s 756ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "audit", attack: "commitment-disagrees") (1s 690ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "authorization", attack: "digest-substituted") (1s 926ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "content", attack: "digest-substituted") (2s 185ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "content", attack: "replaced") (1s 970ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "content", attack: "identity-substituted") (2s 262ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "authorization", attack: "replaced") (1s 629ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "authorization", attack: "row-disagrees") (1s 592ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "authorization", attack: "identity-substituted") (2s 743ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "audit", attack: "identity-substituted") (2s 947ms)
+
+Test run summary: Passed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 18
+  failed: 0
+  succeeded: 18
+  skipped: 0
+  duration: 45s 094ms
+[wp4] containers and their anonymous volumes removed
+[wp4] exit code 0

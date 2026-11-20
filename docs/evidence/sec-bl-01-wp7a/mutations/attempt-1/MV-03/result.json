@@ -1,0 +1,30 @@
+{
+  "id": "MV-03",
+  "what": "VF-10: an Anchored row above the archive head is trusted as archived (delivery state as evidence)",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalStreamComparer.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalStreamComparer.cs": "b0f99f91097841a5cd9695f03a7c6eb91e14efba0dde7bea00ef2b147401359b"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 47.0,
+    "exit": 2,
+    "seconds": 6.5,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 410,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalBaselineServiceTests.MissingArchiveObjectsForgedAnchoredRowsRedigestedRowsAndATruncatedTailAreReported",
+      "AuthorizationAuthority.Tests.JournalVerificationRaceTests.AnEntryDeliveredBetweenTheListingAndTheRowWalkIsInconclusiveNeverAFakeReceipt(stream:",
+      "AuthorizationAuthority.Tests.JournalVerificationRaceTests.TheSameRowWithNoArchivedObjectIsAFakeReceipt",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.AForgedAnchoredRowIsAFakeReceipt",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.FindingsAreRecordedCreateOnlyAndAlertedOnceAndNothingIsQuarantinedOrRepaired"
+    ]
+  },
+  "seconds": 53.5
+}

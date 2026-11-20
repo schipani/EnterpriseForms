@@ -1,0 +1,15 @@
+failed AuthorizationAuthority.Tests.JournalChainRulesTests.R4APreviousDigestColumnThatDiffersFromTheEnvelopeIsAColumnMismatch (2ms)
+  Assert.False() Failure
+  Expected: False
+  Actual:   True
+    at AuthorizationAuthority.Tests.JournalChainRulesTests.AssertFailure(JournalEntryInspection inspection, JournalCheckOutcome outcome, String code) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalChainRulesTests.cs:55
+    at AuthorizationAuthority.Tests.JournalChainRulesTests.R4APreviousDigestColumnThatDiffersFromTheEnvelopeIsAColumnMismatch() in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalChainRulesTests.cs:170
+    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 417
+  failed: 1
+  succeeded: 416
+  skipped: 0
+  duration: 2s 004ms

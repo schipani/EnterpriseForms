@@ -1,0 +1,27 @@
+{
+  "id": "MV-15b",
+  "what": "VF-14 (expressible variant): the verifier snapshot is not server-enforced read-only (READ WRITE)",
+  "kind": "pg",
+  "files": [
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/JournalVerificationReader.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Infrastructure/Persistence/JournalVerificationReader.cs": "3405c52bd16b548a9341fa008b5f8fc2495ce45c5c828381973ee070c873a524"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 45.8,
+    "exit": 2,
+    "seconds": 38.5,
+    "kind": "pg",
+    "total": 3,
+    "succeeded": 1,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.TheSnapshotIsServerEnforcedReadOnlyAndIssuesOnlySelects",
+      "AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AllThreeStreamsTogetherAreCleanReadOnlyAndIsolatedUnderTampering"
+    ]
+  },
+  "seconds": 84.3
+}

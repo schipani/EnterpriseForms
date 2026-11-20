@@ -1,0 +1,24 @@
+{
+  "id": "MV-7A-04",
+  "what": "RV-3: a refusal or an outage is reused within the bound",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "976ea25a7d858f53e61578b81c8e2850f487e70dfbf98b6d3aa735690c0bfb36"
+  },
+  "restored": true,
+  "verdict": "SURVIVED",
+  "result": {
+    "build": 0,
+    "build_seconds": 35.4,
+    "exit": 0,
+    "seconds": 4.5,
+    "kind": "ip",
+    "total": 417,
+    "succeeded": 417,
+    "failed": []
+  },
+  "seconds": 40.0
+}

@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Security.Cryptography;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Application.Features.Content;
 using AuthorizationAuthority.Application.Features.Journal;
+using AuthorizationAuthority.Application.Features.Journal.Verification;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Organizations;
 
@@ -87,11 +89,146 @@ public sealed class CapabilityRefusalEvidenceWorld
 
     public int Scopes => Volatile.Read(ref scopeSequence);
 
-    public Guid AddOrganization()
+    /// <summary>
+    /// SEC-BL-01 WP-5a: the genuine audit entry at revision 40 of each organization (not part of <see cref="Journal"/>, which holds only what
+    /// the tests append). The organization head links to it, so appended entries chain onto a real predecessor that D+ can verify once
+    /// <see cref="ProvisionArchiveAsync"/> has archived it.
+    /// </summary>
+    public ConcurrentDictionary<Guid, SecurityJournalEntry> AuditPredecessors { get; } = new();
+
+    /// <param name="freshAuditStream">WP-5a: an organization whose audit stream starts at revision 1 (genesis), with no history.</param>
+    public Guid AddOrganization(bool freshAuditStream = false)
     {
         var id = Guid.CreateVersion7();
-        Organizations[id] = new OrganizationAuthorizationState { OrganizationId = id, AuthorizationRevision = 5, ProjectionAppliedRevision = 5, AuditJournalRevision = 40 };
+        if (freshAuditStream)
+        {
+            Organizations[id] = new OrganizationAuthorizationState { OrganizationId = id, AuthorizationRevision = 5, ProjectionAppliedRevision = 5 };
+            return id;
+        }
+
+        var history = new OrganizationAuthorizationState { OrganizationId = id, AuditJournalRevision = 39, LatestAuditJournalDigest = SHA256.HashData(id.ToByteArray()) };
+        var predecessor = JournalChain.Append(history, JournalStreamNames.Audit, 40, "WorldHistory", new { note = "genuine audit history before the test" }, null, null, Clock);
+        AuditPredecessors[id] = predecessor;
+        Organizations[id] = new OrganizationAuthorizationState
+        {
+            OrganizationId = id, AuthorizationRevision = 5, ProjectionAppliedRevision = 5, AuditJournalRevision = 40, LatestAuditJournalDigest = predecessor.JournalEventDigest,
+        };
         return id;
+    }
+
+    /// <summary>SEC-BL-01 G14-R2 (A-4 §24): the in-memory D+ durability (record stores, instance pin, recovery keys) of this world's processors.</summary>
+    public DPlusTestStores DPlus { get; } = new();
+
+    /// <summary>SEC-BL-01 E-6/E-7: the receipt verifier of this world's scopes (fail closed unless a test composes one).</summary>
+    public IJournalReceiptVerifier JournalReceipts { get; set; } = NotComposedJournalReceiptVerifier.Instance;
+
+    /// <summary>SEC-BL-01 WP-5b: the genuine revision-40 history entries of the authorization and content streams (see <see cref="AddStreamHistory"/>).</summary>
+    public ConcurrentDictionary<(Guid Organization, string Stream), SecurityJournalEntry> StreamPredecessors { get; } = new();
+
+    private readonly ConcurrentDictionary<(Guid Organization, string Stream), long> streamHeads = new();
+
+    /// <summary>The genuine revision-40 history entry of <paramref name="stream"/> (audit: <see cref="AuditPredecessors"/>).</summary>
+    public SecurityJournalEntry Predecessor(Guid organization, string stream) =>
+        stream == JournalStreamNames.Audit ? AuditPredecessors[organization] : StreamPredecessors[(organization, stream)];
+
+    /// <summary>
+    /// SEC-BL-01 WP-5b: genuine history for the authorization or content stream, as for the audit stream: revision 40 chained to an
+    /// unknown older digest, committed (not in <see cref="Journal"/>, like the audit history) and not archived until a test archives it. For
+    /// the authorization stream the projection precondition of the gate is satisfied, so only archive delivery decides it.
+    /// </summary>
+    public SecurityJournalEntry AddStreamHistory(Guid organization, string stream)
+    {
+        if (stream == JournalStreamNames.Audit)
+        {
+            return AuditPredecessors[organization];
+        }
+
+        lock (Journal)
+        {
+            var state = Organizations[organization];
+            var older = SHA256.HashData([.. organization.ToByteArray(), .. System.Text.Encoding.UTF8.GetBytes(stream)]);
+            var history = new OrganizationAuthorizationState { OrganizationId = organization, LatestSecurityJournalDigest = older, LatestContentJournalDigest = older };
+            var predecessor = JournalChain.Append(history, stream, 40, "WorldHistory", new { note = "genuine " + stream + " history before the test" }, null, null, Clock);
+            predecessor.ArchiveDeliveryState = ArchiveDeliveryStates.Anchored; // delivered before the test (the archive object is the test's choice)
+            if (stream == JournalStreamNames.Authorization)
+            {
+                state.LatestSecurityJournalDigest = predecessor.JournalEventDigest;
+                state.AuthorizationRevision = 40;
+                state.ProjectionAppliedRevision = 40;
+                state.ProjectionZedToken = "world-zed-40";
+            }
+            else
+            {
+                state.LatestContentJournalDigest = predecessor.JournalEventDigest;
+            }
+
+            streamHeads[(organization, stream)] = 40;
+            StreamPredecessors[(organization, stream)] = predecessor;
+            return predecessor;
+        }
+    }
+
+    /// <summary>
+    /// SEC-BL-01 WP-5b: appends an entry to any stream as a committed transaction would (audit: <see cref="Seed"/>). Authorization entries also
+    /// advance the authorization revision and its applied projection (the gate then depends on archive delivery only).
+    /// </summary>
+    public SecurityJournalEntry SeedStream(Guid organization, string stream, string eventKind, object body)
+    {
+        if (stream == JournalStreamNames.Audit)
+        {
+            return Seed(organization, eventKind, body);
+        }
+
+        // The organization row lock, as a committing Authority transaction holds it (a pass in progress commits its state first).
+        var rowLock = RowLock(organization);
+        rowLock.Wait();
+        try
+        {
+            lock (Journal)
+            {
+                return SeedLocked(organization, stream, eventKind, body);
+            }
+        }
+        finally
+        {
+            rowLock.Release();
+        }
+    }
+
+    private SecurityJournalEntry SeedLocked(Guid organization, string stream, string eventKind, object body)
+    {
+        {
+            var state = Organizations[organization];
+            var revision = streamHeads.AddOrUpdate((organization, stream), 1, (_, head) => head + 1);
+            if (stream == JournalStreamNames.Authorization)
+            {
+                state.AuthorizationRevision = revision;
+                state.ProjectionAppliedRevision = revision;
+                state.ProjectionZedToken = "world-zed-" + revision.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            var entry = JournalChain.Append(state, stream, revision, eventKind, body, null, null, Clock);
+            Journal.Add(entry);
+            return entry;
+        }
+    }
+
+    /// <summary>
+    /// SEC-BL-01 WP-5a: the sentinel and every organization's archived revision-40 predecessor, as a baselined archive holds them.
+    /// G14-R2: the sentinel's instance is also pinned by a provisioning record in <see cref="DPlus"/>.
+    /// </summary>
+    public async Task ProvisionArchiveAsync(ISecurityEventArchive archive)
+    {
+        if (archive is ISecurityEventArchiveInventory inventory)
+        {
+            await DPlus.ProvisionAsync(inventory, Clock.GetUtcNow()).ConfigureAwait(false);
+        }
+
+        foreach (var predecessor in AuditPredecessors.Values.Concat(StreamPredecessors.Values))
+        {
+            await archive.AppendAsync(predecessor.OrganizationId, predecessor.JournalStreamName, 40, System.Text.Encoding.UTF8.GetBytes(predecessor.JournalEventBodyJson), predecessor.JournalEventDigest,
+                CancellationToken.None).ConfigureAwait(false);
+        }
     }
 
     /// <summary>Appends an entry directly (test setup), exactly as <see cref="AuditJournal.Append"/> would in a committed transaction.</summary>
@@ -232,6 +369,39 @@ public class EvidenceScopeProxy : DispatchProxy
                 lock (World.Journal)
                 {
                     return Task.FromResult(World.Journal.Where(e => e.OrganizationId == (Guid)args![0]! && e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending).Take((int)args![1]!).ToList());
+                }
+
+            case nameof(IAuthorityScope.GetPendingJournalEntriesByStreamAsync):
+                lock (World.Journal)
+                {
+                    // SEC-BL-01 WP-5a: the per-stream pending query of the archive processor.
+                    var stream = (string)args![1]!;
+                    var include = (bool)args[2]!;
+                    return Task.FromResult(World.Journal.Where(e => e.OrganizationId == (Guid)args[0]! && e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending
+                            && string.Equals(e.JournalStreamName, stream, StringComparison.Ordinal) == include)
+                        .OrderBy(e => e.JournalStreamName, StringComparer.Ordinal).ThenBy(e => e.JournalStreamRevision).Take((int)args[3]!).ToList());
+                }
+
+            case nameof(IAuthorityScope.CountPendingArchiveAsync):
+                lock (World.Journal)
+                {
+                    // SEC-BL-01 WP-5b: the organization gate's count (rows of the stream not Anchored), as AuthorityStore computes it.
+                    return Task.FromResult(World.Journal.Count(e => e.OrganizationId == (Guid)args![0]! && e.JournalStreamName == (string)args[1]! && e.ArchiveDeliveryState != ArchiveDeliveryStates.Anchored));
+                }
+
+            case nameof(IAuthorityScope.FindLatestJournalEntryAsync):
+                lock (World.Journal)
+                {
+                    return Task.FromResult(World.Journal.Where(e => e.OrganizationId == (Guid)args![0]! && e.JournalStreamName == (string)args[1]!).OrderByDescending(e => e.JournalStreamRevision).FirstOrDefault());
+                }
+
+            case "get_" + nameof(IAuthorityScope.JournalReceipts):
+                return World.JournalReceipts;
+
+            case nameof(IAuthorityScope.FindJournalEntryAsync):
+                lock (World.Journal)
+                {
+                    return Task.FromResult(World.Journal.FirstOrDefault(e => e.OrganizationId == (Guid)args![0]! && e.JournalStreamName == (string)args[1]! && e.JournalStreamRevision == (long)args[2]!));
                 }
 
             case nameof(IAuthorityScope.AddJournalEntry):

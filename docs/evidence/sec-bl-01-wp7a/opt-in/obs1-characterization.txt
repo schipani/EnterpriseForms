@@ -1,0 +1,14 @@
+SEC-BL-01 WP-7A opt-in run: obs1-characterization.txt (local paths scrubbed)
+
+passed AuthorizationAuthority.Tests.ArchiveDeliveryOutageCharacterizationTests.TheDeliveryReadAndAppendReportUnavailabilityWhereTheAggregateExceptionEscapedBefore(timeoutSeconds: 3) (6s 400ms)
+passed AuthorizationAuthority.Tests.ArchiveDeliveryOutageCharacterizationTests.TheDeliveryReadAndAppendReportUnavailabilityWhereTheAggregateExceptionEscapedBefore(timeoutSeconds: 8) (16s 052ms)
+passed AuthorizationAuthority.Tests.ArchiveDeliveryOutageCharacterizationTests.AfterAnOutageTheNextPassDeliversThePendingEntriesInOrderWithoutQuarantineOrFalseSuccess (343ms)
+passed AuthorizationAuthority.Tests.ArchiveDeliveryOutageCharacterizationTests.TheArchiveProcessorKeepsTheEntryPendingWithoutQuarantineAgainstAnUnreachableArchive (8s 026ms)
+
+Test run summary: Passed! - <repo>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 4
+  failed: 0
+  succeeded: 4
+  skipped: 0
+  duration: 34s 105ms
+exit 0

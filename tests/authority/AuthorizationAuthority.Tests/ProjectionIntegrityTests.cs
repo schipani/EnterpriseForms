@@ -446,6 +446,37 @@ public sealed class ProjectionIntegrityTests
         Assert.Equal((ProjectionMarker.SubjectId(org, 1, previous), ProjectionMarker.SubjectId(org, 2, current)), Assert.Single(spice.MarkerWrites));
     }
 
+    /// <summary>
+    /// SEC-BL-01 WP-7 (C-159; A-7 §27.2 GT-6; mutation MV-X1): the same state as the test above, but with the trusted receipt verifier composed
+    /// (as the host composes it) and an archive that never received the entry. The row claims <c>Anchored</c> (J1 can write that), so the
+    /// projector must not apply it: no SpiceDB marker write, no applied-revision advance. The test above is the positive control (receipt
+    /// assumed: applied).
+    /// </summary>
+    [Fact]
+    public async Task TheProjectorNeverAppliesAnAuthorizationEntryWhoseAnchoredStateHasNoTrustedReceipt()
+    {
+        var stores = new DPlusTestStores();
+        var archive = new AuthorizationAuthority.Infrastructure.Archive.InMemorySecurityEventArchive();
+        await stores.ProvisionAsync(archive, DateTimeOffset.UtcNow);
+        var store = new InMemoryAuthorityStore { RealJournalDelivery = true, ReceiptVerifier = new AuthorizationAuthority.Application.Features.Journal.TrustedJournalReceipts(archive, stores.Durability) };
+        var spice = new FakeSpiceDb();
+        var transition = new ProjectionMarkerTransitionState();
+        transition.MarkCompleted();
+        var org = Guid.CreateVersion7();
+        var previous = new byte[32];
+        previous[0] = 1;
+        var current = AuthorizationAuthority.Application.Common.CanonicalJson.Digest("{}"u8.ToArray());
+        var state = new OrganizationAuthorizationState { OrganizationId = org, AuthorizationRevision = 2, ProjectionAppliedRevision = 1, ProjectionZedToken = "z1", LatestSecurityJournalDigest = current, CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous };
+        store.Organizations.Add(state);
+        store.Outbox.Add(new ProjectionOutboxEvent { ProjectionOutboxEventId = Guid.CreateVersion7(), OrganizationId = org, SecurityCommandId = Guid.CreateVersion7(), TargetAuthorizationRevision = 2, RelationshipDeltaJson = "[]", ProjectionCreatedOn = DateTimeOffset.UtcNow });
+        store.Journal.Add(new SecurityJournalEntry { SecurityJournalEntryId = Guid.CreateVersion7(), OrganizationId = org, JournalStreamName = JournalStreamNames.Authorization, JournalStreamRevision = 2, JournalEventKind = "SecurityCommandCommitted", JournalEventBodyJson = "{}", JournalEventDigest = current, JournalPreviousDigest = previous, ArchiveDeliveryState = ArchiveDeliveryStates.Anchored, ArchiveReceiptReference = "forged", JournalCreatedOn = DateTimeOffset.UtcNow });
+        var processor = new ProjectionProcessor(store, spice, transition, new NoOpFaultInjector(), TimeProvider.System);
+        Assert.Equal(ProjectionStepResult.AwaitingArchive, await processor.ProcessOrganizationAsync(org, CancellationToken.None));
+        Assert.Empty(spice.MarkerWrites);
+        Assert.Equal(1, state.ProjectionAppliedRevision);
+        Assert.False(state.IntegrityQuarantineEnabled);
+    }
+
     [Fact]
     public async Task TheTransitionUpgradesLegacyMarkersAndQuarantinesInconsistentOnes()
     {

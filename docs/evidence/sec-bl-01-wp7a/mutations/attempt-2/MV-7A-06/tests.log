@@ -1,0 +1,13 @@
+failed AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.TheGateRefusesAHeadWhoseSuccessorIsArchived (13ms)
+  Assert.Equal() Failure: Values differ
+  Expected: AwaitingArchive
+  Actual:   Ready
+    at AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.TheGateRefusesAHeadWhoseSuccessorIsArchived() in <clone>\tests\authority\AuthorizationAuthority.Tests\AuthorizationStreamGateDPlusTests.cs:295
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 424
+  failed: 1
+  succeeded: 423
+  skipped: 0
+  duration: 2s 139ms

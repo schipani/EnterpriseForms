@@ -1,0 +1,30 @@
+{
+  "id": "MV-02",
+  "what": "VF-7: drop the row-versus-archive byte comparison",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalStreamComparer.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalStreamComparer.cs": "97ec2fbbcd090f87693f219e2fbe3a903e81ec4c5dcf50b3e7be0fed19265647"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 47.6,
+    "exit": 2,
+    "seconds": 7.0,
+    "kind": "ip",
+    "total": 337,
+    "succeeded": 332,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AChangedAnchorAndADatabaseArchiveMismatchAboveTheCheckpointAreStillDetectedByTheBoundedSweep",
+      "AuthorizationAuthority.Tests.JournalBaselineServiceTests.AnArchivedObjectThatDiffersFromTheRowFailsTheBaseline",
+      "AuthorizationAuthority.Tests.JournalBaselineServiceTests.MissingArchiveObjectsForgedAnchoredRowsRedigestedRowsAndATruncatedTailAreReported",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.AModifiedDeliveredRowIsAnAnchorMismatchAndADeletedRowIsAGap",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.TamperingInOneOrganizationAndStreamDoesNotAffectOthers"
+    ]
+  },
+  "seconds": 54.6
+}

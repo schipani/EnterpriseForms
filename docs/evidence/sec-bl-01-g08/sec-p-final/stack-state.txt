@@ -1,0 +1,21 @@
+Disposable security-test stack built from the G08 / E-6 / E-7 sources, fresh project enterpriseforms-sectest, down -v before and after.
+SEC-P01..SEC-P12: 13/13 (secp.txt). The G08 triggers were present (2). The added migration-history query failed (identifier quoting) and is kept as run;
+the trigger count shows migration 20261119021623_AuthorityJournalImmutabilityG08 applied.
+
+Post-run journal delivery states (stream|state|error code|rows), quarantine, triggers:
+SEC-BL-01 G08 / E-6 / E-7 final SEC-P: stack-state.txt (local paths scrubbed)
+
+audit|Anchored|-|16
+authorization|Anchored|-|60
+content|Anchored|-|25
+quarantined 0 of 16
+docker : ERROR:  relation "authority.__efmigrationshistory" does not exist
+At line:1 char:1567
++ ... s[1].Value; docker compose @c exec -T -e "PGPASSWORD=$p" authority-db ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ERROR:  relatio... does not exist:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+LINE 1: ...nal; SELECT 'migration ' || max(MigrationId) FROM authority....
+                                                             ^
+g08 triggers 2

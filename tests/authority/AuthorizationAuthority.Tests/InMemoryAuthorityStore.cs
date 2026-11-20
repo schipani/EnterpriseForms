@@ -20,6 +20,15 @@ namespace AuthorizationAuthority.Tests;
 /// </summary>
 internal sealed class InMemoryAuthorityStore : IAuthorityStore
 {
+    /// <summary>SEC-BL-01 WP-5b: when true, pending journal queries and the gate's archive count reflect the journal (default: nothing pending).</summary>
+    public bool RealJournalDelivery { get; set; }
+
+    /// <summary>
+    /// SEC-BL-01 E-6/E-7: the receipt verifier of this store. Unset: with <see cref="RealJournalDelivery"/> the fail-closed verifier (a test must
+    /// compose a real one); without it, the test double that treats Anchored rows as delivered (this store models no archive).
+    /// </summary>
+    public IJournalReceiptVerifier? ReceiptVerifier { get; set; }
+
     public List<OrganizationAuthorizationState> Organizations { get; } = [];
     public List<IdentityBinding> Bindings { get; } = [];
     public List<AuthorityResource> Resources { get; } = [];
@@ -234,9 +243,19 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public Task<SecurityJournalEntry?> FindJournalEntryAsync(Guid organizationId, string streamName, long streamRevision, CancellationToken cancellationToken) =>
             Task.FromResult(s.Journal.FirstOrDefault(j => j.OrganizationId == organizationId && j.JournalStreamName == streamName && j.JournalStreamRevision == streamRevision));
 
-        public Task<List<SecurityJournalEntry>> GetPendingJournalEntriesAsync(Guid organizationId, int limit, CancellationToken cancellationToken) => Task.FromResult(new List<SecurityJournalEntry>());
+        public Task<List<SecurityJournalEntry>> GetPendingJournalEntriesAsync(Guid organizationId, int limit, CancellationToken cancellationToken) =>
+            Task.FromResult(s.RealJournalDelivery
+                ? s.Journal.Where(j => j.OrganizationId == organizationId && j.ArchiveDeliveryState == ArchiveDeliveryStates.Pending)
+                    .OrderBy(j => j.JournalStreamName, StringComparer.Ordinal).ThenBy(j => j.JournalStreamRevision).Take(limit).ToList()
+                : new List<SecurityJournalEntry>());
 
-        public Task<int> CountPendingArchiveAsync(Guid organizationId, string streamName, CancellationToken cancellationToken) => Task.FromResult(0);
+        public Task<SecurityJournalEntry?> FindLatestJournalEntryAsync(Guid organizationId, string streamName, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Journal.Where(j => j.OrganizationId == organizationId && j.JournalStreamName == streamName).OrderByDescending(j => j.JournalStreamRevision).FirstOrDefault());
+
+        public IJournalReceiptVerifier JournalReceipts => s.ReceiptVerifier ?? (s.RealJournalDelivery ? NotComposedJournalReceiptVerifier.Instance : AssumeDeliveredTestReceipts.Instance);
+
+        public Task<int> CountPendingArchiveAsync(Guid organizationId, string streamName, CancellationToken cancellationToken) =>
+            Task.FromResult(s.RealJournalDelivery ? s.Journal.Count(j => j.OrganizationId == organizationId && j.JournalStreamName == streamName && j.ArchiveDeliveryState != ArchiveDeliveryStates.Anchored) : 0);
 
         public Task<RecordContentHead?> FindContentHeadAsync(Guid organizationId, Guid formRecordId, bool lockForUpdate, CancellationToken cancellationToken) =>
             Task.FromResult(s.Heads.FirstOrDefault(h => h.OrganizationId == organizationId && h.FormRecordId == formRecordId));

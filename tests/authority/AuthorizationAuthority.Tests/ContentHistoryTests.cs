@@ -56,7 +56,8 @@ public sealed class ContentHistoryTests
         }
     }
 
-    private sealed class Harness
+    /// <summary>SEC-BL-01 WP-5b reuses this harness (internal) for the content-stream RD-5 demonstration.</summary>
+    internal sealed class Harness
     {
         public Guid Org { get; } = Guid.CreateVersion7();
         public Guid Record { get; } = Guid.CreateVersion7();
@@ -71,6 +72,9 @@ public sealed class ContentHistoryTests
 
         /// <summary>Accepted rows (with signatures) of every revision, as the business store keeps them.</summary>
         public Dictionary<long, List<StagedContentItem>> Snapshots { get; } = [];
+
+        /// <summary>SEC-BL-01 WP-5b: when false, journal entries keep their real delivery state (the archive processor delivers them).</summary>
+        public bool AnchorAfterCommit { get; set; } = true;
 
         public Harness()
         {
@@ -119,7 +123,7 @@ public sealed class ContentHistoryTests
             var staged = candidate.Select(c => new StagedContentItem(c.Kind, c.ItemId, c.Base64, signatures[(c.Kind, c.ItemId)])).ToList();
             var revision = await Service.CommitAsync(Actor(Owner), operation, new CommitContentChangeRequest(Org, Record, staged), Guid.CreateVersion7(), CancellationToken.None);
             Snapshots[revision.CommittedContentRevision] = staged;
-            foreach (var entry in Store.Journal)
+            foreach (var entry in AnchorAfterCommit ? Store.Journal : [])
             {
                 entry.ArchiveDeliveryState = ArchiveDeliveryStates.Anchored; // archive receipt present (SEC-P12 precondition for any release)
             }

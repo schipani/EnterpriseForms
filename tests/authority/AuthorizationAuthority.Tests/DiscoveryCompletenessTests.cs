@@ -72,6 +72,9 @@ public sealed class DiscoveryCompletenessTests
             };
             scopeControl.Handlers["GetActiveRecordIdsAsync"] = _ => Task.FromResult(Registered.ToList());
             scopeControl.Handlers["DisposeAsync"] = _ => ValueTask.CompletedTask;
+            // SEC-BL-01 E-6: the gate's archive conditions (this fake has no authorization journal: nothing pending, no head to verify).
+            scopeControl.Handlers["CountPendingArchiveAsync"] = _ => Task.FromResult(0);
+            scopeControl.Handlers["FindLatestJournalEntryAsync"] = _ => Task.FromResult<AuthorizationAuthority.Domain.Features.Journal.SecurityJournalEntry?>(null);
             var (store, storeControl) = CreateFake<IAuthorityStore>();
             storeControl.Handlers["BeginScopeAsync"] = _ => Task.FromResult(scope);
             var (spiceDb, spiceControl) = CreateFake<ISpiceDbProjection>();

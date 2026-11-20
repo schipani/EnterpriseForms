@@ -1,0 +1,5 @@
+Disposable security-test stack, WP-5b content stage (EnforcedStreams = audit, content; authorization delivered without D+), fresh project
+enterpriseforms-sectest, down -v before and after. SEC-P01..SEC-P12: 13/13 passed (secp.txt).
+
+Post-run journal delivery states: NOT CAPTURED. The psql query after the run failed (no password supplied to psql inside the container) and
+the stack was then removed by down -v, so the per-stream delivery states of this run are not evidence. The final-stage run captures them.

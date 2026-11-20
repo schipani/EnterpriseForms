@@ -190,7 +190,7 @@ Executed in T2 after the organization lock, the index check (T2-8) and `t_db`:
 - A1. The recorder is the only producer of the event kind and always follows §5.3 (M2F3-38; MZ-15).
 - A2. Every evidence append happens in a T2 that holds o's organization row lock from the lookup through commit (M2F3-61; MZ-24).
 - A3. Audit revisions are unique per organization and stream (`uq_journal_stream_revision`); an insert at a revision already used fails (LK-8).
-- A4. No privileged actor inserts, deletes, reorders or edits journal rows (outside the runtime model; G08). Edited bodies fail LK-3.
+- A4. No privileged actor inserts, deletes, reorders or edits journal rows (outside the runtime model; G08). Edited bodies fail LK-3. *(Note 2026-11-17, C-155, correction D-1: this proof **assumption** A4 is what R-M2f3-6 and R-FU-1 refer to as "A4"; it is unrelated to attacker class A4 of `E3_ENVELOPE_V2_KEY_HIERARCHY_DESIGN.md` §7. The assumption can be violated by attacker classes J1 (Authority runtime database credential: insert and edit) and J2 (privileged administrator: also delete) of `SEC_BL_01_DR_CONTRACT_CLOSURE.md` §2; "Edited bodies fail LK-3" holds only when the digest is not recomputed. The theorem below remains conditional on A4.)*
 - A5. The lookup's **result** is defined by SQL semantics, whatever access path the planner uses: it returns exactly the newest `min(8, |E_o|)` rows of `E_o`. IX-B only makes that cheap (§5.6); it is not a correctness assumption (L-D).
 
 **Invariant I-1.** `E_o` is non-decreasing in τ.
@@ -574,7 +574,7 @@ No API reads the audit stream; no permission changes (PD-09). Readers remain Aut
 | M2F3-40 | The recorder does not reference the ledger port; AM-F1 caller count still one |
 | M2F3-41 | No new endpoint, route or permission; OpenAPI diff limited to the CC-2 text |
 | M2F3-42 | Mutation driver over MZ-01..MZ-36 |
-| M2F3-43 | Evidence-removal: delete or alter a delivered evidence row ⇒ chain / archive verification detects it |
+| M2F3-43 | Evidence-removal: delete or alter a delivered evidence row ⇒ chain / archive verification detects it *(Note 2026-11-17, C-155: requirement unchanged; status FAILED; remediation contract `SEC_BL_01_DR_CONTRACT_CLOSURE.md` (design D-R), not implemented)* |
 | M2F3-44 | Existing suites green without assertion changes for level-2 callers; TS-M2f-01 remains the recorded open failure |
 | M2F3-45 | Filter registered on **exactly** the seven routes |
 | M2F3-46 | Filter rethrows the same instance; other exceptions pass through unrecorded |
@@ -705,7 +705,7 @@ No API reads the audit stream; no permission changes (PD-09). Readers remain Aut
 | R-M2f3-3 | A post-restore evidence append can trigger organization quarantine (CC-5) | Accepted under RB-a |
 | R-M2f3-4 | No evidence when a restore admits level-1 traffic (RS-6) | R-M2f-4 / BD-1, open |
 | R-M2f3-5 | A compromised business runtime can cause bounded evidence naming any registered organization, or avoid evidence by claiming level 2 | Bounded (≤ 7 per organization per hour); CAP-S7 |
-| R-M2f3-6 | Privileged AuthorityDb actor can remove an undelivered tail or forge entries (A4) | G08 residual |
+| R-M2f3-6 | Privileged AuthorityDb actor can remove an undelivered tail or forge entries (A4) | G08 residual. *(Note 2026-11-17, C-155, D-1/D-4: "A4" = proof assumption A4 of §5.4, not an attacker class; forging needs only J1 (runtime credential), removal J2 (`SEC_BL_01_DR_CONTRACT_CLOSURE.md` §2). Unchanged by D-R: = R-DR-1)* |
 | R-M2f3-7 | Suppressed, inconclusive, dropped and abandoned refusals have no durable trace | Accepted by PD-02/PD-07 |
 | R-M2f3-8 | Extra organization-row locks and examinations under a flood | Bounded by pre-filter, negative cache and attempt limit; TQ-14 |
 | R-M2f3-9 | Future tenant exposure of the audit stream (M4-2) | PD-09 |
@@ -719,7 +719,7 @@ No API reads the audit stream; no permission changes (PD-09). Readers remain Aut
 | R-M2f3-17 | An interrupted concurrent build leaves an INVALID index; until cleaned up, evidence is not recorded | Accepted; IXP-5 |
 | R-M2f3-18 | The index ties the schema to one event-kind literal; adding refusal classes later (PD-11) needs a new or rebuilt index | Accepted; future decision |
 | R-M2f3-19 | Building the index on a populated persistent database waits on long-running transactions and scans the table twice | Open; OD-IX-2 |
-| R-FU-1 | *(added 2026-11-17, FU-M2f3-01)* A privileged AuthorityDb writer can delete or consistently forge a **delivered** evidence row without product detection; the archive keeps the delivered original but nothing reports the divergence; a forged row can suppress recording of its key for the rest of the bucket | **Open**; retained; tracked as SEC-BL-01 (`SECURITY_BACKLOG.md`); M2F3-43 FAILED |
+| R-FU-1 | *(added 2026-11-17, FU-M2f3-01)* A privileged AuthorityDb writer can delete or consistently forge a **delivered** evidence row without product detection; the archive keeps the delivered original but nothing reports the divergence; a forged row can suppress recording of its key for the rest of the bucket | **Open**; retained; tracked as SEC-BL-01 (`SECURITY_BACKLOG.md`); M2F3-43 FAILED. *(Note 2026-11-17, C-155: D-1: the privileged actor is attacker class J1 or J2 of `SEC_BL_01_DR_CONTRACT_CLOSURE.md` §2, not "A4". D-3: suppression is not bounded to the bucket; a forged entry with a future `evidence_database_time_utc` makes later lookups Inconclusive (LK-6) until the database clock passes it (source inspection; not executed). D-4: deletion needs J2; alteration and insertion need only J1. Remediation direction D-R approved, not implemented)* |
 
 Carried forward unchanged: BD-1, BD-2 (FB-1 obligation), G14 recovery, F-E2, R-A1-1..5, R-M2f-1..R-M2f-10 (R-M2f-9 closes only when E3-M2f-3i, -3b and -3G are accepted; *2026-11-17: accepted, R-M2f-9 closed for Development/Testing only, §14*), R-CARV-12 for its own class, R-M2b2-7, R-M2e-9, UQ-4, TS-M2f-01, FU-M2E2-MUT-01, INV-1/INV-2, OA-FE1-2, V2-IND-01, RB-CARV-1 production closure, PB-08, PB-11, PB-12, Azure PostgreSQL verification.
 
@@ -783,7 +783,7 @@ Before any deployment beyond Development/Testing: monitoring routes for 9253/925
 | R-M2f-9 | Closed for Development/Testing only. Persistent use remains blocked |
 | OPEN-M2f-1 | Still open, pending OD-IX-2 |
 | Envelope v2 acceptance | Not activated anywhere; no acceptance policy was requested in any 3G database (Z-02); no data-key binding exists (Z-03) |
-| Still open | OD-IX-2; BD-1, BD-2 (FB-1), G14 recovery; TQ-6, TQ-10 (at the bound), TQ-15, TQ-16, TQ-18/19/23 (Azure), TQ-21, TQ-22; open risks R-M2f3-2 (G14 class), -4 (BD-1), -13 (Azure), -16, -19, with the accepted residual risks of §11.3 unchanged; TS-M2f-01; the unidentified contract failure; FU-M2f3-01, FU-M2f3-02; OPEN-M2f-4; F-E2; V2-IND-01 (independent review); PB-11, PB-12; Azure PostgreSQL verification |
+| Still open | OD-IX-2; BD-1, BD-2 (FB-1), G14 recovery; TQ-6, TQ-10 (at the bound), TQ-15, TQ-16, TQ-18/19/23 (Azure), TQ-21, TQ-22; open risks R-M2f3-2 (G14 class), -4 (BD-1), -13 (Azure), -16, -19, with the accepted residual risks of §11.3 unchanged; TS-M2f-01; the unidentified contract failure; FU-M2f3-01, FU-M2f3-02; OPEN-M2f-4; F-E2; V2-IND-01 (independent review); PB-11, PB-12; Azure PostgreSQL verification. *(Note 2026-11-17, correction D-2: FU-M2f3-01 and FU-M2f3-02 were executed and accepted later the same day; this entry is superseded by §14.1. The remaining items are unchanged)* |
 | Review | Owner-led. Not an independent security review, not a certification and not production evidence |
 
 ### 14.1 Final closure of the refusal-evidence implementation workstream (Option A, 2026-11-17)
@@ -801,3 +801,27 @@ Before any deployment beyond Development/Testing: monitoring routes for 9253/925
 | Remaining verification gaps (preserved) | M2F3-43 (SEC-BL-01); M2F3-28 binding-inserting Prepares and M2F3-33 restore below the first binding (both need a bound organization, OPEN-M2f-4); M2F3-29, -31, -42, -78 reduced; M2F3-44 inconclusive; **TS-M2f-01** (timing-sensitive contract test, open, not fixed); **the unidentified historical contract failure** of the E3-M2f-3G contract run 1 (kept separate, not attributed) |
 | Still open (unchanged) | PD-15; OD-IX-2; OPEN-M2f-1; OPEN-M2f-4; BD-1, BD-2, G14 recovery; R-FU-1 and the open risks of §11.3; TQ-6, TQ-10, TQ-15, TQ-16, TQ-18/19/23 (Azure), TQ-21, TQ-22; F-E2; V2-IND-01 (independent review); PB-11, PB-12; Azure PostgreSQL verification |
 | Not claimed | No PD-15 pass; no detection of delivered-row deletion or forgery; no persistent, Azure or production evidence; no independent review or certification |
+
+### 14.2 SEC-BL-01 design D-R and PD-15 dependencies (owner decision C-155, 2026-11-17)
+
+**Owner decision, 2026-11-17 (C-155):** the D-R architectural dispositions for SEC-BL-01 were approved and WP-0 (documentation only) authorized. The authoritative contract is `SEC_BL_01_DR_CONTRACT_CLOSURE.md`. This section changes **no** requirement, status or historical outcome of this record.
+
+| Item | State |
+|---|---|
+| M2F3-43 | **FAILED**, requirement unchanged. Remediation contract D-R; acceptance by AC-DR-01..AC-DR-14 (inverted gap tests EG-1..EG-3, ADV-01..ADV-20, MV-01..MV-18, two PostgreSQL runs of record). **Not implemented** |
+| Regressions D-R must preserve | M2F3-31 (archive delivery and outage), M2F3-54 (T2 statement and trigger set unchanged; therefore M-6 v1 adds **no** INSERT trigger on the journal), M2F3-57 (restore collision, isolation, preservation), the T2 request-path footprint; SEC-P01..SEC-P12 when D+ or M-6 is implemented (contract §13.4) |
+| PD-15 | **OPEN.** Closing SEC-BL-01 is necessary but **not sufficient**. Unchanged: M2F3-33 not executed (bound organization, OPEN-M2f-4; no prohibited data-key binding may be inserted to make a test pass); M2F3-28 binding inserts, -29, -31, -42, -78 reduced as recorded; M2F3-44 inconclusive (TS-M2f-01 open, the unidentified 3G contract failure unattributed); MZ-22 and MZ-03 owner dispositions as recorded (contract §15) |
+| Documentation corrections D-1..D-5 | Applied as dated notes (§5.4 A4, §11.3 R-M2f3-6 and R-FU-1, §14 row; other documents per contract §16). Historical text unchanged |
+| Not claimed | No verifier, no D+, no detection of the M2F3-43 cases, no PD-15 pass, no production assurance, no independent review |
+
+### 14.3 M2F3-43 technical verification and SEC-BL-01 workstream conclusion (owner decision C-161, 2026-11-19)
+
+**Owner decision, 2026-11-19 (C-161):** the SEC-BL-01 Development/Testing workstream (D-R, WP-1..WP-7A) is concluded and accepted for Development/Testing, and its outstanding requirements are deferred to the pre-production backlog PP-01..PP-15 (`SEC_BL_01_DEVELOPMENT_WORKSTREAM_CONSOLIDATION.md`; contract amendment A-10). This section changes **no** requirement, status or historical outcome of this record.
+
+| Item | State |
+|---|---|
+| M2F3-43 technical verification | **Successful within its demonstrated Development/Testing scope:** deletion of a delivered evidence row (`REVISION_GAP`), a consistently re-digested row never re-sent (`LINK_MISMATCH`), an alteration outside the newest eight (`BODY_DIGEST_MISMATCH`) and ADV-01..ADV-10 on delivered rows of all three streams are detected, in-process and in two independent PostgreSQL 18 + Azurite runs of record (WP-7, WP-7A). Detection, not prevention; alert-only; latency `T_inc`/`T_full` plus sweep duration |
+| M2F3-43 status | **FAILED (retained).** Its acceptance is "by AC-DR-01..AC-DR-14" (§14.2); AC-DR-11 is INCONCLUSIVE (deferred) and AC-DR-13 is conditional only. Outstanding: an executed 2M-row AC-DR-11 measurement (after the F-7A-5 performance remediation) and unconditional owner acceptance (consolidation record §3). The FU-M2f3-01 outcomes are not rewritten |
+| PD-15 | **OPEN.** Unchanged: M2F3-33 not executed; M2F3-28, -29, -31, -42, -78 reduced; M2F3-44 inconclusive; OPEN-M2f-4, TS-M2f-01 and the unidentified 3G contract failure open; MZ-22 and MZ-03 dispositions as recorded |
+| R-FU-1 | No longer holds for **delivered** rows in Development/Testing; residuals R-DR-1 (= R-M2f3-6, including J2 deletion of an entry before its W2-S commitment, accepted by C-161), R-DR-2, R-DR-4, CKR-3, J4 + J6, J2 + J5 and JP remain. No production assurance |
+| Not claimed | No PD-15 pass; no reclassification of M2F3-43; no production, Azure or persistent evidence; no independent review |

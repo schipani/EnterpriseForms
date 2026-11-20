@@ -1,0 +1,27 @@
+{
+  "id": "MV-15a",
+  "what": "VF-14 (expressible variant): the verifier gains an AuthorityDb write/quarantine dependency (IAuthorityScope)",
+  "kind": "arch",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs": "03914f5aab5a7447d95b29f8ae7f996d7d03f685dfebb24523c363b955abccbd"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 42.4,
+    "exit": 2,
+    "seconds": 4.1,
+    "kind": "arch",
+    "total": 13,
+    "succeeded": 11,
+    "failed": [
+      "EnterpriseForms.ArchitectureTests.JournalVerificationBoundaryTests.TheBaselineAndVerifierCannotWriteAuthorityDbQuarantineSignOrDeliver",
+      "EnterpriseForms.ArchitectureTests.JournalVerificationBoundaryTests.TheVerifierAndTheBaselineHaveNoAuthorityDbWriteQuarantineSigningGateOrEntryArchiveWriteDependency"
+    ]
+  },
+  "seconds": 46.5
+}

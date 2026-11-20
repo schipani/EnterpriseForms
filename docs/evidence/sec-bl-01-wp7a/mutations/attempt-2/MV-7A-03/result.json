@@ -1,0 +1,27 @@
+{
+  "id": "MV-7A-03",
+  "what": "RV-6: a changed evidence identity (instance, generation, commitment bytes) is accepted when the new evidence verifies",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "976ea25a7d858f53e61578b81c8e2850f487e70dfbf98b6d3aa735690c0bfb36"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 31.5,
+    "exit": 2,
+    "seconds": 3.7,
+    "kind": "ip",
+    "total": 424,
+    "succeeded": 418,
+    "failed": [
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1AChangedExternalEvidenceIsRefusedWithinTheFreshnessBoundAndStaysRefused(stream:",
+      "AuthorizationAuthority.Tests.TrustedJournalReceiptValidityTests.F1WithAZeroBoundTheNextAccessIsRefused(stream:"
+    ]
+  },
+  "seconds": 35.2
+}

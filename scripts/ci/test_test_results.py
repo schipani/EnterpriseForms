@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import sys
 import tempfile
 import threading
@@ -235,18 +236,47 @@ class AllowlistFile(unittest.TestCase):
         with self.assertRaises(assert_test_totals.AllowlistError):
             assert_test_totals.load_authorized_skips(Path(self.tmp.name) / "absent.json")
 
-    def test_the_committed_allowlist_is_the_reviewed_opt_in_vault_set_used_by_ci_and_level_3(self) -> None:
+    def test_the_committed_allowlist_is_the_reviewed_opt_in_set_used_by_ci_and_level_3(self) -> None:
         import run_dotnet_tests  # noqa: PLC0415
         committed = REPO / "scripts" / "ci" / "authorized_test_skips.json"
         self.assertEqual(committed.resolve(), run_dotnet_tests.DEFAULT_AUTHORIZED_SKIPS.resolve())
         allowed = assert_test_totals.load_authorized_skips(committed)
-        # Changing this number is deliberate: every new authorized skip needs review of both files.
-        self.assertEqual(16, len(allowed))
+        vault = r"^E\d_VAULT_\* .*not set \(run scripts/dev/e\d[\w-]*\.ps1\)$"
+        # The two exact SEC-BL-01 skip reasons (C-161 owner-approved allowlist): the environment-dependent real-store tests and
+        # the opt-in OBS-1 timing characterization tests. No other SEC-BL-01 reason is accepted.
+        secbl01_stores = "SECBL01_* not set (run scripts/dev/sec-bl-01-wp2-azurite-integration.ps1)"
+        secbl01_obs1 = "SECBL01_OBS1_CHARACTERIZE=1 not set (timing-dependent real-endpoint test)"
+        authority = REPO / "tests" / "authority" / "AuthorizationAuthority.Tests"
+        # Changing these numbers is deliberate: every new authorized skip needs review of both files.
+        counts = {"vault": 0, "secbl01_stores": 0, "secbl01_obs1": 0}
         for (project, test), reason in allowed.items():
             self.assertTrue(test.startswith(project + "."), test)
-            self.assertRegex(reason, r"^E\d_VAULT_\* .*not set \(run scripts/dev/e\d[\w-]*\.ps1\)$")
-            source = REPO / "tests" / ("authority" if project.startswith("AuthorizationAuthority") else "features") / project / (test.split(".")[-2] + ".cs")
-            self.assertIn(reason, source.read_text(encoding="utf-8"), f"{test}: the reason must be the test's own Assert.Skip* text")
+            if re.match(vault, reason):
+                counts["vault"] += 1
+                source = REPO / "tests" / ("authority" if project.startswith("AuthorizationAuthority") else "features") / project / (test.split(".")[-2] + ".cs")
+                self.assertIn(reason, source.read_text(encoding="utf-8"), f"{test}: the reason must be the test's own Assert.Skip* text")
+                continue
+            self.assertEqual("AuthorizationAuthority.Tests", project, test)
+            test_class = test[len(project) + 1:].split(".")[0]
+            declaring = [path for path in sorted(authority.glob("*.cs"))
+                         if re.search(rf"\bclass {re.escape(test_class)}\b", path.read_text(encoding="utf-8"))]
+            self.assertTrue(declaring, f"{test}: no source file declares class {test_class}")
+            if reason == secbl01_obs1:
+                counts["secbl01_obs1"] += 1
+                self.assertEqual("ArchiveDeliveryOutageCharacterizationTests", test_class, test)
+                self.assertTrue(any(reason in path.read_text(encoding="utf-8") for path in declaring), f"{test}: the reason must be the test's own Assert.Skip* text")
+            elif reason == secbl01_stores:
+                counts["secbl01_stores"] += 1
+                # The reason is the Assert.SkipWhen text of the shared Wp2Azurite.Require() helper, which the class must call.
+                helper = (authority / "JournalVerificationAzuriteIntegrationTests.cs").read_text(encoding="utf-8")
+                self.assertIn("internal static class Wp2Azurite", helper)
+                self.assertIn(reason, helper, f"{test}: the reason must be Wp2Azurite.Require()'s Assert.SkipWhen text")
+                self.assertTrue(any("Wp2Azurite.Require()" in path.read_text(encoding="utf-8") for path in declaring),
+                                f"{test}: class {test_class} must skip through Wp2Azurite.Require()")
+            else:
+                self.fail(f"{test}: unreviewed skip reason {reason!r}")
+        self.assertEqual({"vault": 16, "secbl01_stores": 204, "secbl01_obs1": 3}, counts)
+        self.assertEqual(223, len(allowed))
 
 
 if __name__ == "__main__":

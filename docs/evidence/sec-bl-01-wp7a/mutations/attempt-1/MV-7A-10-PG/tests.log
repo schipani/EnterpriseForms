@@ -1,0 +1,82 @@
+[wp4] AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "authorization", attack: "deleted") (10s 342ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "authorization", attack: "commitment-disagrees") (1s 252ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "content", attack: "row-disagrees") (1s 294ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "audit", attack: "deleted") (1s 248ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "audit", attack: "row-disagrees") (1s 264ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "audit", attack: "digest-substituted") (1s 157ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "content", attack: "commitment-disagrees") (1s 158ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "audit", attack: "replaced") (1s 233ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "content", attack: "deleted") (1s 164ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "audit", attack: "commitment-disagrees") (1s 201ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "authorization", attack: "digest-substituted") (1s 073ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "content", attack: "digest-substituted") (1s 125ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "content", attack: "replaced") (1s 260ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "content", attack: "identity-substituted") (1s 245ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "authorization", attack: "replaced") (1s 237ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "authorization", attack: "row-disagrees") (1s 111ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "authorization", attack: "identity-substituted") (1s 180ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+failed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(stream: "audit", attack: "identity-substituted") (1s 158ms)
+  the full sweep reads every archived object: 1
+    at AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AOiDr7TheFullSweepVerifiesEveryHistoricalArchivedObject(String stream, String attack) in <clone>\tests\authority\AuthorizationAuthority.Tests\JournalVerificationPostgresIntegrationTests.WP7A.cs:265
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 18
+  failed: 18
+  succeeded: 0
+  skipped: 0
+  duration: 31s 783ms
+[wp4] containers and their anonymous volumes removed
+[wp4] exit code 2

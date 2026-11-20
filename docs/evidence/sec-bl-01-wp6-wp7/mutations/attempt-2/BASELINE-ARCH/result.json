@@ -1,0 +1,20 @@
+{
+  "id": "BASELINE-ARCH",
+  "what": "no edit (architecture)",
+  "kind": "arch",
+  "files": [],
+  "original_sha256": {},
+  "restored": true,
+  "verdict": "PASS",
+  "result": {
+    "build": 0,
+    "build_seconds": 45.3,
+    "exit": 0,
+    "seconds": 4.0,
+    "kind": "arch",
+    "total": 13,
+    "succeeded": 13,
+    "failed": []
+  },
+  "seconds": 49.3
+}

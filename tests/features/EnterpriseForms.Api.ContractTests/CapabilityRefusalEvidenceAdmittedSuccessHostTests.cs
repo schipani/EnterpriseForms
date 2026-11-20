@@ -153,6 +153,9 @@ public sealed class CapabilityRefusalEvidenceAdmittedSuccessHostTests
                     return Task.FromResult(Script.Bound);
                 case nameof(IAuthorityScope.CountPendingArchiveAsync):
                     return Task.FromResult(0);
+                case nameof(IAuthorityScope.FindLatestJournalEntryAsync):
+                    // SEC-BL-01 E-6: this script has no authorization journal, so the gate has no head receipt to verify.
+                    return Task.FromResult<AuthorizationAuthority.Domain.Features.Journal.SecurityJournalEntry?>(null);
                 case "get_" + nameof(IAuthorityScope.SearchIndex):
                     if (index is null)
                     {
@@ -346,7 +349,7 @@ public sealed class CapabilityRefusalEvidenceAdmittedSuccessHostTests
             path.Add(nameof(IAuthorityScope.OrganizationHasDataKeyBindingsAsync));
         }
 
-        path.AddRange([nameof(IAuthorityScope.CountPendingArchiveAsync), "get_SearchIndex", "index.FindProjectionStateAsync", "index.BindOrganizationAsync"]);
+        path.AddRange([nameof(IAuthorityScope.CountPendingArchiveAsync), nameof(IAuthorityScope.FindLatestJournalEntryAsync), "get_SearchIndex", "index.FindProjectionStateAsync", "index.BindOrganizationAsync"]);
         path.AddRange(route == "deep-verify"
             ? [nameof(IAuthorityScope.GetFieldSearchApprovalsAsync), "index.GetStoredRecordIndexAsync", "index.RecordDeepCheckAsync", nameof(IAuthorityScope.CommitAsync), "Dispose"]
             : ["index.GetCoveragesAsync", "index.GetFormEntriesAsync", "Dispose"]);

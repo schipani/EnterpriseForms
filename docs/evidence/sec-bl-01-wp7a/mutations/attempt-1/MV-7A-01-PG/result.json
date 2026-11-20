@@ -1,0 +1,27 @@
+{
+  "id": "MV-7A-01-PG",
+  "what": "RV-2 on real stores: the freshness bound ignored; the F-1 attack variants",
+  "kind": "pg",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/TrustedJournalReceipts.cs": "976ea25a7d858f53e61578b81c8e2850f487e70dfbf98b6d3aa735690c0bfb36"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 41.9,
+    "exit": 2,
+    "seconds": 31.5,
+    "kind": "pg",
+    "total": 21,
+    "succeeded": 0,
+    "failed": [
+      "AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1ChangedEvidenceOfAnUnchangedHeadIsRefusedPastTheFreshnessBound(stream:",
+      "AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AF1WithAZeroBoundTheNextAccessIsRefusedOnRealStores(stream:"
+    ]
+  },
+  "seconds": 73.4
+}

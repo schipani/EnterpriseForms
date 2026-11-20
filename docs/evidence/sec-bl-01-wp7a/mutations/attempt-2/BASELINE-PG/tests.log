@@ -1,0 +1,13 @@
+[wp4] AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.G08TheDedicatedVerifierLoginIsReadOnlyAndRunsTheVerifier (8s 974ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.WP7AllThreeStreamsTogetherAreCleanReadOnlyAndIsolatedUnderTampering (7s 252ms)
+passed AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests.TheSnapshotIsServerEnforcedReadOnlyAndIssuesOnlySelects (437ms)
+
+Test run summary: Passed! - <clone>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 3
+  failed: 0
+  succeeded: 3
+  skipped: 0
+  duration: 17s 545ms
+[wp4] containers and their anonymous volumes removed
+[wp4] exit code 0

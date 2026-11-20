@@ -1,0 +1,7 @@
+SEC-BL-01 WP-7 SEC-P: image-restore.txt (local paths scrubbed)
+
+authority restored=True sha256:e5b738a971dafeb50e25df432a383808cc76014c917ce7e127aefec9ead5d782
+worker restored=True sha256:96cd10ebb5ff6d9028426c647bd6216287af20c7a351ae7e22e32780031d52e6
+api restored=True sha256:fefab7964bdf495357dcccb6e8b84992bbf77f6548e3ee0d690579de0a35daa8
+dev-seed restored=True sha256:d2bfd8bfb4b6d28c74b2cef4a1dc32761a36664f384c0565b01a09943919a62a
+platform-console restored=True sha256:d1d3371adb0cfc8cec2e6f288f1a930d126612cb0855e4f5a69c66f1cc3b24e9

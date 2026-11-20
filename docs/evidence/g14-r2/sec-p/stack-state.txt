@@ -1,0 +1,10 @@
+Disposable security-test stack, G14-R2 (fresh project enterpriseforms-sectest; down -v before and after).
+Provisioner: "archive provisioning Provisioned: archive provisioned" (the provisioning record pins the archive instance for D+).
+
+Post-run journal delivery states (stream, state, error code, rows):
+audit Anchored - 16
+authorization Anchored - 60
+content Anchored - 25
+quarantined 0 of 16
+
+Every audit entry was delivered through D+ with the archive-instance pin and a W2-S evidence commitment in both stores.

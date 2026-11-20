@@ -1,0 +1,5 @@
+﻿[wp4] AuthorizationAuthority.Tests.JournalVerificationPostgresIntegrationTests, 
+AuthorizationAuthority.Tests.JournalBoundedListingAzuriteTests, 
+AuthorizationAuthority.Tests.JournalVerificationAzuriteIntegrationTests
+[wp4] containers and their anonymous volumes removed
+[wp4] exit code 0

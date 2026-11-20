@@ -1,0 +1,11 @@
+{"id": "BASELINE", "verdict": "PASS", "restored": true, "failed": 0, "total": 424, "seconds": 37.3}
+{"id": "BASELINE-PG", "verdict": "PASS", "restored": true, "failed": 0, "total": 3, "seconds": 56.6}
+{"id": "BASELINE-PG-F1", "verdict": "PASS", "restored": true, "failed": 0, "total": 21, "seconds": 57.1}
+{"id": "BASELINE-PG-J2", "verdict": "PASS", "restored": true, "failed": 0, "total": 1, "seconds": 53.1}
+{"id": "BASELINE-PG-OIDR7", "verdict": "PASS", "restored": true, "failed": 0, "total": 18, "seconds": 85.9}
+{"id": "MV-15b", "verdict": "DETECTED", "restored": true, "failed": 2, "total": 3, "seconds": 58.3}
+{"id": "MV-7A-01", "verdict": "DETECTED", "restored": true, "failed": 9, "total": 424, "seconds": 36.4}
+{"id": "MV-7A-03", "verdict": "DETECTED", "restored": true, "failed": 2, "total": 424, "seconds": 35.2}
+{"id": "MV-7A-04", "verdict": "DETECTED", "restored": true, "failed": 3, "total": 424, "seconds": 37.7}
+{"id": "MV-7A-06", "verdict": "DETECTED", "restored": true, "failed": 1, "total": 424, "seconds": 37.9}
+{"id": "RESTORED", "verdict": "PASS", "restored": true, "failed": 0, "total": 424, "seconds": 35.8}

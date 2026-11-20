@@ -1,0 +1,45 @@
+Running tests from <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+skipped EnterpriseForms.Api.ContractTests.EnvelopeV2ReaderVaultIntegrationTests.TheVerifiedDocumentReaderOpensAVaultWrappedV2VersionAndRefusesAForeignOrganization
+  E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e3-m2c-vault-reader.ps1)
+  from <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+skipped EnterpriseForms.Api.ContractTests.EnvelopeV2ReaderVaultIntegrationTests.TheVerifiedFieldReaderOpensVaultWrappedV1AndV2RowsWithOneUnwrapPerDataKeyGroup
+  E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e3-m2c-vault-reader.ps1)
+  from <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+skipped EnterpriseForms.Api.ContractTests.EnvelopeV2ReaderVaultIntegrationTests.TheExactVaultKeyVersionIsUsedAndARetiredVersionIsNotReplacedByTheCurrentOne
+  E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e3-m2c-vault-reader.ps1)
+  from <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+skipped EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.TheApplicationCannotCreateAKeyByEncryptingUnderAnUnprovisionedOrganization
+  E2_VAULT_* not set (run scripts/dev/e2-vault-integration.ps1)
+  from <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+skipped EnterpriseForms.Api.ContractTests.KeyActivationVaultIntegrationTests.AnIncorrectActivationThatDropsVersionOneFailsClosedAndCorrectingItRecoversTheData
+  E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e2-vault-integration.ps1)
+  from <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+skipped EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.InvalidCredentialsAndAnUnreachableVaultFailClosed
+  E2_VAULT_* not set (run scripts/dev/e2-vault-integration.ps1)
+  from <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+skipped EnterpriseForms.Api.ContractTests.KeyActivationVaultIntegrationTests.TheVersionScriptProvisionedVersionTwoWithoutActivatingIt
+  E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e2-vault-integration.ps1)
+  from <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+skipped EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.TheBusinessTokenHasNoAdministrativeExportOrAuthorityCapability
+  E2_VAULT_* not set (run scripts/dev/e2-vault-integration.ps1)
+  from <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+skipped EnterpriseForms.Api.ContractTests.KeyActivationVaultIntegrationTests.TheBusinessTokenCannotProvisionActivateOrRetireVersions
+  E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e2-vault-integration.ps1)
+  from <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+skipped EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.RealVaultWrapsAndUnwrapsUnderTheScriptProvisionedKeys
+  E2_VAULT_* not set (run scripts/dev/e2-vault-integration.ps1)
+  from <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+skipped EnterpriseForms.Api.ContractTests.KeyActivationVaultIntegrationTests.ActivatingVersionTwoChangesOnlyThatOrganizationAndPurposeAndKeepsVersionOneReadable
+  E2_VAULT_* / E4_VAULT_ACTIVATION_ORGANIZATION not set (run scripts/dev/e2-vault-integration.ps1)
+  from <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+skipped EnterpriseForms.Api.ContractTests.VaultTransitDockerIntegrationTests.RealVaultRejectsCrossOrganizationCrossPurposeAndVersionSubstitution
+  E2_VAULT_* not set (run scripts/dev/e2-vault-integration.ps1)
+  from <repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64)
+<repo>\tests\features\EnterpriseForms.Api.ContractTests\bin\Debug\net10.0\EnterpriseForms.Api.ContractTests.dll (net10.0|x64) passed (1m 06s 779ms)
+
+Test run summary: Passed!
+  total: 958
+  failed: 0
+  succeeded: 946
+  skipped: 12
+  duration: 1m 08s 063ms

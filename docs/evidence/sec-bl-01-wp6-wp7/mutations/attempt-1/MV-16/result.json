@@ -1,0 +1,35 @@
+{
+  "id": "MV-16",
+  "what": "VF-12/VF-13: the full sweep is skipped (a full sweep runs as an incremental one)",
+  "kind": "ip",
+  "files": [
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs"
+  ],
+  "original_sha256": {
+    "src/authority/AuthorizationAuthority.Application/Features/Journal/Reconciliation/JournalVerifier.cs": "03914f5aab5a7447d95b29f8ae7f996d7d03f685dfebb24523c363b955abccbd"
+  },
+  "restored": true,
+  "verdict": "DETECTED",
+  "result": {
+    "build": 0,
+    "build_seconds": 44.1,
+    "exit": 2,
+    "seconds": 5.6,
+    "kind": "ip",
+    "total": 337,
+    "succeeded": 325,
+    "failed": [
+      "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAConsistentlyRedigestedDeliveredRowThatIsNotSentAgainIsDetectedByTheVerifier",
+      "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierAnAlteredDeliveredRowOutsideTheNewestEightIsDetectedByTheVerifier",
+      "AuthorizationAuthority.Tests.CapabilityRefusalEvidenceRemovalTests.M2F343VerifierDeletingADeliveredRowIsDetectedByTheVerifierAndTheKeyIsStillRecordedAgainUntilDetection",
+      "AuthorizationAuthority.Tests.DPlusCommitmentVerificationTests.EveryCommitmentDefectIsReported(stream:",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.ADeletionBelowTheCheckpointIsInvisibleToTheBoundedIncrementalSweepAndDetectedByTheFullSweep",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.AMissingOrForeignRecordIsAFindingAndTheGapIsNoLongerAccepted",
+      "AuthorizationAuthority.Tests.JournalAcceptedExceptionTests.LaterSweepsClassifyTheUnchangedAcceptedGapAsAnObservationAndAdvanceWhileStayingReduced",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.AFullSweepRunsOnAllThreeStreams",
+      "AuthorizationAuthority.Tests.JournalVerifierTests.ANonRechainedEditBelowTheCheckpointIsMissedIncrementallyAndFoundByTheFullSweep",
+      "AuthorizationAuthority.Tests.StopMarkerVerifierTests.AnInvalidMarkerAndAnUnexpectedMetaObjectAreReportedByTheFullSweep"
+    ]
+  },
+  "seconds": 49.7
+}

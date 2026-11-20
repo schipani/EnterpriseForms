@@ -1,0 +1,11 @@
+SEC-BL-01 G08 E-6/E-7 reproduction BEFORE remediation (in-process, the pre-remediation KnownLimit tests; passing = the attack succeeded)
+
+passed AuthorizationAuthority.Tests.AuthorizationStreamGateDPlusTests.KnownLimitE6ForgingTheAnchoredStateReopensTheGateButDeliversNothing (291ms)
+passed AuthorizationAuthority.Tests.ContentStreamDPlusReadabilityTests.KnownLimitE7ForgingTheAnchoredStateReleasesTheRevisionButNothingIsDeliveredAndTheVerifierReportsIt (342ms)
+
+Test run summary: Passed! - <repo>\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 2
+  failed: 0
+  succeeded: 2
+  skipped: 0
+  duration: 909ms

@@ -204,7 +204,32 @@ public interface IAuthorityScope : IAsyncDisposable
 
     Task<List<SecurityJournalEntry>> GetPendingJournalEntriesAsync(Guid organizationId, int limit, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// SEC-BL-01 WP-5a: the pending entries of one stream (<paramref name="includeStream"/> true) or of every other stream (false), ordered
+    /// by stream then revision, at most <paramref name="limit"/>. A stopped D+ stream keeps its rows Pending, so they must not consume the
+    /// batch of the other streams. The default (test doubles) filters <see cref="GetPendingJournalEntriesAsync"/>; the store overrides it
+    /// with a bounded query.
+    /// </summary>
+    async Task<List<SecurityJournalEntry>> GetPendingJournalEntriesByStreamAsync(Guid organizationId, string streamName, bool includeStream, int limit, CancellationToken cancellationToken) =>
+        [.. (await GetPendingJournalEntriesAsync(organizationId, int.MaxValue, cancellationToken).ConfigureAwait(false))
+            .Where(e => string.Equals(e.JournalStreamName, streamName, StringComparison.Ordinal) == includeStream)
+            .OrderBy(e => e.JournalStreamName, StringComparer.Ordinal).ThenBy(e => e.JournalStreamRevision).Take(limit)];
+
     Task<int> CountPendingArchiveAsync(Guid organizationId, string streamName, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// SEC-BL-01 E-6 (A-7 §27): the entry with the highest revision of the stream, from the journal itself (never from a mutable organization
+    /// head column). G08 makes revisions immutable and the journal undeletable for the runtime. The default refuses (fail closed): every store
+    /// that can serve the organization gate implements it.
+    /// </summary>
+    Task<SecurityJournalEntry?> FindLatestJournalEntryAsync(Guid organizationId, string streamName, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("this authority scope cannot read the journal head (E-6): fail closed");
+
+    /// <summary>
+    /// SEC-BL-01 E-6/E-7 (A-7 §27): the trusted delivery-receipt verifier. The default is the fail-closed verifier: without one, nothing counts
+    /// as delivered, so the gate stays closed and no content is released.
+    /// </summary>
+    IJournalReceiptVerifier JournalReceipts => NotComposedJournalReceiptVerifier.Instance;
 
     Task<RecordContentHead?> FindContentHeadAsync(Guid organizationId, Guid formRecordId, bool lockForUpdate, CancellationToken cancellationToken);
 
