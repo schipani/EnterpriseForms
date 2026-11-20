@@ -1069,8 +1069,8 @@
     },
     {
       "path": "scripts/ci/test_test_results.py",
-      "sha256": "d140e83e39d8857452d151f1ef3e5fc7c88e6b6493ecff3d03cf8ea6eb6e95dd",
-      "bytes": 13552
+      "sha256": "81baccb7269b344c817888d0df8a00ab77b07468e8fd4d10ae1a9a25496e33e2",
+      "bytes": 15916
     },
     {
       "path": "scripts/dev/check-journal-store-coupling.py",
