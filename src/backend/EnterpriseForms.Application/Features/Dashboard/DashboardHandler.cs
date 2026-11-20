@@ -22,6 +22,7 @@ public sealed class DashboardHandler(IBusinessStore store, IAuthorizationAuthori
             new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.DesignForm),
             new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.ManageOrganization),
             new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.AdministerSecurity),
+            new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.ViewAudit),
         ], cancellationToken).ConfigureAwait(false);
         var capabilities = new List<string> { "records.discover" };
         if (decisions[0].Allowed)
@@ -38,6 +39,12 @@ public sealed class DashboardHandler(IBusinessStore store, IAuthorizationAuthori
         if (decisions[2].Allowed)
         {
             capabilities.Add("security.administer");
+        }
+
+        // C8 M4-2: Security Auditors (view_audit). Navigation only — every audit read is authorized and recorded by the Authority (AC-8.3).
+        if (decisions[3].Allowed)
+        {
+            capabilities.Add("audit.view");
         }
 
         return capabilities;

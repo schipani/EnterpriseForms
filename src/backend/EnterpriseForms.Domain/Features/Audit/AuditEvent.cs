@@ -96,6 +96,11 @@ public static class AuditActions
     // E0-4: an encrypted field value or document could not be decrypted (authentication failure, key mismatch or key
     // unavailability); the request failed closed. Reason code and identifiers only — never plaintext, keys, wrapped keys or ciphertext.
     public const string DecryptionFailed = "DECRYPTION_FAILED";
+
+    // C8 M4-2 (AC-8.3, PG-054/PG-055): business-reported delivery outcome of an audit read the Authority authorized and recorded
+    // (AuditAccessAuthorized). Metadata: deliveryOutcome, Authority journal revision, access kind and filter digest only.
+    public const string AuditEventsViewed = "AUDIT_EVENTS_VIEWED";
+    public const string AuditEventViewed = "AUDIT_EVENT_VIEWED";
 }
 
 /// <summary>

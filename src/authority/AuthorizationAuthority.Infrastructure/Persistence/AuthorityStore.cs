@@ -74,7 +74,7 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
     }
 
     private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction, AuthorityWorkSignal? wakeup, ISecurityAlertSink? alerts, ContentAcceptancePolicy policy,
-        IJournalReceiptVerifier journalReceiptVerifier) : IAuthorityScope
+        IJournalReceiptVerifier journalReceiptVerifier) : IAuthorityScope, IAuditAccessScope
     {
         private bool committed;
         private bool authorizationWorkAppended;
@@ -223,11 +223,53 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public ISearchAccessStore SearchAccess => searchAccess ??= new SearchAccessStore(context);
 
-        public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
+        public async Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
         {
             lockedOrganizationId = organizationId; // diagnostics of a refused content write only
-            return context.OrganizationStates.FromSqlInterpolated($"SELECT * FROM authority.organization_authorization_states WHERE organization_id = {organizationId} FOR UPDATE")
-                .AsTracking().FirstOrDefaultAsync(cancellationToken);
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
+            var state = await context.OrganizationStates.FromSqlInterpolated($"SELECT * FROM authority.organization_authorization_states WHERE organization_id = {organizationId} FOR UPDATE")
+                .AsTracking().FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+            OrganizationLockMetrics.RecordWait(System.Diagnostics.Stopwatch.GetElapsedTime(started)); // C8 M4-2 (AC-M4-2.6): observe audit-read impact on commands
+            return state;
+        }
+
+        /// <summary>C8 M4-2 (AC-8.3): bounds the audit-access transaction; transaction_timeout only where the server has it (PostgreSQL 17+).</summary>
+        public Task ApplyAuditAccessTimeoutsAsync(int statementTimeoutMilliseconds, int transactionTimeoutMilliseconds, CancellationToken cancellationToken)
+        {
+            var statement = statementTimeoutMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture) + "ms";
+            var transactionBound = transactionTimeoutMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture) + "ms";
+            return context.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT set_config('statement_timeout', {statement}, true), CASE WHEN current_setting('server_version_num')::int >= 170000 THEN set_config('transaction_timeout', {transactionBound}, true) END",
+                cancellationToken);
+        }
+
+        /// <summary>C8 M4-2 (AC-8.3): FOR UPDATE NOWAIT; lock_not_available (55P03) is reported as busy, never waited on.</summary>
+        public async Task<OrganizationLockAttempt> TryLockOrganizationNoWaitAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            lockedOrganizationId = organizationId;
+            try
+            {
+                var state = await context.OrganizationStates.FromSqlInterpolated($"SELECT * FROM authority.organization_authorization_states WHERE organization_id = {organizationId} FOR UPDATE NOWAIT")
+                    .AsTracking().FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+                return state is null ? OrganizationLockAttempt.NotFound : OrganizationLockAttempt.Locked(state);
+            }
+            catch (Exception ex) when (IsLockNotAvailable(ex))
+            {
+                return OrganizationLockAttempt.LockBusy; // the transaction is aborted; the caller disposes the scope
+            }
+        }
+
+        private static bool IsLockNotAvailable(Exception? exception)
+        {
+            for (var e = exception; e is not null; e = e.InnerException)
+            {
+                if (e is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.LockNotAvailable })
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public Task<OrganizationAuthorizationState?> ReadOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>

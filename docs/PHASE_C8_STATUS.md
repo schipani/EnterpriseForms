@@ -1017,3 +1017,80 @@ Code baseline: `f117995`, with no product or test change since. This section and
 - independent security review not started;
 - PERF-01 and the Azure staging recovery evidence remain mandatory;
 - §39.6 risks unchanged.
+
+## 41. C-162–C-164: M4-2 — AC-8.3 audit-access evidence, redaction catalog, PG-054/PG-055 (2026-11-19/20). Accepted by the owner for Development/Testing (C-164); not independently reviewed; production requirements outstanding
+
+Owner decision C-162: M4-1 accepted for Development/Testing; the complete M4-2 work package authorized under the AC-8 contract (revision 2). TC-3 defaults approved and made configurable within validated bounds. The two required business indexes approved; the optional record-time index and its 1M-row `EXPLAIN (ANALYZE, BUFFERS)` measurement **deferred, not waived**. The independent production security assessment remains outstanding. M4-3, M4-4 and M4-5 are not started.
+
+### 41.1 Delivered
+
+- **Authority (AC-8.3, contract §5.3):** `POST /internal/v1/organizations/audit/access` (`AuditAccessService`). The `view_audit` check (the M4-1 permission path: gate, pinned SpiceDB decision, verify); then a bounded AuthorityDb transaction; then the organization row `FOR UPDATE NOWAIT` (busy: rollback, 20–80 ms jittered backoff, a fresh check, at most 3 attempts, then 503 `AUDIT_EVIDENCE_BUSY`). Under the lock the authorization and projection revisions must still equal the checked ones, with no quarantine and the binding enabled. Then `AuditAccessAuthorized` (actor, kind, filter digest, page size, event id, revisions R/P, correlation, `delivery: not_attested`; no result count) is appended to the audit stream and committed. Only a committed entry is an allow; a failed, timed-out or unknown commit is 503 `AUDIT_EVIDENCE_UNAVAILABLE`. A denial is 403 `AUDIT_VIEW_FORBIDDEN` at once, with a best-effort `AuditAccessDenied` entry under the same no-wait rule (skips are counted).
+- **Timeouts (verified, not assumed):** the local Authority server is PostgreSQL 18.0 (`postgres:18.0` in `compose.yaml` and `compose.security-test.yaml`), so `transaction_timeout` (PostgreSQL 17+) is available. The store sets `statement_timeout` always and `transaction_timeout` only when `server_version_num >= 170000`. The approved application-deadline fallback (a 500 ms linked cancellation around each attempt's transaction) applies on every server, so the bound also holds on a managed server without the setting. Not verified on Azure Flexible Server (staging).
+- **Settings:** section `AuditAccess` (`AuditAccessOptions`), validated at start-up: statement 50–2000 ms; transaction statement–5000 ms; backoff 1–1000 ms (min ≤ max); attempts 1–5; per-user 1–50/s with burst rate–100; per-organization 1–200/s with burst rate–400, and not below the per-user rate. Rate limits are per Authority instance (RR-10).
+- **Telemetry:** meter `AuthorizationAuthority.AuditAccess` (authorized, lock busy, state moved, refused by reason, denied unrecorded, attempts, hold ms); meter `AuthorizationAuthority.OrganizationLock` histogram `authority_security_command_lock_wait_ms` around the ordinary (waiting) organization lock, for T22.
+- **Business:** `GET /api/v1/security/audit-events` and `GET /api/v1/security/audit-events/{auditEventId}` (feature `Audit`). Filters are validated ids, codes and dates only; the canonical filter is hashed (SHA-256) into the Authority's filter digest and the cursor binding. The keyset cursor (event time, sequence) is protected, expires in 15 minutes and is bound to organization, caller and filter; any mismatch is 400 `CURSOR_INVALID`. Rows are read only after the Authority's allow, always with the session organization's `tenant_id` predicate (R-15). `AUDIT_EVENTS_VIEWED`/`AUDIT_EVENT_VIEWED` (`deliveryOutcome` Delivered, NotFound or best-effort Failed, plus the Authority journal revision) are written in the same business transaction as the read. A failure is 503 `AUDIT_DELIVERY_FAILED` and nothing is served. Another organization's id and an unknown id are the same 404. Capability `audit.view` (navigation only).
+- **Redaction catalog** (`AuditEventCatalog.cs`): all 80 `AuditActions` constants (78 existing plus the two delivery actions), each with a label, a description policy (catalog text; stored text only when it matches an exact code-composed pattern) and an explicit allowlist. Shown values must have the declared shape (identifier, count, status, code, directory name) or they are withheld. Free text, field and group keys, field labels, option text, design diffs and share scopes are listed as withheld, with label and policy only. Unknown keys are dropped. An unknown or forged action renders as the envelope only. List rows are envelopes, never metadata.
+- **Migration** `20261120032237_PhaseC8M4AuditExplorerIndexes`: `ix_audit_events_tenant_actor_time`, `ix_audit_events_tenant_correlation`; additive, no grant change. The indexes are created without `CONCURRENTLY`, which matters only for a large existing table.
+- **Frontend:** `features/audit` `AuditExplorerPage` (PG-054, `/app/security/audit`) and `AuditEventPage` (PG-055, `/app/security/audit/$auditEventId`); an "Audit" navigation entry shown with `audit.view`; regenerated OpenAPI artifacts (business and Authority internal) and TypeScript types; coordinator endpoint keys `audit.events`/`audit.event`.
+
+### 41.2 Targeted verification (executed 2026-11-19, local, no Docker)
+
+| Suite | Result |
+|---|---|
+| Authority `AuditAccessServiceTests` (T10, T11, T20, T21, T23, denials, validation, TC-3 bounds) | 21/21 |
+| Authority classes sharing the modified store and permission service (SecurityAuditor, SecurityAdministrator, DiscoveryCompleteness, ContributorWriteProtocol, SpiceDbBulkCheckMapping, MembershipAdministration, AuditAccessService) | 258/258 |
+| Business `AuditExplorerTests` (catalog completeness and call-site keys, forged rows, shape withholding, sentinel scan, fail-closed Authority answers, delivery rows, 404 equality, keyset stability, cursor binding, filters, digest, `audit.view`) with OpenApiSnapshot, EndpointOwnership, DashboardSecurityMonitoring and BusinessSchemaGuard | 73/73 |
+| Architecture tests (dependency and ownership boundaries) | 227/227 |
+| Frontend typecheck (all workspaces) and ESLint (changed areas) | clean |
+| Vitest (audit model, app shell, work-queue, api-client) | 29/29 |
+| Stage B project build (compile only) and `test_stage_b_groups.py` | succeeded; 19/19 |
+
+### 41.3 Acceptance criteria
+
+| ID | State |
+|---|---|
+| AC-M4-2.1 | **Met** (real stack, C-163): T11 — a page is served only with a committed `AuditAccessAuthorized` entry; T06 — a revoked auditor's next page and detail are refused; non-auditors are refused and nothing is recorded as authorized. T10 (commit fault) is unit-only. |
+| AC-M4-2.2 | **Met** (real stack): the entry states `delivery: not_attested` and survives deletion of the business row (T11); business delivery rows `Delivered`, `Delivered`, `NotFound`, each with the Authority journal revision. |
+| AC-M4-2.3 | **Met** (real stack): no count in the committed entry (T11); unit: no count field in the request contract. |
+| AC-M4-2.4 | **Met** (real stack): sentinel scan over list and detail responses; forged rows rendered as envelopes. |
+| AC-M4-2.5 | **Met** (real stack): with a second organization present only the session organization's rows are served; a foreign id and an unknown id return the same 404 body and the same `NotFound` delivery row, and nothing is written to the other organization. |
+| AC-M4-2.6 | **Met for the measured cases** (real stack): T21 — a held lock is refused fast as `AUDIT_EVIDENCE_BUSY` and never waited on; T23 — 429; T22 — a revocation commits under an audit-read flood (226 ms against a 237 ms baseline). T20 (revision moved between check and lock) is unit-only. See F-M42-V1. |
+
+### 41.4 Outstanding
+
+- **Stage B:** the two M4-2 classes were executed in the C-163 run (§41.6). No other Stage B class or group was run. T10 and T20 have no Stage B fault hooks and are covered by the Authority unit tests only. The shard `authorization-security-onboarding` still has the RB-13 isolation defect (§40, not reopened).
+- **F-M42-V1** accepted under option 1 (C-164); automatic frontend retry deferred as a future usability enhancement.
+- **Not run:** Playwright `security-audit.spec.ts`, axe and the 320/768/1440 px and 200%/400% zoom checks (M4-5); hosted CI; OpenAPI drift in CI.
+- **Deferred:** record-time index and its 1M-row measurement (C-162; requirement kept).
+- **Unchanged:** independent review (Q-1…Q-5, the catalog, AC-8.1–8.3), RR-1…RR-15, G08/G24/AUD-C7-01, PB-08 (no audit-read step-up, D8-69), production key providers, Azure staging evidence.
+
+### 41.5 Deviations
+
+- **D-M42-1:** `actor.roleBadges` (§6.2) is omitted. The auditor is not a roster reader (D8-68), so badges would need a new disclosure decision.
+- **D-M42-2:** additional business codes beyond §6.1: 503 `AUDIT_DELIVERY_FAILED` (read or delivery-row failure after an allow); `deliveryOutcome: NotFound` for an authorized detail of an unknown or foreign id.
+- **D-M42-3:** the per-organization burst (default 20) is a setting the contract did not name; it defaults to the approved 20/s.
+- **D-M42-4:** after a busy lock, each retry repeats the `view_audit` check (step 2) rather than only the lock. This is stricter: every attempt uses a fresh R.
+- D-M42-2 detail (C-163): the delivery row's `event_outcome` is `Success` for `Delivered` and `NotFound` and `Failed` for `Failed`, because `ck_audit_events_outcome` admits only Success, Denied and Failed; the distinction is the `deliveryOutcome` metadata. The PG-054 outcome filter offers those three values only.
+
+### 41.6 C-163 limited Stage B verification run (2026-11-20). Owner-authorized; Development/Testing only; not an independent review
+
+Scope: `SecurityAuditAccessTests` and `AuditExplorerTests` only, each on a fresh disposable `enterpriseforms-sectest` stack (`stage-b.ps1 -Class … -Fresh`; torn down with `down -v` afterwards). No other Stage B class, group, regression, mutation, benchmark or accessibility suite was run. Evidence: `artifacts/test-runs/<run id>/` (TRX, run.json; local, git-ignored).
+
+| Run id | Class | Result | Note |
+|---|---|---|---|
+| 20261120-015735-1c1ac5c0 | SecurityAuditAccessTests | 6/7, failed | Defect V-1 found |
+| 20261120-020202-71e3c0be | SecurityAuditAccessTests | **7/7 passed** | After the V-1 fix; includes T22 |
+| 20261120-020228-686be1ff | AuditExplorerTests | 5/6, failed | F-M42-V1 observed (same stack as the run above) |
+| 20261120-020620-4eca3728 | AuditExplorerTests | **6/6 passed** | Retry of 686be1ff on a fresh stack; one BUSY retried and recorded |
+
+**T22 (measured):** Security Auditor removal 237 ms at baseline; 226 ms while one auditor read at the 5/s per-user rate (13 audit pages served during the flood). Bound: baseline + 2 s. One local run on a developer machine; not a load benchmark.
+
+**Defect V-1 (fixed, M4-2 scope).** An authorized detail of a foreign or unknown id returned 503 `AUDIT_DELIVERY_FAILED` instead of 404: the `NotFound` delivery row set `event_outcome = 'NotFound'`, which `ck_audit_events_outcome` rejects, and the transaction failed. Both ids failed identically, so nothing distinguished them, but the 404 contract failed. Fix: the outcome mapping in `AuditExplorerHandlers.RecordDelivery`; the unit fake now asserts the constrained outcome; the PG-054 filter drops the impossible `Failure` and `NotFound` values. No schema change.
+
+**Owner checks (C-163).** `AUDIT_DELIVERY_FAILED` carries only a fixed message; the exception, its message and any inner exception never reach the response or the delivery row (unit-asserted for list and detail). A foreign-organization id and a nonexistent id take the same lookup (`tenant_id` and id in one predicate), return the same 404 problem body apart from `correlation_id`, and write identical `NotFound` delivery rows apart from the requested id (asserted on the real stack).
+
+**Finding F-M42-V1 (open; owner decision; not a security defect).** Ordinary sequential audit reads were occasionally refused with 503 `AUDIT_EVIDENCE_BUSY` (about 1 of 28 Authority audit-access calls in run 686be1ff, and 1 in run 4eca3728). Cause: the existing `ArchiveProcessor` (SEC-BL-01 D+ delivery, not changed) takes the organization lock with an ordinary wait while it delivers pending journal entries, and every authorized audit read appends one; a read arriving during that hold exhausts the approved three NOWAIT attempts (20–80 ms backoff). The refusal is the contract's fail-closed answer: nothing is served and nothing is recorded as authorized. The Stage B explorer class now retries BUSY like a compliant client (at most three times, 250 ms apart) and writes every retry to the test output. Options were: accept as is; a bounded client-side retry in PG-054/PG-055; or raising `AuditAccess` attempts or backoff (a TC-3 change). **C-164: accepted under option 1** — fail-closed behaviour and TC-3 settings retained; automatic frontend retry deferred.
+
+### 41.7 C-164 owner acceptance (2026-11-20). Owner-led; not an independent review
+
+M4-2 accepted for Development/Testing: the V-1 correction; F-M42-V1 under option 1; AC-M4-2.1–AC-M4-2.6 within the executed Development/Testing coverage (§41.3, §41.6). Limitations kept on record: T10 and T20 are unit-only; T22 is one local measurement, not a benchmark; the initial failed runs (1c1ac5c0, 686be1ff) and the busy-refusal retry evidence (4eca3728). Production requirements and deferred verification (§41.4) remain outstanding. M4-3 is not started.

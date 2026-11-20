@@ -5882,6 +5882,163 @@
           }
         }
       }
+    },
+    "/api/v1/security/audit-events": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "PG-054: a page (at most 50) of the organization's audit events, newest first by event time with the sequence as tie-break (not commit order). Filters are ids, codes and dates only. Envelopes only: action label, actor, target, form, record and field ids. Business projection, not independently verified (AUD-C7-01/G24).",
+        "operationId": "SearchAuditEvents",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "actorUserId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "formRecordId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "correlationId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "excludeAuditAccess",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditExplorerPageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/security/audit-events/{auditEventId}": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "PG-055: one audit event with the redaction catalog's description and allowlisted metadata; free text, field keys and labels, option text, design diffs and record scopes are withheld (label only). Another organization's id and an unknown id are the same 404.",
+        "operationId": "GetAuditEvent",
+        "parameters": [
+          {
+            "name": "auditEventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEventDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6042,6 +6199,97 @@
           }
         }
       },
+      "AuditAccessEvidenceResponse": {
+        "required": [
+          "authorityJournalRevision",
+          "statement"
+        ],
+        "type": "object",
+        "properties": {
+          "authorityJournalRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "statement": {
+            "type": "string"
+          }
+        }
+      },
+      "AuditEventDetailResponse": {
+        "required": [
+          "event",
+          "description",
+          "metadata",
+          "withheldMetadata",
+          "links",
+          "receipt",
+          "orderingStatement",
+          "evidenceStatement",
+          "accessEvidence"
+        ],
+        "type": "object",
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/AuditExplorerEventResponse"
+          },
+          "description": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditMetadataItemResponse"
+            }
+          },
+          "withheldMetadata": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditWithheldMetadataResponse"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEventLinkResponse"
+            }
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/AuditReceiptResponse"
+          },
+          "orderingStatement": {
+            "type": "string"
+          },
+          "evidenceStatement": {
+            "type": "string"
+          },
+          "accessEvidence": {
+            "$ref": "#/components/schemas/AuditAccessEvidenceResponse"
+          }
+        }
+      },
+      "AuditEventLinkResponse": {
+        "required": [
+          "relation",
+          "label",
+          "href"
+        ],
+        "type": "object",
+        "properties": {
+          "relation": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "href": {
+            "type": "string"
+          }
+        }
+      },
       "AuditEventResponse": {
         "required": [
           "auditEventId",
@@ -6108,6 +6356,252 @@
               "string"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "AuditExplorerActorResponse": {
+        "required": [
+          "userId",
+          "displayName",
+          "actorType"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "actorType": {
+            "type": "string"
+          }
+        }
+      },
+      "AuditExplorerEventResponse": {
+        "required": [
+          "auditEventId",
+          "occurredOn",
+          "sequence",
+          "category",
+          "action",
+          "actionLabel",
+          "recognized",
+          "outcome",
+          "actor",
+          "target",
+          "formDefinitionId",
+          "formDisplayName",
+          "formRecordId",
+          "fieldDefinitionId",
+          "correlationId",
+          "schemaVersion",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sequence": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "category": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "actionLabel": {
+            "type": "string"
+          },
+          "recognized": {
+            "type": "boolean"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/AuditExplorerActorResponse"
+          },
+          "target": {
+            "$ref": "#/components/schemas/AuditExplorerTargetResponse"
+          },
+          "formDefinitionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "formDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "formRecordId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "fieldDefinitionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "schemaVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "evidence": {
+            "type": "string"
+          }
+        }
+      },
+      "AuditExplorerPageResponse": {
+        "required": [
+          "items",
+          "nextCursor",
+          "pageSize",
+          "orderingStatement",
+          "evidenceStatement",
+          "accessEvidence"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditExplorerEventResponse"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "orderingStatement": {
+            "type": "string"
+          },
+          "evidenceStatement": {
+            "type": "string"
+          },
+          "accessEvidence": {
+            "$ref": "#/components/schemas/AuditAccessEvidenceResponse"
+          }
+        }
+      },
+      "AuditExplorerTargetResponse": {
+        "required": [
+          "entityType",
+          "entityId"
+        ],
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "entityId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "AuditMetadataItemResponse": {
+        "required": [
+          "key",
+          "label",
+          "kind",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "AuditReceiptResponse": {
+        "required": [
+          "state",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "AuditWithheldMetadataResponse": {
+        "required": [
+          "label",
+          "policy"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "policy": {
+            "type": "string"
           }
         }
       },

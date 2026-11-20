@@ -480,6 +480,77 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
         public Task<List<AuditEvent>> GetActorAuditEventsAsync(Guid tenantId, Guid actorUserId, int limit, CancellationToken cancellationToken) =>
             context.AuditEvents.AsNoTracking().Where(e => e.TenantId == tenantId && e.ActorUserId == actorUserId).OrderByDescending(e => e.EventOccurredOn).ThenByDescending(e => e.AuditSequence).Take(limit).ToListAsync(cancellationToken);
 
+        public Task<List<AuditEvent>> QueryOrganizationAuditEventsAsync(Guid tenantId, OrganizationAuditEventFilter filter, AuditEventPosition? after, int limit, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(filter);
+            var query = context.AuditEvents.AsNoTracking().Where(e => e.TenantId == tenantId);
+            if (filter.OccurredFrom is { } from)
+            {
+                query = query.Where(e => e.EventOccurredOn >= from);
+            }
+
+            if (filter.OccurredBefore is { } before)
+            {
+                query = query.Where(e => e.EventOccurredOn < before);
+            }
+
+            if (filter.ActorUserId is { } actor)
+            {
+                query = query.Where(e => e.ActorUserId == actor);
+            }
+
+            if (filter.EventAction is { } action)
+            {
+                query = query.Where(e => e.EventAction == action);
+            }
+
+            if (filter.EventCategory is { } category)
+            {
+                query = query.Where(e => e.EventCategory == category);
+            }
+
+            if (filter.EventOutcome is { } outcome)
+            {
+                query = query.Where(e => e.EventOutcome == outcome);
+            }
+
+            if (filter.TargetEntityType is { } entityType)
+            {
+                query = query.Where(e => e.TargetEntityType == entityType);
+            }
+
+            if (filter.TargetEntityId is { } entityId)
+            {
+                query = query.Where(e => e.TargetEntityId == entityId);
+            }
+
+            if (filter.FormRecordId is { } recordId)
+            {
+                query = query.Where(e => e.FormRecordId == recordId);
+            }
+
+            if (filter.CorrelationIdentifier is { } correlation)
+            {
+                query = query.Where(e => e.CorrelationIdentifier == correlation);
+            }
+
+            if (filter.ExcludedActions.Count > 0)
+            {
+                var excluded = filter.ExcludedActions.ToList();
+                query = query.Where(e => !excluded.Contains(e.EventAction));
+            }
+
+            if (after is { } position)
+            {
+                query = query.Where(e => e.EventOccurredOn < position.OccurredOn || (e.EventOccurredOn == position.OccurredOn && e.AuditSequence < position.Sequence));
+            }
+
+            return query.OrderByDescending(e => e.EventOccurredOn).ThenByDescending(e => e.AuditSequence).Take(limit).ToListAsync(cancellationToken);
+        }
+
+        public Task<AuditEvent?> FindOrganizationAuditEventAsync(Guid tenantId, Guid auditEventId, CancellationToken cancellationToken) =>
+            context.AuditEvents.AsNoTracking().FirstOrDefaultAsync(e => e.TenantId == tenantId && e.AuditEventId == auditEventId, cancellationToken);
+
         public async Task<StorePage<AuditEvent>> QueryActorAuditEventsAsync(Guid tenantId, Guid actorUserId, ActorAuditEventFilter filter, int offset, int limit, CancellationToken cancellationToken)
         {
             var query = context.AuditEvents.AsNoTracking().Where(e => e.TenantId == tenantId && e.ActorUserId == actorUserId);

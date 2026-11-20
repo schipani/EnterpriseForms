@@ -74,6 +74,21 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
     /// <summary>C-133 PD-3 fault injection: the next commit throws this exception (once).</summary>
     public Exception? FailNextCommit { get; set; }
+
+    /// <summary>C8 M4-2: the next N no-wait organization locks report busy (a lock held by a security command).</summary>
+    public int NoWaitLockBusyCount { get; set; }
+
+    /// <summary>C8 M4-2: runs before every no-wait organization lock (e.g. a revocation that commits between check and lock).</summary>
+    public Action? BeforeNoWaitLock { get; set; }
+
+    /// <summary>C8 M4-2: no-wait lock attempts made.</summary>
+    public int NoWaitLockAttempts { get; private set; }
+
+    /// <summary>C8 M4-2: statement and transaction timeouts applied to audit-access scopes.</summary>
+    public List<(int Statement, int Transaction)> AppliedAuditAccessTimeouts { get; } = [];
+
+    /// <summary>C8 M4-2: when false, scopes do not implement IAuditAccessScope (a store that cannot bound the transaction).</summary>
+    public bool SupportsAuditAccess { get; set; } = true;
     public List<PublishedFormVersion> PublishedVersions { get; } = [];
     public List<FieldSearchApproval> Approvals { get; } = [];
     public List<OrganizationProtectionPolicy> Policies { get; } = [];
@@ -120,7 +135,7 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken)
     {
         ScopeCount++;
-        return Task.FromResult<IAuthorityScope>(new Scope(this));
+        return Task.FromResult<IAuthorityScope>(SupportsAuditAccess ? new AuditAccessScope(this) : new Scope(this));
     }
 
     /// <summary>Phase C8 AC-9: number of read-only snapshot scopes opened; such a scope refuses to commit.</summary>
@@ -144,8 +159,33 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         return Task.FromResult<IReadOnlyList<OrganizationChangeMarker>>(Organizations.OrderBy(o => o.OrganizationId).Select(o => new OrganizationChangeMarker(o.OrganizationId, o.AuthorizationRevision, o.ContentIntegrityRevision, o.AuditJournalRevision)).ToList());
     }
 
-    private sealed class Scope(InMemoryAuthorityStore s, bool readOnly = false) : IAuthorityScope
+    private sealed class AuditAccessScope(InMemoryAuthorityStore owner) : Scope(owner), IAuditAccessScope
     {
+        public Task ApplyAuditAccessTimeoutsAsync(int statementTimeoutMilliseconds, int transactionTimeoutMilliseconds, CancellationToken cancellationToken)
+        {
+            Store.AppliedAuditAccessTimeouts.Add((statementTimeoutMilliseconds, transactionTimeoutMilliseconds));
+            return Task.CompletedTask;
+        }
+
+        public Task<OrganizationLockAttempt> TryLockOrganizationNoWaitAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            Store.NoWaitLockAttempts++;
+            Store.BeforeNoWaitLock?.Invoke();
+            if (Store.NoWaitLockBusyCount > 0)
+            {
+                Store.NoWaitLockBusyCount--;
+                return Task.FromResult(OrganizationLockAttempt.LockBusy);
+            }
+
+            var state = Store.Organizations.FirstOrDefault(o => o.OrganizationId == organizationId);
+            return Task.FromResult(state is null ? OrganizationLockAttempt.NotFound : OrganizationLockAttempt.Locked(state));
+        }
+    }
+
+    private class Scope(InMemoryAuthorityStore s, bool readOnly = false) : IAuthorityScope
+    {
+        protected InMemoryAuthorityStore Store => s;
+
         public ISearchIndexStore SearchIndex => s.SearchIndex;
 
         public ISearchAccessStore SearchAccess => s.SearchAccess;
