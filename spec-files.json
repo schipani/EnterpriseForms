@@ -1044,8 +1044,8 @@
     },
     {
       "path": "scripts/ci/authorized_test_skips.json",
-      "sha256": "baf4789cd78880034105291c849276bff98c01cabe5d993c215aacf2bc8c665a",
-      "bytes": 8619
+      "sha256": "d106ad00ba7e0871fc94cf52f1d9a1e66e1f679e9f5d99c5fc4ad20764726457",
+      "bytes": 240063
     },
     {
       "path": "scripts/ci/run_dotnet_tests.py",
