@@ -23,6 +23,10 @@ public sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEven
         builder.Property(e => e.EventMetadataJson).HasColumnType("jsonb");
         builder.HasIndex(e => new { e.TenantId, e.EventOccurredOn, e.AuditSequence }).HasDatabaseName("ix_audit_events_tenant_time");
         builder.HasIndex(e => new { e.FormRecordId, e.EventOccurredOn }).HasDatabaseName("ix_audit_events_record_time");
+        // C8 M4-2 (AC-8 §7): the audit explorer's actor and correlation filters. A tenant-scoped record-time index is added only
+        // if EXPLAIN (ANALYZE, BUFFERS) on a seeded 1M-row organization requires it (measurement deferred by the owner, not waived).
+        builder.HasIndex(e => new { e.TenantId, e.ActorUserId, e.EventOccurredOn, e.AuditSequence }).HasDatabaseName("ix_audit_events_tenant_actor_time");
+        builder.HasIndex(e => new { e.TenantId, e.CorrelationIdentifier }).HasDatabaseName("ix_audit_events_tenant_correlation");
         builder.HasOne<Tenant>().WithMany().HasForeignKey(e => e.TenantId).HasConstraintName("fk_audit_events_tenant");
         builder.ToTable(t => t.HasCheckConstraint("ck_audit_events_outcome", "event_outcome IN ('Success','Denied','Failed')"));
     }

@@ -3,6 +3,11 @@
 - **Status:** **revision 2 (C-109, 2026-11-04), accepted with TC-1…TC-5 in C-110. M4-1 (AC-8.1 only) implemented for
   Development/Testing (C-111; `docs/PHASE_C8_STATUS.md` §34): not pushed, not merged, not independently reviewed.**
   AC-8.2–AC-8.5, the audit pages and the Security Home are not built. Revision 1 was C-108.
+- **M4-2 (C-162–C-164, 2026-11-19/20):** AC-8.3, the redaction catalog, PG-054/PG-055 and the two required indexes implemented
+  and accepted by the owner for Development/Testing (`docs/PHASE_C8_STATUS.md` §41); the two M4-2 Stage B classes executed in a
+  limited owner-authorized run (§41.6); not independently reviewed. TC-3 approved as configurable bounded settings and retained
+  (F-M42-V1, option 1); the record-time index and its 1M-row measurement deferred, not waived. AC-8.2, AC-8.4, AC-8.5 and PG-052
+  remain unbuilt.
 - **Baseline:** `main` = `c245200` (PR #50, merged 2026-11-04 09:50 UTC; it includes C8 M1–M3 and AC-7). Branch
   `phase-c8/m4-governance-audit` was created from that commit and is local only (not pushed, no PR).
 - **Audience:** the project owner (final acceptance) and the independent Authority reviewer (AC-8 joins the

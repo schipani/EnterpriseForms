@@ -24,6 +24,8 @@ export const ENDPOINTS = {
   "security.addIncidentNote": { method: "POST", path: "/api/v1/security/incidents/{securityIncidentId}/notes" },
   "audit.mine": { method: "GET", path: "/api/v1/my-activity" },
   "audit.record": { method: "GET", path: "/api/v1/form-records/{formRecordId}/activity" },
+  "audit.events": { method: "GET", path: "/api/v1/security/audit-events" },
+  "audit.event": { method: "GET", path: "/api/v1/security/audit-events/{auditEventId}" },
   "forms.list": { method: "GET", path: "/api/v1/form-definitions" },
   "forms.get": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}" },
   "forms.create": { method: "POST", path: "/api/v1/form-definitions/designer" },

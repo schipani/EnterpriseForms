@@ -1,4 +1,5 @@
 using EnterpriseForms.Api.Composition;
+using EnterpriseForms.Api.Features.Audit;
 using EnterpriseForms.Api.Features.Dashboard;
 using EnterpriseForms.Api.Features.Documents;
 using EnterpriseForms.Api.Features.FormDefinitions;
@@ -90,6 +91,7 @@ public sealed class Program
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Identity.Profile.UserProfileHandlers>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Identity.Presence.PresenceHandlers>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.SecurityOperations.Incidents.SecurityIncidentHandlers>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Audit.Explorer.AuditExplorerHandlers>(); // C8 M4-2 PG-054/055
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.History.RecordHistoryHandler>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.History.RecordRestoreHandler>();
         // Phase C7 D4: provisional field-search limits (configuration FieldSearch); a bad value fails at startup.
@@ -142,6 +144,7 @@ public sealed class Program
         app.MapOrganizationEndpoints();
         app.MapSearchEndpoints();
         app.MapSecurityIncidentEndpoints();
+        app.MapAuditExplorerEndpoints();
         if (app.Environment.IsEnvironment("Testing"))
         {
             // Phase C7 M1: real-stack proof of the AC-5 verification path. Never mapped outside the isolated Testing stack.

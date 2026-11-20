@@ -6,12 +6,12 @@
     {
       "name": "forms-documents",
       "title": "Forms, Designer, Validation and Documents",
-      "classes": ["DesignerTests", "DropdownTests", "RulesTests", "FieldEditTests", "FormRenameTests", "RepeatingGroupsTests", "BrandingTests", "FormAccessTests", "ParentChildTests", "RegionalPreferencesTests", "DocumentTests", "DocumentEncryptionAuditTests", "EncryptionTests"]
+      "classes": ["DesignerTests", "DropdownTests", "RulesTests", "FieldEditTests", "FormRenameTests", "RepeatingGroupsTests", "BrandingTests", "FormAccessTests", "ParentChildTests", "RegionalPreferencesTests", "DocumentTests", "DocumentEncryptionAuditTests", "AuditExplorerTests", "EncryptionTests"]
     },
     {
       "name": "authorization-security-onboarding",
       "title": "Authorization, Security, Onboarding and Recovery",
-      "classes": ["AuthorizationAndTamperTests", "SessionCsrfTests", "SessionRevocationTests", "SecurityIncidentTests", "SecurityAdministratorTests", "SecurityAuditorTests", "AuthorizationRollbackTests", "ProjectionIntegrityRollbackTests", "SpiceDbBehaviourContractTests", "AuthorizationLatencyTests", "SecurityAdministratorProvisioningTests", "FieldProtectionDowngradeTests", "ConsoleOperatorRegistrationTests", "OrganizationOnboardingStackTests", "OwnerRecoveryStackTests", "PlatformConsoleStackTests", "PlatformOperatorApprovalTests", "AuthorityWorkWakeupStackTests", "SearchAccessVerificationStackTests", "SearchAccessShadowStackTests", "Ix7SearchRecoveryRehearsalStackTests"]
+      "classes": ["AuthorizationAndTamperTests", "SessionCsrfTests", "SessionRevocationTests", "SecurityIncidentTests", "SecurityAdministratorTests", "SecurityAuditorTests", "SecurityAuditAccessTests", "AuthorizationRollbackTests", "ProjectionIntegrityRollbackTests", "SpiceDbBehaviourContractTests", "AuthorizationLatencyTests", "SecurityAdministratorProvisioningTests", "FieldProtectionDowngradeTests", "ConsoleOperatorRegistrationTests", "OrganizationOnboardingStackTests", "OwnerRecoveryStackTests", "PlatformConsoleStackTests", "PlatformOperatorApprovalTests", "AuthorityWorkWakeupStackTests", "SearchAccessVerificationStackTests", "SearchAccessShadowStackTests", "Ix7SearchRecoveryRehearsalStackTests"]
     },
     {
       "name": "records-lifecycle",

@@ -331,6 +331,23 @@ public interface IOwnerRecoveryNoticeAuthority
     Task<AuthorityOwnerRecoveryObjection> ObjectToOwnerRecoveryAsync(DelegatedUserContext user, OwnerRecoveryObjectionCommand command, CancellationToken cancellationToken);
 }
 
+// ---- C8 M4-2 (AC-8.3): audit-access evidence (mirrors AuthorizationAuthority.Contracts.V1 AuditAccessRequest/AuditAccessDecision) ----
+
+/// <summary>AccessKind is ExplorerPage or EventDetail; FilterDigest is lower-case hex SHA-256 of the canonical filter (ids, codes and dates only).</summary>
+public sealed record AuditAccessQuery(Guid OrganizationId, string AccessKind, string FilterDigest, int PageSize, Guid? AuditEventId, Guid CorrelationId);
+
+/// <summary>An allow with the committed AuditAccessAuthorized entry's audit-stream revision; Delivery is always "not_attested".</summary>
+public sealed record AuthorityAuditAccessDecision(bool Allowed, long AuditJournalRevision, long AuthorizationRevision, string Delivery, Guid CorrelationId);
+
+/// <summary>
+/// C8 M4-2: the only way the business may serve its audit projection. The Authority checks view_audit and commits evidence
+/// before it answers; any refusal or failure is an AuthorityClientException and nothing is served (fail closed).
+/// </summary>
+public interface IAuditAccessAuthority
+{
+    Task<AuthorityAuditAccessDecision> AuthorizeAuditAccessAsync(DelegatedUserContext user, AuditAccessQuery query, CancellationToken cancellationToken);
+}
+
 /// <summary>Owner message 7: the Authority's Security Administrator roster (narrow port; used by Organizations, and read-only by SecurityOperations to list and validate incident investigators).</summary>
 public interface ISecurityAdministratorAuthority
 {

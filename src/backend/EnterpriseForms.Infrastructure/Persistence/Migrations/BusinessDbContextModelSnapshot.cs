@@ -124,8 +124,14 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                     b.HasIndex("FormRecordId", "EventOccurredOn")
                         .HasDatabaseName("ix_audit_events_record_time");
 
+                    b.HasIndex("TenantId", "CorrelationIdentifier")
+                        .HasDatabaseName("ix_audit_events_tenant_correlation");
+
                     b.HasIndex("TenantId", "EventOccurredOn", "AuditSequence")
                         .HasDatabaseName("ix_audit_events_tenant_time");
+
+                    b.HasIndex("TenantId", "ActorUserId", "EventOccurredOn", "AuditSequence")
+                        .HasDatabaseName("ix_audit_events_tenant_actor_time");
 
                     b.ToTable("audit_events", null, t =>
                         {

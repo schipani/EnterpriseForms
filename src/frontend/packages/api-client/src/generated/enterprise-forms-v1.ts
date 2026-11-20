@@ -2115,6 +2115,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/security/audit-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PG-054: a page (at most 50) of the organization's audit events, newest first by event time with the sequence as tie-break (not commit order). Filters are ids, codes and dates only. Envelopes only: action label, actor, target, form, record and field ids. Business projection, not independently verified (AUD-C7-01/G24). */
+        get: operations["SearchAuditEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/security/audit-events/{auditEventId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PG-055: one audit event with the redaction catalog's description and allowlisted metadata; free text, field keys and labels, option text, design diffs and record scopes are withheld (label only). Another organization's id and an unknown id are the same 404. */
+        get: operations["GetAuditEvent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2157,6 +2191,27 @@ export interface components {
             /** @default false */
             useDevelopmentStepUp: boolean;
         };
+        AuditAccessEvidenceResponse: {
+            /** Format: int64 */
+            authorityJournalRevision: number | string;
+            statement: string;
+        };
+        AuditEventDetailResponse: {
+            event: components["schemas"]["AuditExplorerEventResponse"];
+            description: string;
+            metadata: components["schemas"]["AuditMetadataItemResponse"][];
+            withheldMetadata: components["schemas"]["AuditWithheldMetadataResponse"][];
+            links: components["schemas"]["AuditEventLinkResponse"][];
+            receipt: components["schemas"]["AuditReceiptResponse"];
+            orderingStatement: string;
+            evidenceStatement: string;
+            accessEvidence: components["schemas"]["AuditAccessEvidenceResponse"];
+        };
+        AuditEventLinkResponse: {
+            relation: string;
+            label: string;
+            href: string;
+        };
         AuditEventResponse: {
             /** Format: uuid */
             auditEventId: string;
@@ -2175,6 +2230,67 @@ export interface components {
             fileAttachmentId: null | string;
             /** Format: uuid */
             targetEntityId: null | string;
+        };
+        AuditExplorerActorResponse: {
+            /** Format: uuid */
+            userId: null | string;
+            displayName: null | string;
+            actorType: string;
+        };
+        AuditExplorerEventResponse: {
+            /** Format: uuid */
+            auditEventId: string;
+            /** Format: date-time */
+            occurredOn: string;
+            /** Format: int64 */
+            sequence: number | string;
+            category: string;
+            action: string;
+            actionLabel: string;
+            recognized: boolean;
+            outcome: string;
+            actor: components["schemas"]["AuditExplorerActorResponse"];
+            target: components["schemas"]["AuditExplorerTargetResponse"];
+            /** Format: uuid */
+            formDefinitionId: null | string;
+            formDisplayName: null | string;
+            /** Format: uuid */
+            formRecordId: null | string;
+            /** Format: uuid */
+            fieldDefinitionId: null | string;
+            /** Format: uuid */
+            correlationId: string;
+            /** Format: int32 */
+            schemaVersion: number | string;
+            evidence: string;
+        };
+        AuditExplorerPageResponse: {
+            items: components["schemas"]["AuditExplorerEventResponse"][];
+            nextCursor: null | string;
+            /** Format: int32 */
+            pageSize: number | string;
+            orderingStatement: string;
+            evidenceStatement: string;
+            accessEvidence: components["schemas"]["AuditAccessEvidenceResponse"];
+        };
+        AuditExplorerTargetResponse: {
+            entityType: null | string;
+            /** Format: uuid */
+            entityId: null | string;
+        };
+        AuditMetadataItemResponse: {
+            key: string;
+            label: string;
+            kind: string;
+            value: string;
+        };
+        AuditReceiptResponse: {
+            state: string;
+            reason: string;
+        };
+        AuditWithheldMetadataResponse: {
+            label: string;
+            policy: string;
         };
         BeginUploadRequest: {
             /** Format: uuid */
@@ -8165,6 +8281,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SecurityIncidentDetailResponse"];
+                };
+            };
+        };
+    };
+    SearchAuditEvents: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                actorUserId?: string;
+                action?: string;
+                category?: string;
+                outcome?: string;
+                entityType?: string;
+                entityId?: string;
+                formRecordId?: string;
+                correlationId?: string;
+                excludeAuditAccess?: boolean;
+                pageSize?: number | string;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditExplorerPageResponse"];
+                };
+            };
+        };
+    };
+    GetAuditEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auditEventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEventDetailResponse"];
                 };
             };
         };

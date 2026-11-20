@@ -313,6 +313,77 @@
         }
       }
     },
+    "/internal/v1/organizations/audit/access": {
+      "post": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "AC-8.3: authorizes one audit-explorer page or event detail for the delegated user (view_audit, Security Auditors) and commits an AuditAccessAuthorized entry (actor, kind, filter digest, authorization revision, delivery not_attested; no result counts) in the organization's audit stream before answering. The organization lock is taken NOWAIT with bounded retries (503 AUDIT_EVIDENCE_BUSY), and a failed or unknown commit is 503 AUDIT_EVIDENCE_UNAVAILABLE: no allow without committed evidence.",
+        "operationId": "AuthorizeAuditAccess",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditAccessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditAccessDecision"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/verifier/protection-coverage": {
       "post": {
         "tags": [
@@ -3173,6 +3244,92 @@
   },
   "components": {
     "schemas": {
+      "AuditAccessDecision": {
+        "required": [
+          "allowed",
+          "audit_journal_revision",
+          "authorization_revision",
+          "delivery",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "audit_journal_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "delivery": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "AuditAccessKind": {
+        "enum": [
+          "ExplorerPage",
+          "EventDetail"
+        ]
+      },
+      "AuditAccessRequest": {
+        "required": [
+          "organization_id",
+          "access_kind",
+          "filter_digest",
+          "page_size",
+          "audit_event_id",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "access_kind": {
+            "$ref": "#/components/schemas/AuditAccessKind"
+          },
+          "filter_digest": {
+            "type": "string"
+          },
+          "page_size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "audit_event_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "AuthorityProbeResponse": {
         "required": [
           "probe_status",
@@ -11835,6 +11992,9 @@
     },
     {
       "name": "SecurityCommands"
+    },
+    {
+      "name": "Audit"
     },
     {
       "name": "Catalogue"

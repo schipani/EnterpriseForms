@@ -194,6 +194,17 @@ public static class AuthorityErrorCodes
 
     /// <summary>IX-2: the search index is quarantined; only a SearchProjectionRebuild clears it (IX-D7). Never an organization quarantine.</summary>
     public const string SearchIndexQuarantined = "SEARCH_INDEX_QUARANTINED";
+
+    // C8 M4-2 (AC-8.3): audit-access evidence.
+
+    /// <summary>403: the caller does not hold view_audit (Security Auditor) in the organization.</summary>
+    public const string AuditViewForbidden = "AUDIT_VIEW_FORBIDDEN";
+
+    /// <summary>503, retryable: the organization lock stayed busy (or the authorization state moved) for every bounded attempt; nothing was served.</summary>
+    public const string AuditEvidenceBusy = "AUDIT_EVIDENCE_BUSY";
+
+    /// <summary>503, retryable: the AuditAccessAuthorized entry could not be committed (failure, timeout or unknown outcome); nothing was served.</summary>
+    public const string AuditEvidenceUnavailable = "AUDIT_EVIDENCE_UNAVAILABLE";
 }
 
 /// <summary>Thrown by application services; mapped to an ErrorResponse by the host. Never carries secrets or protected values.</summary>

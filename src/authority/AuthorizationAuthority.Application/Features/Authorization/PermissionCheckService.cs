@@ -9,7 +9,7 @@ namespace AuthorizationAuthority.Application.Features.Authorization;
 /// Authorization check (CROSS_SYSTEM §2 "Authorization check"): gate → pin the projection marker → SpiceDB check at exactly
 /// the pinned snapshot → decisive marker re-read and gate re-read (C8 M4 S1, <see cref="ProjectionIntegrityVerifier"/>).
 /// </summary>
-public sealed class PermissionCheckService(IAuthorityStore store, ProjectionIntegrityVerifier verifier)
+public sealed class PermissionCheckService(IAuthorityStore store, ProjectionIntegrityVerifier verifier) : Audit.IOrganizationPermissionCheck
 {
     private const int MaxGateRetries = 2;
 

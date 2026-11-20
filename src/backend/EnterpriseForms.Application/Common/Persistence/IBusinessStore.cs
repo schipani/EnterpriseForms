@@ -45,6 +45,16 @@ public sealed record UploadSessionFilter(IReadOnlyCollection<string> States, str
 /// <summary>Dashboard activity filter (the caller's own audit events only).</summary>
 public sealed record ActorAuditEventFilter(string? EventCategory, string? EventOutcome, DateTimeOffset? OccurredFrom, DateTimeOffset? OccurredBefore);
 
+/// <summary>
+/// C8 M4-2 audit explorer filter (tenant-scoped; every member optional). <c>ExcludedActions</c> drops the explorer's own
+/// delivery rows when the viewer asks to hide audit access. The position is the keyset of the last row of the previous page.
+/// </summary>
+public sealed record OrganizationAuditEventFilter(DateTimeOffset? OccurredFrom, DateTimeOffset? OccurredBefore, Guid? ActorUserId, string? EventAction, string? EventCategory, string? EventOutcome,
+    string? TargetEntityType, Guid? TargetEntityId, Guid? FormRecordId, Guid? CorrelationIdentifier, IReadOnlyCollection<string> ExcludedActions);
+
+/// <summary>Keyset position (event time, then sequence; newest first).</summary>
+public sealed record AuditEventPosition(DateTimeOffset OccurredOn, long Sequence);
+
 /// <summary>Security incident filter (tenant-scoped). <c>FormRecordIds</c>, when set, restricts to incidents of those records.</summary>
 public sealed record SecurityIncidentFilter(string? IncidentTypeName, string? IncidentSeverityName, string? IncidentStatusName, DateTimeOffset? DetectedFrom, DateTimeOffset? DetectedBefore, string? IncidentIdSuffix, IReadOnlyCollection<Guid>? FormRecordIds);
 
@@ -277,6 +287,15 @@ public interface IBusinessScope : IAsyncDisposable
 
     /// <summary>Dashboard: the distinct categories of the caller's own events (filter choices).</summary>
     Task<List<string>> GetActorAuditCategoriesAsync(Guid tenantId, Guid actorUserId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// C8 M4-2 (PG-054): at most <paramref name="limit"/> events of the organization after <paramref name="after"/>, newest first
+    /// (event time descending, then sequence descending). Always predicated on <paramref name="tenantId"/> (R-15: no business RLS).
+    /// </summary>
+    Task<List<AuditEvent>> QueryOrganizationAuditEventsAsync(Guid tenantId, OrganizationAuditEventFilter filter, AuditEventPosition? after, int limit, CancellationToken cancellationToken);
+
+    /// <summary>C8 M4-2 (PG-055): one event of the organization; another organization's id and an unknown id are both null.</summary>
+    Task<AuditEvent?> FindOrganizationAuditEventAsync(Guid tenantId, Guid auditEventId, CancellationToken cancellationToken);
 
     /// <summary>Events whose target is the given entity, oldest first (incident audit trail).</summary>
     Task<List<AuditEvent>> GetTargetAuditEventsAsync(Guid tenantId, string targetEntityType, Guid targetEntityId, int limit, CancellationToken cancellationToken);

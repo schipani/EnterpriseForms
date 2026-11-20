@@ -1,4 +1,5 @@
 using AuthorizationAuthority.Api.Composition;
+using AuthorizationAuthority.Api.Features.Audit;
 using AuthorizationAuthority.Api.Features.Authorization;
 using AuthorizationAuthority.Api.Features.Catalogue;
 using AuthorizationAuthority.Api.Features.Content;
@@ -103,6 +104,7 @@ public sealed class Program
         builder.Services.AddInternalAuthentication(builder.Configuration);
         // Phase C8 AC-9: read-only outcome lookup for the business reconciler (own credential, rate limit; bad limits fail at startup).
         builder.Services.AddReconcilerLookup(builder.Configuration);
+        builder.Services.AddAuditAccess(builder.Configuration); // C8 M4-2 (AC-8.3) audit-access evidence, TC-3 bounds
         // Phase C7 M2 (OD-7): AC-6 approvals are unavailable unless the development-only synthetic step-up path is configured;
         // Create refuses that path outside Development/Testing or without the synthetic TestIdentityProvider (startup failure).
         builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.SecurityCommands.FieldSearchApprovalGate.Create(
@@ -204,6 +206,7 @@ public sealed class Program
         app.MapFormAccessEndpoints();
         app.MapSecurityCommandEndpoints();
         app.MapSecurityCommandOutcomeEndpoints();
+        AuthorizationAuthority.Api.Features.Audit.AuditAccessEndpoints.MapAuditAccessEndpoints(app);
         app.MapContentEndpoints();
         app.MapCatalogueEndpoints();
         app.MapOperatorEndpoints();

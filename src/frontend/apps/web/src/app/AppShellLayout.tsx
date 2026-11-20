@@ -115,6 +115,7 @@ export function usePrimaryNavItems(): Array<{ to: string; label: string }> {
     { to: "/app/activity", label: "My activity", show: true },
     { to: "/app/organization", label: "Organization", show: session.hasCapability("organization.manage") || session.hasCapability("security.administer") },
     { to: "/app/security/incidents", label: "Security incidents", show: session.hasCapability("security.administer") },
+    { to: "/app/security/audit", label: "Audit", show: session.hasCapability("audit.view") },
   ];
   return items.filter((item) => item.show);
 }

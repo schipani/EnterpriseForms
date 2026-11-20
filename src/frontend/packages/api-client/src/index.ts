@@ -224,6 +224,28 @@ export type DashboardFormQuery = DashboardPageQuery & { q?: string; access?: "cr
 
 export type SecurityIncidentQuery = DashboardPageQuery & { q?: string; type?: string; severity?: string; status?: string; from?: string; before?: string };
 
+/** C8 M4-2 audit explorer (PG-054): ids, codes and ISO dates only; `cursor` is the opaque `nextCursor` of the previous page of the same filters. */
+export type AuditExplorerQuery = {
+  from?: string;
+  to?: string;
+  actorUserId?: string;
+  action?: string;
+  category?: string;
+  outcome?: string;
+  entityType?: string;
+  entityId?: string;
+  formRecordId?: string;
+  correlationId?: string;
+  excludeAuditAccess?: boolean;
+  pageSize?: number;
+  cursor?: string;
+};
+export type AuditExplorerPageResponse = S["AuditExplorerPageResponse"];
+export type AuditExplorerEventResponse = S["AuditExplorerEventResponse"];
+export type AuditEventDetailResponse = S["AuditEventDetailResponse"];
+export type AuditMetadataItemResponse = S["AuditMetadataItemResponse"];
+export type AuditWithheldMetadataResponse = S["AuditWithheldMetadataResponse"];
+
 function idempotencyKey(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -272,6 +294,10 @@ export function createApiClient(coordinator: IRequestCoordinator) {
     audit: {
       mine: (limit = 25, signal?: AbortSignal) => read<AuditEventResponse[]>("audit.mine", undefined, { limit }, "background-read", signal),
       record: (formRecordId: string, signal?: AbortSignal) => read<RecordActivityResponse>("audit.record", { formRecordId }, undefined, "interactive-read", signal),
+      /** PG-054: every page is authorized and recorded by the Authority (Security Auditors only). */
+      events: (query: AuditExplorerQuery, signal?: AbortSignal) => read<AuditExplorerPageResponse>("audit.events", undefined, query, "interactive-read", signal),
+      /** PG-055: one event, redacted by the server's catalog. */
+      event: (auditEventId: string, signal?: AbortSignal) => read<AuditEventDetailResponse>("audit.event", { auditEventId }, undefined, "interactive-read", signal),
     },
     forms: {
       list: (signal?: AbortSignal) => read<FormDefinitionSummaryResponse[]>("forms.list", undefined, undefined, "interactive-read", signal),
