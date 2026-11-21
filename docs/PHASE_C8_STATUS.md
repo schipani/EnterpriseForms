@@ -1348,3 +1348,51 @@ Outstanding, unchanged by acceptance:
 - accessibility, zoom and Playwright checks (M4-5);
 - hosted CI evidence beyond this PR;
 - Azure staging and every production requirement.
+
+## 44. C-174: M4-5 package 1 — browser accessibility verification and reviewer preparation (2026-11-21). Development/Testing; not owner-accepted; not independently reviewed; hosted verification not run
+
+Owner decision C-174: bounded M4-5 implementation (WP-1 and WP-4 preparation) on `phase-c8/m4-5-accessibility-review` from `main` `6142f91`, with OD-1…OD-7. Not authorized: Stage B, hosted workflow dispatch, publishing, merge.
+
+### 44.1 Delivered (uncommitted)
+
+- **`src/frontend/e2e/security-audit.spec.ts`** (six serial tests, isolated security-test stack only, existing isolation guard; no seed or stack change):
+  1. Owner, designer and clerk: no Security home or Audit navigation. On `/app/security` the four Authority-backed sections say "Not available to your role" and the two live-check widgets show their unavailable text. `/app/security/audit`, `/app/security/audit/commands` and an event route show "No permission" with no table.
+  2. Security Administrator: Security home navigation (current-page marked), every widget's content, search approvals and incidents. The gate's Refresh is reached with Tab, its focus outline is visible, and Enter refreshes that section (200). No audit explorer (D8-6).
+  3. The Security Administrator appoints Riley Reader as Security Auditor on the People page (reason code, development-only step-up). The test first asserts Riley holds no role.
+  4. Security Auditor:
+     - Security home archive only, with the live-check widgets unavailable.
+     - Audit explorer (current tab marked). An invalid action code typed by keyboard is marked invalid and clearing it restores the list. Refresh is reached with Tab (visible focus) and refreshes by Enter (200).
+     - Previous is disabled on page 1; Next and Previous are exercised by keyboard when the server returns a cursor (conditional on data).
+     - An event is opened by keyboard (visible focus) showing its provenance warning and back link.
+     - The security-command timeline table is shown.
+  5. axe (WCAG 2.0/2.1/2.2 A and AA tags plus best-practice, the PB-14 filter) and no horizontal page overflow at 320×720, 768×1024, 1440×900, 720×600 (200% zoom equivalent) and 320×256 (400% zoom equivalent). It covers the Security home (auditor and administrator), audit explorer, event detail and timeline (25 scans).
+  6. Revocation mid-session: with the auditor's session open on the explorer, a second browser context (the Security Administrator) removes the role. The auditor's next refresh gets 403 `AUDIT_VIEW_FORBIDDEN` (shown as an access refusal), and the Security home archive section is refused.
+  - `afterAll` removes Riley's auditor role if a failure left it, so the shared organization ends as it started.
+- **Reviewer package:** [architecture/PHASE_C8_M4_AC8_REVIEWER_PACKAGE.md](architecture/PHASE_C8_M4_AC8_REVIEWER_PACKAGE.md). It is consolidated for AC-8.1–AC-8.5, references the M4-1 S1/M1 package, and adds questions Q-6…Q-11. The findings and attestation sections are blank. It is marked owner-led and not reviewed.
+- **Sanitized evidence:** [evidence/phase-c8/m4-audit/STAGE_B_RUN_SUMMARIES.md](evidence/phase-c8/m4-audit/STAGE_B_RUN_SUMMARIES.md). All ten M4-2…M4-4 Stage B runs are listed, including the failed ones, with class, timing, per-test outcome and duration, and SHA-256 of the local raw TRX and `run.json`. Machine and user names, paths, identifiers, output and error text are removed, with a generator guard.
+- **PB-14 checklist:** row PB14-M4 added (manual NVDA/VoiceOver and real zoom for the M4 pages): pending.
+
+### 44.2 Local verification (executed 2026-11-21; `scripts/dev/test.ps1 -Level 2 -Spec security-audit`, isolated stack verified by the guard)
+
+| Run | Result | Note |
+|---|---|---|
+| 1 (incremental stack build) | 3 passed, 1 failed, 2 not run | Test defect: on the event page `getByText('Not independently verified')` matched the warning title and the lower-case business-projection sentence (strict mode). `afterAll` removed the auditor role |
+| 2 (`-NoRebuild`, after anchoring the selector to the title) | **6 passed** (1.9 min) | Test 3's precondition confirms the cleanup of run 1 |
+
+- **Accessibility defects found:** none. axe reported no violation and no page overflowed at any of the five viewports on the four pages. No M4 page or shared UI component was changed.
+- ESLint on the spec: clean. No other spec, Stage B class or hosted workflow was run.
+
+### 44.3 AC-M4-5.1 state
+
+| Part | State |
+|---|---|
+| Accessibility checks pass | Automated axe, keyboard and viewport checks pass locally (§44.2). Manual NVDA/VoiceOver review pending (PB14-M4, OD-3) |
+| Hosted runs green | **Not met; not run.** The seven Stage B shards plus the aggregate, `level3-script` and `security-gate-a` have not run on M4 code (OD-1: scope preserved; separate authorization). `ci` and CodeQL are green on `6142f91`. Known pre-existing risks for a full hosted Stage B run: RB-13 test isolation and the P-S1-1 benchmark (§40) |
+| Status log and evidence recorded | This section; sanitized summaries |
+| Reviewer package updated | Prepared (consolidated AC-8 package); not submitted |
+
+### 44.4 Deferred (not M4-5 criteria; unchanged)
+
+- Performance (PB-09/PERF-01, OD-4): the M4-4 overview SQL aggregates at volume; the C-162 record-time index and its 1M-row measurement.
+- Independent review of AC-5…AC-9 (including D8-66).
+- Azure staging, PB-08 step-up, G08/G24, G14, SD-5 and PB-12 release evidence.
