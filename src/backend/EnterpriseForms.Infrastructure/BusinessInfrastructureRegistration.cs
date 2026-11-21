@@ -58,6 +58,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<ISecurityAdministratorAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IAuditAccessAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>()); // C8 M4-2 (AC-8.3)
         services.AddSingleton<ISecurityCommandTimelineAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>()); // C8 M4-3 (AC-8.2)
+        services.AddSingleton<ISecurityOverviewAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>()); // C8 M4-4 (AC-8.4/8.5)
         services.AddSingleton<IOrganizationRosterAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IOwnerRecoveryNoticeAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<ITestStackIdentityAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());

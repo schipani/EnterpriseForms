@@ -105,15 +105,17 @@ function Brand({ branding, size }: { branding: Branding; size: "full" | "small" 
 }
 
 /** The primary destinations, each shown only to people with its capability (every destination is authorized again by the server). */
-export function usePrimaryNavItems(): Array<{ to: string; label: string }> {
+export function usePrimaryNavItems(): Array<{ to: string; label: string; exact?: boolean }> {
   const session = useSession();
-  const items: Array<{ to: string; label: string; show: boolean }> = [
+  const items: Array<{ to: string; label: string; show: boolean; exact?: boolean }> = [
     { to: "/app/dashboard", label: "Dashboard", show: true },
     { to: "/app/records", label: "My Records", show: session.hasCapability("records.discover") },
     { to: "/app/forms", label: "Forms", show: true },
     { to: "/app/uploads", label: "Uploads", show: true },
     { to: "/app/activity", label: "My activity", show: true },
     { to: "/app/organization", label: "Organization", show: session.hasCapability("organization.manage") || session.hasCapability("security.administer") },
+    // C8 M4-4 (D8-70, OD-5): either role, from the existing capabilities only; exact, so it is not also active on its sub pages.
+    { to: "/app/security", label: "Security home", show: session.hasCapability("security.administer") || session.hasCapability("audit.view"), exact: true },
     { to: "/app/security/incidents", label: "Security incidents", show: session.hasCapability("security.administer") },
     { to: "/app/security/audit", label: "Audit", show: session.hasCapability("audit.view") },
   ];
@@ -126,10 +128,11 @@ export function usePrimaryNavItems(): Array<{ to: string; label: string }> {
  * underline in the primary token (black in the default theme) under its label, a background and semibold text. Focus has its own
  * outline and is not confused with the active indicator.
  */
-function PrimaryLink({ to, label }: { to: string; label: string }) {
+function PrimaryLink({ to, label, exact = false }: { to: string; label: string; exact?: boolean | undefined }) {
   return (
     <Link
       to={to}
+      activeOptions={{ exact }}
       activeProps={{ "aria-current": "page" }}
       className="group inline-flex min-h-11 items-center rounded-control px-3 text-base font-medium text-muted hover:bg-page hover:text-body aria-[current=page]:bg-page aria-[current=page]:font-semibold aria-[current=page]:text-body"
     >
@@ -145,7 +148,7 @@ function PrimaryNav({ width }: { width: string }) {
       <ul className="flex flex-wrap gap-1 py-1">
         {items.map((item) => (
           <li key={item.to}>
-            <PrimaryLink to={item.to} label={item.label} />
+            <PrimaryLink to={item.to} label={item.label} exact={item.exact} />
           </li>
         ))}
       </ul>
@@ -176,7 +179,7 @@ function CompactBar({ active, width, branding }: { active: boolean; width: strin
           <ul className="flex flex-nowrap items-center gap-1">
             {items.map((item) => (
               <li key={item.to} className="shrink-0">
-                <PrimaryLink to={item.to} label={item.label} />
+                <PrimaryLink to={item.to} label={item.label} exact={item.exact} />
               </li>
             ))}
           </ul>

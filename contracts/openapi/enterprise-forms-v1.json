@@ -6111,6 +6111,37 @@
           }
         }
       }
+    },
+    "/api/v1/security/overview/{section}": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "PG-052 / AC-8.4 / AC-8.5: one Security Home section — gate, commands or archive (security overview) or coverage (field protection coverage). Authorized by the Authorization Authority from its committed state (Effective-edge rule, one read-only snapshot), so it is available while the organization gate is closed: gate, commands and coverage need Security Administrator; archive needs Security Administrator or Security Auditor. Counts, codes, kinds, revisions, times and identifiers only. Coverage staleness is an organization-wide comparison, not a per-form verification; this is operational information, not a compliance conclusion.",
+        "operationId": "ReadSecurityOverviewSection",
+        "parameters": [
+          {
+            "name": "section",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityOverviewSectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -13193,6 +13224,265 @@
           }
         }
       },
+      "SecurityCoverageAttestationResponse": {
+        "required": [
+          "attestationId",
+          "attestationComplete",
+          "attestationIncompleteReasonCode",
+          "expectedRecordCount",
+          "acceptedRecordCount",
+          "compliantRecordCount",
+          "pendingCreationRecordCount",
+          "quarantinedRecordCount",
+          "unverifiedRecordCount",
+          "notYetCensusedRecordCount",
+          "retiredRecordCount",
+          "retainedHistoryRevisionCount",
+          "auditJournalRevision",
+          "attestedContentIntegrityRevision",
+          "attestedOn"
+        ],
+        "type": "object",
+        "properties": {
+          "attestationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attestationComplete": {
+            "type": "boolean"
+          },
+          "attestationIncompleteReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expectedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "acceptedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "compliantRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pendingCreationRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "quarantinedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "unverifiedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "notYetCensusedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "retiredRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "retainedHistoryRevisionCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "auditJournalRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "attestedContentIntegrityRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "attestedOn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SecurityCoverageDecisionResponse": {
+        "required": [
+          "securityCommandId",
+          "formDefinitionId",
+          "formDisplayName",
+          "fieldDefinitionId",
+          "protectionDirection",
+          "formRegisteredActive",
+          "attestationState",
+          "attestation"
+        ],
+        "type": "object",
+        "properties": {
+          "securityCommandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fieldDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "protectionDirection": {
+            "type": "string"
+          },
+          "formRegisteredActive": {
+            "type": "boolean"
+          },
+          "attestationState": {
+            "type": "string"
+          },
+          "attestation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityCoverageAttestationResponse"
+              }
+            ]
+          }
+        }
+      },
+      "SecurityCoverageResponse": {
+        "required": [
+          "registeredFormCount",
+          "decisionCount",
+          "attestedCompleteDecisionCount",
+          "missingDecisionCount",
+          "staleDecisionCount",
+          "organizationContentIntegrityRevision",
+          "decisions",
+          "coverageStatement",
+          "stalenessStatement",
+          "formNameStatement"
+        ],
+        "type": "object",
+        "properties": {
+          "registeredFormCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "decisionCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "attestedCompleteDecisionCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "missingDecisionCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "staleDecisionCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "organizationContentIntegrityRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityCoverageDecisionResponse"
+            }
+          },
+          "coverageStatement": {
+            "type": "string"
+          },
+          "stalenessStatement": {
+            "type": "string"
+          },
+          "formNameStatement": {
+            "type": "string"
+          }
+        }
+      },
       "SecurityIncidentBucketResponse": {
         "required": [
           "bucketStartDate",
@@ -13668,6 +13958,305 @@
           },
           "coverageStatement": {
             "type": "string"
+          }
+        }
+      },
+      "SecurityOverviewArchiveResponse": {
+        "required": [
+          "streams",
+          "archiveStatement"
+        ],
+        "type": "object",
+        "properties": {
+          "streams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityOverviewArchiveStreamResponse"
+            }
+          },
+          "archiveStatement": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityOverviewArchiveStreamResponse": {
+        "required": [
+          "streamName",
+          "pendingCount",
+          "anchoredCount",
+          "verificationFailedCount",
+          "oldestPendingCreatedOn",
+          "oldestPendingAgeSeconds",
+          "lastAnchoredOn"
+        ],
+        "type": "object",
+        "properties": {
+          "streamName": {
+            "type": "string"
+          },
+          "pendingCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "anchoredCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "verificationFailedCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "oldestPendingCreatedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "oldestPendingAgeSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "lastAnchoredOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "SecurityOverviewCommandResponse": {
+        "required": [
+          "commandKind",
+          "commandState",
+          "committedAuthorizationRevision",
+          "createdOn",
+          "ageSeconds"
+        ],
+        "type": "object",
+        "properties": {
+          "commandKind": {
+            "type": "string"
+          },
+          "commandState": {
+            "type": "string"
+          },
+          "committedAuthorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ageSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "SecurityOverviewCommandsResponse": {
+        "required": [
+          "stateCounts",
+          "oldestUnresolvedCreatedOn",
+          "oldestUnresolvedAgeSeconds",
+          "commands",
+          "listLimit",
+          "listStatement"
+        ],
+        "type": "object",
+        "properties": {
+          "stateCounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityOverviewStateCountResponse"
+            }
+          },
+          "oldestUnresolvedCreatedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "oldestUnresolvedAgeSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "commands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityOverviewCommandResponse"
+            }
+          },
+          "listLimit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "listStatement": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityOverviewGateResponse": {
+        "required": [
+          "authorizationRevision",
+          "projectionAppliedRevision",
+          "contentIntegrityRevision",
+          "gateState",
+          "integrityQuarantined"
+        ],
+        "type": "object",
+        "properties": {
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projectionAppliedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "contentIntegrityRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "gateState": {
+            "type": "string"
+          },
+          "integrityQuarantined": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SecurityOverviewSectionResponse": {
+        "required": [
+          "section",
+          "authorizationBasis",
+          "computedOn",
+          "gate",
+          "commands",
+          "archive",
+          "coverage"
+        ],
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string"
+          },
+          "authorizationBasis": {
+            "type": "string"
+          },
+          "computedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "gate": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityOverviewGateResponse"
+              }
+            ]
+          },
+          "commands": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityOverviewCommandsResponse"
+              }
+            ]
+          },
+          "archive": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityOverviewArchiveResponse"
+              }
+            ]
+          },
+          "coverage": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityCoverageResponse"
+              }
+            ]
+          }
+        }
+      },
+      "SecurityOverviewStateCountResponse": {
+        "required": [
+          "commandState",
+          "commandCount"
+        ],
+        "type": "object",
+        "properties": {
+          "commandState": {
+            "type": "string"
+          },
+          "commandCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },

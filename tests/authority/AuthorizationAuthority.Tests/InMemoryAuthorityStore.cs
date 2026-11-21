@@ -219,9 +219,22 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         }
     }
 
-    private class Scope(InMemoryAuthorityStore s, bool readOnly = false) : IAuthorityScope
+    private class Scope(InMemoryAuthorityStore s, bool readOnly = false) : IAuthorityScope, ISecurityOverviewScope
     {
         protected InMemoryAuthorityStore Store => s;
+
+        // C8 M4-4 (AC-8.4): the same aggregates as the PostgreSQL store, over the in-memory lists.
+        public Task<List<CommandStateTally>> CountCommandsByStateAsync(Guid organizationId, IReadOnlyCollection<string> states, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Commands.Where(c => c.OrganizationId == organizationId && states.Contains(c.CommandStateName)).GroupBy(c => c.CommandStateName)
+                .Select(g => new CommandStateTally(g.Key, g.Count(), g.Min(c => c.CommandCreatedOn))).ToList());
+
+        public Task<List<SecurityCommand>> GetOldestCommandsInStatesAsync(Guid organizationId, IReadOnlyCollection<string> states, int limit, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Commands.Where(c => c.OrganizationId == organizationId && states.Contains(c.CommandStateName))
+                .OrderBy(c => c.CommandCreatedOn).ThenBy(c => c.SecurityCommandId).Take(limit).ToList());
+
+        public Task<List<ArchiveDeliveryTally>> CountJournalArchiveStatesAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Journal.Where(j => j.OrganizationId == organizationId).GroupBy(j => (j.JournalStreamName, j.ArchiveDeliveryState))
+                .Select(g => new ArchiveDeliveryTally(g.Key.JournalStreamName, g.Key.ArchiveDeliveryState, g.Count(), g.Min(j => j.JournalCreatedOn), g.Max(j => j.JournalArchivedOn))).ToList());
 
         public ISearchIndexStore SearchIndex => s.SearchIndex;
 

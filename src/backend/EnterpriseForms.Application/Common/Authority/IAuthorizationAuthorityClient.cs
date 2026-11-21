@@ -372,6 +372,49 @@ public interface ISecurityCommandTimelineAuthority
     Task<AuthorityTimelinePage> ReadSecurityCommandTimelineAsync(DelegatedUserContext user, AuthorityTimelineQuery query, CancellationToken cancellationToken);
 }
 
+// ---- C8 M4-4 (AC-8.4, AC-8.5): Security Home overview and coverage (mirrors AuthorizationAuthority.Contracts.V1 SecurityOverview*) ----
+
+public sealed record SecurityOverviewQuery(Guid OrganizationId, Guid CorrelationId);
+
+public sealed record AuthoritySecurityOverview(Guid OrganizationId, string Section, string AuthorizationBasis, DateTimeOffset ComputedOn,
+    AuthorityOverviewGate? Gate, AuthorityOverviewCommands? Commands, AuthorityOverviewArchive? Archive, Guid CorrelationId);
+
+public sealed record AuthorityOverviewGate(long AuthorizationRevision, long ProjectionAppliedRevision, long ContentIntegrityRevision, string GateState, bool IntegrityQuarantined);
+
+public sealed record AuthorityOverviewCommands(List<AuthorityOverviewStateCount> StateCounts, DateTimeOffset? OldestUnresolvedCreatedOn, long? OldestUnresolvedAgeSeconds,
+    List<AuthorityOverviewCommand> Commands, int ListLimit, string ListStatement);
+
+public sealed record AuthorityOverviewStateCount(string CommandState, int CommandCount);
+
+public sealed record AuthorityOverviewCommand(string CommandKind, string CommandState, long? CommittedAuthorizationRevision, DateTimeOffset CreatedOn, long AgeSeconds);
+
+public sealed record AuthorityOverviewArchive(List<AuthorityOverviewArchiveStreamState> Streams, string ArchiveStatement);
+
+public sealed record AuthorityOverviewArchiveStreamState(string StreamName, int PendingCount, int AnchoredCount, int VerificationFailedCount,
+    DateTimeOffset? OldestPendingCreatedOn, long? OldestPendingAgeSeconds, DateTimeOffset? LastAnchoredOn);
+
+public sealed record AuthoritySecurityCoverage(Guid OrganizationId, int RegisteredFormCount, int DecisionCount, int AttestedCompleteDecisionCount, int MissingDecisionCount, int StaleDecisionCount,
+    long OrganizationContentIntegrityRevision, List<AuthorityCoverageDecision> Decisions, DateTimeOffset ComputedOn, string CoverageStatement, string StalenessStatement, string AuthorizationBasis, Guid CorrelationId);
+
+public sealed record AuthorityCoverageDecision(Guid SecurityCommandId, Guid FormDefinitionId, Guid FieldDefinitionId, string ProtectionDirection, bool FormRegisteredActive, string AttestationState,
+    AuthorityCoverageAttestation? Attestation);
+
+public sealed record AuthorityCoverageAttestation(Guid AttestationId, bool AttestationComplete, string? AttestationIncompleteReasonCode, int ExpectedRecordCount, int AcceptedRecordCount, int CompliantRecordCount,
+    int PendingCreationRecordCount, int QuarantinedRecordCount, int UnverifiedRecordCount, int NotYetCensusedRecordCount, int RetiredRecordCount, long RetainedHistoryRevisionCount,
+    long AuditJournalRevision, long AttestedContentIntegrityRevision, DateTimeOffset AttestedOn);
+
+/// <summary>
+/// C8 M4-4: the only source of the Security Home's gate, commands, archive and coverage sections. The Authority authorizes each read
+/// with the Effective-edge rule in one read-only snapshot (no SpiceDB), so the sections answer while the gate is closed; any refusal
+/// or failure is an AuthorityClientException and nothing is shown. Incidents and search approvals keep their own ports and checks (OD-6).
+/// </summary>
+public interface ISecurityOverviewAuthority
+{
+    Task<AuthoritySecurityOverview> ReadSecurityOverviewAsync(DelegatedUserContext user, string section, SecurityOverviewQuery query, CancellationToken cancellationToken);
+
+    Task<AuthoritySecurityCoverage> ReadProtectionCoverageAsync(DelegatedUserContext user, SecurityOverviewQuery query, CancellationToken cancellationToken);
+}
+
 /// <summary>Owner message 7: the Authority's Security Administrator roster (narrow port; used by Organizations, and read-only by SecurityOperations to list and validate incident investigators).</summary>
 public interface ISecurityAdministratorAuthority
 {

@@ -55,7 +55,7 @@
 | PG-049 | `teams` | `/app/organization/teams/:teamId` | To map during implementation | Not implemented |
 | PG-050 | `identity` | `/app/organization/users` | To map during implementation | Not implemented |
 | PG-051 | `identity` | `/app/organization/users/:userId` | To map during implementation | Not implemented |
-| PG-052 | `security-operations` | `/app/security` | To map during implementation | Not implemented |
+| PG-052 | `security-operations` | `/app/security` | `SecurityHomePage` (C8 M4-4, C-169) | Implemented; owner-accepted for Development/Testing (C-173); not independently reviewed |
 | PG-053 | `security-operations` | `/app/security/ownership` | To map during implementation | Not implemented |
 | PG-054 | `audit` | `/app/security/audit` | To map during implementation | Not implemented |
 | PG-055 | `audit` | `/app/security/audit/:auditEventId` | To map during implementation | Not implemented |

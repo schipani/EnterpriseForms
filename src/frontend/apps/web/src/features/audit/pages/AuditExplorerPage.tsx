@@ -7,6 +7,7 @@ import { useState } from "react";
 import { formatInstant } from "../components/auditExplorerModel";
 import { ErrorPanel } from "../../support";
 import { AuditViewTabs } from "../components/AuditViewTabs";
+import { SecurityHomeHint, isGateClosed } from "../components/SecurityHomeHint";
 import {
   AUDIT_CATEGORIES,
   AUDIT_OUTCOMES,
@@ -56,6 +57,7 @@ export function AuditExplorerPage() {
         <StatusMessage tone="info" title="No permission">
           The audit explorer is available to Security Auditors. Access is decided, and recorded, by the independent Authorization Authority.
         </StatusMessage>
+        <SecurityHomeHint />
       </>
     );
   }
@@ -111,6 +113,7 @@ export function AuditExplorerPage() {
           <div className="flex flex-col gap-3">
             {events.isPending && valid ? <LoadingBlock label="Loading audit events" /> : null}
             {events.isError ? <ErrorPanel error={events.error} onRetry={() => void events.refetch()} /> : null}
+            {events.isError && isGateClosed(events.error) ? <SecurityHomeHint /> : null}
             {data && data.items.length === 0 ? (
               <EmptyState title={pageNumber > 1 ? "No more events" : "No events match"}>{hasAuditFilters(filters) ? "Try a wider period or fewer filters." : "No audit events are recorded for this organization yet."}</EmptyState>
             ) : null}

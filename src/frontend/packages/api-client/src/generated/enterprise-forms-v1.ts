@@ -2166,6 +2166,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/security/overview/{section}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PG-052 / AC-8.4 / AC-8.5: one Security Home section — gate, commands or archive (security overview) or coverage (field protection coverage). Authorized by the Authorization Authority from its committed state (Effective-edge rule, one read-only snapshot), so it is available while the organization gate is closed: gate, commands and coverage need Security Administrator; archive needs Security Administrator or Security Auditor. Counts, codes, kinds, revisions, times and identifiers only. Coverage staleness is an organization-wide comparison, not a per-form verification; this is operational information, not a compliance conclusion. */
+        get: operations["ReadSecurityOverviewSection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3958,6 +3975,67 @@ export interface components {
             evidenceStatement: string;
             accessEvidence: components["schemas"]["AuditAccessEvidenceResponse"];
         };
+        SecurityCoverageAttestationResponse: {
+            /** Format: uuid */
+            attestationId: string;
+            attestationComplete: boolean;
+            attestationIncompleteReasonCode: null | string;
+            /** Format: int32 */
+            expectedRecordCount: number | string;
+            /** Format: int32 */
+            acceptedRecordCount: number | string;
+            /** Format: int32 */
+            compliantRecordCount: number | string;
+            /** Format: int32 */
+            pendingCreationRecordCount: number | string;
+            /** Format: int32 */
+            quarantinedRecordCount: number | string;
+            /** Format: int32 */
+            unverifiedRecordCount: number | string;
+            /** Format: int32 */
+            notYetCensusedRecordCount: number | string;
+            /** Format: int32 */
+            retiredRecordCount: number | string;
+            /** Format: int64 */
+            retainedHistoryRevisionCount: number | string;
+            /** Format: int64 */
+            auditJournalRevision: number | string;
+            /** Format: int64 */
+            attestedContentIntegrityRevision: number | string;
+            /** Format: date-time */
+            attestedOn: string;
+        };
+        SecurityCoverageDecisionResponse: {
+            /** Format: uuid */
+            securityCommandId: string;
+            /** Format: uuid */
+            formDefinitionId: string;
+            formDisplayName: null | string;
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            protectionDirection: string;
+            formRegisteredActive: boolean;
+            attestationState: string;
+            attestation: null | components["schemas"]["SecurityCoverageAttestationResponse"];
+        };
+        SecurityCoverageResponse: {
+            /** Format: int32 */
+            registeredFormCount: number | string;
+            /** Format: int32 */
+            decisionCount: number | string;
+            /** Format: int32 */
+            attestedCompleteDecisionCount: number | string;
+            /** Format: int32 */
+            missingDecisionCount: number | string;
+            /** Format: int32 */
+            staleDecisionCount: number | string;
+            /** Format: int64 */
+            organizationContentIntegrityRevision: number | string;
+            decisions: components["schemas"]["SecurityCoverageDecisionResponse"][];
+            coverageStatement: string;
+            stalenessStatement: string;
+            formNameStatement: string;
+        };
         SecurityIncidentBucketResponse: {
             bucketStartDate: string;
             /** Format: int32 */
@@ -4071,6 +4149,71 @@ export interface components {
             timeZoneId: string;
             detections: components["schemas"]["SecurityIncidentBucketResponse"][];
             coverageStatement: string;
+        };
+        SecurityOverviewArchiveResponse: {
+            streams: components["schemas"]["SecurityOverviewArchiveStreamResponse"][];
+            archiveStatement: string;
+        };
+        SecurityOverviewArchiveStreamResponse: {
+            streamName: string;
+            /** Format: int32 */
+            pendingCount: number | string;
+            /** Format: int32 */
+            anchoredCount: number | string;
+            /** Format: int32 */
+            verificationFailedCount: number | string;
+            /** Format: date-time */
+            oldestPendingCreatedOn: null | string;
+            /** Format: int64 */
+            oldestPendingAgeSeconds: null | number | string;
+            /** Format: date-time */
+            lastAnchoredOn: null | string;
+        };
+        SecurityOverviewCommandResponse: {
+            commandKind: string;
+            commandState: string;
+            /** Format: int64 */
+            committedAuthorizationRevision: null | number | string;
+            /** Format: date-time */
+            createdOn: string;
+            /** Format: int64 */
+            ageSeconds: number | string;
+        };
+        SecurityOverviewCommandsResponse: {
+            stateCounts: components["schemas"]["SecurityOverviewStateCountResponse"][];
+            /** Format: date-time */
+            oldestUnresolvedCreatedOn: null | string;
+            /** Format: int64 */
+            oldestUnresolvedAgeSeconds: null | number | string;
+            commands: components["schemas"]["SecurityOverviewCommandResponse"][];
+            /** Format: int32 */
+            listLimit: number | string;
+            listStatement: string;
+        };
+        SecurityOverviewGateResponse: {
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            /** Format: int64 */
+            projectionAppliedRevision: number | string;
+            /** Format: int64 */
+            contentIntegrityRevision: number | string;
+            gateState: string;
+            integrityQuarantined: boolean;
+        };
+        SecurityOverviewSectionResponse: {
+            section: string;
+            authorizationBasis: string;
+            /** Format: date-time */
+            computedOn: string;
+            gate: null | components["schemas"]["SecurityOverviewGateResponse"];
+            commands: null | components["schemas"]["SecurityOverviewCommandsResponse"];
+            archive: null | components["schemas"]["SecurityOverviewArchiveResponse"];
+            coverage: null | components["schemas"]["SecurityCoverageResponse"];
+        };
+        SecurityOverviewStateCountResponse: {
+            commandState: string;
+            /** Format: int32 */
+            commandCount: number | string;
         };
         SessionResponse: {
             authenticated: boolean;
@@ -8427,6 +8570,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SecurityCommandTimelinePageResponse"];
+                };
+            };
+        };
+    };
+    ReadSecurityOverviewSection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityOverviewSectionResponse"];
                 };
             };
         };

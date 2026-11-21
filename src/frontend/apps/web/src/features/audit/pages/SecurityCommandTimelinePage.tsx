@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
 import { AuditViewTabs } from "../components/AuditViewTabs";
+import { SecurityHomeHint, isGateClosed } from "../components/SecurityHomeHint";
 import { FIRST_PAGE, currentCursor, formatInstant, nextPage, previousPage, shortId, type AuditPageTrail } from "../components/auditExplorerModel";
 import {
   EMPTY_TIMELINE_FILTERS,
@@ -54,6 +55,7 @@ export function SecurityCommandTimelinePage() {
         <StatusMessage tone="info" title="No permission">
           The security-command timeline is available to Security Auditors. Access is decided, and recorded, by the independent Authorization Authority.
         </StatusMessage>
+        <SecurityHomeHint />
       </>
     );
   }
@@ -109,6 +111,7 @@ export function SecurityCommandTimelinePage() {
           <div className="flex flex-col gap-3">
             {timeline.isPending && valid ? <LoadingBlock label="Loading security commands" /> : null}
             {timeline.isError ? <ErrorPanel error={timeline.error} onRetry={() => void timeline.refetch()} /> : null}
+            {timeline.isError && isGateClosed(timeline.error) ? <SecurityHomeHint /> : null}
             {data && data.items.length === 0 ? (
               <EmptyState title={pageNumber > 1 ? "No more items" : "No items match"}>{hasTimelineFilters(filters) ? "Try a wider period or fewer filters." : "No security commands are recorded for this organization yet."}</EmptyState>
             ) : null}
