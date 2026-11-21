@@ -11,7 +11,7 @@
     {
       "name": "authorization-security-onboarding",
       "title": "Authorization, Security, Onboarding and Recovery",
-      "classes": ["AuthorizationAndTamperTests", "SessionCsrfTests", "SessionRevocationTests", "SecurityIncidentTests", "SecurityAdministratorTests", "SecurityAuditorTests", "SecurityAuditAccessTests", "SecurityCommandTimelineTests", "AuthorizationRollbackTests", "ProjectionIntegrityRollbackTests", "SpiceDbBehaviourContractTests", "AuthorizationLatencyTests", "SecurityAdministratorProvisioningTests", "FieldProtectionDowngradeTests", "ConsoleOperatorRegistrationTests", "OrganizationOnboardingStackTests", "OwnerRecoveryStackTests", "PlatformConsoleStackTests", "PlatformOperatorApprovalTests", "AuthorityWorkWakeupStackTests", "SearchAccessVerificationStackTests", "SearchAccessShadowStackTests", "Ix7SearchRecoveryRehearsalStackTests"]
+      "classes": ["AuthorizationAndTamperTests", "SessionCsrfTests", "SessionRevocationTests", "SecurityIncidentTests", "SecurityAdministratorTests", "SecurityAuditorTests", "SecurityAuditAccessTests", "SecurityCommandTimelineTests", "SecurityHomeTests", "AuthorizationRollbackTests", "ProjectionIntegrityRollbackTests", "SpiceDbBehaviourContractTests", "AuthorizationLatencyTests", "SecurityAdministratorProvisioningTests", "FieldProtectionDowngradeTests", "ConsoleOperatorRegistrationTests", "OrganizationOnboardingStackTests", "OwnerRecoveryStackTests", "PlatformConsoleStackTests", "PlatformOperatorApprovalTests", "AuthorityWorkWakeupStackTests", "SearchAccessVerificationStackTests", "SearchAccessShadowStackTests", "Ix7SearchRecoveryRehearsalStackTests"]
     },
     {
       "name": "records-lifecycle",

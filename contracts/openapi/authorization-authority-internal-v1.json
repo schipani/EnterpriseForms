@@ -455,6 +455,137 @@
         }
       }
     },
+    "/internal/v1/organizations/security-overview": {
+      "post": {
+        "tags": [
+          "SecurityOverview"
+        ],
+        "summary": "AC-8.4: one section (gate, commands or archive) of the organization's security overview for the delegated user. Authorized by the Effective-edge rule (enabled binding, current organization role edge, Effective granting command) in one REPEATABLE READ READ ONLY snapshot, without SpiceDB, so it answers while the gate is closed: gate and commands need system_administrator; archive needs system_administrator or security_auditor. Counts, codes, kinds, revisions and times only; no payload, target or free text. Otherwise 404.",
+        "operationId": "ReadSecurityOverview",
+        "parameters": [
+          {
+            "name": "section",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityOverviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityOverviewResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/field-protection/coverage": {
+      "post": {
+        "tags": [
+          "SecurityOverview"
+        ],
+        "summary": "AC-8.5 (DR-C7-5): every current field protection decision of the organization with its latest Authority attestation, as counts and identifiers, for a delegated Security Administrator (Effective-edge rule, system_administrator only; otherwise 404). Computed from Authority protection resources and attestations in one read-only snapshot: no record ids, no record enumeration, no SpiceDB call, no verifier route. Missing when a decision has no attestation; StaleOrganizationWide when the organization's content-integrity revision advanced after the attestation (an organization-wide comparison, not a per-form verification).",
+        "operationId": "ReadProtectionCoverage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityCoverageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityCoverageResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/verifier/protection-coverage": {
       "post": {
         "tags": [
@@ -12054,6 +12185,605 @@
           }
         }
       },
+      "SecurityCoverageAttestation": {
+        "required": [
+          "attestation_id",
+          "attestation_complete",
+          "attestation_incomplete_reason_code",
+          "expected_record_count",
+          "accepted_record_count",
+          "compliant_record_count",
+          "pending_creation_record_count",
+          "quarantined_record_count",
+          "unverified_record_count",
+          "not_yet_censused_record_count",
+          "retired_record_count",
+          "retained_history_revision_count",
+          "audit_journal_revision",
+          "attested_content_integrity_revision",
+          "attested_on"
+        ],
+        "type": "object",
+        "properties": {
+          "attestation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attestation_complete": {
+            "type": "boolean"
+          },
+          "attestation_incomplete_reason_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expected_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "accepted_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "compliant_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pending_creation_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "quarantined_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "unverified_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "not_yet_censused_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "retired_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "retained_history_revision_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "audit_journal_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "attested_content_integrity_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "attested_on": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SecurityCoverageDecision": {
+        "required": [
+          "security_command_id",
+          "form_definition_id",
+          "field_definition_id",
+          "protection_direction",
+          "form_registered_active",
+          "attestation_state",
+          "attestation"
+        ],
+        "type": "object",
+        "properties": {
+          "security_command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "protection_direction": {
+            "type": "string"
+          },
+          "form_registered_active": {
+            "type": "boolean"
+          },
+          "attestation_state": {
+            "type": "string"
+          },
+          "attestation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityCoverageAttestation"
+              }
+            ]
+          }
+        }
+      },
+      "SecurityCoverageRequest": {
+        "required": [
+          "organization_id",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityCoverageResponse": {
+        "required": [
+          "organization_id",
+          "registered_form_count",
+          "decision_count",
+          "attested_complete_decision_count",
+          "missing_decision_count",
+          "stale_decision_count",
+          "organization_content_integrity_revision",
+          "decisions",
+          "computed_on",
+          "coverage_statement",
+          "staleness_statement",
+          "authorization_basis",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "registered_form_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "decision_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "attested_complete_decision_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "missing_decision_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "stale_decision_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "organization_content_integrity_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityCoverageDecision"
+            }
+          },
+          "computed_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coverage_statement": {
+            "type": "string"
+          },
+          "staleness_statement": {
+            "type": "string"
+          },
+          "authorization_basis": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityOverviewArchive": {
+        "required": [
+          "streams",
+          "archive_statement"
+        ],
+        "type": "object",
+        "properties": {
+          "streams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityOverviewArchiveStreamState"
+            }
+          },
+          "archive_statement": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityOverviewArchiveStreamState": {
+        "required": [
+          "stream_name",
+          "pending_count",
+          "anchored_count",
+          "verification_failed_count",
+          "oldest_pending_created_on",
+          "oldest_pending_age_seconds",
+          "last_anchored_on"
+        ],
+        "type": "object",
+        "properties": {
+          "stream_name": {
+            "type": "string"
+          },
+          "pending_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "anchored_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "verification_failed_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "oldest_pending_created_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "oldest_pending_age_seconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "last_anchored_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "SecurityOverviewCommand": {
+        "required": [
+          "command_kind",
+          "command_state",
+          "committed_authorization_revision",
+          "created_on",
+          "age_seconds"
+        ],
+        "type": "object",
+        "properties": {
+          "command_kind": {
+            "type": "string"
+          },
+          "command_state": {
+            "type": "string"
+          },
+          "committed_authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "created_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "age_seconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "SecurityOverviewCommands": {
+        "required": [
+          "state_counts",
+          "oldest_unresolved_created_on",
+          "oldest_unresolved_age_seconds",
+          "commands",
+          "list_limit",
+          "list_statement"
+        ],
+        "type": "object",
+        "properties": {
+          "state_counts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityOverviewStateCount"
+            }
+          },
+          "oldest_unresolved_created_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "oldest_unresolved_age_seconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "commands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityOverviewCommand"
+            }
+          },
+          "list_limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "list_statement": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityOverviewGate": {
+        "required": [
+          "authorization_revision",
+          "projection_applied_revision",
+          "content_integrity_revision",
+          "gate_state",
+          "integrity_quarantined"
+        ],
+        "type": "object",
+        "properties": {
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_applied_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "content_integrity_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "gate_state": {
+            "type": "string"
+          },
+          "integrity_quarantined": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SecurityOverviewRequest": {
+        "required": [
+          "organization_id",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityOverviewResponse": {
+        "required": [
+          "organization_id",
+          "section",
+          "authorization_basis",
+          "computed_on",
+          "gate",
+          "commands",
+          "archive",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "section": {
+            "type": "string"
+          },
+          "authorization_basis": {
+            "type": "string"
+          },
+          "computed_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "gate": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityOverviewGate"
+              }
+            ]
+          },
+          "commands": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityOverviewCommands"
+              }
+            ]
+          },
+          "archive": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityOverviewArchive"
+              }
+            ]
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityOverviewStateCount": {
+        "required": [
+          "command_state",
+          "command_count"
+        ],
+        "type": "object",
+        "properties": {
+          "command_state": {
+            "type": "string"
+          },
+          "command_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "SessionDigestRequest": {
         "required": [
           "organization_id",
@@ -12347,6 +13077,9 @@
     },
     {
       "name": "Audit"
+    },
+    {
+      "name": "SecurityOverview"
     },
     {
       "name": "Catalogue"

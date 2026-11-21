@@ -53,6 +53,8 @@ const organizationTeamsRoute = createRoute({ getParentRoute: () => appRoute, pat
 const organizationTeamRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/teams/$teamId", component: lazyRouteComponent(() => import("../features/teams"), "TeamDetailPage") });
 const searchApprovalsRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/search-approvals", component: lazyRouteComponent(() => import("../features/search"), "SearchApprovalsPage") });
 // PG-056 security incidents (security-operations): Security Administrators only; every request is authorized again by the server.
+// PG-052 Security Home (C8 M4-4): widgets authorize themselves; the route grants nothing.
+const securityHomeRoute = createRoute({ getParentRoute: () => appRoute, path: "/security", component: lazyRouteComponent(() => import("../features/security-operations"), "SecurityHomePage") });
 const securityIncidentsRoute = createRoute({ getParentRoute: () => appRoute, path: "/security/incidents", component: lazyRouteComponent(() => import("../features/security-operations"), "SecurityIncidentsPage") });
 const securityIncidentRoute = createRoute({ getParentRoute: () => appRoute, path: "/security/incidents/$securityIncidentId", component: lazyRouteComponent(() => import("../features/security-operations"), "SecurityIncidentPage") });
 // PG-054/PG-055 audit explorer and event detail (audit, C8 M4-2): Security Auditors only; every page is authorized and recorded by the Authority.
@@ -91,7 +93,7 @@ const noPermissionRoute = createRoute({ getParentRoute: () => appRoute, path: "/
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationRegionalRoute, organizationLanguageRoute, organizationTextSizeRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityIncidentsRoute, securityIncidentRoute, auditExplorerRoute, securityCommandTimelineRoute, auditEventRoute, userProfileRoute, userRegionalRoute, userLanguageRoute, userTextSizeRoute, ...legacyRoutes, ...developmentRoutes, noPermissionRoute]),
+  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationRegionalRoute, organizationLanguageRoute, organizationTextSizeRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityHomeRoute, securityIncidentsRoute, securityIncidentRoute, auditExplorerRoute, securityCommandTimelineRoute, auditEventRoute, userProfileRoute, userRegionalRoute, userLanguageRoute, userTextSizeRoute, ...legacyRoutes, ...developmentRoutes, noPermissionRoute]),
 ]);
 
 export function createAppRouter(history?: RouterHistory) {

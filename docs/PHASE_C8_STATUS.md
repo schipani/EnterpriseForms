@@ -1171,3 +1171,180 @@ M4-3 accepted for Development/Testing: corrections F-M43-V1 and F-M43-V2; the re
 - **Finding:** hosted CodeQL on PR #61 reported `cs/user-controlled-bypass` (high) at the new guard in `AuditAccessService.AuthorizeAsync`: a condition on the caller-supplied `AuditAccessKind` preceded the authorization call. Data-flow review: the business runtime supplies the kind on the AC-8.3 route; the guard only refused the timeline kind and every path still ran view_audit, the lock, the revision comparison and committed evidence, so no authorization was skipped. The root cause was structural: the timeline mode was a member of the caller-visible wire enum.
 - **Correction:** the access mode is now an internal, server-determined `AuditAccessMode`. The AC-8.3 route maps its wire kind onto ExplorerPage or EventDetail only (any other value, including the former timeline value, is refused with 422 before the permission check, the transaction and any entry). The timeline endpoint uses a request type without an access kind (`AuditTimelineAccess`) and always records CommandTimelinePage with `served_by: authority`; the mode and the page reader are asserted to go together. `CommandTimelinePage` is removed from the wire `AuditAccessKind`, restoring the M4-2 internal contract exactly (the `/organizations/audit/access` path and `AuditAccessKind` schema equal `main`). The recorded `access_kind` values, the view_audit check, NOWAIT lock, revision and quarantine checks, bounded retries, rate limits, TC-3 bounds and commit-before-disclosure are unchanged. Business OpenAPI unchanged.
 - **Targeted tests:** new `TheExplorerRouteCannotSelectTheTimelineOrAnyOtherMode` (values 2, 3, -1, int.MaxValue: 422, no check, no transaction, no entry), `TheWireKindHasOnlyTheExplorerKindsAndRefusesTheTimelineName` (enum members; Authority JSON options refuse "CommandTimelinePage"), `TheTimelineModeIsSetByTheServerAndACallerSuppliedKindIsNotBound` (a caller-supplied `access_kind` on the timeline request is not bound; entries record CommandTimelinePage/authority); explorer entries carry no `served_by`. Executed: Authority `AuditAccessServiceTests` + `SecurityCommandTimelineTests` 40/40; architecture `EnvelopeCapabilityEnforcementBoundaryTests` + `CapabilityRefusalEvidenceRecorderBoundaryTests` 36/36. Stage B not re-run (the recorded entry shape it asserts is unchanged).
+
+## 43. C-169–C-173: M4-4 — AC-8.4 security overview, AC-8.5 coverage, PG-052 Security Home (2026-11-20). Accepted by the owner for Development/Testing (C-173); not independently reviewed; production requirements outstanding
+
+Owner decision C-169: M4-4 authorized on `main` `ce4789c` (PR #61 merged; M4-3 accepted under C-167) with OD-1…OD-7 (contract amendment C-169 in §5.4/§5.5/§6.1). Branch `phase-c8/m4-4-security-home`; uncommitted at the time of this entry. No migration.
+
+### 43.1 Delivered
+
+- **Effective-edge rule** (`Application/Features/SecurityOverview/EffectiveEdgeRule.cs`, internal): in the caller's single `REPEATABLE READ READ ONLY` snapshot, an enabled identity binding, an organization role edge with no removing command, and a creating command of the same organization in state `Effective`. No SpiceDB call. Callers restricted to the overview and coverage services by a source-scan guard test.
+- **AC-8.4** `POST /internal/v1/organizations/security-overview?section=gate|commands|archive` (`SecurityOverviewService`): gate and commands for `system_administrator`, archive for `system_administrator` or `security_auditor` (D8-70); otherwise the same 404 for every unauthorized, unbound, disabled or other-organization caller. Gate: authorization, projection-applied and content-integrity revisions, gate state (`OrganizationGate`), quarantine flag. Commands (OD-4): counts for Pending, CommittedAwaitingProjection and FailedReconciliation (zero included), oldest unresolved age, and up to 20 unresolved commands oldest first with kind, state, revision, created time and age — no id, payload, reason or target. Archive: per journal stream (authorization, content, audit) pending, anchored and verification-failed counts, oldest pending age, last anchored time, and the RR-6 statement. Aggregates run in SQL through a new scope port (`ISecurityOverviewScope`; fail closed if the store does not implement it).
+- **AC-8.5** `POST /internal/v1/field-protection/coverage` (`SecurityCoverageService`): `system_administrator` only under the rule, otherwise 404. The verifier projection was refactored into `ProtectionReconciliationService.ComputeCoverageAsync(scope, …)`, which the verifier route still calls in its own scope (behaviour unchanged) and the user plane calls inside the rule's snapshot. Rows are copied field by field into an allowlist (OD-3; the §13 counts, completeness and reason code, attestation id, audit-journal revision and time). States: `Missing`, `StaleOrganizationWide` (OD-1: the organization's content-integrity revision advanced after the attestation) and `NoLaterOrganizationContentChange`. No record enumeration, SpiceDB call or verifier route; no attestation digest, catalogue snapshot id or organization-complete conclusion.
+- **Business:** `GET /api/v1/security/overview/{section}` (feature `Audit`; `gate`, `commands`, `archive`, `coverage`; unknown section 404) through `ISecurityOverviewAuthority`. Session organization only; the answer must name that organization and section, else 503. Authority 404/403 → 403 `SECURITY_ADMINISTRATION_FORBIDDEN`; 422; 429; everything else 503 `AUTHORITY_UNAVAILABLE` (Authority detail not reflected). Coverage adds business-directory form names (labelled). No business write. No-store (global).
+- **Frontend:** `SecurityHomePage` at `/app/security` (`security-operations`): six cards, each with its own query and Refresh button (PB-07). Gate, commands, archive and coverage always ask (they work while the gate is closed) and show "Not available to your role" on 403. Search approvals and incidents (OD-6) use their existing endpoints only when `security.administer` is held; otherwise they show an unavailable state naming the live permission check, and nothing is requested. Primary navigation "Security home" for `security.administer` or `audit.view` (OD-5; exact-match active state). The audit explorer and the security-command timeline link to the Security home when refused with `AUTHORITY_GATE_CLOSED` or when the permission cannot be confirmed (a link only). Every card's wording states operational state, not verified evidence or a compliance result; coverage staleness is labelled organization-wide.
+- **Contracts:** Authority internal OpenAPI +2 paths, +12 schemas, +1 tag; business OpenAPI +1 path, +10 schemas; generated TypeScript +165 lines; no existing path or schema changed (verified by semantic JSON comparison). Endpoint key `security.overview`.
+
+### 43.2 Targeted verification (executed 2026-11-20, local, no Docker)
+
+| Suite | Result |
+|---|---|
+| Authority `SecurityOverviewTests` (rule: Effective grant; Pending, CommittedAwaitingProjection, FailedReconciliation and Rejected grants of either role; committed revoke before projection; disabled and re-enabled binding; unbound; member without role. T09: other-organization binding, edge and command. Exact role matrix incl. owner, designer, dual holder; unknown section refused before any read; one read-only snapshot and no write scope per read; T12 gate closed and quarantined; commands states, order, limit, zero; archive per stream; sentinel and id scan; shape allowlists; coverage Missing/Stale/NoLater, no record or snapshot ids or digest, gate-closed availability and agreement with the verifier route; caller guard) | 28/28 |
+| With `ProtectionReconciliationTests`, `SecurityCommandTimelineTests`, `AuditAccessServiceTests`, `SecurityCommandOutcome*` (store, coverage refactor) | 108/108 |
+| Business `SecurityOverviewHandlerTests` (each section for the session organization, field-by-field copy, directory names and field ids only, wire-shape scan, every refusal fail-closed without detail, wrong organization, section or missing content refused, unknown section without a request) with `OpenApiSnapshotTests`, `SecurityCommandTimelineHandlerTests` | 31/31 |
+| `EndpointOwnershipTests`, `CapabilityRefusalEvidenceHostTests` | 8/8 |
+| Full business contract-test project | 1003 passed, 12 skipped (pre-existing), 0 failed |
+| Architecture tests | 227/227 |
+| Frontend typecheck (all workspaces), ESLint (whole frontend) | clean |
+| Vitest: security-operations (model and page: per-role widgets, gate-closed availability, independent failure and refresh), audit, app shell (navigation test updated for the new item) | 34/34 |
+| Vitest: work-queue, api-client | 11/11 |
+| Stage B project build (compile only); test discovery (`--list-tests`, nothing run): 4 `SecurityHomeTests`; `stage_b_groups.py plan`: PASS, 422 tests in 7 groups; `test_stage_b_groups` | succeeded; 19/19 |
+
+### 43.3 Acceptance criteria
+
+| ID | State |
+|---|---|
+| AC-M4-4.1 | Met in unit tests (rule restricted to two callers by guard test, one read-only snapshot per read, enabled-binding check). Not yet verified on PostgreSQL (Stage B not run). |
+| AC-M4-4.2 | Met in unit and contract tests (shape allowlists, sentinel scans). Not yet verified on the real stack. |
+| T12 | Met at unit level; Stage B `SecurityHomeTests` authored, not executed. |
+| T09 (overview, coverage) | Met at unit level; Stage B authored (direct Authority call with another organization's id), not executed. |
+
+### 43.4 Outstanding
+
+- **Stage B:** `SecurityHomeTests` (4 tests, group `authorization-security-onboarding`) authored, compiled and registered; **not executed**. Execution needs a separate owner authorization.
+- Not run: the full Authority unit suite, Playwright, axe, and the 320/768/1440 px and 200%/400% zoom checks (M4-5), hosted CI, CodeQL.
+- Not measured: the SQL aggregates (commands per state, journal per stream and state) at volume. They use the existing organization-prefixed indexes and scan the organization's rows. No index was added (no migration, per C-169); a measurement on a large organization is recommended before staging.
+- The gate section evaluates `OrganizationGate`, which may reach the archive receipt verifier for the stream head. Assessed in §43.6 (C-170): an unreachable verifier yields `AwaitingArchive` (closed), or 503 only if verification outlasts the business client timeout; both fail closed.
+- Unchanged: independent review (AC-8.1…AC-8.5 and the AC-8.5 endpoint verification, D8-66), RR-1…RR-15, G08/G24, PB-08, SD-5, Azure staging evidence, and the deferred record-time index and its 1M-row measurement (C-162).
+
+### 43.5 Deviations (for owner approval)
+
+- **D-M44-1 (OD-6):** the business route serves `gate`, `commands`, `archive` and `coverage`; `search-approvals` and `incidents` are not sections of `/api/v1/security/overview/{section}` (contract §6.1 listed them). Those widgets call the existing endpoints with their existing authorization.
+- **D-M44-2:** every unauthorized §5.4 caller gets 404 at the Authority, as §5.5 specifies for coverage. The business maps it to 403 `SECURITY_ADMINISTRATION_FORBIDDEN`, since the caller's own organization exists.
+- **D-M44-3:** coverage omits the verifier response's organization-complete flag, attestation digest, catalogue snapshot id and the counts outside §13 (not applicable, old-form, target-occurrence, envelope-issue, archived, active search approvals). `AttestedCompleteDecisionCount` counts complete attestations as recorded, including stale ones; staleness is counted separately.
+- **D-M44-4:** the commands list is ordered oldest first (the contract does not specify an order) and carries no command id.
+- **D-M44-5:** the gate section carries the quarantine flag only, not the quarantine reason code.
+- **D-M44-6:** coverage form names come from the business directory (OD-3, labelled as such), not the Authority's registered form title mentioned in §13.
+- **D-M44-7:** the existing app-shell navigation test was updated to expect the new "Security home" item. The item uses exact-match active state, so it is not also marked active on the incidents and audit pages.
+- **D-M44-8:** in Stage B T12, the "pending grant of either role" is a command row and edge placed by the AuthorityDb administrator (state CommittedAwaitingProjection), as the M4-3 class places command rows: once the gate is closed, the business API's own permission pre-check refuses a second real command. The committed revoke under a closed gate uses a real auditor removal with the archive paused.
+
+### 43.6 C-170: focused verification and limited Stage B run (2026-11-20). Owner-authorized: `SecurityHomeTests` only, fresh disposable stack. Stopped on Stage B failures (test defects); not owner-accepted
+
+Owner decision C-170: implementation provisionally accepted for Development/Testing; D-M44-1, -2, -4, -5, -6 and -7 approved; D-M44-3 and D-M44-8 conditionally approved, subject to this verification.
+
+**Corrections made before the run (directly affected local tests only):**
+- **D-M44-8 superseded:** the administrator-inserted pending grant was removed (it was not a genuine grant, and inserting authorization edges could trip the Authority's own integrity checks). T12 now uses only real API commands, one per archive-paused phase: (A) pending Security Administrator grant, (B) pending Security Auditor grant, (C) committed auditor removal. No Stage B test inserts authorization rows.
+- **D-M44-3 wording:** a recorded attestation could read as current, because a green "Attestation complete" badge sat beside "Possibly stale". The badge is now "Complete when attested" (neutral) or "Incomplete when attested" (warning). The KPI is "Complete when attested", with "N of these possibly stale; not re-verified". The Authority coverage statement now says that a possibly stale attestation is still counted as complete and is not a current verification. Tests added in Authority, Vitest and the page test.
+- **Item 7:** business test `FormNamesComeOnlyFromTheSessionOrganizationsDirectory` (only the session organization's directory is read; another organization's form gets no name).
+- **Added to `SecurityHomeTests`:** a dual holder in the matrix test, and `CoverageStatesFollowARealAttestationAndTheOrganizationWideContentRevision` (a genuine verifier attestation through protection strengthening, then a record created in another form).
+- Local results: Authority `SecurityOverviewTests` 28/28; business `SecurityOverviewHandlerTests` with `OpenApiSnapshotTests` 21/21; Vitest security-operations 14/14; ESLint and typecheck clean; Stage B project build succeeded.
+
+**Stage B run `20261120-195129-d7e086ef`: 3 passed, 2 failed (5 tests, 78 s).** Evidence in `artifacts/test-runs/20261120-195129-d7e086ef/`. Stack left running for inspection.
+
+| Test | Result |
+|---|---|
+| `EachSectionIsAuthorizedSeparatelyAndCarriesCountsAndKindsOnly` | Passed |
+| `CoverageHasOneRowPerAuthorityDecisionMissingWithoutAttestationAndNoRecordIds` | Passed |
+| `CoverageStatesFollowARealAttestationAndTheOrganizationWideContentRevision` | Passed |
+| `T09AnotherOrganizationsIdIsTheSameNotFoundAtTheAuthority` | **Failed: test defect F-M44-V1** |
+| `T12WhileTheGateIsClosed…` | **Failed in phase B: test-design defect F-M44-V2**; phase A passed |
+
+- **F-M44-V1 (test defect):** the test compared whole 404 bodies, including `correlation_id`, which is unique per request. Status and `error_code` were equal (NOT_FOUND). Both paths throw the same exception without detail (`SecurityOverviewService`/`SecurityCoverageService`: unknown organization, or no Effective edge). Correction (not applied): compare status, `error_code`, `retryable` and `detail`, and ignore `correlation_id`.
+- **F-M44-V2 (test-design defect; product failed closed):** the second archive-paused command (phase B auditor appointment) got 503 `AUTHORITY_NOT_READY`. AuthorityDb shows no command row for it (the organization holds only the bootstrap command and two Effective grants), so nothing was committed. Cause: stream-head receipts are re-established against the archive at most `JournalReceipts:CurrentStateMaxAge` (default 1 s, WP-7A) before each gate evaluation. Once the archive store is paused and the bound has elapsed, every gate evaluation, including the API's own pre-check, closes the gate. Phase A's command arrived inside the window; phase B's did not. The same window affects the existing SEC-P12 pattern, which relies on the first command landing within ~1 s of pausing. Not applied; needs owner direction.
+- **T12 phase A (real stack, passed):** with the archive paused, the gate was not Ready. DesignerOnly's pending Security Administrator grant had an edge whose creating command was not Effective, and DesignerOnly got 403 `SECURITY_ADMINISTRATION_FORBIDDEN` on all four sections. The Effective Security Administrator read all four while the gate was closed. After unpausing, the same grant was Effective and authorized all four. Phases B (pending auditor grant) and C (committed revoke, explorer `AUTHORITY_GATE_CLOSED`) did not run; they remain unit-tested only.
+- **Matrix (real stack, passed):**
+  - The Security Administrator reads all four sections; the Security Auditor reads archive only, with 403 on the rest.
+  - Member, organization owner + designer and designer-only get 403 on all four.
+  - A dual holder reads all four.
+  - `incidents` is 404.
+  - No sentinel, record id or field key appears in any response; command list items have exactly the five approved keys.
+- **Coverage (real stack, passed):**
+  - Missing: one row per active Authority protection decision (checked against AuthorityDb); all Missing without attestations.
+  - A real attestation then reads `NoLaterOrganizationContentChange`, with the session organization's directory form name.
+  - After a record is created in another form, the same attestation id reads `StaleOrganizationWide`, with the organization revision above the attested one.
+- **Item 9 (gate card, assessment):** the receipt verifier maps archive or store outages to `Unavailable` (bounded 5 s reads) and never throws, so the gate evaluates to `AwaitingArchive` (closed); phase B observed this with the archive paused and nothing pending. A 503 is possible only if establishment outlasts the business client's 10 s timeout. Both fail closed and grant nothing. This is an acceptable availability condition, not a contract defect. The card text ("a committed authorization change has no verified archive receipt yet") does not describe the outage case precisely; a wording change is recommended, not applied.
+
+### 43.7 C-171: test corrections; stopped before Stage B on a T12 testability limitation (2026-11-20). Owner-authorized corrections; no Stage B run; not owner-accepted
+
+Owner decision C-171: F-M44-V1 and F-M44-V2 corrections and the gate-card wording authorized; one further `SecurityHomeTests` run authorized after them, with a stop condition if deterministic T12 conditions cannot be established. Prescribed T12 phases: establish grant and revoke state through genuine API commands while the gate is operational; confirm it; close the gate with existing controls; verify; restore the gate before the next command. No blind retries, no inserted authorization rows, no change to the 1 s receipt-freshness policy or to production authorization.
+
+**Corrections made:**
+- **F-M44-V1:** T09 compares status, `error_code`, `retryable`, `detail` and the set of body properties, and excludes `correlation_id`. Production responses unchanged.
+- **F-M44-V2:** T12 restructured into the prescribed deterministic phases. Grants and the removal are made through the API while the gate is operational, and AuthorityDb confirms they are Effective. The gate is then closed by pausing the archive and waiting for the Authority to report it closed; no command is issued while it is closed. Under the closed gate, each Effective holder gets exactly their sections, the removed auditor and the owner get none, and the explorer must answer `AUTHORITY_GATE_CLOSED`. The gate is then restored. The timing-dependent pending-grant phases are removed.
+- **Gate-card wording:** "Closed — awaiting archive" now explains that the newest authorization change has no currently verified archive receipt, either because it is still awaiting delivery or because archive receipt verification is temporarily unavailable, and that protected access is refused until it is verified. Behaviour unchanged.
+- Local: Vitest security-operations 14/14; ESLint and typecheck clean; Stage B project build; discovery lists the 5 `SecurityHomeTests`; `stage_b_groups.py plan` PASS (423 tests in 7 groups).
+
+**Stopped before the authorized Stage B run (limitation T12-L1).** Under the prescribed phases, a pending (committed but not Effective) grant or revoke cannot be established deterministically with genuine commands. While the gate is operational, a command becomes Effective; once the gate is closed, the business API's pre-check refuses new commands. The only supported way to hold a command non-Effective is the archive pause, which closes the gate for the pre-check within the 1 s freshness bound (the F-M44-V2 race). The Authority's fault controls are crash points and a content-commit pause, none of which holds a security command. Therefore three items cannot be verified on the real stack under the current controls: a pending Security Administrator grant, a pending Security Auditor grant, and a committed revoke denying before it is Effective. All three remain unit-tested (`SecurityOverviewTests`).
+
+**Smallest proposed harness improvements (owner decision; none implemented):**
+- **P1 (test-only, smallest):** close the gate first (archive paused; wait until the Authority reports it closed), then submit the grant or revoke command directly to the Authority's production command endpoint (`/internal/v1/security-commands`), with the business workload credential and the Security Administrator's own delegated assertion. The payload, synthetic development step-up marker and idempotency key are the ones the business API sends. The command commits but cannot become Effective while the archive is paused. The existing Stage A harness already does this (`Scenario.SubmitAuthorityCommandAsync`, "for faults that block the API's own pre-checks"). The Authority still authorizes the actor itself. This departs from the prescribed step 1 (a command submitted while the gate is closed, bypassing the business pre-check).
+- **P2 (faithful to the prescribed phases, one Authority change):** a Testing-only fault point `PauseBeforeArchiveDelivery`, like the existing `PauseBeforeContentCommit` (refused unless `FaultInjection:Enabled`; bounded hold; released by the operator fault endpoint). The genuine business API command then runs while the gate is operational, commits, and stays non-Effective while delivery is held; existing receipts keep verifying. The `CurrentStateMaxAge` policy and production behaviour are unchanged, but it is new Authority code.
+
+Deviation update: D-M44-8 superseded (no inserted authorization rows anywhere in `SecurityHomeTests`). New limitation T12-L1 above.
+
+### 43.8 C-171 P1: direct-Authority T12 and the authorized Stage B run (2026-11-20). Stopped on a test-harness defect; not owner-accepted
+
+Owner approved P1 (test-only direct submission to the Authority's production command endpoint on the disposable stack) and rejected P2. T12 was rewritten to the owner's 11-step sequence. Effective holders are established through the API while the gate is open; the archive is paused and the test waits until the Authority reports the gate closed. Genuine `GrantSystemRole` (DesignerOnly → Security Administrator; Designer → Security Auditor) and `RevokeSystemRole` (Reader's auditor role) commands are then submitted with the business workload credential, the Administrator's own assertion and the business API's payloads and change reasons. The test then checks command rows and edges in AuthorityDb (read-only), sections, the explorer, and finalization after restore. `SecurityHomeTests` contains no database writes.
+
+**Stage B run `20261120-205839-0f934820`** (`SecurityHomeTests` only, fresh stack, 51 s): **4 passed, 1 failed.**
+
+| Test | Result |
+|---|---|
+| `EachSectionIsAuthorizedSeparatelyAndCarriesCountsAndKindsOnly` | Passed |
+| `T09AnotherOrganizationsIdIsTheSameNotFoundAtTheAuthority` (corrected comparison) | Passed |
+| `CoverageHasOneRowPerAuthorityDecisionMissingWithoutAttestationAndNoRecordIds` | Passed |
+| `CoverageStatesFollowARealAttestationAndTheOrganizationWideContentRevision` | Passed |
+| `T12PendingGrantsConferNothingACommittedRevokeDeniesAtOnceAndEffectiveHoldersKeepTheirSections` | **Failed: test defect F-M44-V3** |
+
+- **F-M44-V3 (test defect):** the helper read the command id as `security_command_id`; the Authority's submission response names it `command_id`. The test stopped immediately after the first submission.
+- **Observed before the failure:**
+  - The gate closed after the archive was paused (`AwaitingArchive`).
+  - The Authority **accepted** the direct `GrantSystemRole` while the gate was closed: 202, `command_status` CommittedAwaitingProjection, authorization revision 4, projection revision 3.
+  - AuthorityDb: that command's edge (`system_administrator` for DesignerOnly) was created by it.
+  - The test's `finally` then restored the archive, and the command became Effective 0.54 s later (created 01:59:30.122, effective 01:59:30.662).
+- **Not reached:** steps 4–11. That covers the pending-grant checks (both roles), the committed revoke, Effective holders under the closed gate, the explorer, and finalization of all three commands.
+- **Correction (not applied, needs authorization):** read `command_id` from the response. Nothing else changes.
+
+### 43.9 C-172: F-M44-V3 correction and Stage B run `20261120-210905-b5e56ad3` (2026-11-20). `SecurityHomeTests` 5/5; not owner-accepted
+
+- **Correction (F-M44-V3, test only):** `SubmitToAuthorityAsync` reads `command_id`. The field was checked against the Authority contract: the 202 response of `POST /internal/v1/security-commands` is `OperationStatus` (`command_id`, `command_status`, `authorization_revision`, `projection_revision`, `projection_gate_state`, `rejection_reason_code`, `correlation_id`). No production schema or behaviour changed. Local: Stage B project build, discovery (5 tests), `stage_b_groups.py plan` PASS (423 tests in 7 groups).
+- **Run `20261120-210905-b5e56ad3`** (`SecurityHomeTests` only, fresh disposable stack, 61 s): **5 passed, 0 failed.** Evidence in `artifacts/test-runs/20261120-210905-b5e56ad3/`.
+
+| Test | Result | Duration |
+|---|---|---|
+| `EachSectionIsAuthorizedSeparatelyAndCarriesCountsAndKindsOnly` | Passed | 5.6 s |
+| `T09AnotherOrganizationsIdIsTheSameNotFoundAtTheAuthority` | Passed | 1.2 s |
+| `CoverageHasOneRowPerAuthorityDecisionMissingWithoutAttestationAndNoRecordIds` | Passed | 8.5 s |
+| `CoverageStatesFollowARealAttestationAndTheOrganizationWideContentRevision` | Passed | 9.9 s |
+| `T12PendingGrantsConferNothingACommittedRevokeDeniesAtOnceAndEffectiveHoldersKeepTheirSections` | Passed | 25.5 s |
+
+**T12 evidence (test output and AuthorityDb, read-only):**
+
+| Step | Observation |
+|---|---|
+| Effective holders (API, gate open) | Administrator (bootstrap, revision 1), Reader and Clerk auditors (revisions 2, 3): commands Effective; edges active |
+| Gate closed | Authority reported `AwaitingArchive` after the archive was paused |
+| Pending administrator grant (DesignerOnly) | Direct submission 202; `CommittedAwaitingProjection`, revision 4, projection 3; edge created by that command; DesignerOnly: 403 on all four sections |
+| Pending auditor grant (Designer, organization owner) | 202; `CommittedAwaitingProjection`, revision 5; edge created by that command; Designer: 403 on all four sections |
+| Committed revoke (Reader's auditor role) | 202; `CommittedAwaitingProjection`, revision 6; Reader's edge removed by that command; Reader: 403 on all four sections, while the revoke was not Effective |
+| Effective holders under the closed gate | Administrator read all four sections; Clerk read archive only; the gate section showed a closed state; the commands section listed two GrantSystemRole and one RevokeSystemRole as unresolved |
+| Audit explorer | Clerk: 503 `AUTHORITY_GATE_CLOSED` |
+| After restore | Gate Ready; the three commands became Effective (02:10:05.276, .358, .450; committed 02:09:53.666, 58.688, 02:10:03.706). DesignerOnly reads all four sections, Designer archive only, Reader none, Clerk archive, Administrator all four. Organization authorization revision 6 = projection-applied 6; no quarantine |
+
+- **Other items, on the real stack:** per-section matrix including the owner and a dual holder; counts-only responses (no sentinel, record id or field key; exact command-item keys); T09 equivalence (status, error code, retryable, detail, property set; correlation id excluded); coverage Missing, NoLaterOrganizationContentChange and StaleOrganizationWide with a genuine attestation; directory form names from the session organization (plus the unit test for foreign forms).
+- **Remaining limitations:**
+  - The T12 pending states rely on the C-171 P1 test-only direct submission. The commands are genuine, and the Authority authenticated, bound, authorized and journaled them, but they bypass the business API's own pre-check, which refuses every command while the gate is closed.
+  - The SQL aggregates are not measured at volume.
+  - Not run: Playwright, accessibility, zoom (M4-5), hosted CI and CodeQL, the full Authority unit suite.
+  - Independent review and production requirements are unchanged.
+
+### 43.10 C-173: owner acceptance for Development/Testing (2026-11-20). Owner-led; not an independent review; no production claim
+
+M4-4 (AC-8.4, AC-8.5, PG-052) accepted for Development/Testing on the reported implementation results and the final Stage B run `20261120-210905-b5e56ad3` (`SecurityHomeTests` 5 passed, 0 failed; §43.9). T09 and T12 accepted for Development/Testing. Deviations D-M44-1…D-M44-8 approved (D-M44-3 and D-M44-8 under the C-170 conditions; D-M44-8 superseded, no inserted authorization rows). Stage B was not rerun for publishing. Authorized: one signed commit, push, PR into `main`, squash merge once required checks (including C# CodeQL) pass.
+
+Outstanding, unchanged by acceptance:
+- independent security review of AC-8.1…AC-8.5 and verification of the AC-8.5 endpoint (D8-66);
+- measurement of the overview SQL aggregates at volume;
+- accessibility, zoom and Playwright checks (M4-5);
+- hosted CI evidence beyond this PR;
+- Azure staging and every production requirement.

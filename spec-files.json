@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "8d60ccc597eb9a05ba8f7f62b8b85c81fbe445d143f40340e5022563de833dac",
-      "bytes": 153737
+      "sha256": "38961bd0734fac3f4a668d3c7cc70235075265fdbafca4f73862f956cef62ff5",
+      "bytes": 182104
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -139,8 +139,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "e8b0fa5800c38fd09d03d10d433378eee593c5b56e3f9c1113b460dbb4e4ff9b",
-      "bytes": 18890
+      "sha256": "c5cb24379c20d3892c74fe671bb3a3df31ca1ebac5e46955e97be563cd528ea8",
+      "bytes": 19074
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_C149_EVIDENCE.md",
@@ -354,8 +354,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_M4_AC8_SECURITY_CONTRACT.md",
-      "sha256": "ebfb662c67f7d9bc1a410bcf8fbeebdd660a2cba0864890499b62762bc736143",
-      "bytes": 57514
+      "sha256": "d4dd70ac8f2bbc798f98be03ff35401d3e2d49a9622ffb3f47bbd366da30b75c",
+      "bytes": 60166
     },
     {
       "path": "docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md",
@@ -464,8 +464,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "2c1a5bf969c3fe91d7e6237d2f6e54b787052190a4235c8348ca74dc42109d81",
-      "bytes": 305001
+      "sha256": "41b99f4861d1cebd19eca89d9b3ba10296041815e90ad636c6e166ced0185002",
+      "bytes": 310513
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -964,8 +964,8 @@
     },
     {
       "path": "docs/ui/SCREEN_IMPLEMENTATION_MATRIX.md",
-      "sha256": "b9df949a16445a9a7a4ef87727a69b84f5360f27789e7de86243093f36610469",
-      "bytes": 7825
+      "sha256": "70db9564d8459cceef30841549670a7e34df1975b6c7dd44a7832a7b0bd3d9bf",
+      "bytes": 7904
     },
     {
       "path": "docs/ui/UI_CONSISTENCY_STANDARD.md",

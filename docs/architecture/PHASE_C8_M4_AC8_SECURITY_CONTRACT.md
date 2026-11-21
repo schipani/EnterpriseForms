@@ -12,6 +12,9 @@
   owner for Development/Testing (C-167; `docs/PHASE_C8_STATUS.md` §42); `SecurityCommandTimelineTests` (Stage B) executed in a
   limited owner-authorized run under C-166 (4/4 on the final run, after corrections F-M43-V1 and F-M43-V2; §42.6); not
   independently reviewed. T10/T20 unit-only. AC-8.4, AC-8.5 and PG-052 remain unbuilt.
+- **M4-4 (C-169, 2026-11-20):** AC-8.4, AC-8.5 and PG-052 implemented for Development/Testing with owner decisions OD-1…OD-7
+  (amendment C-169 in §5.4, §5.5 and §6.1, below); accepted by the owner for Development/Testing (C-173) after Stage B
+  `SecurityHomeTests` 5/5 (run `20261120-210905-b5e56ad3`, C-172); **not independently reviewed** (`docs/PHASE_C8_STATUS.md` §43). No migration.
 - **Baseline:** `main` = `c245200` (PR #50, merged 2026-11-04 09:50 UTC; it includes C8 M1–M3 and AC-7). Branch
   `phase-c8/m4-governance-audit` was created from that commit and is local only (not pushed, no PR).
 - **Audience:** the project owner (final acceptance) and the independent Authority reviewer (AC-8 joins the
@@ -288,6 +291,14 @@ Search approvals reuse the existing `POST /internal/v1/field-search/administrati
 - **UI:** the C-75 wording "current versions only … DR-C7-4".
 - **Review:** the endpoint and authorization contract are submitted for verification (D8-66).
 
+**Amendment C-169 (owner decisions for M4-4; implementation notes, not independent approval).**
+- **OD-1:** an attestation is `StaleOrganizationWide` when the organization's content-integrity revision exceeds the one it recorded. The comparison is organization-wide and conservative (it may mark an attestation stale when its own form did not change); it is never presented as a per-form verification result. `NoLaterOrganizationContentChange` is not a new verification.
+- **OD-2:** migration status and "Request verification" (§13 of `FIELD_PROTECTION_RECONCILIATION.md`) are deferred; M4-4 is read-only.
+- **OD-3:** coverage identifies forms by business directory name (labelled as such) and fields by id only; no field keys or labels.
+- **OD-4:** the `commands` section counts and lists Pending, CommittedAwaitingProjection and FailedReconciliation only, oldest first; Rejected and Effective commands stay in the AC-8.2 timeline.
+- **Unauthorized callers** of every §5.4 section get the same 404 as §5.5 (unbound, disabled, no Effective edge, another or unknown organization).
+- **Coverage shape:** the §13 counts only (expected, accepted, compliant, pending, quarantined, unverified, not yet censused, retired, retained history), the completeness flag and reason code, attestation id, audit-journal revision and time; no attestation digest, catalogue snapshot id or organization-complete conclusion.
+
 ### 5.6 Authority migration and recovery
 
 - **AuthorityDb:** no new table. Membership requests stay limited to `designer` (`ck_membership_request_role` unchanged).
@@ -305,6 +316,7 @@ Search approvals reuse the existing `POST /internal/v1/field-search/administrati
 | `GET /api/v1/security/audit/security-commands` | `view_audit` (AC-8.2) | Cursor, `kind`, `state`, `from`, `to` |
 | `GET /api/v1/security/overview/{section}` | §5.4 / §5.5 | `section` is one of `gate`, `commands`, `archive`, `search-approvals`, `incidents` (existing summary) or `coverage`. Each is independently refreshable (PB-07). |
 
+- **Amendment C-169 (OD-5, OD-6, OD-7):** the route serves `gate`, `commands`, `archive` and `coverage`. The incidents and search-approval widgets of PG-052 keep their existing endpoints (`/api/v1/security/incidents/summary`, `/api/v1/organization/search-approvals`) and their existing live (SpiceDB) authorization; they show an unavailable state when that check refuses or cannot run, and the Effective-edge rule is not extended to them. Navigation keeps the existing capabilities (the Security home link is shown for `security.administer` or `audit.view`); the audit explorer links to the Security home when audit is refused because the gate is closed or the permission cannot be confirmed (a link only). No new step-up for these reads; PG-053 and ownership-transfer workflows are deferred, and unresolved transfer commands appear in `commands`.
 - **Problems (RFC 9457):** 403 `AUDIT_VIEW_FORBIDDEN` or `SECURITY_ADMINISTRATION_FORBIDDEN`; 404 generic; 400 `CURSOR_INVALID`; 429; 503 `AUTHORITY_UNAVAILABLE`, `AUTHORITY_GATE_CLOSED`, `AUDIT_EVIDENCE_BUSY` or `AUDIT_EVIDENCE_UNAVAILABLE`.
 - **Responses:** all carry `Cache-Control: no-store`. OpenAPI is regenerated; the frontend uses the coordinator only.
 - **Capability:** `audit.view` joins the batch check (navigation only).

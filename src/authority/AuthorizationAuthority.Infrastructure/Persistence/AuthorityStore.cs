@@ -74,7 +74,7 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
     }
 
     private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction, AuthorityWorkSignal? wakeup, ISecurityAlertSink? alerts, ContentAcceptancePolicy policy,
-        IJournalReceiptVerifier journalReceiptVerifier) : IAuthorityScope, IAuditAccessScope, ISecurityCommandTimelineScope
+        IJournalReceiptVerifier journalReceiptVerifier) : IAuthorityScope, IAuditAccessScope, ISecurityCommandTimelineScope, ISecurityOverviewScope
     {
         private bool committed;
         private bool authorizationWorkAppended;
@@ -257,6 +257,39 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
             {
                 return OrganizationLockAttempt.LockBusy; // the transaction is aborted; the caller disposes the scope
             }
+        }
+
+        /// <summary>C8 M4-4 (AC-8.4): count and oldest creation time per state, aggregated in SQL for the given states only.</summary>
+        public async Task<List<CommandStateTally>> CountCommandsByStateAsync(Guid organizationId, IReadOnlyCollection<string> states, CancellationToken cancellationToken)
+        {
+            var stateList = states.ToList();
+            var rows = await context.SecurityCommands.AsNoTracking()
+                .Where(c => c.OrganizationId == organizationId && stateList.Contains(c.CommandStateName))
+                .GroupBy(c => c.CommandStateName)
+                .Select(g => new { State = g.Key, Count = g.Count(), Oldest = g.Min(c => c.CommandCreatedOn) })
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            return [.. rows.Select(r => new CommandStateTally(r.State, r.Count, r.Oldest))];
+        }
+
+        /// <summary>C8 M4-4 (AC-8.4): the oldest commands in the given states, ordered and limited in SQL.</summary>
+        public Task<List<SecurityCommand>> GetOldestCommandsInStatesAsync(Guid organizationId, IReadOnlyCollection<string> states, int limit, CancellationToken cancellationToken)
+        {
+            var stateList = states.ToList();
+            return context.SecurityCommands.AsNoTracking()
+                .Where(c => c.OrganizationId == organizationId && stateList.Contains(c.CommandStateName))
+                .OrderBy(c => c.CommandCreatedOn).ThenBy(c => c.SecurityCommandId).Take(limit)
+                .ToListAsync(cancellationToken);
+        }
+
+        /// <summary>C8 M4-4 (AC-8.4): journal entries per (stream, delivery state), aggregated in SQL; no body, digest or receipt is read.</summary>
+        public async Task<List<ArchiveDeliveryTally>> CountJournalArchiveStatesAsync(Guid organizationId, CancellationToken cancellationToken)
+        {
+            var rows = await context.JournalEntries.AsNoTracking()
+                .Where(j => j.OrganizationId == organizationId)
+                .GroupBy(j => new { j.JournalStreamName, j.ArchiveDeliveryState })
+                .Select(g => new { g.Key.JournalStreamName, g.Key.ArchiveDeliveryState, Count = g.Count(), Oldest = g.Min(j => j.JournalCreatedOn), LatestArchived = g.Max(j => j.JournalArchivedOn) })
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            return [.. rows.Select(r => new ArchiveDeliveryTally(r.JournalStreamName, r.ArchiveDeliveryState, r.Count, r.Oldest, r.LatestArchived))];
         }
 
         /// <summary>

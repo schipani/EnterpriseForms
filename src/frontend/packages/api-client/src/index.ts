@@ -249,6 +249,18 @@ export type SecurityCommandTimelineQuery = { kind?: string; state?: string; from
 export type SecurityCommandTimelinePageResponse = S["SecurityCommandTimelinePageResponse"];
 export type SecurityCommandTimelineItemResponse = S["SecurityCommandTimelineItemResponse"];
 export type SecurityCommandTimelineDetailResponse = S["SecurityCommandTimelineDetailResponse"];
+
+/** C8 M4-4 Security Home (PG-052; AC-8.4, AC-8.5): one section per request, each authorized by the Authority on its own. */
+export type SecurityOverviewSection = "gate" | "commands" | "archive" | "coverage";
+export type SecurityOverviewSectionResponse = S["SecurityOverviewSectionResponse"];
+export type SecurityOverviewGateResponse = S["SecurityOverviewGateResponse"];
+export type SecurityOverviewCommandsResponse = S["SecurityOverviewCommandsResponse"];
+export type SecurityOverviewCommandResponse = S["SecurityOverviewCommandResponse"];
+export type SecurityOverviewArchiveResponse = S["SecurityOverviewArchiveResponse"];
+export type SecurityOverviewArchiveStreamResponse = S["SecurityOverviewArchiveStreamResponse"];
+export type SecurityCoverageResponse = S["SecurityCoverageResponse"];
+export type SecurityCoverageDecisionResponse = S["SecurityCoverageDecisionResponse"];
+export type SecurityCoverageAttestationResponse = S["SecurityCoverageAttestationResponse"];
 export type AuditMetadataItemResponse = S["AuditMetadataItemResponse"];
 export type AuditWithheldMetadataResponse = S["AuditWithheldMetadataResponse"];
 
@@ -296,6 +308,8 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       incident: (securityIncidentId: string, signal?: AbortSignal) => read<SecurityIncidentDetailResponse>("security.incident", { securityIncidentId }, undefined, "interactive-read", signal),
       updateIncident: (securityIncidentId: string, request: UpdateSecurityIncidentRequest) => write<SecurityIncidentDetailResponse>("PATCH", "security.updateIncident", { securityIncidentId }, request, { lane: "security", resourceKey: `security-incident:${securityIncidentId}` }),
       addIncidentNote: (securityIncidentId: string, request: AddSecurityIncidentNoteRequest) => write<SecurityIncidentDetailResponse>("POST", "security.addIncidentNote", { securityIncidentId }, request, { lane: "security", resourceKey: `security-incident:${securityIncidentId}` }),
+      /** C8 M4-4: one Security Home section (gate, commands, archive, coverage); authorized from the Authority's committed state, so it answers while the gate is closed. */
+      overview: (section: SecurityOverviewSection, signal?: AbortSignal) => read<SecurityOverviewSectionResponse>("security.overview", { section }, undefined, "interactive-read", signal),
     },
     audit: {
       mine: (limit = 25, signal?: AbortSignal) => read<AuditEventResponse[]>("audit.mine", undefined, { limit }, "background-read", signal),

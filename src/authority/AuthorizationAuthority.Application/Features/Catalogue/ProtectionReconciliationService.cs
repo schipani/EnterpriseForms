@@ -286,6 +286,16 @@ public sealed class ProtectionReconciliationService(IAuthorityStore store, Conte
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.ReadOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        return await ComputeCoverageAsync(scope, state, clock, correlationId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The coverage projection shared by the verifier route (<see cref="CoverageAsync"/>, its own scope) and C8 M4-4 AC-8.5
+    /// (<c>SecurityCoverageService</c>, the caller's read-only snapshot). Reads protection resources, registered forms and the latest
+    /// attestations only: no record enumeration, no SpiceDB call, no write.
+    /// </summary>
+    internal static async Task<ProtectionCoverageResponse> ComputeCoverageAsync(IAuthorityScope scope, OrganizationAuthorizationState state, TimeProvider clock, Guid correlationId, CancellationToken cancellationToken)
+    {
         var decisions = await scope.GetResourcesByTypeAsync(state.OrganizationId, [ResourceTypeNames.FieldProtectionRequirement, ResourceTypeNames.FieldProtectionRelease], [ResourceLifecycleStates.Active], cancellationToken).ConfigureAwait(false);
         var forms = (await scope.GetResourcesByTypeAsync(state.OrganizationId, [ResourceTypeNames.FormDefinition], [ResourceLifecycleStates.Active], cancellationToken).ConfigureAwait(false)).Select(f => f.ResourceEntityId).ToHashSet();
         var commandIds = decisions.Select(d => d.RegisteredBySecurityCommandId).ToList();

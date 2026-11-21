@@ -142,7 +142,7 @@ describe("AppShellLayout header", () => {
     const user = userEvent.setup();
     await user.click(within(compactBar()).getByRole("button", { name: "Main menu" }));
     const items = (await screen.findAllByRole("menuitem")).map((i) => i.textContent);
-    expect(items).toEqual(["Dashboard", "Forms", "Uploads", "My activity", "Organization", "Security incidents", "My Profile", "Preferences"]);
+    expect(items).toEqual(["Dashboard", "Forms", "Uploads", "My activity", "Organization", "Security home", "Security incidents", "My Profile", "Preferences"]); // C8 M4-4: Security home for either role
     expect(items).not.toContain("My Records"); // records.discover is not held
     await user.click(screen.getByRole("menuitem", { name: "Organization" }));
     expect(navigate).toHaveBeenCalledWith({ to: "/app/organization" });
