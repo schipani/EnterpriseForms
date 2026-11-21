@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Locator, type Page, type Route } from "@playwright/test";
 import { signIn, signOut } from "./support";
 
 /**
@@ -10,6 +10,12 @@ import { signIn, signOut } from "./support";
  *  2. Security Administrator: every Security Home widget; no audit explorer (D8-6).
  *  3. Riley Reader is appointed Security Auditor through the People page (there is no auditor seed persona).
  *  4. Security Auditor: Security Home archive only; explorer, event detail and timeline; keyboard filters, refresh and paging.
+ *  4a. Security Auditor: keyboard paging of the security-command timeline (both paged screens share checkKeyboardPaging: a second
+ *     page is guaranteed, each read is held while its loading state is checked, unavailable controls keep focus and do nothing).
+ *  4b, 4c. Security Auditor: a failed page read on the explorer and on the timeline (checkPagingFailure: one synthetic 500 on the
+ *     page-2 read; focus moves to the error, Try again retries, focus follows to the page navigation, paging continues).
+ *  4d, 4e. Security Auditor: a keyboard Refresh of the explorer and of the timeline (checkKeyboardRefresh: one read, held while
+ *     Refresh keeps focus and ignores Enter, Space and a click; afterwards it is available with focus).
  *  5. axe WCAG 2.2 AA and no horizontal overflow at 320/768/1440 px and the 200%/400% zoom equivalents (720 and 320×256 CSS px).
  *  6. Revocation mid-session: a second browser context removes the auditor; the auditor's next request is refused.
  * The organization ends as it started (Riley holds no role; the afterAll removes the role if a failure left it). Gate-closed
@@ -22,6 +28,9 @@ const AUDITOR = /Riley Reader/;
 const NOT_FOR_ROLE = "Not available to your role";
 const LIVE_CHECK = /live permission check/;
 const HOME_SECTIONS = ["Authorization gate", "Archive delivery", "Unresolved security commands", "Encryption coverage"] as const;
+const PAGE_SIZE = 25; // AUDIT_PAGE_SIZE and TIMELINE_PAGE_SIZE, the page size of the explorer and of the timeline
+const EXPLORER_READS = /\/api\/v1\/security\/audit-events\?/;
+const TIMELINE_READS = /\/api\/v1\/security\/audit\/security-commands\?/;
 
 const VIEWPORTS = [
   { name: "320 phone", width: 320, height: 720 },
@@ -64,6 +73,335 @@ async function tabTo(page: Page, target: Locator, label: string, maximum = 80) {
     await page.keyboard.press("Tab");
   }
   throw new Error(`${label}: not reachable with Tab within ${maximum} presses`);
+}
+
+/**
+ * Guarantees that a screen's default (unfiltered) view has a second page, from this auditor's own reads only (no other spec's
+ * data): every explorer read records one AUDIT_EVENTS_VIEWED event, and every timeline read one AuditAccessAuthorized entry (an
+ * allowlisted timeline kind), in this organization. So reading the first page every 250 ms (4 per second, under the Authority's
+ * 5-per-second user limit) ends once that page returns a next cursor, after at most one page of reads.
+ */
+async function ensureSecondPage(page: Page, path: "/api/v1/security/audit-events" | "/api/v1/security/audit/security-commands", screen: string) {
+  await expect
+    .poll(
+      async () => {
+        const response = await page.request.get(`${path}?pageSize=${PAGE_SIZE}`);
+        expect(response.status(), `auditor ${screen} read`).toBe(200);
+        return ((await response.json()) as PageBody).nextCursor !== null;
+      },
+      { message: `the ${screen} has a second page`, intervals: [250], timeout: 60_000 },
+    )
+    .toBe(true);
+}
+
+type PageBody = { items: Array<Record<string, unknown>>; nextCursor: string | null };
+
+/**
+ * The real page reads of one screen (matched by URL), sent to the server and answered unchanged (no mocked data). Each read is
+ * counted with the cursor it asked for, and its answer is kept. While held, a read waits until released, so a test can check the
+ * loading state deterministically instead of racing it.
+ */
+async function pageReads(page: Page, url: RegExp) {
+  const requested: Array<string | null> = [];
+  const answered: Array<{ cursor: string | null; body: PageBody }> = [];
+  const waiting: Array<() => void> = [];
+  let holding = false;
+  await page.context().route(url, async (route: Route) => {
+    const cursor = new URL(route.request().url()).searchParams.get("cursor");
+    requested.push(cursor);
+    if (holding) await new Promise<void>((resume) => waiting.push(resume));
+    const response = await route.fetch();
+    if (response.ok()) answered.push({ cursor, body: (await response.json()) as PageBody });
+    await route.fulfill({ response });
+  });
+  return {
+    count: () => requested.length,
+    lastCursor: () => requested[requested.length - 1],
+    held: () => waiting.length,
+    lastAnswer: () => {
+      expect(answered.length, "a page has been answered").toBeGreaterThan(0);
+      return answered[answered.length - 1]!;
+    },
+    hold: () => {
+      holding = true;
+    },
+    release: () => {
+      holding = false;
+      waiting.splice(0).forEach((resume) => resume());
+    },
+  };
+}
+
+type PageReads = Awaited<ReturnType<typeof pageReads>>;
+
+/** A paged screen: its page navigation, its reads, the keys of the rows it shows (in order) and the same keys from an answer. */
+type PagedScreen = { name: string; nav: Locator; reads: PageReads; shownKeys: () => Promise<string[]>; answerKeys: (body: PageBody) => string[] };
+
+/** The audit explorer as a paged screen: a row is identified by its event id. */
+function explorerScreen(page: Page, reads: PageReads): PagedScreen {
+  const events = page.getByRole("table", { name: "Audit events" });
+  return {
+    name: "audit explorer",
+    nav: page.getByRole("navigation", { name: "Audit event pages" }),
+    reads,
+    shownKeys: () => events.getByRole("link", { name: /^Open event / }).evaluateAll((links) => links.map((link) => link.getAttribute("href")!.split("/").pop()!)),
+    answerKeys: (body) => body.items.map((item) => String(item.auditEventId)),
+  };
+}
+
+/** The security-command timeline as a paged screen: a row is identified by its evidence ("<stream> #<revision> · archive <state>"); rows without evidence have no key on either side. */
+function timelineScreen(page: Page, reads: PageReads): PagedScreen {
+  const items = page.getByRole("table", { name: "Security commands and audit entries" });
+  return {
+    name: "security-command timeline",
+    nav: page.getByRole("navigation", { name: "Security command pages" }),
+    reads,
+    shownKeys: () =>
+      items.locator("tbody tr").evaluateAll((rows) =>
+        rows.flatMap((row) => {
+          const match = /([A-Za-z][\w-]*) #(\d+) · archive /.exec((row as HTMLElement).innerText);
+          return match ? [`${match[1]} #${match[2]}`] : [];
+        }),
+      ),
+    answerKeys: (body) =>
+      body.items.flatMap((item) => {
+        const evidence = item.evidence as { stream: string; streamRevision: number } | null | undefined;
+        return evidence ? [`${evidence.stream} #${String(evidence.streamRevision)}`] : [];
+      }),
+  };
+}
+
+/** An unavailable paging control stays focusable, says it is unavailable, and Enter, Space and a mouse click change nothing. */
+async function expectInert(page: Page, screen: PagedScreen, control: Locator, label: string) {
+  const status = screen.nav.locator("p[aria-live=polite]");
+  const shown = await status.textContent();
+  const requests = screen.reads.count();
+  await control.focus();
+  await expect(control, `${label}: still focusable`).toBeFocused();
+  await expectVisibleFocus(page, label);
+  await expect(control, `${label}: unavailable`).toHaveAttribute("aria-disabled", "true");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Space");
+  await control.click({ force: true }); // a real mouse click; force skips only Playwright's own wait for an available control
+  // Read once, not polled: an activation would have re-rendered the page label at once (a discrete event), and any read it caused
+  // is also caught by the exact read counts the caller checks once the page has loaded.
+  expect(await status.textContent(), `${label}: the page and cursor are unchanged`).toBe(shown);
+  expect(screen.reads.count(), `${label}: no read was requested`).toBe(requests);
+  await expect(control, `${label}: focus stays`).toBeFocused();
+}
+
+/**
+ * Keyboard paging of a screen whose default view has at least two pages (ensureSecondPage), from page 1 to page 2 and back, with
+ * each read held until the loading state has been checked. The page label announces a page only once its rows have arrived; while
+ * a page loads, both controls are unavailable but keep keyboard focus, and nothing activates them (on the first page Previous is
+ * unavailable too). Each move makes exactly one read, with the cursor the previous answer gave, and shows exactly that answer.
+ */
+async function checkKeyboardPaging(page: Page, screen: PagedScreen) {
+  const { name, nav, reads } = screen;
+  const status = nav.locator("p[aria-live=polite]");
+  const previous = nav.getByRole("button", { name: "Previous" });
+  const next = nav.getByRole("button", { name: "Next" });
+
+  // Page 1 is shown, and it is the last answer read; Previous is unavailable on the first page.
+  await expect(status).toHaveText(/^Page 1 ·/);
+  await expect(previous).toHaveAttribute("aria-disabled", "true");
+  await expect(next).toHaveAttribute("aria-disabled", "false");
+  const pageOne = reads.lastAnswer();
+  expect(pageOne.cursor, `${name}: page 1 is read without a cursor`).toBeNull();
+  expect(pageOne.body.nextCursor, `${name}: page 1 has a next cursor`).not.toBeNull();
+  expect(await screen.shownKeys(), `${name}: page 1 shows its answer`).toEqual(screen.answerKeys(pageOne.body));
+  await expectInert(page, screen, previous, `${name}: Previous on the first page`);
+
+  // Forward to page 2, the read held while the loading state is checked.
+  const beforeNext = reads.count();
+  reads.hold();
+  await next.focus();
+  await expectVisibleFocus(page, `${name}: next page button`);
+  await page.keyboard.press("Enter");
+  await expect.poll(() => reads.held(), { message: `${name}: page 2 is requested` }).toBe(1);
+  expect(reads.count()).toBe(beforeNext + 1);
+  expect(reads.lastCursor(), `${name}: page 2 is read with page 1's next cursor`).toBe(pageOne.body.nextCursor);
+  await expect(status, `${name}: page 2 is not announced while page 1's rows are still shown`).toHaveText("Loading page 2…");
+  await expect(next, `${name}: focus stays on Next while it is unavailable`).toBeFocused();
+  await expect(next).toHaveAttribute("aria-disabled", "true");
+  await expect(previous).toHaveAttribute("aria-disabled", "true");
+  await expectInert(page, screen, previous, `${name}: Previous while page 2 loads`);
+  await expectInert(page, screen, next, `${name}: Next while page 2 loads`);
+  reads.release();
+  await expect(status).toHaveText(/^Page 2 ·/);
+  const pageTwo = reads.lastAnswer();
+  expect(pageTwo.cursor).toBe(pageOne.body.nextCursor);
+  expect(await screen.shownKeys(), `${name}: page 2 shows its answer as soon as it is announced`).toEqual(screen.answerKeys(pageTwo.body));
+  expect(screen.answerKeys(pageTwo.body).length, `${name}: page 2 has rows`).toBeGreaterThan(0);
+  expect(screen.answerKeys(pageTwo.body).filter((key) => screen.answerKeys(pageOne.body).includes(key)), `${name}: page 2 lists other rows than page 1`).toEqual([]);
+  await expect(previous).toHaveAttribute("aria-disabled", "false");
+  await expect(next).toBeFocused();
+  expect(reads.count(), `${name}: one read for page 2`).toBe(beforeNext + 1);
+
+  // Back to page 1: its earlier rows are shown again at once and refreshed; the refresh is held while the controls are checked.
+  const beforePrevious = reads.count();
+  reads.hold();
+  await previous.focus();
+  await expectVisibleFocus(page, `${name}: previous page button`);
+  await page.keyboard.press("Enter");
+  await expect.poll(() => reads.held(), { message: `${name}: page 1 is requested again` }).toBe(1);
+  expect(reads.count()).toBe(beforePrevious + 1);
+  expect(reads.lastCursor(), `${name}: page 1 is read without a cursor`).toBeNull();
+  await expect(status).toHaveText(/^Page 1 ·/);
+  expect(await screen.shownKeys(), `${name}: page 1's earlier rows are shown`).toEqual(screen.answerKeys(pageOne.body));
+  await expect(previous, `${name}: focus stays on Previous, unavailable on the first page`).toBeFocused();
+  await expect(previous).toHaveAttribute("aria-disabled", "true");
+  await expect(next).toHaveAttribute("aria-disabled", "true");
+  await expectInert(page, screen, next, `${name}: Next while page 1 is refreshed`);
+  await expectInert(page, screen, previous, `${name}: Previous on the first page while it is refreshed`);
+  reads.release();
+  await expect(next).toHaveAttribute("aria-disabled", "false"); // page 1 has been read again
+  const refreshed = reads.lastAnswer();
+  expect(refreshed.cursor).toBeNull();
+  expect(await screen.shownKeys(), `${name}: page 1 shows its new answer`).toEqual(screen.answerKeys(refreshed.body));
+  await expect(status).toHaveText(/^Page 1 ·/);
+  await expect(previous).toHaveAttribute("aria-disabled", "true");
+  await expect(previous).toBeFocused();
+  expect(reads.count(), `${name}: one read for page 1`).toBe(beforePrevious + 1);
+}
+
+/**
+ * Keyboard Refresh of a paged screen on page 1, its read held while it loads: Enter starts exactly one read (of page 1); Refresh
+ * keeps focus and is unavailable meanwhile, and Enter, Space and a mouse click start no second read; once the page has been read,
+ * Refresh is available with focus, the page shows that answer, and Enter refreshes again.
+ */
+async function checkKeyboardRefresh(page: Page, screen: PagedScreen) {
+  const { name, nav, reads } = screen;
+  const refresh = page.getByRole("button", { name: "Refresh", exact: true });
+  await expect(nav.locator("p[aria-live=polite]")).toHaveText(/^Page 1 ·/);
+  await expect(refresh).toHaveAttribute("aria-disabled", "false");
+  const before = reads.count();
+  reads.hold();
+  await refresh.focus();
+  await expectVisibleFocus(page, `${name}: refresh`);
+  await page.keyboard.press("Enter");
+  await expect.poll(() => reads.held(), { message: `${name}: the refresh is requested` }).toBe(1);
+  expect(reads.count(), `${name}: one read for the refresh`).toBe(before + 1);
+  expect(reads.lastCursor(), `${name}: the refresh reads page 1`).toBeNull();
+  await expect(refresh, `${name}: focus stays on Refresh while it is unavailable`).toBeFocused();
+  await expect(refresh).toHaveAttribute("aria-disabled", "true");
+  await expectVisibleFocus(page, `${name}: refresh while loading`);
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Space");
+  await refresh.click({ force: true }); // a real mouse click; force skips only Playwright's own wait for an available control
+  expect(reads.count(), `${name}: no second read while the refresh loads`).toBe(before + 1);
+  await expect(refresh).toBeFocused();
+  reads.release();
+  await expect(refresh, `${name}: the refresh has completed`).toHaveAttribute("aria-disabled", "false");
+  await expect(refresh).toBeFocused();
+  expect(await screen.shownKeys(), `${name}: the page shows the refreshed answer`).toEqual(screen.answerKeys(reads.lastAnswer().body));
+  expect(reads.count(), `${name}: still one read for the refresh`).toBe(before + 1);
+
+  // Focus is still usable: Enter refreshes again.
+  await page.keyboard.press("Enter");
+  await expect.poll(() => reads.count(), { message: `${name}: a second refresh is requested` }).toBe(before + 2);
+  await expect(refresh).toHaveAttribute("aria-disabled", "false");
+  await expect(refresh).toBeFocused();
+}
+
+const FAILURE_CODE = "SYNTHETIC_PAGE_READ_FAILURE";
+const FAILURE_DETAIL = "Synthetic page-read failure injected by the security-audit browser test.";
+
+/**
+ * A failed page move (ensureSecondPage guarantees page 2). Only the first page-2 read is changed: it is answered here with a
+ * synthetic, non-retryable 500 (a server error, not an authorization or security answer); every other read reaches the server
+ * through `reads` unchanged, and the interception is removed afterwards. The rows and paging controls are replaced by the error
+ * panel, which keeps its single role=alert; keyboard focus, which was on Next, moves once to the error container (not a live
+ * region and not a Tab stop). Tab reaches "Try again", which retries the same page; focus then moves to the page navigation (Next
+ * and Previous are unavailable while the retry loads), the page is announced once it has arrived, and keyboard paging continues.
+ */
+async function checkPagingFailure(page: Page, screen: PagedScreen, url: RegExp) {
+  const { name, nav, reads } = screen;
+  const status = nav.locator("p[aria-live=polite]");
+  const previous = nav.getByRole("button", { name: "Previous" });
+  const next = nav.getByRole("button", { name: "Next" });
+  const alert = page.getByRole("alert");
+  let failures = 0;
+  const failFirstPageTwoRead = async (route: Route) => {
+    if (failures === 0 && new URL(route.request().url()).searchParams.get("cursor") !== null) {
+      failures += 1;
+      await route.fulfill({ status: 500, contentType: "application/problem+json", body: JSON.stringify({ title: FAILURE_CODE, status: 500, detail: FAILURE_DETAIL, retryable: false }) });
+    } else {
+      await route.fallback();
+    }
+  };
+  await page.context().route(url, failFirstPageTwoRead);
+  try {
+    await expect(status).toHaveText(/^Page 1 ·/);
+    await expect(next).toHaveAttribute("aria-disabled", "false");
+    const pageOne = reads.lastAnswer();
+    const before = reads.count();
+
+    // The move to page 2 fails.
+    await next.focus();
+    await expectVisibleFocus(page, `${name}: next page button`);
+    await page.keyboard.press("Enter");
+    await expect(alert).toBeVisible();
+    expect(failures, `${name}: the page-2 read failed once`).toBe(1);
+    await expect(alert).toContainText("The request failed");
+    await expect(alert).toContainText(FAILURE_DETAIL);
+    await expect(alert).toContainText(`Code ${FAILURE_CODE}`);
+    await expect(alert, `${name}: one announcement`).toHaveCount(1);
+    await expect(nav, `${name}: the paging controls are replaced by the error`).toHaveCount(0);
+
+    // Focus moved to the error container, which holds the alert and is neither a live region nor a Tab stop.
+    const focusedError = () =>
+      page.evaluate(() => {
+        const active = document.activeElement as HTMLElement | null;
+        const shown = document.querySelector('[role="alert"]');
+        return active && shown && active !== document.body && active.contains(shown) ? { tabIndex: active.tabIndex, role: active.getAttribute("role"), live: active.getAttribute("aria-live"), text: active.textContent ?? "" } : null;
+      });
+    await expect.poll(focusedError, { message: `${name}: focus is on the error` }).not.toBeNull();
+    const target = (await focusedError())!;
+    expect(target.tabIndex, `${name}: the error is focusable without being a Tab stop`).toBe(-1);
+    expect(target.role, `${name}: the error container adds no second announcement`).toBeNull();
+    expect(target.live).toBeNull();
+    expect(target.text).toContain(FAILURE_DETAIL);
+    await expectVisibleFocus(page, `${name}: error`);
+    await scan(page, `${name} page-read error (focused)`);
+
+    // Recovery: Tab reaches Try again; it retries the same page and focus follows to the page navigation.
+    const retry = alert.getByRole("button", { name: "Try again" });
+    await page.keyboard.press("Tab");
+    await expect(retry, `${name}: Tab from the error reaches Try again`).toBeFocused();
+    await expectVisibleFocus(page, `${name}: try again`);
+    expect(await focusedError(), `${name}: focus is not moved back to the error`).toBeNull();
+    reads.hold();
+    await page.keyboard.press("Enter");
+    await expect.poll(() => reads.held(), { message: `${name}: page 2 is read again` }).toBe(1);
+    expect(reads.lastCursor(), `${name}: the same page is retried`).toBe(pageOne.body.nextCursor);
+    await expect(alert).toHaveCount(0);
+    await expect(nav, `${name}: focus follows to the page navigation`).toBeFocused();
+    await expectVisibleFocus(page, `${name}: page navigation`);
+    await expect(status).toHaveText("Loading page 2…");
+    await expect(next).toHaveAttribute("aria-disabled", "true");
+    await expect(previous).toHaveAttribute("aria-disabled", "true");
+    reads.release();
+    await expect(status).toHaveText(/^Page 2 ·/);
+    const pageTwo = reads.lastAnswer();
+    expect(pageTwo.cursor).toBe(pageOne.body.nextCursor);
+    expect(await screen.shownKeys(), `${name}: page 2 shows its answer`).toEqual(screen.answerKeys(pageTwo.body));
+    await expect(nav, `${name}: the arrival does not move focus`).toBeFocused();
+    expect(failures, `${name}: the retry was not failed`).toBe(1);
+    expect(reads.count(), `${name}: only the retry reached the server`).toBe(before + 1);
+
+    // Keyboard paging continues from the navigation: Tab reaches Previous, which returns to page 1.
+    await page.keyboard.press("Tab");
+    await expect(previous).toBeFocused();
+    await expect(previous).toHaveAttribute("aria-disabled", "false");
+    await page.keyboard.press("Enter");
+    await expect(next).toHaveAttribute("aria-disabled", "false"); // page 1 has been read again
+    await expect(status).toHaveText(/^Page 1 ·/);
+    await expect(previous).toBeFocused();
+    expect(await screen.shownKeys(), `${name}: page 1 shows its new answer`).toEqual(screen.answerKeys(reads.lastAnswer().body));
+  } finally {
+    await page.context().unroute(url, failFirstPageTwoRead);
+  }
 }
 
 async function openSecurityHome(page: Page) {
@@ -192,6 +530,8 @@ test.describe("Security Home and audit (C8 M4-5)", () => {
     await signIn(page, "reader");
     await expect(primary(page).getByRole("link", { name: "Security home", exact: true })).toBeVisible();
     await expect(primary(page).getByRole("link", { name: "Audit", exact: true })).toBeVisible();
+    await ensureSecondPage(page, "/api/v1/security/audit-events", "audit explorer");
+    const explorerReads = await pageReads(page, EXPLORER_READS);
 
     // Security Home: archive only (D8-70); the live-check widgets request nothing for this role.
     await openSecurityHome(page);
@@ -224,19 +564,8 @@ test.describe("Security Home and audit (C8 M4-5)", () => {
     await page.keyboard.press("Enter");
     expect((await refreshed).status()).toBe(200);
 
-    // Paging: Previous is disabled on the first page; Next is enabled only when the server returned a cursor, and then works.
-    const pages = page.getByRole("navigation", { name: "Audit event pages" });
-    await expect(pages.getByText(/^Page 1 ·/)).toBeVisible();
-    await expect(pages.getByRole("button", { name: "Previous" })).toBeDisabled();
-    const next = pages.getByRole("button", { name: "Next" });
-    if (await next.isEnabled()) {
-      await next.focus();
-      await page.keyboard.press("Enter");
-      await expect(pages.getByText(/^Page 2 ·/)).toBeVisible({ timeout: 30_000 });
-      await pages.getByRole("button", { name: "Previous" }).focus();
-      await page.keyboard.press("Enter");
-      await expect(pages.getByText(/^Page 1 ·/)).toBeVisible({ timeout: 30_000 });
-    }
+    // Paging by keyboard: a second page always exists (ensureSecondPage); loading, boundaries and focus as in checkKeyboardPaging.
+    await checkKeyboardPaging(page, explorerScreen(page, explorerReads));
 
     // Event detail (PG-055), opened from the list by keyboard.
     const open = events.getByRole("link", { name: /^Open event / }).first();
@@ -255,6 +584,45 @@ test.describe("Security Home and audit (C8 M4-5)", () => {
     await expect(page.getByRole("navigation", { name: "Security command pages" }).getByRole("button", { name: "Previous" })).toBeDisabled();
     await signOut(page);
   });
+
+  test("a Security Auditor pages the security-command timeline by keyboard, and unavailable paging controls do nothing", async ({ page }) => {
+    test.setTimeout(180_000);
+    await signIn(page, "reader");
+    await ensureSecondPage(page, "/api/v1/security/audit/security-commands", "security-command timeline");
+    const timelineReads = await pageReads(page, TIMELINE_READS);
+    await page.goto("/app/security/audit/commands");
+    await expect(page.getByRole("heading", { level: 1, name: "Security commands" })).toBeVisible();
+    await expect(page.getByRole("table", { name: "Security commands and audit entries" })).toBeVisible({ timeout: 30_000 });
+    await checkKeyboardPaging(page, timelineScreen(page, timelineReads));
+    await signOut(page);
+  });
+
+  for (const target of [
+    { name: "audit explorer", path: "/app/security/audit", api: "/api/v1/security/audit-events", reads: EXPLORER_READS, table: "Audit events", screen: explorerScreen },
+    { name: "security-command timeline", path: "/app/security/audit/commands", api: "/api/v1/security/audit/security-commands", reads: TIMELINE_READS, table: "Security commands and audit entries", screen: timelineScreen },
+  ] as const) {
+    test(`a failed ${target.name} page read moves focus to the error, and Try again resumes keyboard paging`, async ({ page }) => {
+      test.setTimeout(180_000);
+      await signIn(page, "reader");
+      await ensureSecondPage(page, target.api, target.name);
+      const reads = await pageReads(page, target.reads);
+      await page.goto(target.path);
+      await expect(page.getByRole("table", { name: target.table })).toBeVisible({ timeout: 30_000 });
+      await checkPagingFailure(page, target.screen(page, reads), target.reads);
+      await signOut(page);
+    });
+
+    test(`a keyboard Refresh of the ${target.name} keeps focus and starts exactly one read`, async ({ page }) => {
+      test.setTimeout(180_000);
+      await signIn(page, "reader");
+      await ensureSecondPage(page, target.api, target.name);
+      const reads = await pageReads(page, target.reads);
+      await page.goto(target.path);
+      await expect(page.getByRole("table", { name: target.table })).toBeVisible({ timeout: 30_000 });
+      await checkKeyboardRefresh(page, target.screen(page, reads));
+      await signOut(page);
+    });
+  }
 
   test("PG-052, PG-054, PG-055 and the timeline pass axe WCAG 2.2 AA without overflow at every width", async ({ browser }) => {
     test.setTimeout(900_000);
