@@ -60,6 +60,17 @@ public sealed class PhaseC7FieldSearchExecutionTests
         }
     }
 
+    /// <summary>A clock whose time does not advance; its timers (and so every <c>Task.Delay</c>) still fire in real time (TS-M2f-01).</summary>
+    private sealed class StoppedClock : TimeProvider
+    {
+        private readonly long timestamp = System.GetTimestamp();
+        private readonly DateTimeOffset now = System.GetUtcNow();
+
+        public override long GetTimestamp() => timestamp;
+
+        public override DateTimeOffset GetUtcNow() => now;
+    }
+
     private sealed class World
     {
         public List<Rec> Records { get; } = [];
@@ -72,6 +83,9 @@ public sealed class PhaseC7FieldSearchExecutionTests
         public List<SearchExecutionEvidence> Evidence { get; } = [];
         public bool EvidenceFails { get; set; }
         public FieldSearchLimits Limits { get; } = new() { ExecutionEnabled = true, RetryInitialDelayMilliseconds = 10, RetryMaximumDelayMilliseconds = 20 };
+
+        /// <summary>The handler's clock; the real clock unless a test needs elapsed time held still (TS-M2f-01).</summary>
+        public TimeProvider Clock { get; init; } = TimeProvider.System;
 
         public List<AuthoritySearchableField> Searchable { get; } =
         [
@@ -93,8 +107,8 @@ public sealed class PhaseC7FieldSearchExecutionTests
                 nameof(IAuthorizationAuthorityClient.CheckPermissionsBatchAsync) => Task.FromResult<IReadOnlyList<PermissionDecision>>(((IReadOnlyList<PermissionCheckRequest>)args[1]!).Select(_ => new PermissionDecision(true, null, Revision, Revision, null, Guid.Empty)).ToList()),
                 _ => throw new NotSupportedException(method.Name),
             };
-            return new FieldSearchHandler(Limits, new Policy(this), new TrustedScopeVerifier(authority, new RecordsReader(this), Limits, TimeProvider.System), admission ?? new FieldSearchAdmission(Limits),
-                authority, new Cursors(), new Directory(), TimeProvider.System);
+            return new FieldSearchHandler(Limits, new Policy(this), new TrustedScopeVerifier(authority, new RecordsReader(this), Limits, Clock), admission ?? new FieldSearchAdmission(Limits),
+                authority, new Cursors(), new Directory(), Clock);
         }
 
         private Task<SearchCatalogue> Catalogue()
@@ -292,7 +306,10 @@ public sealed class PhaseC7FieldSearchExecutionTests
     [Fact]
     public async Task AChangedSnapshotIsRetriedWithinTheBoundedBudgetAndAPendingCreationNeverBlocks()
     {
-        var world = new World();
+        // TS-M2f-01: this test asserts the attempt ceiling. With the real clock, full-suite parallel load could exhaust the 2 s total
+        // budget first (5 snapshots instead of 6). Elapsed time is held still here so only the ceiling decides; the waits are real.
+        // The total-time bound itself is covered deterministically by FieldSearchRetryPolicyTests.
+        var world = new World { Clock = new StoppedClock() };
         world.Records.Add(new Rec().Text(Name, "Jordan"));
         world.Records.Add(new Rec { Revision = 0 }); // registered, never accepted
         world.CatalogueFailures.Enqueue(new AuthorityClientException("AUTHORITY_NOT_READY", 503, true));

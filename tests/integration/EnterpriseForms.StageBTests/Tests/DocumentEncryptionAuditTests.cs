@@ -56,7 +56,9 @@ public sealed class DocumentEncryptionAuditTests(StageBFixture fixture)
         var parts = envelope.Split('|');
         Assert.Equal("AES-256-GCM", parts[0]);
         Assert.Equal("1", parts[1]);
-        Assert.Equal("local-dev-kek-v1", parts[2]); // a key reference only; never key material
+        // A key reference only, never key material. E-1: new data is wrapped under the organization- and purpose-scoped key
+        // (localdev:{organization}:{purpose}:{version}); the legacy local-dev-kek-v1 reference is decrypt-only (F-3).
+        Assert.Equal($"localdev:{s.OrganizationId:D}:document:1", parts[2]);
         Assert.Equal("8", parts[3]);
         Assert.Equal("60", parts[4]); // 12-byte wrap nonce + 32-byte DEK ciphertext + 16-byte tag
         Assert.Equal("1048576", parts[5]);

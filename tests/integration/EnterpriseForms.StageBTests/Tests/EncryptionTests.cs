@@ -92,7 +92,11 @@ public sealed class EncryptionTests(StageBFixture fixture)
         Assert.DoesNotContain(hexOfNotes, dump, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(hexOfInformant, dump, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("marina", dump, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("local-dev-kek-v1", dump, StringComparison.Ordinal); // key reference only, never key material
+        // Key reference only, never key material. E-1: every value is wrapped under this organization's scoped field-value key
+        // (localdev:{organization}:field-value:{version}); the legacy local-dev-kek-v1 reference is decrypt-only (F-3).
+        var keyReferences = fixture.Stack.AttackerSql($"SELECT DISTINCT encryption_key_reference FROM field_encrypted_values WHERE form_record_id = '{recordId:D}';").Trim();
+        Assert.Equal($"localdev:{s.OrganizationId:D}:field-value:1", keyReferences);
+        Assert.DoesNotContain("local-dev-kek-v1", dump, StringComparison.Ordinal);
         var plainCount = fixture.Stack.AttackerSql($"SELECT integer_value FROM field_integer_values WHERE form_record_id = '{recordId:D}';").Trim();
         Assert.Equal("3", plainCount);
         var hostileSelect = fixture.Stack.AttackerSql($"SELECT coalesce(string_agg(convert_from(encrypted_value_bytes, 'SQL_ASCII'), '|'), '') FROM field_encrypted_values WHERE form_record_id = '{recordId:D}';", throwOnError: false);
