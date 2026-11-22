@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Browser, type Locator, type Page, type Route } from "@playwright/test";
+import { expect, test, type Browser, type Locator, type Page, type Request, type Route } from "@playwright/test";
 import { signIn, signOut } from "./support";
 
 /**
@@ -98,29 +98,53 @@ type PageBody = { items: Array<Record<string, unknown>>; nextCursor: string | nu
 
 /**
  * The real page reads of one screen (matched by URL), sent to the server and answered unchanged (no mocked data). Each read is
- * counted with the cursor it asked for, and its answer is kept. While held, a read waits until released, so a test can check the
- * loading state deterministically instead of racing it.
+ * counted with the cursor it asked for. While held, a read waits until released, so a test can check the loading state
+ * deterministically instead of racing it.
+ *
+ * Only answers the page actually received count. The route still fetches an answer for a read the page has already cancelled,
+ * for example the first page-1 read of React StrictMode's development double mount, but that answer never reaches the page. So
+ * each answer is kept with its own browser request and becomes the last answer only when the browser reports that request as
+ * finished; a cancelled (failed) read never does. lastAnswer() first waits until every read seen here is finished or failed, so
+ * it returns the answer of the read the page received last.
  */
 async function pageReads(page: Page, url: RegExp) {
   const requested: Array<string | null> = [];
-  const answered: Array<{ cursor: string | null; body: PageBody }> = [];
+  const routed: Request[] = [];
+  const settled = new Set<Request>();
+  const fetched = new Map<Request, { cursor: string | null; body: PageBody }>();
+  const delivered: Array<{ cursor: string | null; body: PageBody }> = [];
   const waiting: Array<() => void> = [];
   let holding = false;
-  await page.context().route(url, async (route: Route) => {
-    const cursor = new URL(route.request().url()).searchParams.get("cursor");
+  const context = page.context();
+  context.on("requestfinished", (request) => {
+    if (!routed.includes(request) || settled.has(request)) return;
+    settled.add(request);
+    const answer = fetched.get(request);
+    if (answer) delivered.push(answer);
+  });
+  context.on("requestfailed", (request) => {
+    settled.add(request); // cancelled or failed in the browser: its answer, if any, was never received
+  });
+  await context.route(url, async (route: Route) => {
+    const request = route.request();
+    const cursor = new URL(request.url()).searchParams.get("cursor");
     requested.push(cursor);
+    routed.push(request);
     if (holding) await new Promise<void>((resume) => waiting.push(resume));
     const response = await route.fetch();
-    if (response.ok()) answered.push({ cursor, body: (await response.json()) as PageBody });
+    if (response.ok()) fetched.set(request, { cursor, body: (await response.json()) as PageBody });
     await route.fulfill({ response });
   });
   return {
     count: () => requested.length,
     lastCursor: () => requested[requested.length - 1],
     held: () => waiting.length,
-    lastAnswer: () => {
-      expect(answered.length, "a page has been answered").toBeGreaterThan(0);
-      return answered[answered.length - 1]!;
+    lastAnswer: async () => {
+      await expect
+        .poll(() => routed.filter((request) => !settled.has(request)).length, { message: "every page read has been received or cancelled" })
+        .toBe(0);
+      expect(delivered.length, "a page has been answered").toBeGreaterThan(0);
+      return delivered[delivered.length - 1]!;
     },
     hold: () => {
       holding = true;
@@ -206,7 +230,7 @@ async function checkKeyboardPaging(page: Page, screen: PagedScreen) {
   await expect(status).toHaveText(/^Page 1 ·/);
   await expect(previous).toHaveAttribute("aria-disabled", "true");
   await expect(next).toHaveAttribute("aria-disabled", "false");
-  const pageOne = reads.lastAnswer();
+  const pageOne = await reads.lastAnswer();
   expect(pageOne.cursor, `${name}: page 1 is read without a cursor`).toBeNull();
   expect(pageOne.body.nextCursor, `${name}: page 1 has a next cursor`).not.toBeNull();
   expect(await screen.shownKeys(), `${name}: page 1 shows its answer`).toEqual(screen.answerKeys(pageOne.body));
@@ -229,7 +253,7 @@ async function checkKeyboardPaging(page: Page, screen: PagedScreen) {
   await expectInert(page, screen, next, `${name}: Next while page 2 loads`);
   reads.release();
   await expect(status).toHaveText(/^Page 2 ·/);
-  const pageTwo = reads.lastAnswer();
+  const pageTwo = await reads.lastAnswer();
   expect(pageTwo.cursor).toBe(pageOne.body.nextCursor);
   expect(await screen.shownKeys(), `${name}: page 2 shows its answer as soon as it is announced`).toEqual(screen.answerKeys(pageTwo.body));
   expect(screen.answerKeys(pageTwo.body).length, `${name}: page 2 has rows`).toBeGreaterThan(0);
@@ -256,7 +280,7 @@ async function checkKeyboardPaging(page: Page, screen: PagedScreen) {
   await expectInert(page, screen, previous, `${name}: Previous on the first page while it is refreshed`);
   reads.release();
   await expect(next).toHaveAttribute("aria-disabled", "false"); // page 1 has been read again
-  const refreshed = reads.lastAnswer();
+  const refreshed = await reads.lastAnswer();
   expect(refreshed.cursor).toBeNull();
   expect(await screen.shownKeys(), `${name}: page 1 shows its new answer`).toEqual(screen.answerKeys(refreshed.body));
   await expect(status).toHaveText(/^Page 1 ·/);
@@ -294,7 +318,7 @@ async function checkKeyboardRefresh(page: Page, screen: PagedScreen) {
   reads.release();
   await expect(refresh, `${name}: the refresh has completed`).toHaveAttribute("aria-disabled", "false");
   await expect(refresh).toBeFocused();
-  expect(await screen.shownKeys(), `${name}: the page shows the refreshed answer`).toEqual(screen.answerKeys(reads.lastAnswer().body));
+  expect(await screen.shownKeys(), `${name}: the page shows the refreshed answer`).toEqual(screen.answerKeys((await reads.lastAnswer()).body));
   expect(reads.count(), `${name}: still one read for the refresh`).toBe(before + 1);
 
   // Focus is still usable: Enter refreshes again.
@@ -334,7 +358,7 @@ async function checkPagingFailure(page: Page, screen: PagedScreen, url: RegExp) 
   try {
     await expect(status).toHaveText(/^Page 1 ·/);
     await expect(next).toHaveAttribute("aria-disabled", "false");
-    const pageOne = reads.lastAnswer();
+    const pageOne = await reads.lastAnswer();
     const before = reads.count();
 
     // The move to page 2 fails.
@@ -383,7 +407,7 @@ async function checkPagingFailure(page: Page, screen: PagedScreen, url: RegExp) 
     await expect(previous).toHaveAttribute("aria-disabled", "true");
     reads.release();
     await expect(status).toHaveText(/^Page 2 ·/);
-    const pageTwo = reads.lastAnswer();
+    const pageTwo = await reads.lastAnswer();
     expect(pageTwo.cursor).toBe(pageOne.body.nextCursor);
     expect(await screen.shownKeys(), `${name}: page 2 shows its answer`).toEqual(screen.answerKeys(pageTwo.body));
     await expect(nav, `${name}: the arrival does not move focus`).toBeFocused();
@@ -398,7 +422,7 @@ async function checkPagingFailure(page: Page, screen: PagedScreen, url: RegExp) 
     await expect(next).toHaveAttribute("aria-disabled", "false"); // page 1 has been read again
     await expect(status).toHaveText(/^Page 1 ·/);
     await expect(previous).toBeFocused();
-    expect(await screen.shownKeys(), `${name}: page 1 shows its new answer`).toEqual(screen.answerKeys(reads.lastAnswer().body));
+    expect(await screen.shownKeys(), `${name}: page 1 shows its new answer`).toEqual(screen.answerKeys((await reads.lastAnswer()).body));
   } finally {
     await page.context().unroute(url, failFirstPageTwoRead);
   }
