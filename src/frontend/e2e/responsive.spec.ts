@@ -9,8 +9,13 @@ test("gallery reflows at 320px without horizontal scroll and every control is ke
   await expect(page.getByRole("heading", { name: "Component gallery" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
-  // Phone breakpoint: the renderer stacks into one column.
-  await expect(page.locator('[data-breakpoint="phone"]')).toHaveCount(1);
+  // Phone breakpoint: the renderer stacks into one column. FD-01 (C-153/C-154) marks the renderer and each of its section
+  // grids with data-breakpoint, so every marked element must report phone and every section grid must have one track (F-4).
+  await expect(page.locator('[data-breakpoint="phone"]').first()).toBeVisible();
+  await expect(page.locator('[data-breakpoint]:not([data-breakpoint="phone"])')).toHaveCount(0);
+  await expect
+    .poll(() => page.locator('.grid[data-breakpoint="phone"]').evaluateAll((grids) => grids.map((grid) => getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).length)))
+    .toEqual([1]);
   // Keyboard: tab from the top reaches the primary button and the checkbox; focus ring is visible (outline set).
   await page.keyboard.press("Tab");
   await expect(page.locator(":focus")).toHaveText(/Skip to main content/);
