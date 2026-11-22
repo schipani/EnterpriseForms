@@ -1,0 +1,273 @@
+# Targeted hosted browser verification of ONE named Playwright spec for ONE frozen, signed application commit (C8 M4-5).
+#
+# This is the hosted equivalent of the focused development test `scripts/dev/test.ps1 -Level 2 -Spec <name>`, which the Stage B
+# release-only policy (C-131, docs/testing/STAGE_B_RELEASE_ONLY_POLICY.md §1) classes as focused testing, NOT Stage B. It runs no
+# Stage B integration group and no other spec, and it does not replace or invoke the stage-b-integration workflow. Stage B stays
+# release-only and is still started only through stage-b-integration.yml.
+#
+# Started by hand only (workflow_dispatch): no push, pull-request, schedule, tag, release or workflow_call trigger, and no other
+# workflow invokes it.
+#
+# Where it runs (cache-poisoning boundary, CodeQL actions/cache-poisoning): the job never runs on main and never checks out a
+# commit other than its own. It is dispatched on the spec's dedicated verification branch, whose head is exactly one commit on top
+# of the frozen application commit and adds only this file, byte-identical to main's copy. The job checks out that run's own
+# commit, so the tested code runs, and could only ever write caches, in that verification branch's scope. main and other branches
+# never restore that scope. The file on main exists so the workflow can be dispatched; dispatched on main it refuses to run.
+#
+# Before any repository script or action runs, the job proves, with only the runner's bash, git, gh and python3: the trigger and
+# branch; the run's own commit and workflow file; that the commit's single parent is the frozen commit and that the only change is
+# this file, identical to main's; that GitHub verifies both signatures; and that the frozen commit is still its branch's head.
+# Every check fails closed.
+#
+# Owner approval: the single job runs in the GitHub environment `targeted-browser-verification`, which requires the owner's review
+# and admits only the approved verification branch. Nothing (checkout, stack, browser) starts before that approval.
+#
+# The spec input is a closed list. Adding a spec is a reviewed change to this file: a new option, its file, its exact expected test
+# count, its source branch and its verification branch. A run passes only when JUnit shows exactly that many tests executed, none
+# failed and none skipped.
+name: targeted-browser-spec
+run-name: "Targeted browser spec ${{ inputs.spec }} on ${{ github.ref_name }} for ${{ inputs.commit_sha }} (${{ inputs.authorization }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorization:
+        description: "Owner authorization reference for this verification run (for example a decision-log id). Required."
+        required: true
+        type: string
+      commit_sha:
+        description: "Frozen application commit (40 hex): the verification commit's only parent and the current signed head of the spec's source branch. Compared only, never checked out."
+        required: true
+        type: string
+      spec:
+        description: "Playwright spec to run (closed list)"
+        required: true
+        type: choice
+        options:
+          - security-audit
+
+permissions:
+  contents: read
+
+# A verification run is never cancelled by a newer one.
+concurrency:
+  group: targeted-browser-spec-${{ inputs.spec }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Targeted browser spec (${{ inputs.spec }}) on its verification branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: targeted-browser-verification
+    defaults:
+      run:
+        shell: bash   # bash --noprofile --norc -eo pipefail
+    env:
+      AUTHORIZATION: ${{ inputs.authorization }}
+      COMMIT_SHA: ${{ inputs.commit_sha }}
+      SPEC: ${{ inputs.spec }}
+      RUN_ACTOR: ${{ github.actor }}
+      WORKFLOW_PATH: .github/workflows/targeted-browser-spec.yml
+      EVIDENCE: artifacts/stage-b
+    steps:
+      - name: Validate the inputs, trigger, branch and workflow identity (before any checkout; a mismatch refuses the run)
+        run: |
+          set -u
+          fail() { echo "$1" >&2; exit 1; }
+          printf '%s' "$AUTHORIZATION" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9 ._:/#()-]{2,119}$' \
+            || fail "An owner authorization reference (3..120 characters) is required."
+          printf '%s' "$COMMIT_SHA" | grep -Eq '^[0-9a-f]{40}$' \
+            || fail "commit_sha must be a full 40-character lowercase hexadecimal commit SHA."
+          [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || fail "Only a manual dispatch may run this workflow."
+          case "$SPEC" in
+            security-audit)
+              SPEC_FILE=e2e/security-audit.spec.ts; SPEC_CLASSNAME=security-audit.spec.ts; EXPECTED_TESTS=11
+              SOURCE_BRANCH=phase-c8/m4-5-accessibility-review; VERIFICATION_BRANCH=verify/c8-m4-5-security-audit ;;
+            *) fail "Unknown spec '$SPEC'." ;;
+          esac
+          # Only the spec's verification branch; never main or any other branch or tag.
+          if [ "$GITHUB_REF_TYPE" != "branch" ] || [ "$GITHUB_REF" != "refs/heads/$VERIFICATION_BRANCH" ]; then
+            fail "Dispatch this workflow on $VERIFICATION_BRANCH (--ref $VERIFICATION_BRANCH); it was started on '$GITHUB_REF'."
+          fi
+          # The workflow that is running is this file, from this run's own commit on that branch.
+          [ "$GITHUB_WORKFLOW_REF" = "$GITHUB_REPOSITORY/$WORKFLOW_PATH@refs/heads/$VERIFICATION_BRANCH" ] \
+            || fail "Unexpected workflow ref '$GITHUB_WORKFLOW_REF'."
+          [ "$GITHUB_WORKFLOW_SHA" = "$GITHUB_SHA" ] || fail "The workflow file does not come from the run's own commit."
+          {
+            echo "SPEC_FILE=$SPEC_FILE"; echo "SPEC_CLASSNAME=$SPEC_CLASSNAME"; echo "EXPECTED_TESTS=$EXPECTED_TESTS"
+            echo "SOURCE_BRANCH=$SOURCE_BRANCH"; echo "VERIFICATION_BRANCH=$VERIFICATION_BRANCH"
+          } >> "$GITHUB_ENV"
+      # The run's own commit (github.sha), with its parent for the checks below; no other ref is ever checked out.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: The verification commit is the frozen commit plus only this workflow file (local git only)
+        run: |
+          set -u
+          fail() { echo "$1" >&2; exit 1; }
+          HEAD_SHA=$(git rev-parse --verify 'HEAD^{commit}')
+          [ "$HEAD_SHA" = "$GITHUB_SHA" ] || fail "HEAD $HEAD_SHA is not the run's commit $GITHUB_SHA."
+          read -r -a COMMIT_AND_PARENTS <<< "$(git rev-list --parents -n 1 HEAD)"
+          [ "${#COMMIT_AND_PARENTS[@]}" -eq 2 ] || fail "The verification commit must have exactly one parent."
+          [ "${COMMIT_AND_PARENTS[1]}" = "$COMMIT_SHA" ] \
+            || fail "The verification commit's parent ${COMMIT_AND_PARENTS[1]} is not the frozen commit $COMMIT_SHA."
+          WORKFLOW_BLOB=$(git rev-parse --verify "HEAD:$WORKFLOW_PATH")
+          ZERO=0000000000000000000000000000000000000000
+          EXPECTED_CHANGE=$(printf ':000000 100644 %s %s A\t%s' "$ZERO" "$WORKFLOW_BLOB" "$WORKFLOW_PATH")
+          ACTUAL_CHANGE=$(git diff-tree -r --raw --no-abbrev --no-renames "$COMMIT_SHA" "$HEAD_SHA")
+          printf '%s\n' "$ACTUAL_CHANGE"
+          [ "$ACTUAL_CHANGE" = "$EXPECTED_CHANGE" ] \
+            || fail "The verification commit must differ from the frozen commit only by adding $WORKFLOW_PATH (mode 100644)."
+          [ "$(git hash-object -- "$WORKFLOW_PATH")" = "$WORKFLOW_BLOB" ] || fail "The checked-out workflow file differs from HEAD."
+          echo "WORKFLOW_BLOB=$WORKFLOW_BLOB" >> "$GITHUB_ENV"
+      - name: GitHub verifies both signatures, the frozen branch head and the approved workflow file on main (fails closed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          fail() { echo "$1" >&2; exit 1; }
+          check_signature() {
+            local sha="$1" label="$2" result
+            result=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha" \
+              --jq '[.sha, (.commit.verification.verified | tostring), .commit.verification.reason] | join(" ")')
+            echo "$label: $result"
+            [ "$result" = "$sha true valid" ] || fail "GitHub does not verify the signature of the $label $sha."
+          }
+          check_signature "$GITHUB_SHA" "verification commit"
+          check_signature "$COMMIT_SHA" "frozen commit"
+          SOURCE_HEAD=$(gh api "repos/$GITHUB_REPOSITORY/branches/$SOURCE_BRANCH" --jq '.commit.sha')
+          echo "$SOURCE_BRANCH head: $SOURCE_HEAD"
+          [ "$SOURCE_HEAD" = "$COMMIT_SHA" ] || fail "The frozen commit is not the current head of $SOURCE_BRANCH."
+          MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')
+          printf '%s' "$MAIN_SHA" | grep -Eq '^[0-9a-f]{40}$' || fail "Could not resolve main."
+          MAIN_BLOB=$(gh api "repos/$GITHUB_REPOSITORY/contents/$WORKFLOW_PATH?ref=$MAIN_SHA" \
+            --jq 'if .type == "file" then .sha else "" end')
+          echo "main $MAIN_SHA $WORKFLOW_PATH blob: $MAIN_BLOB; verification commit blob: $WORKFLOW_BLOB"
+          if [ -z "$MAIN_BLOB" ] || [ "$MAIN_BLOB" != "$WORKFLOW_BLOB" ]; then
+            fail "The workflow file is not identical to main's copy."
+          fi
+          gh api -H "Accept: application/vnd.github.raw" "repos/$GITHUB_REPOSITORY/contents/$WORKFLOW_PATH?ref=$MAIN_SHA" \
+            > "$RUNNER_TEMP/main-workflow.yml"
+          cmp -- "$RUNNER_TEMP/main-workflow.yml" "$WORKFLOW_PATH" || fail "The workflow file bytes differ from main's copy."
+          echo "MAIN_SHA=$MAIN_SHA" >> "$GITHUB_ENV"
+      - name: Record what is being verified
+        run: |
+          mkdir -p "$EVIDENCE"
+          python3 -I - "$EVIDENCE/targeted-verification.json" <<'PY'
+          import json, os, sys
+          keys = ["AUTHORIZATION", "COMMIT_SHA", "SOURCE_BRANCH", "GITHUB_SHA", "VERIFICATION_BRANCH", "MAIN_SHA", "WORKFLOW_BLOB",
+                  "SPEC", "SPEC_FILE", "EXPECTED_TESTS", "RUN_ACTOR", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_WORKFLOW_REF",
+                  "GITHUB_WORKFLOW_SHA"]
+          with open(sys.argv[1], "w", encoding="utf-8") as f:
+              json.dump({k: os.environ.get(k) for k in keys}, f, indent=2)
+          PY
+          {
+            echo "### Targeted browser verification"
+            echo "- Authorization reference: \`$AUTHORIZATION\`"
+            echo "- Spec: \`$SPEC_FILE\` (expected $EXPECTED_TESTS tests, project chromium-desktop)"
+            echo "- Frozen application commit: \`$COMMIT_SHA\` (signature valid, head of \`$SOURCE_BRANCH\`)"
+            echo "- Verification commit: \`$GITHUB_SHA\` on \`$VERIFICATION_BRANCH\` (signature valid; only change: \`$WORKFLOW_PATH\`, identical to main \`$MAIN_SHA\`)"
+            echo "- Started by: \`$RUN_ACTOR\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Start the disposable security-test stack (synthetic credentials, clean volumes)
+        uses: ./.github/actions/start-stack
+        with:
+          early-services: clamav
+          cache-scope: targeted-browser
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22.20.0"
+      - name: Frontend install
+        working-directory: src/frontend
+        run: npm ci --ignore-scripts
+      # No npm, browser or other cache (CodeQL actions/cache-poisoning): the tested code must not be able to seed anything a
+      # later run would restore. Install fresh every run.
+      - name: Install Playwright Chromium (fresh, uncached)
+        working-directory: src/frontend
+        run: npx playwright install --with-deps chromium
+      - name: Browser-test isolation regression (misrouted base URL, occupied port, persistent endpoint → refused before any write)
+        working-directory: src/frontend
+        env:
+          API_TARGET: http://127.0.0.1:5180
+          E2E_EXPECTED_STACK_IDENTITY: enterpriseforms-security-test
+        run: node scripts/e2e-isolation-regression.mjs
+      - name: The selection is exactly the spec's expected tests (before anything runs)
+        working-directory: src/frontend
+        run: |
+          set -o pipefail
+          npx playwright test "$SPEC_FILE" --project=chromium-desktop --list --reporter=list | tee "../../$EVIDENCE/selected-tests.txt"
+          LISTED=$(grep -cE "^\s+\[chromium-desktop\] › $SPEC_CLASSNAME:" "../../$EVIDENCE/selected-tests.txt" || true)
+          echo "listed=$LISTED expected=$EXPECTED_TESTS"
+          [ "$LISTED" = "$EXPECTED_TESTS" ]
+          # --list also writes the JUnit report (every test as skipped); remove it so only the real run's report is judged.
+          rm -f "../../$EVIDENCE/playwright-junit.xml"
+      - name: Run the spec (dedicated Vite server → security-test API on 5180; identity verified first)
+        id: spec
+        working-directory: src/frontend
+        env:
+          API_TARGET: http://127.0.0.1:5180
+          E2E_EXPECTED_STACK_IDENTITY: enterpriseforms-security-test
+        run: npx playwright test "$SPEC_FILE" --project=chromium-desktop
+      - name: JUnit shows exactly the expected tests executed, zero failed and zero skipped (never trusts the exit code)
+        if: ${{ !cancelled() && steps.spec.outcome != 'skipped' }}
+        run: |
+          set -o pipefail
+          python3 -I - "$EVIDENCE/playwright-junit.xml" "$EXPECTED_TESTS" "$SPEC_CLASSNAME" <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import sys
+          import xml.etree.ElementTree as ET
+          path, expected, classname = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+          try:
+              root = ET.parse(path).getroot()
+          except (OSError, ET.ParseError) as error:
+              print(f"FAIL  no readable JUnit report at {path}: {error}")
+              sys.exit(1)
+          cases = list(root.iter("testcase"))
+          failed = sum(1 for c in cases if c.find("failure") is not None or c.find("error") is not None)
+          skipped = sum(1 for c in cases if c.find("skipped") is not None)
+          executed = len(cases) - skipped
+          problems = []
+          if len(cases) != expected:
+              problems.append(f"{len(cases)} test cases reported, expected exactly {expected}")
+          if failed:
+              problems.append(f"{failed} failed")
+          if skipped:
+              problems.append(f"{skipped} skipped")
+          for attribute, wanted in (("tests", str(expected)), ("failures", "0"), ("errors", "0"), ("skipped", "0")):
+              if root.get(attribute) != wanted:
+                  problems.append(f"report attribute {attribute}={root.get(attribute)!r}, expected {wanted!r}")
+          strangers = sorted({c.get("classname") for c in cases} - {classname}, key=str)
+          if strangers:
+              problems.append(f"test cases from other specs: {strangers}")
+          for problem in problems:
+              print(f"FAIL  {problem}")
+          for case in cases:
+              outcome = "failed" if case.find("failure") is not None or case.find("error") is not None else "skipped" if case.find("skipped") is not None else "passed"
+              print(f"- {outcome}: {case.get('name')}")
+          print(f"{'PASS' if not problems else 'FAIL'}  executed={executed} failed={failed} skipped={skipped} expected={expected}")
+          sys.exit(1 if problems else 0)
+          PY
+      - name: Collect service logs (sanitized by the services; no secrets are logged)
+        if: always()
+        run: |
+          mkdir -p "$EVIDENCE/logs"
+          if [ -f infrastructure/docker/.env ]; then
+            cd infrastructure/docker
+            for s in authority api worker clamav business-migrate; do
+              docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env logs --no-color $s > "../../$EVIDENCE/logs/$s.log" 2>&1 || true
+            done
+          fi
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        if: always()
+        with:
+          name: targeted-browser-evidence-${{ inputs.spec }}
+          path: artifacts/stage-b
+          if-no-files-found: warn
+      - name: Tear down
+        if: always()
+        run: |
+          if [ -f infrastructure/docker/.env ]; then
+            cd infrastructure/docker
+            docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env down -v --remove-orphans
+          fi
