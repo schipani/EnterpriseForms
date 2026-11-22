@@ -169,15 +169,38 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
         return (response.StatusCode, await response.Content.ReadAsStringAsync(Ct), response);
     }
 
+    private async Task<long> AuthorizationRevisionAsync(StageBScenario s) =>
+        (await fixture.Authority.GateAsync(s.OrganizationId)).GetProperty("authorization_revision").GetInt64();
+
     /// <summary>
-    /// The request was accepted and recorded, but is not yet on the roster. A refused request is a failed precondition, not a
-    /// pending one (F-2: a refusal used to pass silently and surfaced later as a missing operation row).
+    /// Makes a membership change pending deterministically, as RC-06 does: the Designer's delegated command is submitted to the
+    /// Authority directly while the archive is paused, then the API's T1 row (AwaitingCommit) is recorded. Through the business
+    /// API the pre-check needs a stream-head receipt established within the WP-7A freshness bound, which a paused archive cannot
+    /// give, so whether that request was accepted or refused (503 AwaitingArchive) was a race; a refusal is a failed
+    /// precondition, never a pending operation (F-2). The Authority commits the command at the next revision and cannot deliver
+    /// it to the paused archive, so it is committed but not Effective. The caller reads <paramref name="revision"/>, then pauses
+    /// and finally unpauses the archive.
     /// </summary>
-    private static void AssertNotEffectiveYet(HttpResult result)
+    private async Task<Guid> SubmitPendingAsync(StageBScenario s, long revision, string kind, Guid teamId, TestUser member, string authorityKey, string reason)
     {
-        Assert.True(result.IsSuccess, "the request was refused instead of being accepted as pending: " + (int)result.Status + " " + result.Body);
-        Assert.NotEqual("Projected", result.Root.GetProperty("operation").GetProperty("operationState").GetString());
-        Assert.False(result.Root.GetProperty("operation").GetProperty("rosterUpdated").GetBoolean(), result.Body);
+        var submitted = await fixture.Authority.SendAsync(HttpMethod.Post, "/internal/v1/security-commands/", TestIdentity.WorkloadToken(), new
+        {
+            organization_id = s.OrganizationId,
+            command_kind = kind,
+            resource = new { resource_kind = "Team", resource_id = teamId },
+            expected_authorization_revision = revision,
+            command_payload = new { team_id = teamId, member_user_id = member.AuthorityUserId },
+            change_reason = reason,
+        }, s.Token(s.Designer), authorityKey);
+        Assert.True(submitted.IsSuccess, submitted.Body);
+        Assert.Equal("CommittedAwaitingProjection", submitted.Root.GetProperty("command_status").GetString());
+        Assert.Equal(revision + 1, submitted.Root.GetProperty("authorization_revision").GetInt64());
+        Assert.Equal("AwaitingArchive", submitted.Root.GetProperty("projection_gate_state").GetString());
+        Sql($"""
+            INSERT INTO authority_command_operations (authority_command_operation_id, tenant_id, initiated_by_user_id, command_kind_name, team_id, member_user_id, authority_idempotency_key, request_correlation_identifier, operation_created_on, operation_state_name, next_attempt_on, attempt_count, consecutive_error_count, operation_modified_on)
+            VALUES (gen_random_uuid(), '{s.OrganizationId:D}', '{s.Designer.AuthorityUserId:D}', '{kind}', '{teamId:D}', '{member.AuthorityUserId:D}', '{authorityKey}', gen_random_uuid(), now(), 'AwaitingCommit', now(), 0, 0, now())
+            """);
+        return submitted.Root.GetProperty("command_id").GetGuid();
     }
 
     // ---------------------------------------------------------------- RC-01 / RC-02 / RC-16 / RC-21
@@ -186,12 +209,14 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
     public async Task RC01APendingAddCompletesOnTheServerAfterTheBrowserIsGone()
     {
         var (s, teamId) = await TeamAsync("rc01");
-        var key = NewKey("rc01");
+        var key = "team-add:" + NewKey("rc01");
+        var revision = await AuthorizationRevisionAsync(s);
         fixture.Stack.Pause("archive-store");
+        Guid commandId;
         try
         {
-            AssertNotEffectiveYet(await AddAsync(s, teamId, s.Designer, s.Clerk, key));
-            Assert.Equal(0, ActiveRosterRows(s, teamId, s.Clerk)); // no optimistic roster write while pending
+            commandId = await SubmitPendingAsync(s, revision, "AddTeamMember", teamId, s.Clerk, key, "rc01");
+            Assert.Equal(0, ActiveRosterRows(s, teamId, s.Clerk)); // nothing on the roster while the command is not Effective
         }
         finally
         {
@@ -199,11 +224,12 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
         }
 
         // The "browser" is gone: no further request of any kind reaches the business API. The Worker alone completes it.
-        var row = await WaitProjectedAsync(s, "team-add:" + key);
+        var row = await WaitProjectedAsync(s, key);
+        Assert.Equal(commandId, row.GetProperty("authority_command_id").GetGuid()); // found by key, never re-sent
         Assert.Equal("MembershipPresentProjected", row.GetProperty("operation_outcome_code").GetString());
         Assert.Equal(1, ActiveRosterRows(s, teamId, s.Clerk));
         Assert.Equal((true, row.GetProperty("committed_authorization_revision").GetInt64()), Watermark(s, teamId, s.Clerk));
-        Assert.Equal(1, AuthorityCommands(s.OrganizationId, "team-add:" + key));
+        Assert.Equal(1, AuthorityCommands(s.OrganizationId, key));
     }
 
     [Fact]
@@ -213,11 +239,13 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
         var addKey = NewKey("rc02-add");
         Assert.True((await AddAsync(s, teamId, s.Designer, s.Clerk, addKey)).IsSuccess);
         await WaitProjectedAsync(s, "team-add:" + addKey);
-        var key = NewKey("rc02");
+        var key = "team-remove:" + NewKey("rc02");
+        var revision = await AuthorizationRevisionAsync(s);
         fixture.Stack.Pause("archive-store");
+        Guid commandId;
         try
         {
-            AssertNotEffectiveYet(await RemoveAsync(s, teamId, s.Designer, s.Clerk, key));
+            commandId = await SubmitPendingAsync(s, revision, "RemoveTeamMember", teamId, s.Clerk, key, "rc02");
             Assert.Equal(1, ActiveRosterRows(s, teamId, s.Clerk)); // still a member until the Authority confirms
         }
         finally
@@ -225,7 +253,9 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
             fixture.Stack.Unpause("archive-store");
         }
 
-        var row = await WaitProjectedAsync(s, "team-remove:" + key);
+        var row = await WaitProjectedAsync(s, key);
+        Assert.Equal(commandId, row.GetProperty("authority_command_id").GetGuid()); // found by key, never re-sent
+        Assert.Equal(1, AuthorityCommands(s.OrganizationId, key));
         Assert.Equal("MembershipAbsentProjected", row.GetProperty("operation_outcome_code").GetString());
         Assert.Equal(0, ActiveRosterRows(s, teamId, s.Clerk));
         Assert.Equal((false, row.GetProperty("committed_authorization_revision").GetInt64()), Watermark(s, teamId, s.Clerk));
@@ -292,31 +322,11 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
             Assert.True(added.IsSuccess, added.Body);
             Assert.True(added.Root.GetProperty("command").GetProperty("effective").GetBoolean(), added.Body);
 
-            // The later removal is made pending deterministically, as RC-06 does: the API's T1 row (AwaitingCommit), then the
-            // same delegated command submitted to the Authority directly. Through the business API its pre-check would need a
-            // receipt established within the WP-7A freshness bound while the archive is paused, a race (F-2). The Authority
-            // commits it at r2 and cannot deliver it to the paused archive, so it is not Effective and P stays at r1.
-            var revision = (await fixture.Authority.GateAsync(s.OrganizationId)).GetProperty("authorization_revision").GetInt64();
+            // The later removal is made pending deterministically (F-2): committed at r2, not Effective, so P stays at r1.
+            var revision = await AuthorizationRevisionAsync(s);
             fixture.Stack.Pause("archive-store");
             paused = true;
-            Sql($"""
-                INSERT INTO authority_command_operations (authority_command_operation_id, tenant_id, initiated_by_user_id, command_kind_name, team_id, member_user_id, authority_idempotency_key, request_correlation_identifier, operation_created_on, operation_state_name, next_attempt_on, attempt_count, consecutive_error_count, operation_modified_on)
-                VALUES (gen_random_uuid(), '{s.OrganizationId:D}', '{s.Designer.AuthorityUserId:D}', 'RemoveTeamMember', '{teamId:D}', '{s.Clerk.AuthorityUserId:D}', '{removeKey}', gen_random_uuid(), now(), 'AwaitingCommit', now(), 0, 0, now())
-                """);
-            var submitted = await fixture.Authority.SendAsync(HttpMethod.Post, "/internal/v1/security-commands/", TestIdentity.WorkloadToken(), new
-            {
-                organization_id = s.OrganizationId,
-                command_kind = "RemoveTeamMember",
-                resource = new { resource_kind = "Team", resource_id = teamId },
-                expected_authorization_revision = revision,
-                command_payload = new { team_id = teamId, member_user_id = s.Clerk.AuthorityUserId },
-                change_reason = "rc21",
-            }, s.Token(s.Designer), removeKey);
-            Assert.True(submitted.IsSuccess, submitted.Body);
-            Assert.Equal("CommittedAwaitingProjection", submitted.Root.GetProperty("command_status").GetString());
-            Assert.Equal(revision + 1, submitted.Root.GetProperty("authorization_revision").GetInt64());
-            Assert.Equal("AwaitingArchive", submitted.Root.GetProperty("projection_gate_state").GetString());
-            removeCommandId = submitted.Root.GetProperty("command_id").GetGuid();
+            removeCommandId = await SubmitPendingAsync(s, revision, "RemoveTeamMember", teamId, s.Clerk, removeKey, "rc21");
             await StartWorkersAsync();
 
             // Gate closed by the later removal (D8-15): the add is projected from the Authority's state at P = r1.
@@ -351,11 +361,13 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
     public async Task RC03AnApiRestartWhilePendingLosesNothing()
     {
         var (s, teamId) = await TeamAsync("rc03");
-        var key = NewKey("rc03");
+        var key = "team-add:" + NewKey("rc03");
+        var revision = await AuthorizationRevisionAsync(s);
         fixture.Stack.Pause("archive-store");
+        Guid commandId;
         try
         {
-            AssertNotEffectiveYet(await AddAsync(s, teamId, s.Designer, s.Clerk, key));
+            commandId = await SubmitPendingAsync(s, revision, "AddTeamMember", teamId, s.Clerk, key, "rc03");
             fixture.Stack.Compose("restart api", 180);
         }
         finally
@@ -363,9 +375,10 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
             fixture.Stack.Unpause("archive-store");
         }
 
-        await WaitProjectedAsync(s, "team-add:" + key, 120);
+        var row = await WaitProjectedAsync(s, key, 120);
+        Assert.Equal(commandId, row.GetProperty("authority_command_id").GetGuid());
         Assert.Equal(1, ActiveRosterRows(s, teamId, s.Clerk));
-        Assert.Equal(1, AuthorityCommands(s.OrganizationId, "team-add:" + key));
+        Assert.Equal(1, AuthorityCommands(s.OrganizationId, key));
     }
 
     [Fact]
@@ -851,19 +864,21 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
         Assert.Equal(HttpStatusCode.Forbidden, (await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/membership-operations/{operationId:D}/recheck", s.Token(s.Clerk), new { })).Status);
 
         // Time-based flag: an operation still awaiting the Authority after the attention threshold is flagged.
-        var slowKey = NewKey("rc17-slow");
+        var slowKey = "team-add:" + NewKey("rc17-slow");
+        var slowRevision = await AuthorizationRevisionAsync(s);
         fixture.Stack.Pause("archive-store");
         try
         {
-            AssertNotEffectiveYet(await AddAsync(s, teamId, s.Designer, s.Reader, slowKey));
-            await WaitOperationAsync(s, "team-add:" + slowKey, r => r.GetProperty("needs_attention_flagged_on").ValueKind != JsonValueKind.Null, TimeSpan.FromSeconds(60), "overdue operation not flagged");
+            await SubmitPendingAsync(s, slowRevision, "AddTeamMember", teamId, s.Reader, slowKey, "rc17");
+            await WaitOperationAsync(s, slowKey, r => r.GetProperty("needs_attention_flagged_on").ValueKind != JsonValueKind.Null, TimeSpan.FromSeconds(60), "overdue operation not flagged");
         }
         finally
         {
             fixture.Stack.Unpause("archive-store");
         }
 
-        await WaitProjectedAsync(s, "team-add:" + slowKey, 120);
+        await WaitProjectedAsync(s, slowKey, 120);
+        Assert.Equal(1, AuthorityCommands(s.OrganizationId, slowKey));
     }
 
     [Fact]
