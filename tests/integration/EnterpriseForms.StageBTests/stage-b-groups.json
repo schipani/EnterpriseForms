@@ -1,5 +1,5 @@
 {
-  "_comment": "Single source of truth for Stage B integration sharding. Every test class under Tests/ must appear in exactly one group (scripts/ci/stage_b_groups.py enforces it in CI and in scripts/dev/stage-b.ps1). Groups are balanced by summed test time measured in run 41709208259 (about 3735 s sequential): forms-documents ~180 s, authorization-security-onboarding ~395 s, records-lifecycle ~455 s, administration-membership ~570 s, search-catalogue ~620 s, protection-reconciliation ~715 s, search-execution ~820 s (one 719 s benchmark that cannot be split further).",
+  "_comment": "Single source of truth for Stage B integration sharding. Every test class under Tests/ must appear in exactly one group (scripts/ci/stage_b_groups.py enforces it in CI and in scripts/dev/stage-b.ps1). Groups are balanced by summed test time measured in run 41709208259 (about 3735 s sequential): forms-documents ~180 s, authorization-security-onboarding ~395 s, records-lifecycle ~455 s, administration-membership ~570 s, search-catalogue ~620 s, protection-reconciliation ~715 s, search-execution ~820 s (one 719 s benchmark that cannot be split further). Re-split after Stage B run 44878220074 (findings F-6 and RB-13): the search-execution shard had grown to ten classes, including four long measurement classes recorded locally at about 21 min (IndexedSearchLocalBenchmarkTests), 14 min (SearchAvailabilityUnderPermissionChurnTests), 13 min (SealSweepLockMeasurementTests) and 16 min (RecordRegistrationThroughputMeasurementTests), and exceeded its 45 min job; each measurement now has a shard of its own (the last two share one). ProjectionIntegrityRollbackTests replaces or restores the whole SpiceDB datastore, which correctly quarantines every organization on the stack (RB-13), so it runs on a stack of its own. No test is removed or skipped.",
   "namespace": "EnterpriseForms.StageBTests.Tests",
   "minimumTotalTests": 270,
   "groups": [
@@ -11,7 +11,7 @@
     {
       "name": "authorization-security-onboarding",
       "title": "Authorization, Security, Onboarding and Recovery",
-      "classes": ["AuthorizationAndTamperTests", "SessionCsrfTests", "SessionRevocationTests", "SecurityIncidentTests", "SecurityAdministratorTests", "SecurityAuditorTests", "SecurityAuditAccessTests", "SecurityCommandTimelineTests", "SecurityHomeTests", "AuthorizationRollbackTests", "ProjectionIntegrityRollbackTests", "SpiceDbBehaviourContractTests", "AuthorizationLatencyTests", "SecurityAdministratorProvisioningTests", "FieldProtectionDowngradeTests", "ConsoleOperatorRegistrationTests", "OrganizationOnboardingStackTests", "OwnerRecoveryStackTests", "PlatformConsoleStackTests", "PlatformOperatorApprovalTests", "AuthorityWorkWakeupStackTests", "SearchAccessVerificationStackTests", "SearchAccessShadowStackTests", "Ix7SearchRecoveryRehearsalStackTests"]
+      "classes": ["AuthorizationAndTamperTests", "SessionCsrfTests", "SessionRevocationTests", "SecurityIncidentTests", "SecurityAdministratorTests", "SecurityAuditorTests", "SecurityAuditAccessTests", "SecurityCommandTimelineTests", "SecurityHomeTests", "AuthorizationRollbackTests", "SpiceDbBehaviourContractTests", "AuthorizationLatencyTests", "SecurityAdministratorProvisioningTests", "FieldProtectionDowngradeTests", "ConsoleOperatorRegistrationTests", "OrganizationOnboardingStackTests", "OwnerRecoveryStackTests", "PlatformConsoleStackTests", "PlatformOperatorApprovalTests", "AuthorityWorkWakeupStackTests", "SearchAccessVerificationStackTests", "SearchAccessShadowStackTests", "Ix7SearchRecoveryRehearsalStackTests"]
     },
     {
       "name": "records-lifecycle",
@@ -30,13 +30,33 @@
     },
     {
       "name": "search-execution",
-      "title": "Field Search Execution and Benchmark",
-      "classes": ["FieldSearchExecutionTests", "SearchIndexFoundationTests", "IndexedSearchQueryStackTests", "IndexedFieldSearchEngineStackTests", "IndexedSearchLocalBenchmarkTests", "IndexedSearchTimeoutDiagnosticsTests", "SealSweepLockMeasurementTests", "RecordRegistrationThroughputMeasurementTests", "IndexedSearchShareOnlyItemChannelTests", "SearchAvailabilityUnderPermissionChurnTests"]
+      "title": "Field Search Execution",
+      "classes": ["FieldSearchExecutionTests", "SearchIndexFoundationTests", "IndexedSearchQueryStackTests", "IndexedFieldSearchEngineStackTests", "IndexedSearchTimeoutDiagnosticsTests", "IndexedSearchShareOnlyItemChannelTests"]
     },
     {
       "name": "protection-reconciliation",
       "title": "Protection Migration and Reconciliation",
       "classes": ["ProtectionReconciliationTests", "FieldProtectionMigrationTests"]
+    },
+    {
+      "name": "projection-integrity-restore",
+      "title": "SpiceDB Datastore Restore and Replacement (RB-12, RB-13)",
+      "classes": ["ProjectionIntegrityRollbackTests"]
+    },
+    {
+      "name": "search-benchmark-indexed",
+      "title": "Indexed Search Local Benchmark",
+      "classes": ["IndexedSearchLocalBenchmarkTests"]
+    },
+    {
+      "name": "search-benchmark-churn",
+      "title": "Search Availability Under Permission Churn",
+      "classes": ["SearchAvailabilityUnderPermissionChurnTests"]
+    },
+    {
+      "name": "search-benchmark-ingestion",
+      "title": "Seal Sweep and Record Registration Measurements",
+      "classes": ["SealSweepLockMeasurementTests", "RecordRegistrationThroughputMeasurementTests"]
     }
   ]
 }
