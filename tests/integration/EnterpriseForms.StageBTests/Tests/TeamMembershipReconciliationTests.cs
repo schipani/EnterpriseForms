@@ -169,13 +169,15 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
         return (response.StatusCode, await response.Content.ReadAsStringAsync(Ct), response);
     }
 
+    /// <summary>
+    /// The request was accepted and recorded, but is not yet on the roster. A refused request is a failed precondition, not a
+    /// pending one (F-2: a refusal used to pass silently and surfaced later as a missing operation row).
+    /// </summary>
     private static void AssertNotEffectiveYet(HttpResult result)
     {
-        if (result.IsSuccess)
-        {
-            Assert.NotEqual("Projected", result.Root.GetProperty("operation").GetProperty("operationState").GetString());
-            Assert.False(result.Root.GetProperty("operation").GetProperty("rosterUpdated").GetBoolean(), result.Body);
-        }
+        Assert.True(result.IsSuccess, "the request was refused instead of being accepted as pending: " + (int)result.Status + " " + result.Body);
+        Assert.NotEqual("Projected", result.Root.GetProperty("operation").GetProperty("operationState").GetString());
+        Assert.False(result.Root.GetProperty("operation").GetProperty("rosterUpdated").GetBoolean(), result.Body);
     }
 
     // ---------------------------------------------------------------- RC-01 / RC-02 / RC-16 / RC-21
