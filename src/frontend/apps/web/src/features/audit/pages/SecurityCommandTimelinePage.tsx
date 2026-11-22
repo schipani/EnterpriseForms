@@ -3,6 +3,7 @@ import type { SecurityCommandTimelineItemResponse } from "@enterpriseforms/api-c
 import { ActionIcons, Badge, Button, Card, DataTable, EmptyState, LoadingBlock, PageHeader, Select, StatusMessage, TextInput, useFormatter } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { usePagingErrorFocus } from "../components/usePagingErrorFocus";
 import { ErrorPanel } from "../../support";
 import { AuditViewTabs } from "../components/AuditViewTabs";
 import { SecurityHomeHint, isGateClosed } from "../components/SecurityHomeHint";
@@ -47,6 +48,7 @@ export function SecurityCommandTimelinePage() {
     placeholderData: (previous) => previous,
     staleTime: 0,
   });
+  const paging = usePagingErrorFocus(timeline);
 
   if (!allowed) {
     return (
@@ -66,13 +68,31 @@ export function SecurityCommandTimelinePage() {
   };
   const data = timeline.data;
   const pageNumber = trail.cursors.length;
+  // Activation is ignored while a control is unavailable (aria-disabled): on the first or last page, or while a page loads.
+  const goPrevious = () => {
+    if (pageNumber > 1 && !timeline.isFetching) {
+      paging.pageMoveStarted();
+      setTrail((t) => previousPage(t));
+    }
+  };
+  const goNext = () => {
+    const cursor = data?.nextCursor;
+    if (cursor && !timeline.isFetching) {
+      paging.pageMoveStarted();
+      setTrail((t) => nextPage(t, cursor));
+    }
+  };
   return (
     <>
       <PageHeader
         title="Security commands"
         lead="Security and governance commands and allowlisted Authority audit entries for this organization."
         actions={
-          <Button variant="secondary" size="sm" icon={ActionIcons.refresh} disabled={timeline.isFetching || !valid} onClick={() => void timeline.refetch()}>
+          // aria-disabled, not disabled, so a keyboard Refresh keeps its focus while the page reloads; activation is ignored meanwhile.
+          <Button variant="secondary" size="sm" icon={ActionIcons.refresh} aria-disabled={timeline.isFetching || !valid} onClick={() => {
+              if (!timeline.isFetching && valid) void timeline.refetch();
+            }}
+          >
             Refresh
           </Button>
         }
@@ -110,7 +130,18 @@ export function SecurityCommandTimelinePage() {
         <Card title="Timeline">
           <div className="flex flex-col gap-3">
             {timeline.isPending && valid ? <LoadingBlock label="Loading security commands" /> : null}
-            {timeline.isError ? <ErrorPanel error={timeline.error} onRetry={() => void timeline.refetch()} /> : null}
+            {/* A failed page move replaces the rows and the paging controls, so focus moves here (usePagingErrorFocus). */}
+            {timeline.isError ? (
+              <div ref={paging.errorTarget} tabIndex={-1}>
+                <ErrorPanel
+                  error={timeline.error}
+                  onRetry={() => {
+                    paging.retryStarted();
+                    void timeline.refetch();
+                  }}
+                />
+              </div>
+            ) : null}
             {timeline.isError && isGateClosed(timeline.error) ? <SecurityHomeHint /> : null}
             {data && data.items.length === 0 ? (
               <EmptyState title={pageNumber > 1 ? "No more items" : "No items match"}>{hasTimelineFilters(filters) ? "Try a wider period or fewer filters." : "No security commands are recorded for this organization yet."}</EmptyState>
@@ -118,15 +149,26 @@ export function SecurityCommandTimelinePage() {
             {data && data.items.length > 0 ? (
               <>
                 <DataTable<SecurityCommandTimelineItemResponse> caption="Security commands and audit entries" rows={[...data.items]} rowKey={rowKey} columns={timelineColumns()} />
-                <nav aria-label="Security command pages" className="flex flex-wrap items-center justify-between gap-3">
+                <nav ref={paging.pagingTarget} tabIndex={-1} aria-label="Security command pages" className="flex flex-wrap items-center justify-between gap-3">
+                  {/* While another page loads, the rows shown are still the previous page's, so the page number is announced only once
+                      the requested page has arrived. */}
                   <p className="text-help text-muted" aria-live="polite">
-                    Page {pageNumber} · up to {String(data.pageSize)} items per page · access recorded by the Authority (audit-stream revision {String(data.accessEvidence.authorityJournalRevision)})
+                    {timeline.isPlaceholderData ? (
+                      <>Loading page {pageNumber}…</>
+                    ) : (
+                      <>
+                        Page {pageNumber} · up to {String(data.pageSize)} items per page · access recorded by the Authority (audit-stream revision {String(data.accessEvidence.authorityJournalRevision)})
+                      </>
+                    )}
                   </p>
+                  {/* aria-disabled, not disabled: natively disabling the focused button (while the page loads, or on reaching the first or
+                      last page) drops keyboard focus to the document body. Activation is ignored while unavailable, so a stale cursor
+                      from the previous page shown during a load is never used. */}
                   <div className="flex gap-2">
-                    <Button variant="secondary" size="sm" disabled={pageNumber === 1 || timeline.isFetching} onClick={() => setTrail((t) => previousPage(t))}>
+                    <Button variant="secondary" size="sm" aria-disabled={pageNumber === 1 || timeline.isFetching} onClick={goPrevious}>
                       Previous
                     </Button>
-                    <Button variant="secondary" size="sm" disabled={!data.nextCursor || timeline.isFetching} onClick={() => data.nextCursor && setTrail((t) => nextPage(t, data.nextCursor!))}>
+                    <Button variant="secondary" size="sm" aria-disabled={!data.nextCursor || timeline.isFetching} onClick={goNext}>
                       Next
                     </Button>
                   </div>

@@ -1348,3 +1348,124 @@ Outstanding, unchanged by acceptance:
 - accessibility, zoom and Playwright checks (M4-5);
 - hosted CI evidence beyond this PR;
 - Azure staging and every production requirement.
+
+## 44. C-174: M4-5 package 1 — browser accessibility verification and reviewer preparation (2026-11-21). Development/Testing; not owner-accepted; not independently reviewed; hosted verification not run
+
+Owner decision C-174: bounded M4-5 implementation (WP-1 and WP-4 preparation) on `phase-c8/m4-5-accessibility-review` from `main` `6142f91`, with OD-1…OD-7. Not authorized: Stage B, hosted workflow dispatch, publishing, merge.
+
+### 44.1 Delivered (uncommitted)
+
+- **`src/frontend/e2e/security-audit.spec.ts`** (six serial tests, isolated security-test stack only, existing isolation guard; no seed or stack change):
+  1. Owner, designer and clerk: no Security home or Audit navigation. On `/app/security` the four Authority-backed sections say "Not available to your role" and the two live-check widgets show their unavailable text. `/app/security/audit`, `/app/security/audit/commands` and an event route show "No permission" with no table.
+  2. Security Administrator: Security home navigation (current-page marked), every widget's content, search approvals and incidents. The gate's Refresh is reached with Tab, its focus outline is visible, and Enter refreshes that section (200). No audit explorer (D8-6).
+  3. The Security Administrator appoints Riley Reader as Security Auditor on the People page (reason code, development-only step-up). The test first asserts Riley holds no role.
+  4. Security Auditor:
+     - Security home archive only, with the live-check widgets unavailable.
+     - Audit explorer (current tab marked). An invalid action code typed by keyboard is marked invalid and clearing it restores the list. Refresh is reached with Tab (visible focus) and refreshes by Enter (200).
+     - Previous is disabled on page 1; Next and Previous are exercised by keyboard when the server returns a cursor (conditional on data).
+     - An event is opened by keyboard (visible focus) showing its provenance warning and back link.
+     - The security-command timeline table is shown.
+  5. axe (WCAG 2.0/2.1/2.2 A and AA tags plus best-practice, the PB-14 filter) and no horizontal page overflow at 320×720, 768×1024, 1440×900, 720×600 (200% zoom equivalent) and 320×256 (400% zoom equivalent). It covers the Security home (auditor and administrator), audit explorer, event detail and timeline (25 scans).
+  6. Revocation mid-session: with the auditor's session open on the explorer, a second browser context (the Security Administrator) removes the role. The auditor's next refresh gets 403 `AUDIT_VIEW_FORBIDDEN` (shown as an access refusal), and the Security home archive section is refused.
+  - `afterAll` removes Riley's auditor role if a failure left it, so the shared organization ends as it started.
+- **Reviewer package:** [architecture/PHASE_C8_M4_AC8_REVIEWER_PACKAGE.md](architecture/PHASE_C8_M4_AC8_REVIEWER_PACKAGE.md). It is consolidated for AC-8.1–AC-8.5, references the M4-1 S1/M1 package, and adds questions Q-6…Q-11. The findings and attestation sections are blank. It is marked owner-led and not reviewed.
+- **Sanitized evidence:** [evidence/phase-c8/m4-audit/STAGE_B_RUN_SUMMARIES.md](evidence/phase-c8/m4-audit/STAGE_B_RUN_SUMMARIES.md). All ten M4-2…M4-4 Stage B runs are listed, including the failed ones, with class, timing, per-test outcome and duration, and SHA-256 of the local raw TRX and `run.json`. Machine and user names, paths, identifiers, output and error text are removed, with a generator guard.
+- **PB-14 checklist:** row PB14-M4 added (manual NVDA/VoiceOver and real zoom for the M4 pages): pending.
+
+### 44.2 Local verification (executed 2026-11-21; `scripts/dev/test.ps1 -Level 2 -Spec security-audit`, isolated stack verified by the guard)
+
+| Run | Result | Note |
+|---|---|---|
+| 1 (incremental stack build) | 3 passed, 1 failed, 2 not run | Test defect: on the event page `getByText('Not independently verified')` matched the warning title and the lower-case business-projection sentence (strict mode). `afterAll` removed the auditor role |
+| 2 (`-NoRebuild`, after anchoring the selector to the title) | **6 passed** (1.9 min) | Test 3's precondition confirms the cleanup of run 1 |
+
+- **Accessibility defects found:** none. axe reported no violation and no page overflowed at any of the five viewports on the four pages. No M4 page or shared UI component was changed.
+- ESLint on the spec: clean. No other spec, Stage B class or hosted workflow was run.
+
+### 44.3 AC-M4-5.1 state
+
+| Part | State |
+|---|---|
+| Accessibility checks pass | Automated axe, keyboard and viewport checks pass locally (§44.2). Manual NVDA/VoiceOver review pending (PB14-M4, OD-3) |
+| Hosted runs green | **Not met; not run.** The seven Stage B shards plus the aggregate, `level3-script` and `security-gate-a` have not run on M4 code (OD-1: scope preserved; separate authorization). `ci` and CodeQL are green on `6142f91`. Known pre-existing risks for a full hosted Stage B run: RB-13 test isolation and the P-S1-1 benchmark (§40) |
+| Status log and evidence recorded | This section; sanitized summaries |
+| Reviewer package updated | Prepared (consolidated AC-8 package); not submitted |
+
+### 44.4 Deferred (not M4-5 criteria; unchanged)
+
+- Performance (PB-09/PERF-01, OD-4): the M4-4 overview SQL aggregates at volume; the C-162 record-time index and its 1M-row measurement.
+- Independent review of AC-5…AC-9 (including D8-66).
+- Azure staging, PB-08 step-up, G08/G24, G14, SD-5 and PB-12 release evidence.
+
+## 45. C-175–C-177 and integration preparation: M4-5 focus remediation, targeted hosted verification, integration branch (2026-11-21/22). Development/Testing; not owner-accepted as a milestone; not independently reviewed; hosted Stage B not run on the integrated code
+
+§44 is the C-174 record and is kept unchanged. It describes the six-test state before the remediation below; this section supersedes its statements that no M4 page was changed and that the spec has six tests.
+
+### 45.1 M4-5 commits (signed; `phase-c8/m4-5-accessibility-review`, frozen at `83d0dff`, C-176)
+
+| Commit | Content |
+|---|---|
+| `21c38de` | C-174 package: `security-audit.spec.ts` (six tests), consolidated reviewer package, sanitized Stage B run summaries, PB14-M4 checklist row, §44, decision C-174 |
+| `3a7e4a2` | Keyboard-focus remediation (frontend only). Audit Explorer and Security Command Timeline: paging (Previous/Next) and Refresh use `aria-disabled` with click guards instead of native `disabled`, so focus stays on the control while a page loads; the live region reads "Loading page N…" until the page has arrived. New `features/audit/components/usePagingErrorFocus.ts`: after a failed page read focus moves to the error panel, and after Try again to the paging navigation. `packages/ui` `Button` gains `aria-disabled` styles. The spec grows to 11 tests (keyboard paging and inert controls on both screens, paging-failure focus with an axe scan of the error state, keyboard Refresh) |
+| `83d0dff` | Test-only synchronization correction in `pageReads()` (C-176): an answer counts only when the browser reports its request finished. No assertion weakened |
+
+No backend, Authority, schema, API contract or security-enforcement change is part of M4-5.
+
+### 45.2 Verification recorded so far
+
+| Verification | Result | Kind |
+|---|---|---|
+| Targeted hosted run, C-175: `44972960809` on verification commit `7850d00` (parent `3a7e4a2`) | **Failed** (test interception defect, C-176). Kept as a failed attempt; artifact `14734901516` | Hosted, focused (C-131 §1) |
+| Targeted hosted run, C-177: `44988912226` on verification commit `1fef875` (parent `83d0dff`) | **11/11 passed**; artifact `14741167172`, SHA-256 `b7ba0819270ff346337c30493575fc16fec0f60b35194e4e7b210b79b61a38d3`. Accepted only as focused verification under C-131 §1 | Hosted, focused (C-131 §1) |
+| Stage B `44878220074` on `21c38de` | **Failed** (C-177). Predates `3a7e4a2`, `83d0dff` and the test-only remediation merged to `main` in #67 and #68 | Hosted Stage B |
+| `level3-script` `44862791296`, `security-gate-a` `44875604033` on `21c38de` | Passed; they predate the frozen commit and are not evidence for `83d0dff` (C-177) | Hosted |
+
+### 45.3 Integration branch `integration/c8-m4-5-into-main`
+
+- Created from `origin/main` `5358371`. `83d0dff` is merged with a normal non-fast-forward merge, so the three signed M4-5 commits are kept unchanged; the M4-5 branch is not modified.
+- Conflicts only in `docs/decisions/PHASE_C_DECISION_LOG.md`, `spec-files.json` and `SHA256SUMS.txt` (as predicted by C-175). The decision log keeps every row of both sides byte for byte; C-174 is placed before C-175, C-176 and C-177, in numeric order. The two manifests are regenerated with `scripts/generate-spec-manifest.py` and checked with `scripts/validate-specifications.py --strict`.
+- Documentation updated: this section, and the reviewer package's commit list, evidence index and outstanding items. No application change beyond M4-5.
+
+Local checks on the merged tree (2026-11-22):
+
+| Check | Result |
+|---|---|
+| .NET restore and Release build of `EnterpriseForms.All.slnx` (warnings are errors) | Pass: 0 warnings, 0 errors |
+| Generated OpenAPI equals committed (`contracts/openapi`) | Pass, no drift |
+| Stage A security and Stage B integration test projects (compile only) | Pass |
+| Test-result accounting self-tests | Pass, 37 tests |
+| `scripts/ci/run_dotnet_tests.py` (Authority, contract, architecture, integrity, platform console) | Pass: 3,220 executed, 3,220 passed, 0 failed, 223 authorized skips (Authority 1,893; contract 1,004; architecture 227; integrity 73; platform console 23) |
+| Integrity vectors (Python and Node), regenerated vectors equal committed | Pass, 46 checks each, no drift |
+| Frontend: `npm ci`, regenerated API clients (web and platform console) | Pass, no drift |
+| Frontend: lint, typecheck, Vitest, build | Pass; Vitest 64 files, 536 tests |
+| Docker Compose profiles (dev, integration, security-test) against `env.example` | Pass |
+| `security-audit.spec.ts` via `scripts/dev/test.ps1 -Level 2 -Spec security-audit` (focused, C-131 §1), freshly built isolated security-test stack, isolation guard verified, `retries: 0` | **11/11 passed in each of three runs** (2.6, 2.3, 2.3 min; 33/33); stack then removed with its volumes |
+| `scripts/validate-specifications.py --strict` after manifest regeneration | Pass |
+
+Not run: hosted Stage B (release-only, C-131; needs separate owner authorization), any manual workflow dispatch, deployment.
+
+### 45.4 State, kept distinct
+
+| State | M4-5 |
+|---|---|
+| Code integrated into `main` | **Not yet.** Integration branch and PR prepared; merging needs separate owner authorization |
+| Functional milestone accepted for Development/Testing | **No.** Owner milestone acceptance of M4-5 outstanding (C-177 accepted only the focused hosted run) |
+| Hosted verification | Focused hosted browser run passed (C-177). Hosted Stage B, the seven shards plus the aggregate (OD-1, AC-M4-5.1), not run on M4-5 or integrated code |
+| Independent review | Not performed |
+| Production certification | Not performed; not claimed |
+
+### 45.5 Outstanding (unchanged, not expanded into new workstreams)
+
+M4-5 closure:
+- Hosted Stage B on the integrated M4-5 code under separate release authorization (C-131, OD-1, AC-M4-5.1).
+- Manual NVDA review and manual VoiceOver review of the M4 pages, including the alert-versus-focus announcement (PB14-M4, OD-3).
+- Real browser zoom at 200%/400% and other keyboard, zoom or accessibility evidence beyond the automated spec (PB14-M4; the spec uses viewport equivalents for zoom).
+- Owner acceptance of M4-5 as a milestone.
+- The parked investigation of database connection growth on the security-test stack (authority-db and business-db, observed locally 2026-11-21; C-177).
+
+C8 and production (unchanged):
+- Genuinely independent security review of AC-8.1–AC-8.5 (the consolidated reviewer package, findings and attestation blank), the M4-1 package, AC-5…AC-9 and D8-66.
+- PERF-01: the M4-4 security-overview SQL aggregates at volume; the C-162 index and its 1M-row measurement.
+- SEC-BL-01 / PD-15 and the pre-production backlog PP-01…PP-15 (`docs/security/SECURITY_BACKLOG.md`).
+- Open owner decisions AC-DR-11 (INCONCLUSIVE; PP-11), D-7A-8, and M2F3-33 / OPEN-M2f-4 (PD-15).
+- RB-13 and P-S1-1 as recorded; Azure staging, PB-08 step-up, G08/G24, G14, SD-5, PB-12 release evidence; production Level 2 certification.

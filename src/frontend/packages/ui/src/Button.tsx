@@ -12,7 +12,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: ActionIconComponent;
 }
 
-const base = "inline-flex items-center justify-center gap-2 rounded-control font-medium leading-none whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60";
+// aria-disabled (unavailable but still focusable, for a control that is focused when it becomes unavailable) looks like disabled.
+const base = "inline-flex items-center justify-center gap-2 rounded-control font-medium leading-none whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:opacity-60";
 const variants: Record<ButtonVariant, string> = {
   // Default primary is #111111 with a white label (ADR-PB-014); organization branding only overrides validated tokens.
   primary: "bg-primary text-primary-foreground border border-primary hover:opacity-90",
