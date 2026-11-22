@@ -464,8 +464,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "1a1a1e9d50fcfb2e8892f24b2a15fd007d870771013b36dc2fd6b7a1d40b77a9",
-      "bytes": 311976
+      "sha256": "72929a99288184efe4dc8c2212287bf49e08a4182ccba4d4a02c32dfc648ef41",
+      "bytes": 315504
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
