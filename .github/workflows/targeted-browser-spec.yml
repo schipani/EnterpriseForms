@@ -126,29 +126,14 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "22.20.0"
-          cache: npm
-          cache-dependency-path: src/frontend/package-lock.json
       - name: Frontend install
         working-directory: src/frontend
         run: npm ci --ignore-scripts
-      - name: Resolve Playwright version
-        id: playwright
+      # No npm or browser cache (CodeQL actions/cache-poisoning): this job runs in main's context but executes the tested
+      # commit's code, so anything it saved to a cache would be restorable by main's own workflows. Install fresh every run.
+      - name: Install Playwright Chromium (fresh, uncached)
         working-directory: src/frontend
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-      - name: Cache Playwright browser binaries
-        id: playwright-cache
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium
-      - name: Install Playwright Chromium
-        working-directory: src/frontend
-        run: |
-          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
-            npx playwright install-deps chromium
-          else
-            npx playwright install --with-deps chromium
-          fi
+        run: npx playwright install --with-deps chromium
       - name: Browser-test isolation regression (misrouted base URL, occupied port, persistent endpoint → refused before any write)
         working-directory: src/frontend
         env:
