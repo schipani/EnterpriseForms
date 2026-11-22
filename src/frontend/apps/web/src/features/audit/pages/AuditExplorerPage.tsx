@@ -4,6 +4,7 @@ import { ActionIcons, Badge, Button, Card, Checkbox, DataTable, EmptyState, Load
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
+import { usePagingErrorFocus } from "../components/usePagingErrorFocus";
 import { formatInstant } from "../components/auditExplorerModel";
 import { ErrorPanel } from "../../support";
 import { AuditViewTabs } from "../components/AuditViewTabs";
@@ -49,6 +50,7 @@ export function AuditExplorerPage() {
     placeholderData: (previous) => previous,
     staleTime: 0,
   });
+  const paging = usePagingErrorFocus(events);
 
   if (!allowed) {
     return (
@@ -69,13 +71,31 @@ export function AuditExplorerPage() {
   };
   const data = events.data;
   const pageNumber = trail.cursors.length;
+  // Activation is ignored while a control is unavailable (aria-disabled): on the first or last page, or while a page loads.
+  const goPrevious = () => {
+    if (pageNumber > 1 && !events.isFetching) {
+      paging.pageMoveStarted();
+      setTrail((t) => previousPage(t));
+    }
+  };
+  const goNext = () => {
+    const cursor = data?.nextCursor;
+    if (cursor && !events.isFetching) {
+      paging.pageMoveStarted();
+      setTrail((t) => nextPage(t, cursor));
+    }
+  };
   return (
     <>
       <PageHeader
         title="Audit explorer"
         lead="Activity and changes recorded in this organization's audit log."
         actions={
-          <Button variant="secondary" size="sm" icon={ActionIcons.refresh} disabled={events.isFetching || !valid} onClick={() => void events.refetch()}>
+          // aria-disabled, not disabled, so a keyboard Refresh keeps its focus while the page reloads; activation is ignored meanwhile.
+          <Button variant="secondary" size="sm" icon={ActionIcons.refresh} aria-disabled={events.isFetching || !valid} onClick={() => {
+              if (!events.isFetching && valid) void events.refetch();
+            }}
+          >
             Refresh
           </Button>
         }
@@ -112,7 +132,18 @@ export function AuditExplorerPage() {
         <Card title="Events">
           <div className="flex flex-col gap-3">
             {events.isPending && valid ? <LoadingBlock label="Loading audit events" /> : null}
-            {events.isError ? <ErrorPanel error={events.error} onRetry={() => void events.refetch()} /> : null}
+            {/* A failed page move replaces the rows and the paging controls, so focus moves here (usePagingErrorFocus). */}
+            {events.isError ? (
+              <div ref={paging.errorTarget} tabIndex={-1}>
+                <ErrorPanel
+                  error={events.error}
+                  onRetry={() => {
+                    paging.retryStarted();
+                    void events.refetch();
+                  }}
+                />
+              </div>
+            ) : null}
             {events.isError && isGateClosed(events.error) ? <SecurityHomeHint /> : null}
             {data && data.items.length === 0 ? (
               <EmptyState title={pageNumber > 1 ? "No more events" : "No events match"}>{hasAuditFilters(filters) ? "Try a wider period or fewer filters." : "No audit events are recorded for this organization yet."}</EmptyState>
@@ -120,15 +151,26 @@ export function AuditExplorerPage() {
             {data && data.items.length > 0 ? (
               <>
                 <DataTable<AuditExplorerEventResponse> caption="Audit events" rows={[...data.items]} rowKey={(row) => row.auditEventId} stickyActions columns={eventColumns()} />
-                <nav aria-label="Audit event pages" className="flex flex-wrap items-center justify-between gap-3">
+                <nav ref={paging.pagingTarget} tabIndex={-1} aria-label="Audit event pages" className="flex flex-wrap items-center justify-between gap-3">
+                  {/* While another page loads, the rows shown are still the previous page's, so the page number is announced only once
+                      the requested page has arrived. */}
                   <p className="text-help text-muted" aria-live="polite">
-                    Page {pageNumber} · up to {String(data.pageSize)} events per page · access recorded by the Authority (audit-stream revision {String(data.accessEvidence.authorityJournalRevision)})
+                    {events.isPlaceholderData ? (
+                      <>Loading page {pageNumber}…</>
+                    ) : (
+                      <>
+                        Page {pageNumber} · up to {String(data.pageSize)} events per page · access recorded by the Authority (audit-stream revision {String(data.accessEvidence.authorityJournalRevision)})
+                      </>
+                    )}
                   </p>
+                  {/* aria-disabled, not disabled: natively disabling the focused button (while the page loads, or on reaching the first or
+                      last page) drops keyboard focus to the document body. Activation is ignored while unavailable, so a stale cursor
+                      from the previous page shown during a load is never used. */}
                   <div className="flex gap-2">
-                    <Button variant="secondary" size="sm" disabled={pageNumber === 1 || events.isFetching} onClick={() => setTrail((t) => previousPage(t))}>
+                    <Button variant="secondary" size="sm" aria-disabled={pageNumber === 1 || events.isFetching} onClick={goPrevious}>
                       Previous
                     </Button>
-                    <Button variant="secondary" size="sm" disabled={!data.nextCursor || events.isFetching} onClick={() => data.nextCursor && setTrail((t) => nextPage(t, data.nextCursor!))}>
+                    <Button variant="secondary" size="sm" aria-disabled={!data.nextCursor || events.isFetching} onClick={goNext}>
                       Next
                     </Button>
                   </div>
