@@ -282,15 +282,41 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
     {
         var (s, teamId) = await TeamAsync("rc21");
         var addKey = NewKey("rc21-add");
-        var removeKey = NewKey("rc21-remove");
+        var removeKey = "team-remove:" + NewKey("rc21-remove");
         StopWorkers();
         var paused = false;
+        Guid removeCommandId;
         try
         {
-            Assert.True((await AddAsync(s, teamId, s.Designer, s.Clerk, addKey)).Root.GetProperty("command").GetProperty("effective").GetBoolean());
+            var added = await AddAsync(s, teamId, s.Designer, s.Clerk, addKey);
+            Assert.True(added.IsSuccess, added.Body);
+            Assert.True(added.Root.GetProperty("command").GetProperty("effective").GetBoolean(), added.Body);
+
+            // The later removal is made pending deterministically, as RC-06 does: the API's T1 row (AwaitingCommit), then the
+            // same delegated command submitted to the Authority directly. Through the business API its pre-check would need a
+            // receipt established within the WP-7A freshness bound while the archive is paused, a race (F-2). The Authority
+            // commits it at r2 and cannot deliver it to the paused archive, so it is not Effective and P stays at r1.
+            var revision = (await fixture.Authority.GateAsync(s.OrganizationId)).GetProperty("authorization_revision").GetInt64();
             fixture.Stack.Pause("archive-store");
             paused = true;
-            AssertNotEffectiveYet(await RemoveAsync(s, teamId, s.Designer, s.Clerk, removeKey));
+            Sql($"""
+                INSERT INTO authority_command_operations (authority_command_operation_id, tenant_id, initiated_by_user_id, command_kind_name, team_id, member_user_id, authority_idempotency_key, request_correlation_identifier, operation_created_on, operation_state_name, next_attempt_on, attempt_count, consecutive_error_count, operation_modified_on)
+                VALUES (gen_random_uuid(), '{s.OrganizationId:D}', '{s.Designer.AuthorityUserId:D}', 'RemoveTeamMember', '{teamId:D}', '{s.Clerk.AuthorityUserId:D}', '{removeKey}', gen_random_uuid(), now(), 'AwaitingCommit', now(), 0, 0, now())
+                """);
+            var submitted = await fixture.Authority.SendAsync(HttpMethod.Post, "/internal/v1/security-commands/", TestIdentity.WorkloadToken(), new
+            {
+                organization_id = s.OrganizationId,
+                command_kind = "RemoveTeamMember",
+                resource = new { resource_kind = "Team", resource_id = teamId },
+                expected_authorization_revision = revision,
+                command_payload = new { team_id = teamId, member_user_id = s.Clerk.AuthorityUserId },
+                change_reason = "rc21",
+            }, s.Token(s.Designer), removeKey);
+            Assert.True(submitted.IsSuccess, submitted.Body);
+            Assert.Equal("CommittedAwaitingProjection", submitted.Root.GetProperty("command_status").GetString());
+            Assert.Equal(revision + 1, submitted.Root.GetProperty("authorization_revision").GetInt64());
+            Assert.Equal("AwaitingArchive", submitted.Root.GetProperty("projection_gate_state").GetString());
+            removeCommandId = submitted.Root.GetProperty("command_id").GetGuid();
             await StartWorkersAsync();
 
             // Gate closed by the later removal (D8-15): the add is projected from the Authority's state at P = r1.
@@ -300,7 +326,7 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
             Assert.False(add.GetProperty("superseded_by_later_revision").GetBoolean());
             Assert.Equal(1, ActiveRosterRows(s, teamId, s.Clerk));
             Assert.Equal((true, r1), Watermark(s, teamId, s.Clerk));
-            Assert.NotEqual("Projected", State(Operation(s, "team-remove:" + removeKey)!.Value));
+            Assert.NotEqual("Projected", State(Operation(s, removeKey)!.Value));
         }
         finally
         {
@@ -312,7 +338,9 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
             await StartWorkersAsync();
         }
 
-        var remove = await WaitProjectedAsync(s, "team-remove:" + removeKey);
+        var remove = await WaitProjectedAsync(s, removeKey);
+        Assert.Equal(removeCommandId, remove.GetProperty("authority_command_id").GetGuid()); // found by key, never re-sent
+        Assert.Equal(1, AuthorityCommands(s.OrganizationId, removeKey));
         Assert.Equal(0, ActiveRosterRows(s, teamId, s.Clerk));
         Assert.Equal((false, remove.GetProperty("committed_authorization_revision").GetInt64()), Watermark(s, teamId, s.Clerk));
     }
