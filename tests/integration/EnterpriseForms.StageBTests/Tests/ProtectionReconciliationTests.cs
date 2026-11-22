@@ -682,6 +682,15 @@ INSERT INTO field_string_values SELECT (jsonb_populate_record(NULL::field_string
     /// Owner: a required audit archival outage. The attestation is journaled on the Authority audit stream in the same
     /// transaction (non-gating); a completion is never reported without that journal entry, which is archived once the archive
     /// returns. AUD-C7-01 (archival durability of mandatory evidence) stays open: delivery is asynchronous.
+    /// <para>
+    /// F-1 (Stage B run 44878220074): the outage is simulated reversibly, by pausing the archive, never by stopping it. On the
+    /// disposable stacks the archive lives on tmpfs (SEC-BL-01 N-1, C-155), and stopping its container discards the tmpfs, the
+    /// archived evidence and the D+ archive identity sentinel; D+ then correctly refuses every later delivery as an archive
+    /// regression, which kept every later organization's gate closed. While the archive is unreachable the Authority cannot
+    /// re-establish the authorization stream head's receipt (WP-7A, C-160), so the gate is closed and the verification request
+    /// is refused: no reconciliation starts and nothing is attested. Once the archive returns intact, a verification completes
+    /// only with its attestation journaled and delivered (Anchored).
+    /// </para>
     /// </summary>
     [Fact]
     public async Task AnArchiveOutageNeverYieldsACompletionWithoutAuthorityEvidence()
@@ -689,46 +698,69 @@ INSERT INTO field_string_values SELECT (jsonb_populate_record(NULL::field_string
         var w = await WorkspaceAsync("m4-archive", 2);
         Assert.True((await StrengthenAsync(w)).IsSuccess);
         await WaitStatusAsync(w, s => s.GetProperty("authorityReconciledComplete").GetBoolean());
-        fixture.Stack.Stop("archive-store");
-        Guid id;
-        string row;
+        var reconciliationsBefore = ReconciliationCount(w);
+        var attestationsBefore = AttestationCount(w);
+        fixture.Stack.Pause("archive-store");
         try
         {
-            id = await RequestIdAsync(w, "archive outage");
-            var deadline = DateTime.UtcNow.AddSeconds(180);
-            do
-            {
-                await Task.Delay(1000, Ct);
-                row = ReconciliationRow(id);
-            }
-            while ((row.StartsWith("Queued", StringComparison.Ordinal) || row.StartsWith("Running", StringComparison.Ordinal)) && DateTime.UtcNow < deadline);
+            // The Authority itself reports the gate closed for the archive before anything is requested (no fixed freshness wait).
+            await WaitGateStateAsync(w.S, "AwaitingArchive", TimeSpan.FromSeconds(90));
+            var refused = await RequestVerificationAsync(w, w.S.Designer, "archive outage");
+            TestContext.Current.TestOutputHelper?.WriteLine("during the archive outage: " + (int)refused.Status + " " + refused.Body);
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, refused.Status);
+            Assert.Equal("AUTHORITY_NOT_READY", refused.Root.GetProperty("title").GetString());
+            Assert.Equal("AwaitingArchive", refused.Root.GetProperty("detail").GetString());
+            Assert.Equal(reconciliationsBefore, ReconciliationCount(w)); // no reconciliation was started
+            Assert.Equal(attestationsBefore, AttestationCount(w)); // and nothing was attested
         }
         finally
         {
-            fixture.Stack.Start("archive-store");
+            fixture.Stack.Unpause("archive-store");
         }
 
-        TestContext.Current.TestOutputHelper?.WriteLine("during the archive outage: " + row);
-        var during = await WaitReconciliationAsync(w, id, TimeSpan.FromSeconds(240)); // Blocked (if any) resumes once the archive is back
-        var state = ReconciliationState(during);
-        if (state == "Complete")
+        // The archive is back with its contents and identity sentinel (a pause preserves the tmpfs); D+ would otherwise keep the gate
+        // closed. Asserted here so that a damaged archive fails this test instead of every later organization's bootstrap.
+        await w.S.WaitGateReadyAsync(TimeSpan.FromSeconds(120));
+        var id = await RequestIdAsync(w, "after the archive outage");
+        var after = await WaitReconciliationAsync(w, id, TimeSpan.FromSeconds(240));
+        Assert.Equal("Complete", ReconciliationState(after));
+        var attestationId = Attestation(after).GetProperty("attestationId").GetGuid();
+        Assert.Equal(attestationsBefore + 1, AttestationCount(w));
+        Assert.NotEqual(string.Empty, Observer($"SELECT archive_delivery_state FROM security_journal_entries WHERE journal_event_kind = 'ProtectionReconciliationAttested' AND journal_event_body_json LIKE '%{attestationId:D}%';"));
+        var deadline = DateTime.UtcNow.AddSeconds(180);
+        string delivery;
+        do
         {
-            var attestationId = Attestation(during).GetProperty("attestationId").GetGuid();
-            Assert.NotEqual(string.Empty, Observer($"SELECT archive_delivery_state FROM security_journal_entries WHERE journal_event_kind = 'ProtectionReconciliationAttested' AND journal_event_body_json LIKE '%{attestationId:D}%';"));
-            var deadline = DateTime.UtcNow.AddSeconds(180);
-            string delivery;
-            do
+            await Task.Delay(2000, Ct);
+            delivery = Observer($"SELECT archive_delivery_state FROM security_journal_entries WHERE journal_event_kind = 'ProtectionReconciliationAttested' AND journal_event_body_json LIKE '%{attestationId:D}%';");
+        }
+        while (delivery != "Anchored" && DateTime.UtcNow < deadline);
+        Assert.Equal("Anchored", delivery); // delivered to the same, intact archive
+    }
+
+    private int ReconciliationCount(Workspace w) =>
+        int.Parse(fixture.Stack.AttackerSql($"SELECT count(*) FROM field_protection_reconciliations WHERE field_definition_id = '{w.NoteId:D}';").Trim(), CultureInfo.InvariantCulture);
+
+    private int AttestationCount(Workspace w) =>
+        int.Parse(Observer($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{w.S.OrganizationId:D}' AND journal_stream_name = 'audit' AND journal_event_kind = 'ProtectionReconciliationAttested';"), CultureInfo.InvariantCulture);
+
+    /// <summary>Polls the Authority's own evaluation of the organization gate (operator plane; read-only) until it reports <paramref name="state"/>.</summary>
+    private async Task WaitGateStateAsync(StageBScenario s, string state, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        JsonElement gate;
+        do
+        {
+            gate = await fixture.Authority.GateAsync(s.OrganizationId);
+            if (gate.GetProperty("projection_gate_state").GetString() == state)
             {
-                await Task.Delay(2000, Ct);
-                delivery = Observer($"SELECT archive_delivery_state FROM security_journal_entries WHERE journal_event_kind = 'ProtectionReconciliationAttested' AND journal_event_body_json LIKE '%{attestationId:D}%';");
+                return;
             }
-            while (delivery != "Anchored" && DateTime.UtcNow < deadline);
-            Assert.Equal("Anchored", delivery); // delivered once the archive is back
+
+            await Task.Delay(500, Ct);
         }
-        else
-        {
-            Assert.Contains(state, new[] { "Incomplete", "Blocked" });
-        }
+        while (DateTime.UtcNow < deadline);
+        throw new TimeoutException($"organization gate did not reach {state}: " + gate.GetRawText());
     }
 
     /// <summary>Owner: accepted changes after an attestation. The protection barrier admits a new revision only in the required form; the next reconciliation verifies the new head and stays complete.</summary>
