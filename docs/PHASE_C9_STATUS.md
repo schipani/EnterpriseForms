@@ -2,8 +2,8 @@
 
 - **Branches:** M1 `phase-c9/form-version-management` (from `198aeae`), squash-merged to `main` as `cd48e13` (PR #70; branch kept, tag `archive/c9-m1-form-version-management-9395ec5`). M2 `phase-c9/m2-version-comparison` (from `cd48e13`), squash-merged to `main` as `491fa9a` (PR #71; the branch was deleted automatically on merge; its commits are kept by tag `archive/c9-m2-version-comparison-03b5169`).
 - **Architecture:** `docs/architecture/PHASE_C9_FORM_VERSION_MANAGEMENT.md`.
-- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6); C-184 (PR #71 merge record, §7).
-- **State (2026-11-23):** M1 and M2 merged to `main` (code integration only: `cd48e13`, `491fa9a`). Not final C9 acceptance, not independently reviewed, no production or Level 2 claim. M3 not started. G21 OPEN.
+- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6); C-184 (PR #71 merge record, §7); C-185 (PR #73 merge record and failed post-merge CI, §8); C-186 (test-host startup race, PR #74 and CI recovery, §9).
+- **State (2026-11-23):** M1 and M2 merged to `main` (code integration only: `cd48e13`, `491fa9a`). Post-merge CI on `main` failed at `491fa9a` (§7) and at `7d0c879` (§8), each time on a test defect, and has been green since `3d930f6` (§9). Not final C9 acceptance, not independently reviewed, no production or Level 2 claim. M3 not started. G21 OPEN.
 
 ## 1. What M1 delivers
 
@@ -136,4 +136,50 @@ Remaining limitations: rules are still reported as added, removed or changed (no
 - **Post-merge checks on `491fa9a`:** CodeQL passed for all four languages (0 open alerts). The `ci` run (`45112841517`) passed specifications/vectors, frontend and Compose, but **the .NET job failed on one test**: `AuthorizationAuthority.Tests.SecurityCommandTimelineTests.AuditEnvelopesWithholdCountsDetailsAndIdentityIdentifiers`. The identical tree passed on the PR.
 - **Cause (pre-existing test defect, not an M2 regression):** the test asserts that the serialized audit envelope does not contain the text `917` (its withheld evaluated-record count), but the same envelope contains random UUIDs (`Guid.CreateVersion7()`), and in this run one was `01a206b2-97dc-737e-9178-…`. The test therefore fails at random whenever a generated UUID contains `917`. The test is unchanged by C9 (C8 M4-3 code); the earlier local failure in §6 was the same defect, not load.
 - **Not done (outside the authorization):** the test was not changed (Authority test project) and the workflow was not re-run. A follow-up needs a separate owner decision: assert that no envelope detail carries the withheld value (instead of searching the serialized envelope, which also holds random UUIDs, for its digits) and re-run CI on `main`.
+- **Follow-up completed (C-185, C-186):** the test was corrected by PR #73 (`7d0c879`, §8). The `ci` run on `7d0c879` still failed, in both attempts, on a different test defect; `main` became green only at `3d930f6`, after PR #74 (§9). Run `45112841517` remains recorded as failed.
 - **Unchanged and still open:** C9 M3; manual screen-reader review of the M1 and M2 interfaces (PB-14); hosted Stage B; the deferred D9-9 requirements; G21; the PB-06 concurrency convention; all C8/M4-5 obligations (§45.5 of the C8 status); the six Dependabot alerts; production certification.
+
+## 8. PR #73 merge record and failed post-merge CI (C-185)
+
+- **Defect corrected:** `SecurityCommandTimelineTests.AuditEnvelopesWithholdCountsDetailsAndIdentityIdentifiers` asserted that the serialized audit envelope does not contain the text `917` (its withheld evaluated-record count), while the same envelope carries random UUIDs; it failed whenever a generated UUID contained those digits (§7).
+- **Correction (test only, Authority test project):** fixed identifiers in the test; the envelope's permitted details are compared exactly (sorted ordinally); the withheld-fields contract is asserted (`evaluated_record_count`, `matched_record_count`); neither count (`917`, `4`) may appear as a standalone value anywhere in the serialized envelope (a bounded match that ignores digits inside identifiers); the sentinel check is kept. A new test proves that the scan finds an exposed value and ignores the same digits inside a UUID. No Authority production code, audit policy, journal or authorization change.
+- **Merged:** PR #73 squash-merged into `main` as **`7d0c8796ba2000e1bf5eacddbf71c7d22f01060b`** under explicit owner authorization, with the expected-head guard (`f181984`); parent `491fa9a`; signature verified.
+- **Post-merge `ci` run `45158422231` on `7d0c879`: failed in both attempts.** CodeQL passed. Specifications, frontend and Compose passed; the .NET job failed on one contract test each time, a different one per attempt:
+
+| Attempt | Failed test | Result of the .NET test set |
+|---|---|---|
+| 1 | `AuthorityContentAcceptancePolicyStartupTests.AnInvalidOverrideOfTheDevelopmentSettingIsRefusedToo` (`ReleaseB`, floor missing, `RequiredFloorMissing`) | 3,283 passed, 1 failed, 223 authorized skips |
+| 2 | `EnvelopeCapabilityEnforcementHostTests.M2F29AnInvalidDeploymentFloorRefusesTheAuthorityStart` (empty `Content:MinimumBusinessEnvelopeCapability`) | 3,283 passed, 1 failed, 223 authorized skips |
+
+  Both failed with `Cannot access a disposed object. Object name: 'IServiceProvider'` in place of the expected startup refusal. Neither attempt was successful.
+- **The corrected test passed in both attempts** (Authority project: 1,894 passed, 0 failed, 211 authorized skips; `AuditEnvelopesWithholdCountsDetailsAndIdentityIdentifiers` and the new scan test passed, per each attempt's test-result artifact).
+- **Investigation (owner-authorized, no code change):** evidence preserved; one rerun of the failed job (attempt 2, above); the cause is §9.
+
+## 9. Test-host startup race, PR #74 and CI recovery (C-186)
+
+- **Cause:** a race in `Microsoft.AspNetCore.Mvc.Testing` 10.0.13, confirmed against its source. `WebApplicationFactory` runs the app's `Main` on its own thread. When a hosted startup guard throws inside `Host.StartAsync`, that thread's `app.Run()` disposes the host. Meanwhile, `DeferredHost.StartAsync` resolves `IHostApplicationLifetime` before it waits for the start result; if the app thread disposes first, the factory throws `ObjectDisposedException` (`IServiceProvider`) and the refusal is not surfaced to the test.
+- **Deterministic reproduction:** forcing the factory's start to run only after the host's container has been disposed reproduces the CI failure every time, and the original assertion fails on it.
+- **The startup refusal remained enforced:** the host still refuses to start; only the test's view of the reason is lost. Production does not use `DeferredHost`; `app.Run()` propagates the refusal.
+- **Classification of 23 startup-refusal assertion sites** (by recording each refusal's actual throw site in a temporary, uncommitted run):
+  - **17 affected, migrated:** refusal thrown inside `Host.StartAsync` by a hosted startup guard — content acceptance policy 5, signing and identity policy 6, D+ finding store 3, envelope capability floor 1, reconciler credential 1, verifier credential 1.
+  - **4 unaffected, refused before the host starts:** `TestStackIdentityBoundaryTests` ×2, `ReconcilerBoundaryTests.RC28OutOfBoundsRateLimitsRefuseToStart`, the synthetic platform mode.
+  - **2 unaffected, weak assertion** (any exception accepted, so the race cannot fail them): `ReadinessFailsClosedTests`, `PlatformConsoleDecisionTests`. Unchanged; outside this correction.
+  - **Uncertain:** none.
+- **Correction (test only, contract test project, 8 files):** `StartupRefusal` accepts the factory's exception when it is itself the expected refusal (and agrees with any logged startup failure). It accepts the disposed-provider exception only when it is exactly the framework race (`ObjectDisposedException` for `IServiceProvider`, thrown from `DeferredHost.StartAsync`, no inner exception) **and** the host's own "Hosting failed to start" event (`HostedServiceStartupFaulted`, event 11, logged on the app thread before disposal) carries exactly one failure that is the expected refusal. It rejects unrelated failures, a different refusal, a disposed provider without logged evidence, a disposed-object exception that is not the race, and a host that starts. No delays, retries or broad suppression; no Authority production code, security policy or framework-version change.
+- **Regression coverage:** `StartupRefusalTests` (12 tests) force both orderings against the real Authority host with synchronization, not sleeps: `RequiredFloorMissing` and an invalid envelope floor are proven in both orderings (after disposal, the old assertion is shown to fail); an unrelated failure and a mismatched refusal are rejected in both orderings; an unexpected start, a disposed provider without evidence, a non-race disposed-object exception and a direct match contradicted by the log are rejected. Local: 30 of 30 repeated runs, 12 of 12 each.
+- **Merged:** PR #74 squash-merged into `main` as **`3d930f6de93728de9a5c8b358444ee7745972831`** under explicit owner authorization, with the expected-head guard (`a38e0903fea8e6c88d06eb2a5c20d7ce53da700e`). Preconditions verified: open, CLEAN and mergeable; one signed, verified commit; exactly the eight approved files; the four required checks and CodeQL passed; no reviews or threads; 0 open code-scanning alerts. Single parent `7d0c879`; tree identical to the head; signature verified.
+- **Post-merge on `3d930f6`: green.** `ci` run `45170535971` succeeded (every job; strict specification validation passed); CodeQL run `45170535274` succeeded for all four languages.
+
+| .NET test project | Passed | Failed | Authorized skips |
+|---|---|---|---|
+| Authority | 1,894 | 0 | 211 |
+| Contract | 1,079 | 0 | 12 |
+| Architecture | 227 | 0 | 0 |
+| Integrity | 73 | 0 | 0 |
+| Platform console | 23 | 0 | 0 |
+| **Total** | **3,296** | **0** | **223** (unchanged) |
+
+  `StartupRefusalTests` 12/12 and every migrated class passed in that run.
+- **`main` became green at `3d930f6`, not at `7d0c879`.** Runs `45112841517` (`491fa9a`) and `45158422231` (`7d0c879`, both attempts) remain recorded as failed.
+- **Remaining limitations:** the migrated tests are not individually run under a forced race (the helper's two orderings are); a future framework rename of the startup-failure event would fail those tests visibly; why the race hit two consecutive attempts is not explained; the `SearchIndexBuilderRunnerTests` cancellation failure seen once locally (§6) is not explained.
+- **Unchanged and still open:** C9 M3; manual screen-reader review of the M1 and M2 interfaces (PB-14); hosted Stage B (release-only, C-131); the deferred D9-9 requirements; G21 and the platform-wide PB-06 concurrency convention (D9-3); all C8/M4-5 obligations (§45.5 of the C8 status); the six Dependabot alerts; production certification. Final C9 acceptance is not claimed.
