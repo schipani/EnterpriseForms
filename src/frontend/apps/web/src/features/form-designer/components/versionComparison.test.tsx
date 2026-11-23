@@ -35,6 +35,13 @@ const comparison: LayoutComparisonResponse = {
 };
 
 describe("comparison wording", () => {
+  it("words the completeness additions", () => {
+    expect(describeDetail(detail("RepeatGroup"))).toMatch(/different repeating group/);
+    expect(describeDetail(detail("Protection", { before: null, after: "Confidential / ApplicationEncrypted" }))).toMatch(/recorded with this version/);
+    expect(describeDetail(detail("UploadPolicy", { before: null, after: "one file" }))).toBe("Upload limits set: “one file”");
+    expect(describeDetail(detail("Kind", { before: "field", after: "documentCollection" }))).toMatch(/Element type changed/);
+  });
+
   it("words details without claiming data loss", () => {
     expect(describeDetail(detail("MaxLength", { before: "100", after: "50", tightened: true }))).toBe("Maximum length: “100” → “50” (stricter)");
     expect(describeDetail(detail("Required", { after: "yes" }))).toBe("Now required");

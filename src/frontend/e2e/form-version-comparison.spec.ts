@@ -42,16 +42,23 @@ test.describe.serial("Form version comparison", () => {
     await page.getByRole("button", { name: "Save draft" }).click();
     await expect(page.getByText("Unsaved changes")).toBeHidden();
 
+    // A review that cannot be loaded never allows publishing; once it loads, it does.
+    await page.context().route("**/publish-impact**", (route) => route.abort());
     await page.getByRole("button", { name: /^Publish/ }).click();
     const dialog = page.getByRole("dialog", { name: "Publish a new version" });
+    await dialog.getByLabel("Change reason").fill("comparison v2");
+    await expect(dialog.locator('[data-publish-gate="failed"]')).toContainText("couldn't be loaded");
+    await expect(dialog.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
+    await page.context().unroute("**/publish-impact**");
+    await dialog.getByRole("button", { name: "Try again" }).click();
     await expect(dialog.getByText("Stored values are never changed by publishing")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
     await expect(dialog.getByText("Changes from v1 to v2")).toBeVisible();
     await expect(dialog.getByRole("list", { name: "Added" })).toContainText("Alias");
     await expect(dialog.getByRole("list", { name: "Removed from the layout" })).toContainText("Phone");
     await expect(dialog.getByText(/Stored values are kept/).first()).toBeVisible();
     await expect(dialog.getByText("You can't see any records of this form.")).toBeVisible();
     expect((await axe(page, '[role="dialog"]')).violations).toEqual([]);
-    await dialog.getByLabel("Change reason").fill("comparison v2");
     await dialog.getByRole("button", { name: "Publish", exact: true }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByText("Published v2")).toBeVisible();

@@ -196,6 +196,7 @@ public sealed partial class FormDesignerHandlers
         Add("ELEMENTS_REMOVED", "Information", comparison.Changes.Where(c => c.ChangeType == LayoutChangeTypes.Removed && c.Target != LayoutChangeTargets.Section).Select(c => c.Label));
         Add("READ_ONLY_OR_HIDDEN", "Information", elements.Where(c => c.Details.Any(d => (d.Aspect == LayoutChangeAspects.ReadOnly && d.After == "yes") || (d.Aspect == LayoutChangeAspects.ShowInForm && d.After == "no"))).Select(c => c.Label));
         Add("PROTECTION_CHANGED", "Information", elements.Where(c => c.Details.Any(d => d.Aspect == LayoutChangeAspects.Protection)).Select(c => c.Label));
+        Add("REPEATING_SECTIONS_CHANGED", "Information", comparison.Changes.Where(c => c.Target == LayoutChangeTargets.Section && c.ChangeType != LayoutChangeTypes.Added && c.Details.Any(d => d.Aspect is LayoutChangeAspects.Repeat or LayoutChangeAspects.RepeatGroup)).Select(c => c.Label));
         if (comparison.Changes.All(c => c.Significance == LayoutChangeSignificance.Presentation))
         {
             notices.Add(new PublishImpactNoticeResponse("PRESENTATION_ONLY", "Information", []));

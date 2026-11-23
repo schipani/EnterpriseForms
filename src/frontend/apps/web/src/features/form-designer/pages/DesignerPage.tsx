@@ -18,7 +18,7 @@ import { GridOperationDialog } from "../components/GridOperationDialog";
 import { RemoveSectionDialog } from "../components/RemoveSectionDialog";
 import { RenameFormDialog, type RenameFormTarget } from "../components/RenameFormDialog";
 import { VERSION_BEHAVIOR_COPY, VersionBehaviorDialog, isVersionBehavior, type VersionBehaviorTarget } from "../components/VersionBehaviorDialog";
-import { PublishReview, usePublishImpact } from "../components/PublishReview";
+import { PublishGateNote, PublishReview, publishGate, usePublishImpact } from "../components/PublishReview";
 import { VersionComparePanel } from "../components/VersionComparePanel";
 
 type View = "design" | "fields" | "rules" | "preview" | "versions" | "settings" | "access" | "relationships";
@@ -286,6 +286,8 @@ export function DesignerPage() {
   });
   // Phase C9 M2 (WP-4): the publish review is read while the dialog is open, for the draft revision it would publish.
   const publishImpact = usePublishImpact(formDefinitionId, Number(detail.data?.draft?.draftRevision ?? 0), publishOpen && detail.data?.draft !== null && detail.data?.draft !== undefined);
+  // Publish only on a loaded, current, successful review of exactly this draft revision (the server re-checks on publish).
+  const gate = publishGate(publishImpact, Number(detail.data?.draft?.draftRevision ?? 0));
   const restore = useMutation({
     mutationFn: (fromFormVersionId: string) => api.forms.restoreDraft(formDefinitionId, { fromFormVersionId }).then((r) => r.result),
     onSuccess: async () => {
@@ -1101,7 +1103,7 @@ export function DesignerPage() {
             <Button variant="secondary" onClick={() => setPublishOpen(false)} disabled={publish.isPending}>
               Cancel
             </Button>
-            <Button busy={publish.isPending} disabled={changeReason.trim().length < 3 || publishImpact.data?.canPublish === false} onClick={() => publish.mutate()}>
+            <Button busy={publish.isPending} disabled={changeReason.trim().length < 3 || !gate.allowed} onClick={() => (gate.allowed ? publish.mutate() : undefined)}>
               Publish
             </Button>
           </>
@@ -1109,6 +1111,7 @@ export function DesignerPage() {
       >
         <PublishReview impact={publishImpact} onRetry={() => void publishImpact.refetch()} />
         <TextInput label="Change reason" value={changeReason} required maxLength={500} onChange={(event) => setChangeReason(event.target.value)} />
+        <PublishGateNote gate={gate} />
         {publish.isError ? <ErrorPanel error={publish.error} /> : null}
       </Dialog>
 

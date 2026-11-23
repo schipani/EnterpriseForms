@@ -23,6 +23,48 @@ export function usePublishImpact(formDefinitionId: string, draftRevision: number
   });
 }
 
+/** Why Publish is or is not available (Phase C9 M2 corrective review). */
+export type PublishGateState = "ready" | "loading" | "refreshing" | "failed" | "stale" | "blocked";
+
+export interface PublishGate {
+  allowed: boolean;
+  state: PublishGateState;
+  message: string | null;
+}
+
+/**
+ * Publish is allowed only when a review for exactly the draft revision about to be published has loaded, is not being
+ * refreshed, did not fail, and says the draft can be published. The server still checks the draft revision, the current
+ * version and the layout on publish (optimistic concurrency), so this gate never replaces those checks.
+ */
+export function publishGate(impact: { data?: PublishImpactResponse | undefined; isError: boolean; isFetching: boolean }, draftRevision: number): PublishGate {
+  if (impact.isError) {
+    return { allowed: false, state: "failed", message: "The review of this version couldn't be loaded. Refresh the review before publishing." };
+  }
+  if (!impact.data) {
+    return { allowed: false, state: "loading", message: "Publishing becomes available once the review of this version has loaded." };
+  }
+  if (Number(impact.data.draftRevision) !== draftRevision) {
+    return { allowed: false, state: "stale", message: "The draft changed since this review was made. Publishing becomes available once the review is refreshed." };
+  }
+  if (impact.isFetching) {
+    return { allowed: false, state: "refreshing", message: "The review is being refreshed." };
+  }
+  if (!impact.data.canPublish) {
+    return { allowed: false, state: "blocked", message: null };
+  }
+  return { allowed: true, state: "ready", message: null };
+}
+
+/** Says, next to the Publish action, why it is not available yet (the review itself explains a blocked draft). */
+export function PublishGateNote({ gate }: { gate: PublishGate }) {
+  return (
+    <p className="m-0 text-sm" role="status" aria-live="polite" data-publish-gate={gate.state}>
+      {gate.message ?? ""}
+    </p>
+  );
+}
+
 export function PublishReview({ impact, onRetry }: { impact: ReturnType<typeof usePublishImpact>; onRetry: () => void }) {
   if (impact.isError) {
     return <ErrorPanel error={impact.error} onRetry={onRetry} />;

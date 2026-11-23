@@ -76,6 +76,21 @@ export function describeDetail(detail: LayoutChangeDetailResponse): string {
       return "Order of the options changed";
     case "Repeat":
       return detail.after ? `Now allows multiple entries (${detail.after})` : "No longer allows multiple entries";
+    case "RepeatGroup":
+      return "Now places a different repeating group (entries of the previous one are kept)";
+    case "Kind":
+      return `Element type changed from ${quote(detail.before)} to ${quote(detail.after)}`;
+    case "Protection":
+      return detail.before === null || detail.before === undefined
+        ? `Classification and protection recorded with this version: ${quote(detail.after)}`
+        : detail.after === null || detail.after === undefined
+          ? "Classification and protection no longer recorded with this version"
+          : `Classification and protection: ${quote(detail.before)} → ${quote(detail.after)}`;
+    case "UploadPolicy":
+      if (detail.before === null || detail.before === undefined || detail.after === null || detail.after === undefined) {
+        return detail.after ? `Upload limits set: ${quote(detail.after)}` : "Upload limits no longer set";
+      }
+      return `Upload limits: ${quote(detail.before)} → ${quote(detail.after)}${detail.tightened ? " (stricter)" : ""}`;
     default: {
       const name = ASPECT_NAMES[detail.aspect] ?? detail.aspect;
       return `${name}: ${quote(detail.before)} → ${quote(detail.after)}${detail.tightened ? " (stricter)" : ""}`;
@@ -127,6 +142,7 @@ const NOTICE_TEXT: Record<string, { title: string; body: string }> = {
   LIMITS_TIGHTENED: { title: "Tighter limits", body: "New uploads or entries must fit the new limits; existing documents and entries are kept." },
   ELEMENTS_REMOVED: { title: "Removed from the layout", body: "Their stored values and documents are kept and stay in record history; they are no longer shown or edited with the new version." },
   READ_ONLY_OR_HIDDEN: { title: "Read-only or hidden", body: "These can no longer be changed in the form; their stored values are kept." },
+  REPEATING_SECTIONS_CHANGED: { title: "Repeating sections changed", body: "A section now repeats, no longer repeats or places a different repeating group; existing entries are kept." },
   PROTECTION_CHANGED: { title: "Protection recorded with this version", body: "The version records each field's current classification and protection (changed through the field's protection settings)." },
   PRESENTATION_ONLY: { title: "Presentation changes only", body: "Nothing a person enters is checked differently." },
   NO_CHANGES: { title: "No changes", body: "The draft is the same as the current version." },

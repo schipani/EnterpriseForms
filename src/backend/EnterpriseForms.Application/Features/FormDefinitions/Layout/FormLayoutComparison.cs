@@ -78,6 +78,8 @@ public static class LayoutChangeAspects
     public const string SummaryFields = "SummaryFields";
     public const string Repeat = "Repeat";
     public const string RepeatLimits = "RepeatLimits";
+    public const string RepeatGroup = "RepeatGroup";
+    public const string Kind = "Kind";
     public const string Element = "Element";
 }
 
@@ -155,7 +157,13 @@ public static class FormLayoutComparison
             {
                 details.Add(new LayoutChangeDetail(LayoutChangeAspects.Repeat, LayoutChangeSignificance.Behaviour, RepeatText(before.Repeat), RepeatText(section.Repeat)));
             }
-            else if (before.Repeat is { } r1 && section.Repeat is { } r2 && RepeatText(r1) != RepeatText(r2))
+            else if (before.Repeat is { } g1 && section.Repeat is { } g2 && g1.GroupDefinitionId != g2.GroupDefinitionId)
+            {
+                // The same section now places a different repeating group: the previous group's entries are kept, but no longer shown or edited here.
+                details.Add(new LayoutChangeDetail(LayoutChangeAspects.RepeatGroup, LayoutChangeSignificance.Behaviour, g1.GroupDefinitionId.ToString("D"), g2.GroupDefinitionId.ToString("D")));
+            }
+
+            if (before.Repeat is { } r1 && section.Repeat is { } r2 && RepeatText(r1) != RepeatText(r2))
             {
                 details.Add(new LayoutChangeDetail(LayoutChangeAspects.RepeatLimits, LayoutChangeSignificance.Behaviour, RepeatText(r1), RepeatText(r2), Tightened: r2.MinOccurrences > r1.MinOccurrences || r2.MaxOccurrences < r1.MaxOccurrences || (r1.AllowAdd && !r2.AllowAdd) || (r1.AllowRemove && !r2.AllowRemove)));
             }
@@ -218,6 +226,11 @@ public static class FormLayoutComparison
     {
         const string P = LayoutChangeSignificance.Presentation;
         const string B = LayoutChangeSignificance.Behaviour;
+        if (!string.Equals(a.Kind, b.Kind, StringComparison.Ordinal))
+        {
+            details.Add(new LayoutChangeDetail(LayoutChangeAspects.Kind, B, a.Kind, b.Kind));
+        }
+
         Text(details, LayoutChangeAspects.Label, a.Label, b.Label, P);
         Text(details, LayoutChangeAspects.HelpText, a.HelpText, b.HelpText, P);
         Text(details, LayoutChangeAspects.Placeholder, a.Placeholder, b.Placeholder, P);
@@ -239,7 +252,7 @@ public static class FormLayoutComparison
         Limit(details, LayoutChangeAspects.MaxDate, va.MaxDate?.DayNumber, vb.MaxDate?.DayNumber, tighterWhenHigher: false, va.MaxDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), vb.MaxDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
         if (!string.Equals(va.Pattern, vb.Pattern, StringComparison.Ordinal))
         {
-            details.Add(new LayoutChangeDetail(LayoutChangeAspects.Pattern, B, va.Pattern, vb.Pattern, Tightened: vb.Pattern is not null));
+            details.Add(new LayoutChangeDetail(LayoutChangeAspects.Pattern, B, va.Pattern, vb.Pattern, Tightened: va.Pattern is null && vb.Pattern is not null));
         }
 
         if (a.ReadOnly != b.ReadOnly)
@@ -257,8 +270,11 @@ public static class FormLayoutComparison
             details.Add(new LayoutChangeDetail(LayoutChangeAspects.ClearWhenHidden, B, YesNo(a.ClearWhenHidden), YesNo(b.ClearWhenHidden)));
         }
 
-        Rule(details, LayoutChangeAspects.VisibleWhen, a.VisibleWhen, b.VisibleWhen, tightenedWhenAdded: false);
-        Rule(details, LayoutChangeAspects.RequiredWhen, a.RequiredWhen, b.RequiredWhen, tightenedWhenAdded: true);
+        Rule(details, LayoutChangeAspects.VisibleWhen, a.VisibleWhen, b.VisibleWhen, tightened: false);
+        // A conditional requirement is a proven tightening only when it is added to a field that is not otherwise required
+        // (before and after). Replacing a condition changes when the field is required in a direction that cannot be proven
+        // statically; removing one, or adding one while dropping an unconditional requirement, relaxes it.
+        Rule(details, LayoutChangeAspects.RequiredWhen, a.RequiredWhen, b.RequiredWhen, tightened: a.RequiredWhen is null && b.RequiredWhen is not null && !va.Required && !vb.Required);
         if (FilterKey(a.OptionFilter) != FilterKey(b.OptionFilter))
         {
             details.Add(new LayoutChangeDetail(LayoutChangeAspects.OptionFilter, B, a.OptionFilter is null ? "none" : "set", b.OptionFilter is null ? "none" : "set"));
@@ -273,13 +289,17 @@ public static class FormLayoutComparison
 
         var protectionA = a.Protection is null ? null : a.Protection.Classification + " / " + a.Protection.ProtectionMode;
         var protectionB = b.Protection is null ? null : b.Protection.Classification + " / " + b.Protection.ProtectionMode;
-        if (protectionA is not null && protectionB is not null && protectionA != protectionB)
+        if (!string.Equals(protectionA, protectionB, StringComparison.Ordinal))
         {
             details.Add(new LayoutChangeDetail(LayoutChangeAspects.Protection, B, protectionA, protectionB));
         }
 
         CompareOptions(a.Options ?? [], b.Options ?? [], details);
-        if (a.Upload is { } ua && b.Upload is { } ub)
+        if ((a.Upload is null) != (b.Upload is null))
+        {
+            details.Add(new LayoutChangeDetail(LayoutChangeAspects.UploadPolicy, B, a.Upload is null ? null : UploadText(a.Upload), b.Upload is null ? null : UploadText(b.Upload)));
+        }
+        else if (a.Upload is { } ua && b.Upload is { } ub)
         {
             var before = UploadText(ua);
             var after = UploadText(ub);
@@ -354,7 +374,7 @@ public static class FormLayoutComparison
 
         if (element.RequiredWhen is not null)
         {
-            details.Add(new LayoutChangeDetail(LayoutChangeAspects.RequiredWhen, LayoutChangeSignificance.Behaviour, null, "set", Tightened: true));
+            details.Add(new LayoutChangeDetail(LayoutChangeAspects.RequiredWhen, LayoutChangeSignificance.Behaviour, "none", "set", Tightened: !element.Validation.Required));
         }
 
         return details;
@@ -464,13 +484,13 @@ public static class FormLayoutComparison
         details.Add(new LayoutChangeDetail(aspect, LayoutChangeSignificance.Behaviour, beforeText ?? before?.ToString(CultureInfo.InvariantCulture), afterText ?? after?.ToString(CultureInfo.InvariantCulture), Tightened: tightened));
     }
 
-    private static void Rule(List<LayoutChangeDetail> details, string aspect, RuleCondition? before, RuleCondition? after, bool tightenedWhenAdded)
+    private static void Rule(List<LayoutChangeDetail> details, string aspect, RuleCondition? before, RuleCondition? after, bool tightened)
     {
         var a = RuleKey(before);
         var b = RuleKey(after);
         if (a != b)
         {
-            details.Add(new LayoutChangeDetail(aspect, LayoutChangeSignificance.Behaviour, before is null ? "none" : "set", after is null ? "none" : "set", Tightened: tightenedWhenAdded && after is not null));
+            details.Add(new LayoutChangeDetail(aspect, LayoutChangeSignificance.Behaviour, before is null ? "none" : "set", after is null ? "none" : "set", Tightened: tightened));
         }
     }
 

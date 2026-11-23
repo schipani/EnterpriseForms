@@ -250,3 +250,24 @@ collapsed under a disclosure so they are never presented as destructive. Text ca
 No migration; no Authority, encryption, signing, Merkle or journal change; Historical, Latest and Hybrid unchanged; no
 record values in any comparison or impact; the separate publish permission, translations in comparisons and
 organization-disabled catalog values remain deferred (D9-9).
+
+### 7.5 Corrective review of PR #71 (owner direction, C-183)
+
+- **Publish gate.** Publish is enabled only when a review for exactly the draft revision about to be published has
+  loaded, is not being refreshed, did not fail, and says the draft can be published (`publishGate` in
+  `PublishReview.tsx`); the dialog says why it is not available yet. The server still checks the draft revision, the
+  current version and the layout on publish; the gate never replaces those checks.
+- **Proven tightening only.** `Tightened` marks a rule or limit that is proven to refuse input it accepted before. A
+  conditional requirement is a tightening only when it is added to a field that is not otherwise required, before or
+  after; a replaced condition is a behaviour change of unknown direction; a removed one, or one that replaces an
+  unconditional requirement, relaxes. Likewise only an added pattern is a tightening (a replaced pattern is not proven).
+- **Completeness against the layout contract.** Every persisted element and section property is compared. Added in
+  this review: a section that places a different repeating group (`RepeatGroup`, notice `REPEATING_SECTIONS_CHANGED`);
+  protection recorded in one version and not the other (versions published before protection snapshots); an upload
+  policy present in one version and not the other, and an element-kind change for the same field — the last two cannot
+  occur under the current contract (a document collection always parses a policy and a field id is placed as one kind)
+  but are reported defensively.
+- **Compare selections.** The selection follows new versions while the person has not chosen; a person's choice is kept
+  while both sides exist; a side that no longer exists (for example a removed draft) resets the comparison to the
+  defaults with a visible notice, so something that is gone is never compared. A draft comparison is re-read whenever the
+  draft revision changes (the revision is part of the query key and of the option label).

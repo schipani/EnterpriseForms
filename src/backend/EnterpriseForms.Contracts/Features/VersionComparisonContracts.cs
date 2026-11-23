@@ -3,7 +3,7 @@ namespace EnterpriseForms.Contracts.Features;
 // Phase C9 M2 (WP-3, WP-4, WP-5): semantic layout comparison, publish impact and version-to-version comparison. Form-design
 // metadata only (labels, rules, limits, options as published); no record values are ever part of these responses.
 
-/// <summary>One changed aspect of an element. <c>Aspect</c> is a stable code (Label, Required, MaxLength, OptionDeactivated, …); <c>Subject</c> names the option it concerns; <c>Tightened</c> marks a rule or limit that can refuse input it accepted before.</summary>
+/// <summary>One changed aspect of an element. <c>Aspect</c> is a stable code (Label, Required, MaxLength, OptionDeactivated, …); <c>Subject</c> names the option it concerns; <c>Tightened</c> marks a rule or limit that is proven to refuse input it accepted before (a replaced rule or pattern is a behaviour change of unknown direction and is not marked).</summary>
 public sealed record LayoutChangeDetailResponse(string Aspect, string Significance, string? Before, string? After, string? Subject, bool Tightened);
 
 /// <summary>
@@ -24,7 +24,8 @@ public sealed record VersionComparisonResponse(Guid FormDefinitionId, ComparedLa
 
 /// <summary>
 /// A publish-impact notice. <c>Code</c>: NEW_REQUIRED_FIELDS, VALIDATION_TIGHTENED, OPTIONS_NO_LONGER_AVAILABLE,
-/// LIMITS_TIGHTENED, ELEMENTS_REMOVED, READ_ONLY_OR_HIDDEN, PROTECTION_CHANGED, PRESENTATION_ONLY, NO_CHANGES.
+/// LIMITS_TIGHTENED, ELEMENTS_REMOVED, READ_ONLY_OR_HIDDEN, PROTECTION_CHANGED, REPEATING_SECTIONS_CHANGED, PRESENTATION_ONLY,
+/// NO_CHANGES.
 /// <c>Severity</c>: Attention (records edited with the new version may need attention) or Information. Notices describe
 /// potential impact on future edits; publishing never deletes or changes stored values.
 /// </summary>

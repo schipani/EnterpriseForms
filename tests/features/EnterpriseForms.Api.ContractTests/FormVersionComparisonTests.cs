@@ -188,6 +188,106 @@ public sealed class FormVersionComparisonTests
         Assert.Equal(LayoutChangeTypes.Removed, a.Changes[^1].ChangeType); // removed items come last
     }
 
+    // ---- corrective review of PR #71: proven tightening and comparison completeness ----
+
+    private static readonly RuleComparison WhenOpen = new(RuleOperators.Equal, Status, "open", null);
+
+    private static readonly RuleComparison WhenClosed = new(RuleOperators.Equal, Status, "closed", null);
+
+    private static LayoutChangeDetail RequiredWhenDetail(LayoutElement before, LayoutElement after) =>
+        Assert.Single(Assert.Single(FormLayoutComparison.Compare(Layout(Section("main", "Main", before)), Layout(Section("main", "Main", after))).Changes).Details, d => d.Aspect == LayoutChangeAspects.RequiredWhen);
+
+    [Fact]
+    public void AConditionalRequirementAddedToAnOptionalFieldIsAProvenTightening()
+    {
+        var detail = RequiredWhenDetail(Field(Phone, "Phone"), Field(Phone, "Phone") with { RequiredWhen = WhenOpen });
+        Assert.Equal((LayoutChangeSignificance.Behaviour, "none", "set", true), (detail.Significance, detail.Before, detail.After, detail.Tightened));
+        Assert.Single(FormDesignerHandlers.Notices(FormLayoutComparison.Compare(Layout(Section("main", "Main", Field(Phone, "Phone"))), Layout(Section("main", "Main", Field(Phone, "Phone") with { RequiredWhen = WhenOpen })))), n => n.Code == "NEW_REQUIRED_FIELDS");
+    }
+
+    [Fact]
+    public void AReplacedConditionalRequirementIsABehaviourChangeButNotAProvenTightening()
+    {
+        var before = Layout(Section("main", "Main", Field(Phone, "Phone") with { RequiredWhen = WhenOpen }));
+        var after = Layout(Section("main", "Main", Field(Phone, "Phone") with { RequiredWhen = WhenClosed }));
+        var detail = RequiredWhenDetail(before.Sections[0].Elements[0], after.Sections[0].Elements[0]);
+        Assert.Equal((LayoutChangeSignificance.Behaviour, "set", "set", false), (detail.Significance, detail.Before, detail.After, detail.Tightened));
+        Assert.DoesNotContain(FormDesignerHandlers.Notices(FormLayoutComparison.Compare(before, after)), n => n.Code == "NEW_REQUIRED_FIELDS");
+    }
+
+    [Fact]
+    public void ARemovedConditionalRequirementIsARelaxation()
+    {
+        var detail = RequiredWhenDetail(Field(Phone, "Phone") with { RequiredWhen = WhenOpen }, Field(Phone, "Phone"));
+        Assert.Equal(("set", "none", false), (detail.Before, detail.After, detail.Tightened));
+    }
+
+    [Fact]
+    public void ReplacingAnUnconditionalRequirementWithAConditionalOneRelaxesIt()
+    {
+        var before = Layout(Section("main", "Main", Field(Phone, "Phone", required: true)));
+        var after = Layout(Section("main", "Main", Field(Phone, "Phone", required: false) with { RequiredWhen = WhenOpen }));
+        var details = Assert.Single(FormLayoutComparison.Compare(before, after).Changes).Details;
+        Assert.All(details, d => Assert.False(d.Tightened));
+        Assert.DoesNotContain(FormDesignerHandlers.Notices(FormLayoutComparison.Compare(before, after)), n => n.Code == "NEW_REQUIRED_FIELDS");
+        // A conditional requirement on a field that stays unconditionally required adds nothing either.
+        Assert.False(RequiredWhenDetail(Field(Phone, "Phone", required: true), Field(Phone, "Phone", required: true) with { RequiredWhen = WhenOpen }).Tightened);
+        // A new field that is conditionally (not unconditionally) required is flagged.
+        var added = Assert.Single(FormLayoutComparison.Compare(Layout(Section("main", "Main")), Layout(Section("main", "Main", Field(Alias, "Alias") with { RequiredWhen = WhenOpen }))).Changes, c => c.ChangeType == LayoutChangeTypes.Added);
+        Assert.True(Assert.Single(added.Details, d => d.Aspect == LayoutChangeAspects.RequiredWhen).Tightened);
+        var alreadyRequired = Assert.Single(FormLayoutComparison.Compare(Layout(Section("main", "Main")), Layout(Section("main", "Main", Field(Alias, "Alias", required: true) with { RequiredWhen = WhenOpen }))).Changes, c => c.ChangeType == LayoutChangeTypes.Added);
+        Assert.False(Assert.Single(alreadyRequired.Details, d => d.Aspect == LayoutChangeAspects.RequiredWhen).Tightened);
+    }
+
+    [Fact]
+    public void OnlyAnAddedPatternIsAProvenTightening()
+    {
+        static LayoutElement WithPattern(string? pattern) => Field(Phone, "Phone") with { Validation = new LayoutValidation(false, null, null, pattern, null, null, null, null) };
+        LayoutChangeDetail PatternChange(string? before, string? after) => Assert.Single(Assert.Single(FormLayoutComparison.Compare(Layout(Section("main", "Main", WithPattern(before))), Layout(Section("main", "Main", WithPattern(after)))).Changes).Details);
+        Assert.True(PatternChange(null, "^[0-9]+$").Tightened);
+        Assert.False(PatternChange("^[0-9]+$", "^[0-9-]+$").Tightened);
+        Assert.False(PatternChange("^[0-9]+$", null).Tightened);
+    }
+
+    [Fact]
+    public void ProtectionIsReportedWhenAVersionFirstRecordsIt()
+    {
+        var before = Layout(Section("main", "Main", Field(Phone, "Phone")));
+        var after = Layout(Section("main", "Main", Field(Phone, "Phone") with { Protection = new LayoutProtection("Confidential", "ApplicationEncrypted") }));
+        var detail = Assert.Single(Assert.Single(FormLayoutComparison.Compare(before, after).Changes).Details);
+        Assert.Equal((LayoutChangeAspects.Protection, LayoutChangeSignificance.Behaviour, (string?)null, "Confidential / ApplicationEncrypted"), (detail.Aspect, detail.Significance, detail.Before, detail.After));
+        Assert.Single(FormDesignerHandlers.Notices(FormLayoutComparison.Compare(before, after)), n => n.Code == "PROTECTION_CHANGED");
+        Assert.Single(Assert.Single(FormLayoutComparison.Compare(after, before).Changes).Details, d => d is { Aspect: LayoutChangeAspects.Protection, After: null });
+    }
+
+    [Fact]
+    public void ASectionThatPlacesADifferentRepeatingGroupIsReported()
+    {
+        var before = Layout(new LayoutSection("entries", "Entries", 4, [Field(Alias, "Plate")], Repeat: new LayoutRepeat(Guid.CreateVersion7(), 0, 10, true, true, true)));
+        var after = Layout(new LayoutSection("entries", "Entries", 4, [Field(Alias, "Plate")], Repeat: new LayoutRepeat(Guid.CreateVersion7(), 0, 10, true, true, true)));
+        var change = Assert.Single(FormLayoutComparison.Compare(before, after).Changes);
+        Assert.Equal((LayoutChangeTargets.Section, LayoutChangeSignificance.Behaviour), (change.Target, change.Significance));
+        Assert.Single(change.Details, d => d.Aspect == LayoutChangeAspects.RepeatGroup);
+        Assert.Single(FormDesignerHandlers.Notices(FormLayoutComparison.Compare(before, after)), n => n.Code == "REPEATING_SECTIONS_CHANGED");
+        var madeRepeating = FormLayoutComparison.Compare(Layout(Section("entries", "Entries", Field(Alias, "Plate"))), after);
+        Assert.Single(Assert.Single(madeRepeating.Changes).Details, d => d.Aspect == LayoutChangeAspects.Repeat);
+    }
+
+    [Fact]
+    public void AnUploadPolicyAppearingOrDisappearingAndAKindChangeAreReported()
+    {
+        var policy = new LayoutUploadPolicy(true, 5, 1024, ["application/pdf"]);
+        var collection = new LayoutElement(LayoutElementKinds.DocumentCollection, Alias, null, "fileUpload", "Documents", null, new LayoutPlacement(4, false), new LayoutValidation(false, null, null, null, null, null, null, null), policy, null);
+        var withoutPolicy = collection with { Upload = null };
+        var appeared = Assert.Single(Assert.Single(FormLayoutComparison.Compare(Layout(Section("main", "Main", withoutPolicy)), Layout(Section("main", "Main", collection))).Changes).Details);
+        Assert.Equal((LayoutChangeAspects.UploadPolicy, (string?)null, false), (appeared.Aspect, appeared.Before, appeared.Tightened));
+        Assert.NotNull(appeared.After);
+        Assert.Single(Assert.Single(FormLayoutComparison.Compare(Layout(Section("main", "Main", collection)), Layout(Section("main", "Main", withoutPolicy))).Changes).Details, d => d is { Aspect: LayoutChangeAspects.UploadPolicy, After: null });
+        var asField = Field(Alias, "Documents") with { Validation = collection.Validation };
+        var kind = FormLayoutComparison.Compare(Layout(Section("main", "Main", asField)), Layout(Section("main", "Main", collection))).Changes.Single();
+        Assert.Contains(kind.Details, d => d is { Aspect: LayoutChangeAspects.Kind, Before: LayoutElementKinds.Field, After: LayoutElementKinds.DocumentCollection });
+    }
+
     // ---- WP-4 / WP-5: handlers ----
 
     [Fact]
