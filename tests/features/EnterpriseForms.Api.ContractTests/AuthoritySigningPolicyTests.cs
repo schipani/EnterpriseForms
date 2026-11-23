@@ -28,8 +28,7 @@ public sealed class AuthoritySigningPolicyTests
             b.UseEnvironment("Production");
             b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(new Dictionary<string, string?> { ["Signing:Provider"] = "LocalDevelopment" }));
         });
-        var ex = Assert.ThrowsAny<Exception>(() => authority.CreateClient());
-        Assert.Contains("forbidden in Production", Flatten(ex), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, "forbidden in Production");
     }
 
     [Fact]
@@ -40,7 +39,7 @@ public sealed class AuthoritySigningPolicyTests
             b.UseEnvironment("Production");
             b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(new Dictionary<string, string?> { ["Signing:Provider"] = "VaultTransit", ["Signing:VaultAddress"] = "http://vault:8200" }));
         });
-        Assert.Contains("forbidden in Production", Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient())), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, "forbidden in Production");
     }
 
     [Fact]
@@ -51,7 +50,7 @@ public sealed class AuthoritySigningPolicyTests
             b.UseEnvironment("Development");
             b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(new Dictionary<string, string?> { ["Signing:Provider"] = "Unconfigured" }));
         });
-        Assert.Contains("not configured", Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient())), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, "not configured");
     }
 
     [Fact]
@@ -63,7 +62,7 @@ public sealed class AuthoritySigningPolicyTests
             b.UseEnvironment("Production");
             b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(DevelopmentIdentity(new Dictionary<string, string?> { ["Signing:Provider"] = "AzureManagedHsm", ["Identity:UserAssertion:ProviderKind"] = "EntraId" })));
         });
-        Assert.Contains("not implemented in Stage A", Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient())), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, "not implemented in Stage A");
     }
 
     [Fact]
@@ -74,7 +73,7 @@ public sealed class AuthoritySigningPolicyTests
             b.UseEnvironment("Staging");
             b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(DevelopmentIdentity(new Dictionary<string, string?> { ["Signing:Provider"] = "AzureManagedHsm" })));
         });
-        Assert.Contains("permitted only in Development/Testing", Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient())), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, "permitted only in Development/Testing");
     }
 
     [Fact]
@@ -85,7 +84,7 @@ public sealed class AuthoritySigningPolicyTests
             b.UseEnvironment("Development");
             b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(new Dictionary<string, string?> { ["Identity:Operator:SharedKeyBase64"] = "d29ya2xvYWQtZGV2LW9ubHktc2hhcmVkLWtleS0wMDAwMDAwMDAwMA==" }));
         });
-        Assert.Contains("must be distinct", Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient())), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, "must be distinct");
     }
 
     private static Dictionary<string, string?> DevelopmentIdentity(Dictionary<string, string?> extra)
@@ -111,16 +110,5 @@ public sealed class AuthoritySigningPolicyTests
         }
 
         return values;
-    }
-
-    private static string Flatten(Exception ex)
-    {
-        var messages = new List<string>();
-        for (Exception? e = ex; e is not null; e = e.InnerException)
-        {
-            messages.Add(e.Message);
-        }
-
-        return string.Join(" | ", messages);
     }
 }

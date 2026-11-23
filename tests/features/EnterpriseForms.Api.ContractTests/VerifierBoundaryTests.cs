@@ -111,18 +111,6 @@ public sealed class VerifierBoundaryTests
                 b.UseSetting("Identity:Verifier:SharedKeyBase64", reuseWorkloadKey ? WorkloadKey : VerifierKey);
             }
         });
-        var failure = Assert.ThrowsAny<Exception>(() => authority.CreateClient());
-        Assert.Contains(partial ? "configured completely" : "own key and issuer", Flatten(failure), StringComparison.Ordinal);
-    }
-
-    private static string Flatten(Exception exception)
-    {
-        var text = string.Empty;
-        for (Exception? current = exception; current is not null; current = current.InnerException)
-        {
-            text += current.Message + "\n";
-        }
-
-        return text;
+        StartupRefusal.Assert(authority, partial ? "configured completely" : "own key and issuer");
     }
 }

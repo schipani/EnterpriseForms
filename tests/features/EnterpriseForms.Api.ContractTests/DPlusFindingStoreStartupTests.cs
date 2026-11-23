@@ -21,13 +21,11 @@ public sealed class DPlusFindingStoreStartupTests
             b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(settings));
         });
 
-    private static string Flatten(Exception ex) => ex.InnerException is null ? ex.Message : ex.Message + " | " + Flatten(ex.InnerException);
-
     [Fact]
     public void ADevelopmentHostWithAnArchiveButNoFindingStoreRefusesToStart()
     {
         using var authority = Host("Development", new() { ["JournalVerificationCheckpointStore:Provider"] = "Unconfigured" });
-        Assert.Contains("requires the journal-verification store for durable findings", Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient())), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, "requires the journal-verification store for durable findings");
     }
 
     [Fact]
@@ -38,7 +36,7 @@ public sealed class DPlusFindingStoreStartupTests
             ["SecurityArchive:Provider"] = "Blob", ["SecurityArchive:BlobServiceUri"] = "http://archive.invalid:10000/acct", ["SecurityArchive:AccountName"] = "acct",
             ["SecurityArchive:AccountKey"] = Convert.ToBase64String(new byte[64]), ["JournalVerificationCheckpointStore:Provider"] = "InMemory",
         });
-        Assert.Contains("requires a Blob journal-verification store", Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient())), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, "requires a Blob journal-verification store");
     }
 
     [Fact]
@@ -51,7 +49,7 @@ public sealed class DPlusFindingStoreStartupTests
             ["JournalVerificationCheckpointStore:BlobServiceUri"] = "http://store.invalid:10000/store", ["JournalVerificationCheckpointStore:AccountName"] = "store",
             ["JournalVerificationCheckpointStore:AccountKeyFile"] = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "missing.key"),
         });
-        Assert.Contains("AccountKeyFile cannot be read", Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient())), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, "AccountKeyFile cannot be read");
     }
 
     [Fact]
