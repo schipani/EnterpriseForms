@@ -41,6 +41,16 @@ public static class FormDesignerEndpoints
             .WithName("PreviewFormVersionBehaviorImpact")
             .WithSummary("Phase C9: approximate record-level impact of switching to target (Historical, Latest or Hybrid), counted only over records the caller can discover (Authority lookup); no field values are inspected or counted. Requires the Authority design permission on the form (404 otherwise); 422 for an unknown target.");
 
+        group.MapGet("/{formDefinitionId:guid}/publish-impact", static async Task<Ok<PublishImpactResponse>> (Guid formDefinitionId, long expectedDraftRevision, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.PreviewPublishImpactAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, expectedDraftRevision, cancellationToken).ConfigureAwait(false)))
+            .WithName("PreviewPublishImpact")
+            .WithSummary("Phase C9 M2: what publishing the draft at expectedDraftRevision would change, before confirming: the semantic comparison of the current version with the draft as it would be published, potential-impact notices, and approximate record-level counts over records the caller can discover (no field values). Read-only (nothing written or audited). Requires the Authority design permission on the form (404 otherwise); 409 NO_DRAFT or DRAFT_REVISION_CONFLICT.");
+
+        group.MapGet("/{formDefinitionId:guid}/versions/compare", static async Task<Ok<VersionComparisonResponse>> (Guid formDefinitionId, string? from, string? to, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.CompareVersionsAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, from, to, cancellationToken).ConfigureAwait(false)))
+            .WithName("CompareFormVersions")
+            .WithSummary("Phase C9 M2: semantic comparison of two published versions of the form, or of a version and the draft (from/to = a version id or 'draft'). Elements are matched by stable id; presentation-only changes are reported separately from behaviour changes. Requires the Authority design permission on the form (404 otherwise); 404 VERSION_NOT_FOUND for a version of another form, 404 NO_DRAFT; 422 for a malformed reference.");
+
         group.MapPost("/designer", static async Task<Created<FormDefinitionDetailResponse>> (CreateFormDefinitionV2Request request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
             {
                 var response = await handlers.CreateAsync(BusinessAuthentication.RequireContext(http), request, FormDefinitionEndpoints.RequireIdempotencyKey(http), cancellationToken).ConfigureAwait(false);

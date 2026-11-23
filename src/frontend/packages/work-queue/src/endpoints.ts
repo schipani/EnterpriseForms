@@ -70,6 +70,8 @@ export const ENDPOINTS = {
   "forms.publish": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/publish" },
   "forms.restoreDraft": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/restore-draft" },
   "forms.versions": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/versions" },
+  "forms.publishImpact": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/publish-impact" },
+  "forms.compareVersions": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/versions/compare" },
   "forms.createRelationship": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/relationships" },
   "records.list": { method: "GET", path: "/api/v1/form-records" },
   // Phase C7 Advanced Field Search: predicate values travel in POST bodies only, never in URLs (ADR-PB-004).

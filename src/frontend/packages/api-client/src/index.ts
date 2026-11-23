@@ -70,6 +70,12 @@ export type AddFieldDefinitionRequest = S["AddFieldDefinitionRequest"];
 export type RenameFormDefinitionRequest = S["RenameFormDefinitionRequest"];
 export type ChangeVersionBehaviorRequest = S["ChangeVersionBehaviorRequest"];
 export type VersionBehaviorImpactResponse = S["VersionBehaviorImpactResponse"];
+export type PublishImpactResponse = S["PublishImpactResponse"];
+export type VersionComparisonResponse = S["VersionComparisonResponse"];
+export type LayoutComparisonResponse = S["LayoutComparisonResponse"];
+export type LayoutChangeResponse = S["LayoutChangeResponse"];
+export type LayoutChangeDetailResponse = S["LayoutChangeDetailResponse"];
+export type PublishImpactNoticeResponse = S["PublishImpactNoticeResponse"];
 /** Phase C9: which published layout a form's records are viewed and edited with. */
 export type VersionBehavior = "Historical" | "Latest" | "Hybrid";
 /** Phase C9: a record projection read for display (`view`) or for the editor (`edit`). */
@@ -359,6 +365,10 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       publish: (formDefinitionId: string, request: PublishFormRequest) => write<FormVersionResponse>("POST", "forms.publish", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       restoreDraft: (formDefinitionId: string, request: RestoreVersionRequest) => write<FormDraftResponse>("POST", "forms.restoreDraft", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       versions: (formDefinitionId: string, signal?: AbortSignal) => read<FormVersionResponse[]>("forms.versions", { formDefinitionId }, undefined, "interactive-read", signal),
+      /** Phase C9 M2: what publishing the draft at this revision would change (read-only). */
+      publishImpact: (formDefinitionId: string, expectedDraftRevision: number, signal?: AbortSignal) => read<PublishImpactResponse>("forms.publishImpact", { formDefinitionId }, { expectedDraftRevision }, "interactive-read", signal),
+      /** Phase C9 M2: semantic comparison; `from`/`to` are version ids or "draft". */
+      compareVersions: (formDefinitionId: string, from: string, to: string, signal?: AbortSignal) => read<VersionComparisonResponse>("forms.compareVersions", { formDefinitionId }, { from, to }, "interactive-read", signal),
       createRelationship: (formDefinitionId: string, request: CreateRelationshipDefinitionRequest) => write<RelationshipDefinitionResponse>("POST", "forms.createRelationship", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
     },
     optionLists: {

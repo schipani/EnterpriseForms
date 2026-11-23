@@ -18,6 +18,8 @@ import { GridOperationDialog } from "../components/GridOperationDialog";
 import { RemoveSectionDialog } from "../components/RemoveSectionDialog";
 import { RenameFormDialog, type RenameFormTarget } from "../components/RenameFormDialog";
 import { VERSION_BEHAVIOR_COPY, VersionBehaviorDialog, isVersionBehavior, type VersionBehaviorTarget } from "../components/VersionBehaviorDialog";
+import { PublishReview, usePublishImpact } from "../components/PublishReview";
+import { VersionComparePanel } from "../components/VersionComparePanel";
 
 type View = "design" | "fields" | "rules" | "preview" | "versions" | "settings" | "access" | "relationships";
 
@@ -282,6 +284,8 @@ export function DesignerPage() {
       await queryClient.invalidateQueries({ queryKey: ["forms", formDefinitionId, "versions"] });
     },
   });
+  // Phase C9 M2 (WP-4): the publish review is read while the dialog is open, for the draft revision it would publish.
+  const publishImpact = usePublishImpact(formDefinitionId, Number(detail.data?.draft?.draftRevision ?? 0), publishOpen && detail.data?.draft !== null && detail.data?.draft !== undefined);
   const restore = useMutation({
     mutationFn: (fromFormVersionId: string) => api.forms.restoreDraft(formDefinitionId, { fromFormVersionId }).then((r) => r.result),
     onSuccess: async () => {
@@ -804,7 +808,7 @@ export function DesignerPage() {
                 { key: "v", header: "Version", isRowHeader: true, render: (row) => `v${row.versionNumber}` },
                 { key: "reason", header: "Change reason", render: (row) => row.changeReason },
                 { key: "published", header: "Published", render: (row) => getActiveFormatter().instant(row.publishedOn) },
-                { key: "restored", header: "Restored from", render: (row) => (row.restoredFromFormVersionId ? "earlier version" : "") },
+                { key: "restored", header: "Restored from", render: (row) => (row.restoredFromFormVersionId ? restoredFromLabel(versions.data ?? [], row.restoredFromFormVersionId) : "") },
                 {
                   key: "actions",
                   header: "Actions",
@@ -814,6 +818,7 @@ export function DesignerPage() {
               ]}
             />
           ) : null}
+          {versions.data ? <VersionComparePanel formDefinitionId={formDefinitionId} versions={versions.data} draftRevision={form.draft ? Number(form.draft.draftRevision) : null} /> : null}
         </Card>
       ),
     },
@@ -1088,19 +1093,21 @@ export function DesignerPage() {
         open={publishOpen}
         onOpenChange={setPublishOpen}
         title="Publish a new version"
-        description={`This publishes draft revision ${form.draft?.draftRevision ?? 0} as version ${Number(form.summary.currentVersionNumber ?? 0) + 1}, with ${layout?.sections.length ?? 0} ${layout?.sections.length === 1 ? "section" : "sections"}. Published versions are immutable; existing records keep their values.`}
+        description={`Review what draft revision ${form.draft?.draftRevision ?? 0} changes before publishing it as version ${Number(form.summary.currentVersionNumber ?? 0) + 1}. Published versions are immutable; existing records keep their values.`}
+        size="large"
         locked={publish.isPending}
         footer={
           <>
             <Button variant="secondary" onClick={() => setPublishOpen(false)} disabled={publish.isPending}>
               Cancel
             </Button>
-            <Button busy={publish.isPending} disabled={changeReason.trim().length < 3} onClick={() => publish.mutate()}>
+            <Button busy={publish.isPending} disabled={changeReason.trim().length < 3 || publishImpact.data?.canPublish === false} onClick={() => publish.mutate()}>
               Publish
             </Button>
           </>
         }
       >
+        <PublishReview impact={publishImpact} onRetry={() => void publishImpact.refetch()} />
         <TextInput label="Change reason" value={changeReason} required maxLength={500} onChange={(event) => setChangeReason(event.target.value)} />
         {publish.isError ? <ErrorPanel error={publish.error} /> : null}
       </Dialog>
@@ -1286,4 +1293,10 @@ function SaveIcon() {
       <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8" />
     </svg>
   );
+}
+
+/** Phase C9 M2: "Restored from" names the source version when it is known. */
+function restoredFromLabel(versions: ReadonlyArray<{ formVersionId: string; versionNumber: number | string }>, formVersionId: string): string {
+  const source = versions.find((version) => version.formVersionId === formVersionId);
+  return source ? `v${String(source.versionNumber)}` : "earlier version";
 }

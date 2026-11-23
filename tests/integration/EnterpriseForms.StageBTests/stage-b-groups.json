@@ -6,7 +6,7 @@
     {
       "name": "forms-documents",
       "title": "Forms, Designer, Validation and Documents",
-      "classes": ["DesignerTests", "DropdownTests", "RulesTests", "FieldEditTests", "FormRenameTests", "FormVersionBehaviorTests", "RepeatingGroupsTests", "BrandingTests", "FormAccessTests", "ParentChildTests", "RegionalPreferencesTests", "DocumentTests", "DocumentEncryptionAuditTests", "AuditExplorerTests", "EncryptionTests"]
+      "classes": ["DesignerTests", "DropdownTests", "RulesTests", "FieldEditTests", "FormRenameTests", "FormVersionBehaviorTests", "FormVersionComparisonTests", "RepeatingGroupsTests", "BrandingTests", "FormAccessTests", "ParentChildTests", "RegionalPreferencesTests", "DocumentTests", "DocumentEncryptionAuditTests", "AuditExplorerTests", "EncryptionTests"]
     },
     {
       "name": "authorization-security-onboarding",

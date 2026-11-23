@@ -1189,6 +1189,97 @@
         }
       }
     },
+    "/api/v1/form-definitions/{formDefinitionId}/publish-impact": {
+      "get": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Phase C9 M2: what publishing the draft at expectedDraftRevision would change, before confirming: the semantic comparison of the current version with the draft as it would be published, potential-impact notices, and approximate record-level counts over records the caller can discover (no field values). Read-only (nothing written or audited). Requires the Authority design permission on the form (404 otherwise); 409 NO_DRAFT or DRAFT_REVISION_CONFLICT.",
+        "operationId": "PreviewPublishImpact",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "expectedDraftRevision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishImpactResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/versions/compare": {
+      "get": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Phase C9 M2: semantic comparison of two published versions of the form, or of a version and the draft (from/to = a version id or 'draft'). Elements are matched by stable id; presentation-only changes are reported separately from behaviour changes. Requires the Authority design permission on the form (404 otherwise); 404 VERSION_NOT_FOUND for a version of another form, 404 NO_DRAFT; 422 for a malformed reference.",
+        "operationId": "CompareFormVersions",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionComparisonResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-definitions/designer": {
       "post": {
         "tags": [
@@ -7102,6 +7193,53 @@
           }
         }
       },
+      "ComparedLayoutResponse": {
+        "required": [
+          "kind",
+          "formVersionId",
+          "versionNumber",
+          "draftRevision",
+          "publishedOn"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "formVersionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "versionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "draftRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "publishedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
       "CountryCatalogEntry": {
         "required": [
           "countryCode",
@@ -10175,6 +10313,141 @@
           }
         }
       },
+      "LayoutChangeDetailResponse": {
+        "required": [
+          "aspect",
+          "significance",
+          "before",
+          "after",
+          "subject",
+          "tightened"
+        ],
+        "type": "object",
+        "properties": {
+          "aspect": {
+            "type": "string"
+          },
+          "significance": {
+            "type": "string"
+          },
+          "before": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "after": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subject": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tightened": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LayoutChangeResponse": {
+        "required": [
+          "target",
+          "elementId",
+          "changeType",
+          "significance",
+          "label",
+          "sectionTitle",
+          "details"
+        ],
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "elementId": {
+            "type": "string"
+          },
+          "changeType": {
+            "type": "string"
+          },
+          "significance": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sectionTitle": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LayoutChangeDetailResponse"
+            }
+          }
+        }
+      },
+      "LayoutComparisonResponse": {
+        "required": [
+          "addedCount",
+          "removedCount",
+          "behaviourChangeCount",
+          "presentationChangeCount",
+          "hasChanges",
+          "changes"
+        ],
+        "type": "object",
+        "properties": {
+          "addedCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "removedCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "behaviourChangeCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "presentationChangeCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "hasChanges": {
+            "type": "boolean"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LayoutChangeResponse"
+            }
+          }
+        }
+      },
       "MemberCommandRequest": {
         "required": [
           "reason"
@@ -11514,6 +11787,169 @@
             "format": "int32"
           },
           "changeReason": {
+            "type": "string"
+          }
+        }
+      },
+      "PublishImpactNoticeResponse": {
+        "required": [
+          "code",
+          "severity",
+          "elementLabels"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "elementLabels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PublishImpactResponse": {
+        "required": [
+          "formDefinitionId",
+          "draftRevision",
+          "currentVersionNumber",
+          "nextVersionNumber",
+          "versionBehavior",
+          "canPublish",
+          "blockedReasonCode",
+          "blockedReason",
+          "comparison",
+          "notices",
+          "records",
+          "dataStatement"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "draftRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "currentVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "versionBehavior": {
+            "type": "string"
+          },
+          "canPublish": {
+            "type": "boolean"
+          },
+          "blockedReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blockedReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/LayoutComparisonResponse"
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublishImpactNoticeResponse"
+            }
+          },
+          "records": {
+            "$ref": "#/components/schemas/PublishRecordImpactResponse"
+          },
+          "dataStatement": {
+            "type": "string"
+          }
+        }
+      },
+      "PublishRecordImpactResponse": {
+        "required": [
+          "visibleRecordCount",
+          "shownWithNewVersionCount",
+          "editedWithNewVersionCount",
+          "unavailableRecordCount",
+          "authorizationRevision",
+          "countsAreApproximate",
+          "scopeStatement"
+        ],
+        "type": "object",
+        "properties": {
+          "visibleRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "shownWithNewVersionCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "editedWithNewVersionCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "unavailableRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "countsAreApproximate": {
+            "type": "boolean"
+          },
+          "scopeStatement": {
             "type": "string"
           }
         }
@@ -16011,6 +16447,30 @@
           },
           "scopeStatement": {
             "type": "string"
+          }
+        }
+      },
+      "VersionComparisonResponse": {
+        "required": [
+          "formDefinitionId",
+          "from",
+          "to",
+          "comparison"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "from": {
+            "$ref": "#/components/schemas/ComparedLayoutResponse"
+          },
+          "to": {
+            "$ref": "#/components/schemas/ComparedLayoutResponse"
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/LayoutComparisonResponse"
           }
         }
       },
