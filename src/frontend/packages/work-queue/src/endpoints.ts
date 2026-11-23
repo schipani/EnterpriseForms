@@ -34,6 +34,8 @@ export const ENDPOINTS = {
   "forms.addField": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/fields" },
   "forms.createGroup": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/groups" },
   "forms.rename": { method: "PATCH", path: "/api/v1/form-definitions/{formDefinitionId}" },
+  "forms.changeVersionBehavior": { method: "PUT", path: "/api/v1/form-definitions/{formDefinitionId}/version-behavior" },
+  "forms.versionBehaviorImpact": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/version-behavior-impact" },
   "forms.updateField": { method: "PATCH", path: "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}" },
   "forms.access": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/access" },
   "forms.protection": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection" },

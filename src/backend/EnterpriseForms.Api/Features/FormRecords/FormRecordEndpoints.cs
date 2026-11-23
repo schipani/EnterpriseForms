@@ -50,14 +50,20 @@ public static class FormRecordEndpoints
             .WithName("GetFormRecord")
             .WithSummary("Verified read: authority head → exact staged rows → complete manifest verification → authorized subset only.");
 
-        records.MapGet("/{formRecordId:guid}/projection", static async Task<Ok<RecordProjectionResponse>> (Guid formRecordId, HttpContext http, GetRecordProjectionHandler handler, CancellationToken cancellationToken) =>
+        records.MapGet("/{formRecordId:guid}/projection", static async Task<Ok<RecordProjectionResponse>> (Guid formRecordId, string? purpose, HttpContext http, GetRecordProjectionHandler handler, CancellationToken cancellationToken) =>
             {
-                var response = await handler.HandleAsync(BusinessAuthentication.RequireContext(http), formRecordId, cancellationToken).ConfigureAwait(false);
+                var layoutPurpose = purpose switch
+                {
+                    null or "" or "view" => Domain.Features.FormDefinitions.RecordLayoutPurpose.View,
+                    "edit" => Domain.Features.FormDefinitions.RecordLayoutPurpose.Edit,
+                    _ => throw new Application.Common.BusinessException("INVALID_REQUEST", 422, "purpose must be 'view' or 'edit'"),
+                };
+                var response = await handler.HandleAsync(BusinessAuthentication.RequireContext(http), formRecordId, layoutPurpose, cancellationToken).ConfigureAwait(false);
                 http.Response.Headers.ETag = response.ETag;
                 return TypedResults.Ok(response);
             })
             .WithName("GetRecordProjection")
-            .WithSummary("Verified projection for the UI: layout version, field metadata, authorized values and documents, permitted actions, ETag.");
+            .WithSummary("Verified projection for the UI: layout version, field metadata, authorized values and documents, permitted actions, ETag. Phase C9: purpose=view (default) returns the view layout and purpose=edit the edit layout of the form's version behaviour (Historical: created version for both; Latest: current version for both; Hybrid: created version to view, current version to edit); an unavailable edit layout is 409 EDIT_LAYOUT_UNAVAILABLE; the response reports the behaviour, the created version number and the current edit layout.");
 
         records.MapGet("/{formRecordId:guid}/versions", static async Task<Ok<RecordVersionListResponse>> (Guid formRecordId, long? after, int? pageSize, HttpContext http, RecordHistoryHandler handler, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await handler.ListAsync(BusinessAuthentication.RequireContext(http), formRecordId, after, pageSize, cancellationToken).ConfigureAwait(false)))
@@ -99,7 +105,7 @@ public static class FormRecordEndpoints
                 return TypedResults.Ok(response);
             })
             .WithName("RestoreRecordVersion")
-            .WithSummary("Phase C6 M3: restores the field values and repeating-section entries of an earlier version as a NEW revision (owner, Draft, reason required, optimistic by If-Match/expected revision, idempotent). The source is verified through the Authority's history; values are validated against the current form (all-or-nothing) and stored under the current protection policy; documents, related records, status, owners and shares are not restored; anything that exists only in the version gets a new identity.");
+            .WithSummary("Phase C6 M3: restores the field values and repeating-section entries of an earlier version as a NEW revision (owner, Draft, reason required, optimistic by If-Match/expected revision, idempotent). The source is verified through the Authority's history; values are validated against the record's edit layout (Phase C9: the created version for Historical forms, the current version otherwise; 409 EDIT_LAYOUT_CHANGED when expectedLayoutVersionId is no longer it; all-or-nothing) and stored under the current protection policy; documents, related records, status, owners and shares are not restored; anything that exists only in the version gets a new identity.");
 
         records.MapPatch("/{formRecordId:guid}", static async Task<Ok<FormRecordResponse>> (Guid formRecordId, UpdateFormRecordRequest request, HttpContext http, UpdateFormRecordHandler handler, CancellationToken cancellationToken) =>
             {
@@ -110,7 +116,7 @@ public static class FormRecordEndpoints
                 return TypedResults.Ok(response);
             })
             .WithName("UpdateFormRecord")
-            .WithSummary("Optimistic (expected_content_revision or If-Match) full-snapshot typed update staged as a new immutable candidate and committed by the authority.");
+            .WithSummary("Optimistic (expected_content_revision or If-Match) full-snapshot typed update staged as a new immutable candidate and committed by the authority. Phase C9: validated against the record's edit layout (version behaviour); 409 EDIT_LAYOUT_CHANGED when expectedLayoutVersionId is no longer the edit layout, 409 EDIT_LAYOUT_UNAVAILABLE when there is none.");
 
         foreach (var transition in new[] { Application.Features.FormRecords.Lifecycle.RecordLifecycle.Submit, Application.Features.FormRecords.Lifecycle.RecordLifecycle.Reopen, Application.Features.FormRecords.Lifecycle.RecordLifecycle.Archive, Application.Features.FormRecords.Lifecycle.RecordLifecycle.Unarchive })
         {

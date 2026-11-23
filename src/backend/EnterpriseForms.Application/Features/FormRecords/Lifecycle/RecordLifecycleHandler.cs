@@ -37,7 +37,9 @@ public sealed class RecordLifecycleHandler(VerifiedRecordReader reader, IBusines
         VerifiedRecord verified;
         try
         {
-            verified = await reader.ReadAsync(context, formRecordId, ProtectedAction.Edit, cancellationToken).ConfigureAwait(false);
+            // Phase C9: only Submit validates content, so only Submit needs (and fails closed without) the edit layout.
+            var purpose = transition == RecordLifecycle.Submit ? Domain.Features.FormDefinitions.RecordLayoutPurpose.Edit : Domain.Features.FormDefinitions.RecordLayoutPurpose.View;
+            verified = await reader.ReadAsync(context, formRecordId, ProtectedAction.Edit, purpose, cancellationToken).ConfigureAwait(false);
         }
         catch (BusinessException ex) when (ex.HttpStatusCode is 404 or 403)
         {
@@ -80,6 +82,7 @@ public sealed class RecordLifecycleHandler(VerifiedRecordReader reader, IBusines
 
         if (transition == RecordLifecycle.Submit)
         {
+            EditLayoutGuard.Require(verified, request.ExpectedLayoutVersionId);
             await ValidateForSubmissionAsync(context, formRecordId, verified, now, cancellationToken).ConfigureAwait(false);
         }
 

@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { ErrorPanel } from "../../support";
 import { isDirty, mergeEdits, type EditSnapshot, type FieldConflict } from "../components/editMerge";
 import { layoutValues, parseProjectionLayout, toGroupInfos, toGroups, toRendererFields, toValueMap } from "../components/recordModel";
+import { EditLayoutNotice } from "../components/VersionLayoutNotice";
 
 /** The version of the record this editing session is based on: layout, fields and values all come from it (C-31). */
 interface EditBase {
@@ -50,7 +51,8 @@ export function EditRecordPage() {
   const api = useApi();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const projection = useQuery({ queryKey: ["records", "projection", formRecordId], queryFn: () => api.records.projection(formRecordId).then((r) => r.result) });
+  // Phase C9: the editor reads the edit layout of the form's version behaviour (Hybrid views and edits with different versions).
+  const projection = useQuery({ queryKey: ["records", "projection", formRecordId, "edit"], queryFn: ({ signal }) => api.records.projection(formRecordId, signal, "edit").then((r) => r.result) });
   const [base, setBase] = useState<EditBase | null>(null);
   const [values, setValues] = useState<ValueMap>({});
   const [groups, setGroups] = useState<GroupValueMap>({});
@@ -85,7 +87,9 @@ export function EditRecordPage() {
 
   const update = useMutation({
     // Every repeating section is sent as its complete entry list (stable ids kept, new entries without one, removed ones omitted).
-    mutationFn: (payload: { revision: number; values: Record<string, string>; groups: RecordGroupPayload[] }) => api.records.update(formRecordId, { expectedContentRevision: payload.revision, values: payload.values, groups: payload.groups }).then((r) => r.result),
+    // Phase C9 (D9-5): the edit layout the values were prepared with travels along; a different current one is refused (409).
+    mutationFn: (payload: { revision: number; layoutVersionId: string; values: Record<string, string>; groups: RecordGroupPayload[] }) =>
+      api.records.update(formRecordId, { expectedContentRevision: payload.revision, expectedLayoutVersionId: payload.layoutVersionId, values: payload.values, groups: payload.groups }).then((r) => r.result),
     onSuccess: async () => {
       leaving.current = true;
       await queryClient.invalidateQueries({ queryKey: ["records"] });
@@ -159,7 +163,9 @@ export function EditRecordPage() {
   const presented = update.isError ? presentError(update.error) : null;
   // A locked record (submitted or archived in the meantime) is a different answer from "someone else saved": no merge helps.
   const lockedNow = presented?.code === "RECORD_NOT_EDITABLE";
-  const conflict = presented?.kind === "conflict" && !lockedNow;
+  // Phase C9 (D9-5): a new edit layout (a version published, or the version behaviour changed) is not "someone else saved".
+  const layoutChanged = presented?.code === "EDIT_LAYOUT_CHANGED";
+  const conflict = presented?.kind === "conflict" && !lockedNow && !layoutChanged;
   const applyRules = data.permissions.isCompleteProjection;
   const infos = toGroupInfos(data.record.groups);
   const unresolved = report?.conflicts ?? [];
@@ -191,10 +197,10 @@ export function EditRecordPage() {
         setNothingToSave(true);
         return;
       }
-      update.mutate({ revision: Number(data.record.contentRevision), values: changed, groups: [] });
+      update.mutate({ revision: Number(data.record.contentRevision), layoutVersionId: data.layoutVersion.formVersionId, values: changed, groups: [] });
       return;
     }
-    update.mutate({ revision: Number(data.record.contentRevision), values: layoutValues(layout, fields, values, base.snapshot.values, applyRules), groups: groupPayload(layout, fields, values, groups, infos, applyRules) });
+    update.mutate({ revision: Number(data.record.contentRevision), layoutVersionId: data.layoutVersion.formVersionId, values: layoutValues(layout, fields, values, base.snapshot.values, applyRules), groups: groupPayload(layout, fields, values, groups, infos, applyRules) });
   };
 
   const loadLatest = async (keepMine: boolean) => {
@@ -245,6 +251,7 @@ export function EditRecordPage() {
   return (
     <>
       <PageHeader title={shared ? `Edit shared fields — ${data.formDefinitionName}` : `Edit ${data.formDefinitionName}`} lead={`Editing content revision ${String(data.record.contentRevision)} with layout v${data.layoutVersion.versionNumber}.`} />
+      <EditLayoutNotice projection={data} />
       {shared ? (
         <div className="mb-4">
           <StatusMessage tone="info" title={`You can change ${editableKeys.size} shared ${editableKeys.size === 1 ? "field" : "fields"}`}>
@@ -271,7 +278,24 @@ export function EditRecordPage() {
         }}
       >
         <div ref={summaryRef} tabIndex={-1} className="flex flex-col gap-3 outline-none">
-          {conflict ? (
+          {layoutChanged ? (
+            <StatusMessage
+              tone="warning"
+              title="The form layout changed while you were editing"
+              actions={
+                <>
+                  <Button size="sm" busy={reloading} onClick={() => void loadLatest(true)}>
+                    Reload with the new layout and keep my changes
+                  </Button>
+                  <Button size="sm" variant="secondary" busy={reloading} onClick={() => void loadLatest(false)}>
+                    Discard my changes and reload
+                  </Button>
+                </>
+              }
+            >
+              Your changes were not saved. A new form version was published, or the form&apos;s version setting changed, so this record is now edited with a different layout. Reload to continue: fields may have been added, removed or made required.
+            </StatusMessage>
+          ) : conflict ? (
             <StatusMessage
               tone="warning"
               title="Someone else saved this record while you were editing"

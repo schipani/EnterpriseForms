@@ -68,6 +68,12 @@ export type RelationshipDefinitionResponse = S["RelationshipDefinitionResponse"]
 export type CreateFormDefinitionV2Request = S["CreateFormDefinitionV2Request"];
 export type AddFieldDefinitionRequest = S["AddFieldDefinitionRequest"];
 export type RenameFormDefinitionRequest = S["RenameFormDefinitionRequest"];
+export type ChangeVersionBehaviorRequest = S["ChangeVersionBehaviorRequest"];
+export type VersionBehaviorImpactResponse = S["VersionBehaviorImpactResponse"];
+/** Phase C9: which published layout a form's records are viewed and edited with. */
+export type VersionBehavior = "Historical" | "Latest" | "Hybrid";
+/** Phase C9: a record projection read for display (`view`) or for the editor (`edit`). */
+export type RecordLayoutPurpose = "view" | "edit";
 export type GroupDefinitionResponse = S["GroupDefinitionResponse"];
 export type CreateGroupDefinitionRequest = S["CreateGroupDefinitionRequest"];
 export type UpdateFieldDefinitionRequest = S["UpdateFieldDefinitionRequest"];
@@ -327,6 +333,10 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       get: (formDefinitionId: string, signal?: AbortSignal) => read<FormDefinitionDetailResponse>("forms.get", { formDefinitionId }, undefined, "interactive-read", signal),
       create: (request: CreateFormDefinitionV2Request) => write<FormDefinitionDetailResponse>("POST", "forms.create", undefined, request, { idempotent: true }),
       rename: (formDefinitionId: string, request: RenameFormDefinitionRequest) => write<FormDefinitionDetailResponse>("PATCH", "forms.rename", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
+      /** Phase C9: sets the form's version behaviour (audited; optimistic on the form revision; no record or version changes). */
+      changeVersionBehavior: (formDefinitionId: string, request: ChangeVersionBehaviorRequest) => write<FormDefinitionDetailResponse>("PUT", "forms.changeVersionBehavior", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
+      /** Phase C9: approximate impact of switching to `target`, over the records the caller can discover only. */
+      versionBehaviorImpact: (formDefinitionId: string, target: VersionBehavior, signal?: AbortSignal) => read<VersionBehaviorImpactResponse>("forms.versionBehaviorImpact", { formDefinitionId }, { target }, "interactive-read", signal),
       addField: (formDefinitionId: string, request: AddFieldDefinitionRequest) => write<FieldDefinitionResponse>("POST", "forms.addField", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       createGroup: (formDefinitionId: string, request: CreateGroupDefinitionRequest) => write<GroupDefinitionResponse>("POST", "forms.createGroup", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       updateField: (formDefinitionId: string, fieldDefinitionId: string, request: UpdateFieldDefinitionRequest) => write<FieldDefinitionResponse>("PATCH", "forms.updateField", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
@@ -367,7 +377,8 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       /** Phase C6 M3: restores a version as a new revision; If-Match carries the reviewed head, retries reuse the idempotency key. */
       restore: (formRecordId: string, contentRevision: number, request: RecordRestoreRequest) => write<RecordRestoreResponse>("POST", "records.restore", { formRecordId, contentRevision: String(contentRevision) }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedCurrentContentRevision) }),
       create: (formDefinitionId: string, request: CreateFormRecordRequest) => write<FormRecordResponse>("POST", "records.create", { formDefinitionId }, request, { idempotent: true }),
-      projection: (formRecordId: string, signal?: AbortSignal) => read<RecordProjectionResponse>("records.projection", { formRecordId }, undefined, "interactive-read", signal),
+      /** Phase C9: `purpose` selects the view layout (default) or the edit layout of the form's version behaviour. */
+      projection: (formRecordId: string, signal?: AbortSignal, purpose: RecordLayoutPurpose = "view") => read<RecordProjectionResponse>("records.projection", { formRecordId }, purpose === "edit" ? { purpose } : undefined, "interactive-read", signal),
       lifecycle: (transition: RecordLifecycleTransition, formRecordId: string, request: RecordLifecycleRequest) => write<RecordLifecycleResponse>("POST", `records.${transition}`, { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),
       update: (formRecordId: string, request: UpdateFormRecordRequest) => write<FormRecordResponse>("PATCH", "records.update", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),
     },

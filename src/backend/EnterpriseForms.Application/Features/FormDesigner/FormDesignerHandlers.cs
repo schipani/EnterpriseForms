@@ -189,7 +189,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
                     FormDefinitionName = request.FormDefinitionName.Trim(),
                     FormDefinitionDescription = request.FormDefinitionDescription?.Trim() ?? string.Empty,
                     CurrentFormVersionId = null,
-                    VersionBehavior = "Latest",
+                    VersionBehavior = VersionBehaviors.Latest,
                     LifecycleStatus = "Active",
                     CreatedOn = now,
                     CreatedByUserId = context.LocalUserId,
@@ -1667,7 +1667,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         };
 
     private static FormDefinitionSummaryResponse Summary(FormDefinition d, FormVersion? current, bool hasDraft, bool canDesign, bool canCreate) =>
-        new(d.FormDefinitionId, d.FormDefinitionName, d.FormDefinitionDescription, d.LifecycleStatus, current?.VersionNumber, current?.FormVersionId, hasDraft, canDesign, canCreate, d.ModifiedOn, d.FormDefinitionRevision);
+        new(d.FormDefinitionId, d.FormDefinitionName, d.FormDefinitionDescription, d.LifecycleStatus, current?.VersionNumber, current?.FormVersionId, hasDraft, canDesign, canCreate, d.ModifiedOn, d.FormDefinitionRevision, d.VersionBehavior);
 
     private static FormVersionResponse ToVersion(FormVersion v) => new(v.FormVersionId, v.VersionNumber, v.LayoutSchemaVersion, v.LayoutJson, v.ChangeReason, v.RestoredFromFormVersionId, v.PublishedOn, v.PublishedByUserId);
 

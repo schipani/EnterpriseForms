@@ -1108,6 +1108,87 @@
         }
       }
     },
+    "/api/v1/form-definitions/{formDefinitionId}/version-behavior": {
+      "put": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Phase C9: sets which published layout the form's records are viewed and edited with (Historical, Latest or Hybrid). Business metadata only: no record, value, version or permission changes. Requires the Authority design permission on the form (404 otherwise); 409 FORM_DEFINITION_MODIFIED_CONCURRENTLY when expectedFormDefinitionRevision is stale; 422 for an unknown behaviour or a change reason outside 3-500 characters; audited (FORM_VERSION_BEHAVIOR_CHANGED) in the same transaction. Re-sending the current behaviour changes nothing.",
+        "operationId": "ChangeFormVersionBehavior",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeVersionBehaviorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormDefinitionDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/version-behavior-impact": {
+      "get": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Phase C9: approximate record-level impact of switching to target (Historical, Latest or Hybrid), counted only over records the caller can discover (Authority lookup); no field values are inspected or counted. Requires the Authority design permission on the form (404 otherwise); 422 for an unknown target.",
+        "operationId": "PreviewFormVersionBehaviorImpact",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "target",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionBehaviorImpactResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-definitions/designer": {
       "post": {
         "tags": [
@@ -2249,7 +2330,7 @@
         "tags": [
           "FormRecords"
         ],
-        "summary": "Optimistic (expected_content_revision or If-Match) full-snapshot typed update staged as a new immutable candidate and committed by the authority.",
+        "summary": "Optimistic (expected_content_revision or If-Match) full-snapshot typed update staged as a new immutable candidate and committed by the authority. Phase C9: validated against the record's edit layout (version behaviour); 409 EDIT_LAYOUT_CHANGED when expectedLayoutVersionId is no longer the edit layout, 409 EDIT_LAYOUT_UNAVAILABLE when there is none.",
         "operationId": "UpdateFormRecord",
         "parameters": [
           {
@@ -2291,7 +2372,7 @@
         "tags": [
           "FormRecords"
         ],
-        "summary": "Verified projection for the UI: layout version, field metadata, authorized values and documents, permitted actions, ETag.",
+        "summary": "Verified projection for the UI: layout version, field metadata, authorized values and documents, permitted actions, ETag. Phase C9: purpose=view (default) returns the view layout and purpose=edit the edit layout of the form's version behaviour (Historical: created version for both; Latest: current version for both; Hybrid: created version to view, current version to edit); an unavailable edit layout is 409 EDIT_LAYOUT_UNAVAILABLE; the response reports the behaviour, the created version number and the current edit layout.",
         "operationId": "GetRecordProjection",
         "parameters": [
           {
@@ -2301,6 +2382,13 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "purpose",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -2463,7 +2551,7 @@
         "tags": [
           "FormRecords"
         ],
-        "summary": "Phase C6 M3: restores the field values and repeating-section entries of an earlier version as a NEW revision (owner, Draft, reason required, optimistic by If-Match/expected revision, idempotent). The source is verified through the Authority's history; values are validated against the current form (all-or-nothing) and stored under the current protection policy; documents, related records, status, owners and shares are not restored; anything that exists only in the version gets a new identity.",
+        "summary": "Phase C6 M3: restores the field values and repeating-section entries of an earlier version as a NEW revision (owner, Draft, reason required, optimistic by If-Match/expected revision, idempotent). The source is verified through the Authority's history; values are validated against the record's edit layout (Phase C9: the created version for Historical forms, the current version otherwise; 409 EDIT_LAYOUT_CHANGED when expectedLayoutVersionId is no longer it; all-or-nothing) and stored under the current protection policy; documents, related records, status, owners and shares are not restored; anything that exists only in the version gets a new identity.",
         "operationId": "RestoreRecordVersion",
         "parameters": [
           {
@@ -6871,6 +6959,30 @@
           }
         }
       },
+      "ChangeVersionBehaviorRequest": {
+        "required": [
+          "versionBehavior",
+          "expectedFormDefinitionRevision",
+          "changeReason"
+        ],
+        "type": "object",
+        "properties": {
+          "versionBehavior": {
+            "type": "string"
+          },
+          "expectedFormDefinitionRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "changeReason": {
+            "type": "string"
+          }
+        }
+      },
       "ChildRecordListResponse": {
         "required": [
           "relationship",
@@ -9796,6 +9908,10 @@
               "string"
             ],
             "format": "int64"
+          },
+          "versionBehavior": {
+            "type": "string",
+            "default": "Latest"
           }
         }
       },
@@ -11541,6 +11657,13 @@
               "null",
               "string"
             ]
+          },
+          "expectedLayoutVersionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -11982,6 +12105,39 @@
                 "$ref": "#/components/schemas/RecordLifecycleStateResponse"
               }
             ]
+          },
+          "versionBehavior": {
+            "type": "string",
+            "default": "Latest"
+          },
+          "layoutPurpose": {
+            "type": "string",
+            "default": "View"
+          },
+          "createdFormVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "editLayoutVersionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "editLayoutVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -12052,6 +12208,13 @@
           "acknowledgePlaintext": {
             "type": "boolean",
             "default": false
+          },
+          "expectedLayoutVersionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -12700,6 +12863,22 @@
             "items": {
               "type": "string"
             }
+          },
+          "layoutVersionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "layoutVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -15095,6 +15274,13 @@
             "items": {
               "$ref": "#/components/schemas/RecordGroupValuesRequest"
             }
+          },
+          "expectedLayoutVersionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -15719,6 +15905,131 @@
           },
           "canEdit": {
             "type": "boolean"
+          }
+        }
+      },
+      "VersionBehaviorImpactResponse": {
+        "required": [
+          "formDefinitionId",
+          "currentVersionBehavior",
+          "targetVersionBehavior",
+          "currentVersionNumber",
+          "visibleRecordCount",
+          "viewLayoutChangeCount",
+          "editLayoutChangeCount",
+          "unavailableRecordCount",
+          "recordsByCreatedVersion",
+          "formDefinitionRevision",
+          "authorizationRevision",
+          "countsAreApproximate",
+          "scopeStatement"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currentVersionBehavior": {
+            "type": "string"
+          },
+          "targetVersionBehavior": {
+            "type": "string"
+          },
+          "currentVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "visibleRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "viewLayoutChangeCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "editLayoutChangeCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "unavailableRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "recordsByCreatedVersion": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VersionRecordCountResponse"
+            }
+          },
+          "formDefinitionRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "countsAreApproximate": {
+            "type": "boolean"
+          },
+          "scopeStatement": {
+            "type": "string"
+          }
+        }
+      },
+      "VersionRecordCountResponse": {
+        "required": [
+          "versionNumber",
+          "recordCount"
+        ],
+        "type": "object",
+        "properties": {
+          "versionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "recordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },

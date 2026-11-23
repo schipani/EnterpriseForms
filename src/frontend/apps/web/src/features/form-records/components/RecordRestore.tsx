@@ -70,6 +70,8 @@ function RestoreDialog({ formRecordId, revision, projection, onClose, onRestored
           sourceOperationId: data.sourceOperationId,
           restoreReason: reason.trim(),
           acknowledgePlaintext: acknowledged,
+          // Phase C9 (D9-5): the edit layout this preview was validated against must still be the record's edit layout.
+          expectedLayoutVersionId: data.layoutVersionId ?? null,
         })
         .then((r) => r.result),
     onSuccess: async (result) => {
@@ -84,7 +86,7 @@ function RestoreDialog({ formRecordId, revision, projection, onClose, onRestored
   const confirmable = data ? canConfirmRestore(data, reason, acknowledged) : false;
   const fieldsByKey = new Map(projection.fields.map((field) => [field.fieldKey, field]));
   const presented = mutation.isError ? presentError(mutation.error) : null;
-  const stale = presented?.code === "CONTENT_REVISION_CONFLICT" || presented?.code === "PRECONDITION_FAILED" || presented?.code === "VERSION_CHANGED";
+  const stale = presented?.code === "CONTENT_REVISION_CONFLICT" || presented?.code === "PRECONDITION_FAILED" || presented?.code === "VERSION_CHANGED" || presented?.code === "EDIT_LAYOUT_CHANGED";
 
   return (
     <Dialog

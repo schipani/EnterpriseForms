@@ -433,6 +433,40 @@ export interface paths {
         patch: operations["RenameFormDefinition"];
         trace?: never;
     };
+    "/api/v1/form-definitions/{formDefinitionId}/version-behavior": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Phase C9: sets which published layout the form's records are viewed and edited with (Historical, Latest or Hybrid). Business metadata only: no record, value, version or permission changes. Requires the Authority design permission on the form (404 otherwise); 409 FORM_DEFINITION_MODIFIED_CONCURRENTLY when expectedFormDefinitionRevision is stale; 422 for an unknown behaviour or a change reason outside 3-500 characters; audited (FORM_VERSION_BEHAVIOR_CHANGED) in the same transaction. Re-sending the current behaviour changes nothing. */
+        put: operations["ChangeFormVersionBehavior"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/version-behavior-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phase C9: approximate record-level impact of switching to target (Historical, Latest or Hybrid), counted only over records the caller can discover (Authority lookup); no field values are inspected or counted. Requires the Authority design permission on the form (404 otherwise); 422 for an unknown target. */
+        get: operations["PreviewFormVersionBehaviorImpact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-definitions/designer": {
         parameters: {
             query?: never;
@@ -823,7 +857,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Optimistic (expected_content_revision or If-Match) full-snapshot typed update staged as a new immutable candidate and committed by the authority. */
+        /** Optimistic (expected_content_revision or If-Match) full-snapshot typed update staged as a new immutable candidate and committed by the authority. Phase C9: validated against the record's edit layout (version behaviour); 409 EDIT_LAYOUT_CHANGED when expectedLayoutVersionId is no longer the edit layout, 409 EDIT_LAYOUT_UNAVAILABLE when there is none. */
         patch: operations["UpdateFormRecord"];
         trace?: never;
     };
@@ -834,7 +868,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Verified projection for the UI: layout version, field metadata, authorized values and documents, permitted actions, ETag. */
+        /** Verified projection for the UI: layout version, field metadata, authorized values and documents, permitted actions, ETag. Phase C9: purpose=view (default) returns the view layout and purpose=edit the edit layout of the form's version behaviour (Historical: created version for both; Latest: current version for both; Hybrid: created version to view, current version to edit); an unavailable edit layout is 409 EDIT_LAYOUT_UNAVAILABLE; the response reports the behaviour, the created version number and the current edit layout. */
         get: operations["GetRecordProjection"];
         put?: never;
         post?: never;
@@ -904,7 +938,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Phase C6 M3: restores the field values and repeating-section entries of an earlier version as a NEW revision (owner, Draft, reason required, optimistic by If-Match/expected revision, idempotent). The source is verified through the Authority's history; values are validated against the current form (all-or-nothing) and stored under the current protection policy; documents, related records, status, owners and shares are not restored; anything that exists only in the version gets a new identity. */
+        /** Phase C6 M3: restores the field values and repeating-section entries of an earlier version as a NEW revision (owner, Draft, reason required, optimistic by If-Match/expected revision, idempotent). The source is verified through the Authority's history; values are validated against the record's edit layout (Phase C9: the created version for Historical forms, the current version otherwise; 409 EDIT_LAYOUT_CHANGED when expectedLayoutVersionId is no longer it; all-or-nothing) and stored under the current protection policy; documents, related records, status, owners and shares are not restored; anything that exists only in the version gets a new identity. */
         post: operations["RestoreRecordVersion"];
         delete?: never;
         options?: never;
@@ -2369,6 +2403,12 @@ export interface components {
             /** @default false */
             useDevelopmentStepUp: boolean;
         };
+        ChangeVersionBehaviorRequest: {
+            versionBehavior: string;
+            /** Format: int64 */
+            expectedFormDefinitionRevision: number | string;
+            changeReason: string;
+        };
         ChildRecordListResponse: {
             relationship: components["schemas"]["RelationshipDefinitionResponse"];
             items: components["schemas"]["ChildRecordSummaryResponse"][];
@@ -3095,6 +3135,8 @@ export interface components {
             modifiedOn: string;
             /** Format: int64 */
             formDefinitionRevision: number | string;
+            /** @default Latest */
+            versionBehavior: string;
         };
         FormDraftResponse: {
             /** Format: uuid */
@@ -3554,6 +3596,8 @@ export interface components {
             expectedContentRevision: number | string;
             expectedStatus?: null | string;
             reason?: null | string;
+            /** Format: uuid */
+            expectedLayoutVersionId?: null | string;
         };
         RecordLifecycleResponse: {
             /** Format: uuid */
@@ -3677,6 +3721,16 @@ export interface components {
             summary?: null | components["schemas"]["RecordProjectionSummaryResponse"];
             sharedFieldAccess?: null | components["schemas"]["SharedFieldAccessResponse"][];
             lifecycle?: null | components["schemas"]["RecordLifecycleStateResponse"];
+            /** @default Latest */
+            versionBehavior: string;
+            /** @default View */
+            layoutPurpose: string;
+            /** Format: int32 */
+            createdFormVersionNumber?: null | number | string;
+            /** Format: uuid */
+            editLayoutVersionId?: null | string;
+            /** Format: int32 */
+            editLayoutVersionNumber?: null | number | string;
         };
         RecordProjectionSummaryResponse: {
             recordReference: string;
@@ -3695,6 +3749,8 @@ export interface components {
             restoreReason: null | string;
             /** @default false */
             acknowledgePlaintext: boolean;
+            /** Format: uuid */
+            expectedLayoutVersionId?: null | string;
         };
         RecordRestoreResponse: {
             /** Format: uuid */
@@ -3854,6 +3910,10 @@ export interface components {
             formHasRelatedRecords: boolean;
             validation: null | components["schemas"]["RestoreValidationResponse"];
             plaintextAcknowledgementFieldKeys: string[];
+            /** Format: uuid */
+            layoutVersionId?: null | string;
+            /** Format: int32 */
+            layoutVersionNumber?: null | number | string;
         };
         RestoreSectionChangeResponse: {
             groupKey: string;
@@ -4412,6 +4472,8 @@ export interface components {
                 [key: string]: string;
             };
             groups?: null | components["schemas"]["RecordGroupValuesRequest"][];
+            /** Format: uuid */
+            expectedLayoutVersionId?: null | string;
         };
         UpdateOptionListRequest: {
             /** Format: int64 */
@@ -4557,6 +4619,35 @@ export interface components {
             identitySubject: string;
             isCurrentUser: boolean;
             canEdit: boolean;
+        };
+        VersionBehaviorImpactResponse: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            currentVersionBehavior: string;
+            targetVersionBehavior: string;
+            /** Format: int32 */
+            currentVersionNumber: null | number | string;
+            /** Format: int32 */
+            visibleRecordCount: number | string;
+            /** Format: int32 */
+            viewLayoutChangeCount: number | string;
+            /** Format: int32 */
+            editLayoutChangeCount: number | string;
+            /** Format: int32 */
+            unavailableRecordCount: number | string;
+            recordsByCreatedVersion: components["schemas"]["VersionRecordCountResponse"][];
+            /** Format: int64 */
+            formDefinitionRevision: number | string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            countsAreApproximate: boolean;
+            scopeStatement: string;
+        };
+        VersionRecordCountResponse: {
+            /** Format: int32 */
+            versionNumber: null | number | string;
+            /** Format: int32 */
+            recordCount: number | string;
         };
         WithdrawFieldSearchRequest: {
             reason: null | string;
@@ -5340,6 +5431,56 @@ export interface operations {
             };
         };
     };
+    ChangeFormVersionBehavior: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeVersionBehaviorRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDefinitionDetailResponse"];
+                };
+            };
+        };
+    };
+    PreviewFormVersionBehaviorImpact: {
+        parameters: {
+            query?: {
+                target?: string;
+            };
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionBehaviorImpactResponse"];
+                };
+            };
+        };
+    };
     CreateFormDefinitionDraft: {
         parameters: {
             query?: never;
@@ -6028,7 +6169,9 @@ export interface operations {
     };
     GetRecordProjection: {
         parameters: {
-            query?: never;
+            query?: {
+                purpose?: string;
+            };
             header?: never;
             path: {
                 formRecordId: string;

@@ -25,7 +25,34 @@ public sealed record DirectoryUserResponse(Guid UserId, string DisplayName);
 
 // ---- Form definitions / designer (B-03) ----
 
-public sealed record FormDefinitionSummaryResponse(Guid FormDefinitionId, string FormDefinitionName, string FormDefinitionDescription, string LifecycleStatus, int? CurrentVersionNumber, Guid? CurrentFormVersionId, bool HasDraft, bool CanDesign, bool CanCreateRecord, DateTimeOffset ModifiedOn, long FormDefinitionRevision);
+/// <summary><c>VersionBehavior</c> (Phase C9): Historical, Latest or Hybrid — which published layout records are viewed and edited with.</summary>
+public sealed record FormDefinitionSummaryResponse(Guid FormDefinitionId, string FormDefinitionName, string FormDefinitionDescription, string LifecycleStatus, int? CurrentVersionNumber, Guid? CurrentFormVersionId, bool HasDraft, bool CanDesign, bool CanCreateRecord, DateTimeOffset ModifiedOn, long FormDefinitionRevision, string VersionBehavior = "Latest");
+
+/// <summary>Phase C9: change of a form's version behaviour (no record, value or version changes). Reason 3-500 characters; ExpectedFormDefinitionRevision is the revision the editor saw.</summary>
+public sealed record ChangeVersionBehaviorRequest(string VersionBehavior, long ExpectedFormDefinitionRevision, string ChangeReason);
+
+/// <summary>
+/// Phase C9 impact preview of a version-behaviour change, limited to records the caller may discover (Authority lookup,
+/// one authorization revision). Counts are approximate: they come from unverified business metadata, and records the
+/// caller cannot discover are never counted. No field values are inspected or counted.
+/// </summary>
+public sealed record VersionBehaviorImpactResponse(
+    Guid FormDefinitionId,
+    string CurrentVersionBehavior,
+    string TargetVersionBehavior,
+    int? CurrentVersionNumber,
+    int VisibleRecordCount,
+    int ViewLayoutChangeCount,
+    int EditLayoutChangeCount,
+    int UnavailableRecordCount,
+    IReadOnlyList<VersionRecordCountResponse> RecordsByCreatedVersion,
+    long FormDefinitionRevision,
+    long AuthorizationRevision,
+    bool CountsAreApproximate,
+    string ScopeStatement);
+
+/// <summary>Visible records created with one published version (<c>VersionNumber</c> null when that version no longer exists).</summary>
+public sealed record VersionRecordCountResponse(int? VersionNumber, int RecordCount);
 
 /// <summary>Display-name change of a form (no new version). ExpectedFormDefinitionRevision is the revision the editor saw.</summary>
 public sealed record RenameFormDefinitionRequest(string FormDefinitionName, long ExpectedFormDefinitionRevision);
@@ -208,6 +235,11 @@ public sealed record RecordListResponse(IReadOnlyList<RecordListItemResponse> It
     int TotalCount = 0, int PageStart = 0, int PageSize = 0, string? PreviousToken = null, IReadOnlyList<RecordListFormOption>? AvailableForms = null,
     int UnavailableRecordCount = 0, IReadOnlyList<Guid>? UnavailableRecordIds = null, string SortBy = "modifiedOn", string SortDirection = "desc");
 
+/// <summary>
+/// <c>LayoutVersion</c> is the view layout, or the edit layout when the projection was read with <c>purpose=edit</c>
+/// (<c>LayoutPurpose</c>). Phase C9: <c>VersionBehavior</c>, <c>CreatedFormVersionNumber</c> and the edit layout the record
+/// is edited with now (<c>EditLayoutVersionId</c>/<c>EditLayoutVersionNumber</c>; null when no edit layout is available).
+/// </summary>
 public sealed record RecordProjectionResponse(
     FormRecordResponse Record,
     string FormDefinitionName,
@@ -221,7 +253,12 @@ public sealed record RecordProjectionResponse(
     string ETag,
     RecordProjectionSummaryResponse? Summary = null,
     IReadOnlyList<SharedFieldAccessResponse>? SharedFieldAccess = null,
-    RecordLifecycleStateResponse? Lifecycle = null);
+    RecordLifecycleStateResponse? Lifecycle = null,
+    string VersionBehavior = "Latest",
+    string LayoutPurpose = "View",
+    int? CreatedFormVersionNumber = null,
+    Guid? EditLayoutVersionId = null,
+    int? EditLayoutVersionNumber = null);
 
 /// <summary>
 /// Phase C5: for a share editor's partial projection, whether each readable field can be changed and, if not, why
@@ -269,7 +306,7 @@ public sealed record RecordVersionViewResponse(RecordVersionItemResponse Version
 /// (1–500 characters, recorded in the activity log). <c>AcknowledgePlaintext</c> must be true when the preview listed values that
 /// would now be stored as plaintext (OD-13).
 /// </summary>
-public sealed record RecordRestoreRequest(long ExpectedCurrentContentRevision, Guid SourceOperationId, string? RestoreReason, bool AcknowledgePlaintext = false);
+public sealed record RecordRestoreRequest(long ExpectedCurrentContentRevision, Guid SourceOperationId, string? RestoreReason, bool AcknowledgePlaintext = false, Guid? ExpectedLayoutVersionId = null);
 
 /// <summary>Phase C6 M3: the new accepted revision created by a restore (earlier revisions are unchanged).</summary>
 public sealed record RecordRestoreResponse(Guid FormRecordId, long RestoredFromContentRevision, long ContentRevision, Guid? CommittedOperationId, string ETag, IReadOnlyList<string> ChangedFieldKeys, IReadOnlyList<string> ClearedFieldKeys);
@@ -309,10 +346,12 @@ public sealed record RestorePreviewResponse(
     int UnchangedDocumentCount,
     bool FormHasRelatedRecords,
     RestoreValidationResponse? Validation,
-    IReadOnlyList<string> PlaintextAcknowledgementFieldKeys);
+    IReadOnlyList<string> PlaintextAcknowledgementFieldKeys,
+    Guid? LayoutVersionId = null,
+    int? LayoutVersionNumber = null);
 
-/// <summary>Request of a lifecycle transition. <c>ExpectedStatus</c> guards against acting on a stale view; <c>Reason</c> is mandatory for Reopen (1..500 characters) and optional for Archive.</summary>
-public sealed record RecordLifecycleRequest(long ExpectedContentRevision, string? ExpectedStatus = null, string? Reason = null);
+/// <summary>Request of a lifecycle transition. <c>ExpectedStatus</c> guards against acting on a stale view; <c>Reason</c> is mandatory for Reopen (1..500 characters) and optional for Archive. <c>ExpectedLayoutVersionId</c> (Phase C9, Submit only, optional): the edit layout the client validated against.</summary>
+public sealed record RecordLifecycleRequest(long ExpectedContentRevision, string? ExpectedStatus = null, string? Reason = null, Guid? ExpectedLayoutVersionId = null);
 
 /// <summary>Result of a committed lifecycle transition (the new accepted revision and the state it produced).</summary>
 public sealed record RecordLifecycleResponse(Guid FormRecordId, string Transition, string PreviousStatus, string Status, DateTimeOffset? SubmittedOn, long ContentRevision, Guid? CommittedOperationId, string ETag, IReadOnlyList<string> AllowedTransitions);
