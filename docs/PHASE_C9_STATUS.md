@@ -1,9 +1,9 @@
 # Phase C9 — Form Version Management: status
 
-- **Branch:** `phase-c9/form-version-management` (from `main` `198aeaef1912fb5dc5b79db96c89d456998ad150`). Not merged.
+- **Branches:** M1 `phase-c9/form-version-management` (from `198aeae`), squash-merged to `main` as `cd48e13` (PR #70; branch kept, tag `archive/c9-m1-form-version-management-9395ec5`). M2 `phase-c9/m2-version-comparison` (from `main` `cd48e13974d3539bfa18e65af6d94cbf06f91364`), not merged.
 - **Architecture:** `docs/architecture/PHASE_C9_FORM_VERSION_MANAGEMENT.md`.
-- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4).
-- **State (2026-11-22):** WP-0 and **M1 (WP-1, WP-2, WP-6) implemented for Development/Testing; stopped for owner review.** Not owner-accepted, not independently reviewed, no production or Level 2 claim. M2 and M3 not started. G21 OPEN.
+- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6).
+- **State (2026-11-23):** M1 merged to `main` (code integration only). **M2 (WP-3, WP-4, WP-5) implemented for Development/Testing; stopped for owner review.** Not owner-accepted, not independently reviewed, no production or Level 2 claim. M3 not started. G21 OPEN.
 
 ## 1. What M1 delivers
 
@@ -72,3 +72,59 @@ Verification of the C-181 correction (local, 2026-11-22):
 | Playwright `form-version-behavior.spec.ts` (isolation guard verified, port 5173 free) | 4/4, including the new removed-field reload scenario with an axe scan |
 | Frontend | Lint, typecheck and build pass; Vitest 67 files, 556 tests (7 new: 5 reload-merge, 2 upload-manager); no API-client drift |
 | OpenAPI | Regenerated (optional `expectedLayoutVersionId` on upload begin; endpoint summary) |
+
+## 5. M2 — semantic comparison, publish impact, version comparison (C-182)
+
+Design: architecture §7.
+
+| Work package | Delivered |
+|---|---|
+| WP-3 | `FormLayoutComparison`: matching by stable id (fields, document collections, related lists, sections, options), change types Added/Removed/Modified/Moved, significance Structure/Behaviour/Presentation, stable aspect codes with before/after and a `Tightened` flag, deterministic order; moves and reorders are presentation changes, never removals. |
+| WP-4 | `GET …/publish-impact?expectedDraftRevision=` (read-only, DesignForm): the current version against the draft exactly as publishing would store it (shared snapshot helper), blocked reason (`NO_DRAFT_CHANGES`, layout errors), potential-impact notices, approximate record counts over discoverable records only (D9-4), and a data statement that publishing never deletes or changes stored values. Publish dialog shows the review before the change reason. `FORM_VERSION_PUBLISHED` audit gains counts of added/removed/behaviour/presentation changes. |
+| WP-5 | `GET …/versions/compare?from=&to=` (version ids or `draft`; own versions only). Versions tab "Compare versions" card with From/to selects, Swap, and the shared comparison view (presentation-only changes collapsed); "Restored from" names the source version. |
+
+Verification (local, 2026-11-23):
+
+| Check | Result |
+|---|---|
+| .NET Release build of `EnterpriseForms.All.slnx` and the Stage A/Stage B test projects | Pass: 0 warnings, 0 errors |
+| `run_dotnet_tests.py` (full CI set) | 3,275 executed, 3,275 passed, 0 failed, 223 authorized skips (contract tests 1,059, 16 new in `FormVersionComparisonTests`) |
+| Test-result accounting self-tests; Stage B grouping | Pass (`FormVersionComparisonTests` added to `forms-documents`) |
+| Stage B focused (fresh isolated stack, C-131 §1) | `FormVersionComparisonTests` 1/1; `DesignerTests` 3/3 (publish refactored); `FormVersionBehaviorTests` 4/4 |
+| Playwright (isolation guard verified, port 5173 free) | `form-version-comparison.spec.ts` 3/3 with axe scans of the publish review dialog and the comparison; regression `form-version-behavior` 4/4, `designer-ux` 5/5, `form-management` 3/3, `repeating-groups` 2/2 |
+| Frontend | Lint, typecheck and build pass; Vitest 68 files, 564 tests (8 new); no API-client drift |
+| Integrity vectors | Python and Node, 46 checks each, pass |
+| OpenAPI | Regenerated (two read endpoints; additive) |
+| `validate-specifications.py --strict` | Pass |
+
+Not run: hosted Stage B (release-only, C-131), manual workflow dispatches, deployment.
+
+Deviations and limitations:
+- The publish impact is a `GET` (a read), not the `POST` sketched in CLAUDE.md §6.
+- Comparisons word the layouts' own labels; translations, organization-disabled catalog values and a separate publish permission remain deferred (D9-9).
+- Rules (visibility, conditional requirement, dependent-choice filters) are reported as added, removed or changed, not described condition by condition.
+- The draft side of a comparison is the publish snapshot taken now; catalog changes since (labels, option availability, protection) therefore appear as changes, which is what publishing would record.
+- Manual screen-reader review of the review dialog and comparison view is outstanding (PB-14); automated axe scans pass.
+
+## 6. Corrective review of PR #71 (owner direction, C-183)
+
+| Item | Finding | Correction and tests |
+|---|---|---|
+| 1. Publish-review enforcement | **Defect.** Publish was disabled only when a loaded review said `canPublish: false`; it stayed enabled while the review was loading, after it failed, while it was refreshing, or for a review of another draft revision. | `publishGate` allows Publish only on a loaded, current, successful review of exactly this draft revision that permits publishing; `PublishGateNote` says why otherwise; the click handler re-checks the gate. Server-side revision and validation checks unchanged. Vitest: ready, loading, failed (also with an earlier review held), stale revision, refreshing, blocked, the note. Playwright: a review request that fails keeps Publish disabled; after Try again it loads and Publish is enabled. |
+| 2. Conditional rule classification | **Defect.** A changed `RequiredWhen` that stayed present was marked as tightening; a changed pattern too. | Tightening only when a condition is added to a field required neither before nor after (and for an added pattern). Contract tests: added, replaced, removed, unconditional → conditional, already required, new conditionally required field; pattern added/replaced/removed. |
+| 3. Comparison completeness | **Gaps:** a section placing a different repeating group was not reported; protection recorded in only one version was ignored. **Not reachable under the contract, now handled defensively:** an upload policy in only one version; a field placed as a different element kind. All other persisted properties (label, help, placeholder, control, placement, validation, read-only, shown in form, clear when hidden, rules, dependent-choice filter, defaults, options, upload limits, summary fields, section title/description/order, repeat limits) were already compared. | `RepeatGroup` and `Kind` aspects, protection and upload null↔set reported; notice `REPEATING_SECTIONS_CHANGED`. Contract tests for each. |
+| 4. Version selector synchronization | **Defect.** Selections were fixed at first render: after a new publish the defaults did not move forward, and a chosen side that disappeared (a removed draft) left an invalid selection. A changed draft revision already re-read the comparison (query key). | `reconcileSelection`: defaults follow new versions until the person chooses; a valid choice is kept; an invalid one is reset to the defaults with a "Comparison reset" notice; invalid sides are never shown or queried. Vitest: unit cases plus component tests (defaults move forward on publish, re-read on draft revision change, a chosen comparison kept while valid and reset when the draft disappears). |
+
+Verification (local, 2026-11-23):
+
+| Check | Result |
+|---|---|
+| .NET Release build (solution, Stage A and Stage B test projects) | Pass: 0 warnings, 0 errors; no OpenAPI drift |
+| `run_dotnet_tests.py` (full CI set) | 3,283 executed, 3,283 passed, 0 failed, 223 authorized skips (contract `FormVersionComparisonTests` 24, 8 new). A first run made while the Docker stack was still up had 2 failures in untouched timing-sensitive tests (`SecurityCommandTimelineTests.AuditEnvelopesWithholdCountsDetailsAndIdentityIdentifiers` in the Authority suite and `SearchIndexBuilderRunnerTests.CancellationDuringAPassEndsTheLoopPromptly`); each passed 3/3 alone, and the full run passed after the stack was removed |
+| Stage B focused (fresh isolated stack, C-131 §1) | `FormVersionComparisonTests` 1/1; `DesignerTests` 3/3; `FormVersionBehaviorTests` 4/4 |
+| Playwright (isolation guard verified, port 5173 free) | `form-version-comparison` 3/3 (now also: a failed review keeps Publish disabled until it loads; axe scans pass); regression `form-version-behavior` 4/4, `designer-ux` 5/5, `form-management` 3/3 |
+| Frontend | Lint, typecheck and build pass; Vitest 69 files, 577 tests (13 new) |
+| Integrity vectors | Python and Node, 46 checks each, pass |
+| `validate-specifications.py --strict` | Pass |
+
+Remaining limitations: rules are still reported as added, removed or changed (not condition by condition); a replaced rule or pattern is shown as a behaviour change without a direction; manual screen-reader review of the review dialog and comparison is outstanding (PB-14).

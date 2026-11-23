@@ -467,6 +467,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-definitions/{formDefinitionId}/publish-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phase C9 M2: what publishing the draft at expectedDraftRevision would change, before confirming: the semantic comparison of the current version with the draft as it would be published, potential-impact notices, and approximate record-level counts over records the caller can discover (no field values). Read-only (nothing written or audited). Requires the Authority design permission on the form (404 otherwise); 409 NO_DRAFT or DRAFT_REVISION_CONFLICT. */
+        get: operations["PreviewPublishImpact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/versions/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phase C9 M2: semantic comparison of two published versions of the form, or of a version and the draft (from/to = a version id or 'draft'). Elements are matched by stable id; presentation-only changes are reported separately from behaviour changes. Requires the Authority design permission on the form (404 otherwise); 404 VERSION_NOT_FOUND for a version of another form, 404 NO_DRAFT; 422 for a malformed reference. */
+        get: operations["CompareFormVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-definitions/designer": {
         parameters: {
             query?: never;
@@ -2439,6 +2473,17 @@ export interface components {
         CommandStatusResponse: {
             command: components["schemas"]["CommandOutcome"];
         };
+        ComparedLayoutResponse: {
+            kind: string;
+            /** Format: uuid */
+            formVersionId: null | string;
+            /** Format: int32 */
+            versionNumber: null | number | string;
+            /** Format: int64 */
+            draftRevision: null | number | string;
+            /** Format: date-time */
+            publishedOn: null | string;
+        };
         CountryCatalogEntry: {
             countryCode: string;
             countryDisplayName: string;
@@ -3208,6 +3253,35 @@ export interface components {
             catalogVersion: string;
             languages: components["schemas"]["LanguageCatalogEntry"][];
         };
+        LayoutChangeDetailResponse: {
+            aspect: string;
+            significance: string;
+            before: null | string;
+            after: null | string;
+            subject: null | string;
+            tightened: boolean;
+        };
+        LayoutChangeResponse: {
+            target: string;
+            elementId: string;
+            changeType: string;
+            significance: string;
+            label: string;
+            sectionTitle: null | string;
+            details: components["schemas"]["LayoutChangeDetailResponse"][];
+        };
+        LayoutComparisonResponse: {
+            /** Format: int32 */
+            addedCount: number | string;
+            /** Format: int32 */
+            removedCount: number | string;
+            /** Format: int32 */
+            behaviourChangeCount: number | string;
+            /** Format: int32 */
+            presentationChangeCount: number | string;
+            hasChanges: boolean;
+            changes: components["schemas"]["LayoutChangeResponse"][];
+        };
         MemberCommandRequest: {
             reason: string;
             /** @default false */
@@ -3562,6 +3636,43 @@ export interface components {
             /** Format: int32 */
             expectedCurrentVersionNumber: number | string;
             changeReason: string;
+        };
+        PublishImpactNoticeResponse: {
+            code: string;
+            severity: string;
+            elementLabels: string[];
+        };
+        PublishImpactResponse: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            /** Format: int64 */
+            draftRevision: number | string;
+            /** Format: int32 */
+            currentVersionNumber: null | number | string;
+            /** Format: int32 */
+            nextVersionNumber: number | string;
+            versionBehavior: string;
+            canPublish: boolean;
+            blockedReasonCode: null | string;
+            blockedReason: null | string;
+            comparison: components["schemas"]["LayoutComparisonResponse"];
+            notices: components["schemas"]["PublishImpactNoticeResponse"][];
+            records: components["schemas"]["PublishRecordImpactResponse"];
+            dataStatement: string;
+        };
+        PublishRecordImpactResponse: {
+            /** Format: int32 */
+            visibleRecordCount: number | string;
+            /** Format: int32 */
+            shownWithNewVersionCount: number | string;
+            /** Format: int32 */
+            editedWithNewVersionCount: number | string;
+            /** Format: int32 */
+            unavailableRecordCount: number | string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            countsAreApproximate: boolean;
+            scopeStatement: string;
         };
         ReclassifyFieldRequest: {
             targetClassification: string;
@@ -4645,6 +4756,13 @@ export interface components {
             countsAreApproximate: boolean;
             scopeStatement: string;
         };
+        VersionComparisonResponse: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            from: components["schemas"]["ComparedLayoutResponse"];
+            to: components["schemas"]["ComparedLayoutResponse"];
+            comparison: components["schemas"]["LayoutComparisonResponse"];
+        };
         VersionRecordCountResponse: {
             /** Format: int32 */
             versionNumber: null | number | string;
@@ -5479,6 +5597,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionBehaviorImpactResponse"];
+                };
+            };
+        };
+    };
+    PreviewPublishImpact: {
+        parameters: {
+            query: {
+                expectedDraftRevision: number | string;
+            };
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishImpactResponse"];
+                };
+            };
+        };
+    };
+    CompareFormVersions: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionComparisonResponse"];
                 };
             };
         };

@@ -1284,12 +1284,11 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         }
 
         // Snapshot: an element without its own label takes the catalog name as it is now, so the immutable version never
-        // changes when the catalog name is edited later.
-        var catalogFields = (await scope.GetFieldDefinitionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).ToDictionary(f => f.FieldDefinitionId);
-        var catalogRelationships = (await scope.GetRelationshipDefinitionsAsync(context.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false)).ToDictionary(r => r.FormRelationshipDefinitionId);
-        var catalogOptions = (await scope.GetFieldOptionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).GroupBy(o => o.FieldDefinitionId).ToDictionary(g => g.Key, g => g.ToList());
-        layout = SnapshotLabels(layout, catalogFields, catalogRelationships, catalogOptions);
-        var canonical = FormLayoutCodec.Serialize(layout with { LayoutSchemaVersion = FormLayout.CurrentSchemaVersion });
+        // changes when the catalog name is edited later. Phase C9 M2: the publish-impact preview uses the same snapshot.
+        var snapshot = await SnapshotForPublishAsync(scope, context, formDefinitionId, layout, cancellationToken).ConfigureAwait(false);
+        layout = snapshot.Layout;
+        var catalogFields = snapshot.CatalogFields;
+        var canonical = snapshot.Canonical;
         var currentVersion = versions.FirstOrDefault(v => v.VersionNumber == currentNumber);
         if (currentVersion is not null && FormLayoutCodec.Serialize(FormLayoutCodec.Parse(currentVersion.LayoutJson)) == canonical)
         {
@@ -1319,7 +1318,10 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         draft.DraftRevision++;
         draft.UpdatedOn = now;
         draft.UpdatedByUserId = context.LocalUserId;
-        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormVersionPublished, "immutable form version published", formDefinitionId: formDefinitionId, targetEntityType: "form_version", targetEntityId: version.FormVersionId, metadata: new { versionNumber = version.VersionNumber, changeReason = version.ChangeReason, elements = layout.Elements.Count() });
+        // Phase C9 M2 (WP-4): the semantic change summary of this version against the previous one (counts only; never labels or values).
+        var published = FormLayoutComparison.Compare(currentVersion is null ? null : FormLayoutCodec.Parse(currentVersion.LayoutJson), FormLayoutCodec.Parse(canonical));
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormVersionPublished, "immutable form version published", formDefinitionId: formDefinitionId, targetEntityType: "form_version", targetEntityId: version.FormVersionId,
+            metadata: new { versionNumber = version.VersionNumber, changeReason = version.ChangeReason, elements = layout.Elements.Count(), addedElements = published.AddedCount, removedElements = published.RemovedCount, behaviourChanges = published.BehaviourChangeCount, presentationChanges = published.PresentationChangeCount });
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         var registered = await RegisterPublishedVersionAsync(context, formDefinitionId, version, layout, catalogFields, canonical, cancellationToken).ConfigureAwait(false);
         return ToVersion(version) with { AuthorityRegistered = registered };
