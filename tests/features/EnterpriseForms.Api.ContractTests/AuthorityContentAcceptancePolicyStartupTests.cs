@@ -77,8 +77,7 @@ public sealed class AuthorityContentAcceptancePolicyStartupTests
     public void AStagingHostRefusesToStartWithoutAnExactlyValidPolicy(string? phase, string? floor, string reason)
     {
         using var authority = Authority("Staging", StagingBaseline(phase, floor));
-        var message = Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient()));
-        Assert.Contains($"Content acceptance policy is invalid ({reason})", message, StringComparison.Ordinal);
+        var message = Flatten(StartupRefusal.Assert(authority, $"Content acceptance policy is invalid ({reason})").Refusal);
         Assert.Contains("a missing value is never treated as Release A", message, StringComparison.Ordinal);
     }
 
@@ -89,7 +88,7 @@ public sealed class AuthorityContentAcceptancePolicyStartupTests
     public void AnInvalidOverrideOfTheDevelopmentSettingIsRefusedToo(string phase, string? floor, string reason)
     {
         using var authority = Authority("Development", new Dictionary<string, string?> { ["ContentAcceptance:EnforcementPhase"] = phase, ["ContentAcceptance:RequiredFloor"] = floor });
-        Assert.Contains($"Content acceptance policy is invalid ({reason})", Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient())), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, $"Content acceptance policy is invalid ({reason})");
     }
 
     [Fact]
@@ -132,14 +131,14 @@ public sealed class AuthorityContentAcceptancePolicyStartupTests
         var values = StagingBaseline("ReleaseB", "3");
         values["Content:EnvelopeV2AcceptanceEnabled"] = "true";
         using var authority = Authority("Staging", values);
-        Assert.Contains("must not be enabled outside Development/Testing", Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient())), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, "must not be enabled outside Development/Testing");
     }
 
     [Fact]
     public void ADevelopmentHostRefusesToStartWithAcceptanceOnInReleaseA()
     {
         using var authority = Authority("Development", new Dictionary<string, string?> { ["Content:EnvelopeV2AcceptanceEnabled"] = "true" });
-        Assert.Contains("requires ContentAcceptance:EnforcementPhase = ReleaseB and ContentAcceptance:RequiredFloor = 3", Flatten(Assert.ThrowsAny<Exception>(() => authority.CreateClient())), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, "requires ContentAcceptance:EnforcementPhase = ReleaseB and ContentAcceptance:RequiredFloor = 3");
     }
 
     [Fact]
@@ -153,15 +152,23 @@ public sealed class AuthorityContentAcceptancePolicyStartupTests
             ["ContentAcceptance:RequiredFloor"] = "3",
             ["ConnectionStrings:AuthorityDb"] = "Host=unreachable.invalid;Database=authority;Username=nobody;Password=none;Timeout=2",
         });
-        var ex = Assert.ThrowsAny<Exception>(() => authority.CreateClient());
-        var types = new List<string>();
-        for (Exception? e = ex; e is not null; e = e.InnerException)
-        {
-            types.Add(e.GetType().FullName ?? string.Empty);
-        }
-
-        Assert.Contains(types, t => t.StartsWith("Npgsql.", StringComparison.Ordinal) || t.StartsWith("System.Net.Sockets.", StringComparison.Ordinal)); // the ledger read itself failed
+        // The ledger read itself failed (the refusal is thrown by the Envelope v2 startup guard, during the host start).
+        var ex = StartupRefusal.Assert(authority, IsLedgerReadFailure, "a ledger read failure (Npgsql or socket exception)").Refusal;
         Assert.DoesNotContain("must not be enabled outside", Flatten(ex), StringComparison.Ordinal);
         Assert.DoesNotContain("requires ContentAcceptance:EnforcementPhase", Flatten(ex), StringComparison.Ordinal);
+    }
+
+    private static bool IsLedgerReadFailure(Exception exception)
+    {
+        for (Exception? e = exception; e is not null; e = e.InnerException)
+        {
+            var type = e.GetType().FullName ?? string.Empty;
+            if (type.StartsWith("Npgsql.", StringComparison.Ordinal) || type.StartsWith("System.Net.Sockets.", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
