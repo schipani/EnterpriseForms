@@ -298,8 +298,7 @@ public sealed class ReconcilerBoundaryTests
                 });
             }
         });
-        var failure = Assert.ThrowsAny<Exception>(() => authority.CreateClient());
-        Assert.Contains(variant == "partial" ? "configured completely" : "own key and issuer", Flatten(failure), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, variant == "partial" ? "configured completely" : "own key and issuer");
     }
 
     [Theory]

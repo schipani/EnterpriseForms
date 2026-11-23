@@ -375,8 +375,7 @@ public sealed class EnvelopeCapabilityEnforcementHostTests
     public void M2F29AnInvalidDeploymentFloorRefusesTheAuthorityStart(string configured)
     {
         using var authority = Authority(new Script(), configured);
-        var ex = Assert.ThrowsAny<Exception>(() => authority.CreateClient());
-        Assert.Contains(EnvelopeCapabilityFloor.ConfigurationKey, Flatten(ex), StringComparison.Ordinal);
+        StartupRefusal.Assert(authority, EnvelopeCapabilityFloor.ConfigurationKey);
     }
 
     [Theory]

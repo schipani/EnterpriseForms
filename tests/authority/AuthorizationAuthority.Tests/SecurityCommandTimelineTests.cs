@@ -226,16 +226,27 @@ public sealed partial class SecurityCommandTimelineTests : IDisposable
     [Fact]
     public void AuditEnvelopesWithholdCountsDetailsAndIdentityIdentifiers()
     {
+        Guid snapshot = Guid.CreateVersion7(), form = Guid.CreateVersion7(), user = Guid.CreateVersion7(), field = Guid.CreateVersion7(), correlation = Guid.CreateVersion7();
         var search = SecurityCommandTimelineCatalog.BuildAuditEnvelope("FieldSearchExecuted", V1Envelope(new
         {
-            search_result_snapshot_id = Guid.CreateVersion7(), form_definition_id = Guid.CreateVersion7(), authority_user_id = Guid.CreateVersion7(), search_engine_name = "SENT-ENGINE",
-            field_definition_ids = new[] { Guid.CreateVersion7() }, operators = new List<string> { "equals" }, condition_count = 1, outcome = "COMPLETED",
-            evaluated_record_count = 917, matched_record_count = 4, elapsed_milliseconds = 12, authorization_revision = 9, correlation_id = Guid.CreateVersion7(),
+            search_result_snapshot_id = snapshot, form_definition_id = form, authority_user_id = user, search_engine_name = "SENT-ENGINE",
+            field_definition_ids = new[] { field }, operators = new List<string> { "equals" }, condition_count = 1, outcome = "COMPLETED",
+            evaluated_record_count = 917, matched_record_count = 4, elapsed_milliseconds = 12, authorization_revision = 9, correlation_id = correlation,
         }));
-        Assert.Equal(new List<string> { "authorization_revision", "authority_user_id", "condition_count", "correlation_id", "field_definition_ids", "form_definition_id", "operators", "outcome", "search_result_snapshot_id" }.Order(StringComparer.Ordinal),
-            search.Details.Select(d => d.Key).Order(StringComparer.Ordinal));
+        // Exactly the permitted details, each with its own value (so neither withheld count is shown under any key) ...
+        Assert.Equal(
+            new[]
+            {
+                "authorization_revision=9", "authority_user_id=" + user.ToString("D"), "condition_count=1", "correlation_id=" + correlation.ToString("D"),
+                "field_definition_ids=[" + field.ToString("D") + "]", "form_definition_id=" + form.ToString("D"), "operators=[equals]", "outcome=COMPLETED",
+                "search_result_snapshot_id=" + snapshot.ToString("D"),
+            }.Order(StringComparer.Ordinal),
+            search.Details.Select(DetailText).Order(StringComparer.Ordinal));
         Assert.Equal(["evaluated_record_count", "matched_record_count"], search.WithheldFields);
-        Assert.DoesNotContain("917", JsonSerializer.Serialize(search), StringComparison.Ordinal);
+        // ... and neither withheld value appears anywhere in the envelope as a value of its own. The scan matches whole tokens,
+        // so the digits of a random identifier (for example 01a206b2-97dc-737e-9178-...) are not mistaken for a disclosure.
+        Assert.False(ExposesValue(search, "917"));
+        Assert.False(ExposesValue(search, "4"));
         AssertNoSentinel(search);
 
         var refusal = SecurityCommandTimelineCatalog.BuildAuditEnvelope("EnvelopeCapabilityRefused", V1Envelope(new
@@ -251,6 +262,30 @@ public sealed partial class SecurityCommandTimelineTests : IDisposable
         AssertNoSentinel(rejected);
         Assert.Empty(SecurityCommandTimelineCatalog.BuildAuditEnvelope("SearchIndexRebuilt", "{\"x\":1}").Details); // not allowlisted
     }
+
+    [Fact]
+    public void TheWithheldValueScanFindsAnExposedValueAndIgnoresIdentifierDigits()
+    {
+        var identifier = Guid.ParseExact("01a206b2-97dc-737e-9178-8657c6d871d8", "D"); // the identifier that failed CI run 45112841517
+        var clean = new SecurityCommandTimelineCatalog.Envelope([new SecurityCommandTimelineDetail("correlation_id", "Identifier", identifier.ToString("D"), null)], ["evaluated_record_count"]);
+        Assert.False(ExposesValue(clean, "917"));
+        Assert.False(ExposesValue(new SecurityCommandTimelineCatalog.Envelope([new SecurityCommandTimelineDetail("field_definition_ids", "IdentifierList", null, [identifier.ToString("D")])], []), "917"));
+
+        Assert.True(ExposesValue(new SecurityCommandTimelineCatalog.Envelope([new SecurityCommandTimelineDetail("condition_count", "Count", "917", null)], []), "917"));
+        Assert.True(ExposesValue(new SecurityCommandTimelineCatalog.Envelope([new SecurityCommandTimelineDetail("operators", "CodeList", null, ["equals", "917"])], []), "917"));
+        Assert.True(ExposesValue(new { evaluated_record_count = 917 }, "917")); // a raw JSON number
+        Assert.True(ExposesValue(new { note = "matched 917 records" }, "917")); // inside free text
+    }
+
+    private static string DetailText(SecurityCommandTimelineDetail detail) =>
+        detail.Key + "=" + (detail.Values is null ? detail.Value : "[" + string.Join(",", detail.Values) + "]");
+
+    /// <summary>
+    /// True when <paramref name="value"/> appears in the serialized envelope as a whole token: not adjacent to a letter,
+    /// digit, hyphen or dot, so the digits inside a UUID or a longer number are not a match.
+    /// </summary>
+    private static bool ExposesValue(object envelope, string value) =>
+        Regex.IsMatch(JsonSerializer.Serialize(envelope), "(?<![0-9A-Za-z.-])" + Regex.Escape(value) + "(?![0-9A-Za-z.-])", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     // ---- the service: protocol, evidence, keyset, filters ----
 
