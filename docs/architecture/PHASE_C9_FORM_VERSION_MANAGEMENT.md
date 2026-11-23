@@ -1,7 +1,7 @@
-# Phase C9 — Form Version Management: architecture and M1 design
+# Phase C9 — Form Version Management: architecture, M1 and M2 design
 
-Status: **M1 implemented for Development/Testing; awaiting owner review.** Not independently reviewed; not a production
-or Level 2 claim. Owner decisions D9-1…D9-9 are recorded in C-179; this document is the implementation baseline.
+Status: **M1 merged to `main` (`cd48e13`, PR #70). M2 (WP-3, WP-4, WP-5, §7) implemented for Development/Testing;
+awaiting owner review.** Not independently reviewed; not a production or Level 2 claim. Owner decisions D9-1…D9-9 are recorded in C-179; this document is the implementation baseline.
 
 Scope of C9 (CLAUDE.md §1, §3, §5, §11 tests #1–#6): per-form version behaviour (Historical / Latest / Hybrid), the
 Designer setting, publish impact reports, draft-versus-published comparison, version-aware record viewing and editing,
@@ -186,4 +186,67 @@ permission, no change to field identities, stored values, encryption or option v
 - **Compatibility exception (§4.5):** `expectedLayoutVersionId` is optional on update, Submit, restore and upload begin;
   a legacy API client that omits it is validated against the current edit layout and receives no guaranteed stale-layout
   detection. The web application always sends it.
-- M2/M3 (comparison, publish impact, version history comparison, consolidated §11 #1–#6 scenario, close-out) not started.
+- M2 implemented (§7, C-182); M3 (consolidated §11 #1–#6 scenario, close-out) not started.
+
+## 7. M2 design (WP-3, WP-4, WP-5; authorized by the owner, C-182)
+
+### 7.1 Semantic layout comparison (WP-3)
+
+`Application/Features/FormDefinitions/Layout/FormLayoutComparison.cs` — pure, deterministic, no store and no record data.
+
+- **Identity, never labels or positions:** fields and document collections by `FieldDefinitionId`, related lists by
+  `FormRelationshipDefinitionId`, sections by `SectionKey`, options by `FieldOptionId`.
+- **Change types:** `Added`, `Removed`, `Modified`, `Moved`. **Significance:** `Structure` (added or removed),
+  `Behaviour` (validation, rules, read-only, shown in form, options, defaults, limits, protection), `Presentation`
+  (label, help, placeholder, control, width/position, order, section and option wording). A move is a move, never a
+  removal plus an addition; order is compared only among elements that stay in the same section, so an insertion or a
+  move elsewhere does not mark neighbours as moved.
+- **Aspects** are stable codes (`Label`, `Required`, `MaxLength`, `OptionDeactivated`, `RepeatLimits`, …) with before and
+  after text and a `Tightened` flag for a rule or limit that can refuse input it accepted before (required turned on,
+  stricter length/value/date limits, a pattern, deactivated or removed options, tighter upload or entry limits).
+- **Order:** form title, then sections and elements in the order of the later layout, then removed items in the order
+  of the earlier one. The first version compares against nothing (everything is added).
+- **Not compared:** translations (none exist; D9-9), organization-disabled catalog values (D9-9), record data.
+
+### 7.2 Publish impact (WP-4)
+
+`GET /api/v1/form-definitions/{id}/publish-impact?expectedDraftRevision=` (`FormDesignerHandlers.PreviewPublishImpactAsync`):
+DesignForm (404 otherwise), 409 `NO_DRAFT` / `DRAFT_REVISION_CONFLICT`, read-only (nothing written or audited). A `GET`
+instead of the `POST` sketched in CLAUDE.md §6, because it is a read (documented deviation).
+
+- **Comparison:** the current version against the draft **exactly as publishing would store it** — the label, protection
+  and option snapshot is taken by the same `SnapshotForPublishAsync` that `PublishAsync` now uses.
+- **`CanPublish`/blocked reason:** `NO_DRAFT_CHANGES` when the snapshot equals the current version, or the layout
+  validation error (`LAYOUT_INVALID`) — the same rules publishing enforces.
+- **Notices (potential impact on future edits, never data loss):** Attention — `NEW_REQUIRED_FIELDS`,
+  `VALIDATION_TIGHTENED`, `OPTIONS_NO_LONGER_AVAILABLE`, `LIMITS_TIGHTENED`; Information — `ELEMENTS_REMOVED`,
+  `READ_ONLY_OR_HIDDEN`, `PROTECTION_CHANGED`, `PRESENTATION_ONLY`, `NO_CHANGES`.
+- **Records (D9-4):** approximate counts over the caller's discoverable records only — visible records of the form, how
+  many would be shown and edited with the new version under the form's version behaviour (Latest: all; Hybrid: edited
+  only; Historical: none), authorized records without listing details. No field value is read or counted.
+- **Data statement:** publishing never deletes or changes stored values; values of fields no longer in the layout are
+  kept; existing records are checked against the new version only when next edited with it.
+- **Publish:** unchanged authorization, revision checks and transaction; `FORM_VERSION_PUBLISHED` audit metadata gains
+  `addedElements`, `removedElements`, `behaviourChanges`, `presentationChanges` (counts only, catalog-allowlisted; never
+  labels or values).
+- **UI:** the Publish dialog (`PublishReview.tsx`, large dialog) shows the data statement, the attention and information
+  notices, the approximate record counts and the comparison before the change reason; Publish is disabled when the server
+  says the draft cannot be published.
+
+### 7.3 Version comparison (WP-5)
+
+`GET /api/v1/form-definitions/{id}/versions/compare?from=&to=` (`CompareVersionsAsync`): each side is a version id or
+`draft`; DesignForm (404 otherwise); a version of another form 404 `VERSION_NOT_FOUND`; no draft 404 `NO_DRAFT`; a
+malformed reference 422. The draft side is the publish snapshot (as in WP-4).
+
+UI: the Versions tab gains a "Compare versions" card (`VersionComparePanel.tsx`) with "Compare from" and "to" selects
+(published versions and the draft), Swap, and the shared `LayoutComparisonView.tsx`: a summary sentence and groups —
+Added, Removed from the layout (stored values kept), Changes to how the form behaves, and Presentation-only changes
+collapsed under a disclosure so they are never presented as destructive. Text carries the meaning (never colour alone).
+"Restored from" in the versions table names the source version.
+
+### 7.4 What M2 does not change
+
+No migration; no Authority, encryption, signing, Merkle or journal change; Historical, Latest and Hybrid unchanged; no
+record values in any comparison or impact; the separate publish permission, translations in comparisons and
+organization-disabled catalog values remain deferred (D9-9).
