@@ -2,7 +2,7 @@
 
 - **Branch:** `phase-c9/form-version-management` (from `main` `198aeaef1912fb5dc5b79db96c89d456998ad150`). Not merged.
 - **Architecture:** `docs/architecture/PHASE_C9_FORM_VERSION_MANAGEMENT.md`.
-- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review).
+- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4).
 - **State (2026-11-22):** WP-0 and **M1 (WP-1, WP-2, WP-6) implemented for Development/Testing; stopped for owner review.** Not owner-accepted, not independently reviewed, no production or Level 2 claim. M2 and M3 not started. G21 OPEN.
 
 ## 1. What M1 delivers
@@ -39,10 +39,36 @@ Not run: hosted Stage B (release-only, C-131), any manual workflow dispatch, dep
 ## 3. Deviations from the preparation plan and open items
 
 - **Submit vs. other transitions:** only Submit reads the edit layout; Reopen, Archive and Unarchive read the view layout because they validate no content (so a missing edit layout does not block archiving).
-- **`expectedLayoutVersionId` is optional** on update, Submit and restore for API compatibility; the web application always sends it. A client that omits it is validated against the current edit layout without the D9-5 refusal.
+- **Compatibility exception: `expectedLayoutVersionId` is optional** on update, Submit, restore and upload begin. A legacy API client that omits it is validated against the current edit layout and receives no guaranteed stale-layout detection; the web application always sends it (§4).
 - **Related lists on the record page** come from the view layout: under Hybrid, a related list added in a later version appears in the editor's layout but not on the record page of an older record (the child records are kept and remain reachable).
 - The option label for Latest is "Current published version" (the settings card already has a "Current version" row).
 - **PB-06 concurrency convention** (body revision/409 vs `If-Match`/412/428) remains open platform-wide (D9-3).
 - **Deferred (D9-9):** translations in comparisons; organization-disabled catalog values; a separate publish permission.
 - **Outstanding for M1:** owner review; manual screen-reader review of the new dialog and notices (PB-14); hosted Stage B only under separate release authorization.
 - **Not started:** M2 (WP-3 comparison, WP-4 publish impact, WP-5 version comparison) and M3 (WP-7, WP-8).
+
+## 4. D9-5 reconciliation (owner-directed review of PR #70, C-181)
+
+Details: `docs/architecture/PHASE_C9_FORM_VERSION_MANAGEMENT.md` §4.5.
+
+| Item | Finding | Action |
+|---|---|---|
+| 1. First-party write paths supply `expectedLayoutVersionId` where applicable | Update, Submit and restore already did. **Upload begin did not**, although it validates the file against the edit layout's upload policy. Upload chunks/complete/commit, document removal, child creation and unlink do not validate against the record's edit layout, so D9-5 does not apply. Reopen/Archive/Unarchive validate no content. | **Corrected:** `BeginUploadRequest.ExpectedLayoutVersionId` (optional), guarded in `UploadSessionHandlers.BeginAsync`; the record page passes `editLayoutVersionId` through `DocumentCollection` and the upload manager; an upload refused for a changed layout releases the file (no retry with the stale id) and re-reads the record. |
+| 2. A supplied stale id always conflicts | `EditLayoutGuard.Require` compares with the edit layout resolved in the same verified read whose layout validates and stages the write, before any value or policy validation; covered: owner update, share-editor update, Submit, restore, upload begin. | No code change beyond item 1. Tests added for the paths not yet demonstrated (below). |
+| 3. Compatibility exception | Documented in the architecture §4.5 and §6, in the request contracts' XML documentation and in the upload-begin endpoint summary. | Documentation only. |
+| 4. Tests | Not yet demonstrated: stale after a *publish* (only after a behaviour change), the share-editor path, upload begin. | Stage B `AStaleEditLayoutIsRefusedAfterANewerVersionIsPublishedForOwnersAndSharedEditors` (owner update, share-editor update, Submit after a publish; the share editor's reload then saves); the upload stale/current checks in `DocumentsUploadsAndChildRecordsUseTheirFormsEditLayout`; upload-manager unit tests (expected id sent; no retry after `EDIT_LAYOUT_CHANGED`). |
+| 5. "Reload with the new layout and keep my changes" | Values match by permanent field key, so nothing is applied to another field. **Defect:** a change to a field the new layout no longer lets the person change (removed, read-only, hidden from the form, unshared) or to a repeating section no longer placed was silently left out of the save and counted as carried over. | **Corrected:** such changes are withheld and listed ("Some of your changes can't be carried over", label and entered value); the form shows the latest saved value; nothing withheld is sent. Unit tests (`layoutReload.test.ts`) and a Playwright scenario (a field removed while editing). |
+
+Observation, unchanged and outside D9-5: creating a record (top-level or child) validates against the form's current version at request time; a version published while the new-record page is open is applied without a 409.
+
+Verification of the C-181 correction (local, 2026-11-22):
+
+| Check | Result |
+|---|---|
+| .NET Release build of `EnterpriseForms.All.slnx` and the Stage A/Stage B test projects | Pass: 0 warnings, 0 errors |
+| `run_dotnet_tests.py` (full CI set) | 3,259 executed, 3,259 passed, 0 failed, 223 authorized skips |
+| Stage B focused `FormVersionBehaviorTests` (fresh isolated stack, C-131 §1) | 4/4 (the new stale-layout test and the extended uploads test included) |
+| Stage B focused `DocumentTests` (upload begin changed) | 3/3 |
+| Playwright `form-version-behavior.spec.ts` (isolation guard verified, port 5173 free) | 4/4, including the new removed-field reload scenario with an axe scan |
+| Frontend | Lint, typecheck and build pass; Vitest 67 files, 556 tests (7 new: 5 reload-merge, 2 upload-manager); no API-client drift |
+| OpenAPI | Regenerated (optional `expectedLayoutVersionId` on upload begin; endpoint summary) |

@@ -61,3 +61,34 @@ export function layoutValues(layout: FormLayout, fields: readonly RendererField[
   }
   return result;
 }
+
+/**
+ * Phase C9 (D9-5 reload): what an edit against this layout can carry — the top-level fields the person can change in it
+ * (placed outside repeating sections, not read-only, shown in the form; for a share editor also shared for editing) and
+ * the repeating sections it places. Rules are not considered: a field hidden by a rule keeps its stored value, as before.
+ */
+export function editableTargets(layout: FormLayout, fields: readonly RendererField[], groups: readonly GroupInfo[], sharedEditableKeys: ReadonlySet<string> | null): { fieldKeys: Set<string>; groupKeys: Set<string> } {
+  const byId = new Map(fields.map((field) => [field.fieldDefinitionId, field]));
+  const groupKeyById = new Map(groups.map((group) => [group.groupDefinitionId, group.groupKey]));
+  const fieldKeys = new Set<string>();
+  const groupKeys = new Set<string>();
+  for (const section of layout.sections) {
+    if (section.repeat) {
+      const key = groupKeyById.get(section.repeat.groupDefinitionId);
+      if (key) {
+        groupKeys.add(key);
+      }
+      continue;
+    }
+    for (const element of section.elements) {
+      if (element.kind !== "field" || element.readOnly || element.showInForm === false) {
+        continue;
+      }
+      const field = byId.get(element.fieldDefinitionId);
+      if (field && !field.groupDefinitionId && (sharedEditableKeys === null || sharedEditableKeys.has(field.fieldKey))) {
+        fieldKeys.add(field.fieldKey);
+      }
+    }
+  }
+  return { fieldKeys, groupKeys };
+}

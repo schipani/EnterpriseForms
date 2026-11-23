@@ -1090,7 +1090,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Opens an authorized, idempotent chunked upload session bound to a record's document collection field. */
+        /** Opens an authorized, idempotent chunked upload session bound to a record's document collection field. Phase C9: the upload policy comes from the record's edit layout; 409 EDIT_LAYOUT_CHANGED when expectedLayoutVersionId is no longer it, 409 EDIT_LAYOUT_UNAVAILABLE when there is none. */
         post: operations["BeginUploadSession"];
         delete?: never;
         options?: never;
@@ -2371,6 +2371,8 @@ export interface components {
             sizeBytes: number | string;
             /** Format: uuid */
             replacesFileAttachmentId?: null | string;
+            /** Format: uuid */
+            expectedLayoutVersionId?: null | string;
         };
         BootstrapResponse: {
             session: components["schemas"]["SessionResponse"];

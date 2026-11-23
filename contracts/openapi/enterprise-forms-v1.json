@@ -2946,7 +2946,7 @@
         "tags": [
           "Documents"
         ],
-        "summary": "Opens an authorized, idempotent chunked upload session bound to a record's document collection field.",
+        "summary": "Opens an authorized, idempotent chunked upload session bound to a record's document collection field. Phase C9: the upload policy comes from the record's edit layout; 409 EDIT_LAYOUT_CHANGED when expectedLayoutVersionId is no longer it, 409 EDIT_LAYOUT_UNAVAILABLE when there is none.",
         "operationId": "BeginUploadSession",
         "requestBody": {
           "content": {
@@ -6829,6 +6829,13 @@
             "format": "int64"
           },
           "replacesFileAttachmentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "expectedLayoutVersionId": {
             "type": [
               "null",
               "string"

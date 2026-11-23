@@ -23,7 +23,7 @@ public static class DocumentEndpoints
                 return TypedResults.Created($"{ApiVersions.V1Prefix}/upload-sessions/{response.UploadSessionId:D}", response);
             })
             .WithName("BeginUploadSession")
-            .WithSummary("Opens an authorized, idempotent chunked upload session bound to a record's document collection field.");
+            .WithSummary("Opens an authorized, idempotent chunked upload session bound to a record's document collection field. Phase C9: the upload policy comes from the record's edit layout; 409 EDIT_LAYOUT_CHANGED when expectedLayoutVersionId is no longer it, 409 EDIT_LAYOUT_UNAVAILABLE when there is none.");
 
         sessions.MapPut("/{uploadSessionId:guid}/chunks/{chunkIndex:int}", static async Task<Ok<UploadChunkReceiptResponse>> (Guid uploadSessionId, int chunkIndex, HttpContext http, UploadSessionHandlers handlers, CancellationToken cancellationToken) =>
             {

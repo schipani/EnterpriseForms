@@ -114,4 +114,39 @@ test.describe.serial("Form version behaviour", () => {
     await expect(page.getByText("Shown with layout v1; edits use layout v3")).toBeVisible();
     await signOut(page);
   });
+
+  test("a change to a field the new layout removed is reported with its value, not silently dropped", async ({ page, browser }) => {
+    await signIn(page, "clerk");
+    await page.goto(recordUrl + "/edit");
+    await expect(page.getByText(/with layout v3\./)).toBeVisible();
+    await page.getByLabel(/^Given name/).fill("Casey C");
+    await page.getByLabel(/^Nickname/).fill("Kit");
+
+    // Meanwhile the designer removes Nickname from the layout and publishes v4.
+    const designerContext = await browser.newContext();
+    const designer = await designerContext.newPage();
+    await signIn(designer, "designer");
+    await designer.goto(`/app/forms/${formId}/design`);
+    await designer.getByRole("region", { name: "Form canvas" }).getByRole("button", { name: "Nickname", exact: true }).click();
+    await designer.getByRole("button", { name: "More actions for Nickname" }).click();
+    await designer.getByRole("menuitem", { name: "Remove from layout" }).click();
+    await saveAndPublish(designer, "layout v4: nickname removed");
+    await expect(designer.getByText("Published v4")).toBeVisible();
+    await signOut(designer);
+    await designerContext.close();
+
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.getByText("The form layout changed while you were editing")).toBeVisible();
+    await page.getByRole("button", { name: "Reload with the new layout and keep my changes" }).click();
+    await expect(page.getByText(/with layout v4\./)).toBeVisible();
+    await expect(page.getByText(/Some of your changes can.t be carried over/)).toBeVisible();
+    await expect(page.getByRole("list", { name: "Changes not carried over" })).toContainText("Nickname: you had entered");
+    await expect(page.getByRole("list", { name: "Changes not carried over" })).toContainText("Kit");
+    await expect(page.getByLabel(/^Nickname/)).toHaveCount(0);
+    await expect(page.getByLabel(/^Given name/)).toHaveValue("Casey C");
+    expect((await axe(page, "main")).violations).toEqual([]);
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.getByText("Changes saved")).toBeVisible({ timeout: 60_000 });
+    await signOut(page);
+  });
 });

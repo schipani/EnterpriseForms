@@ -225,6 +225,53 @@ public sealed class FormVersionBehaviorTests(StageBFixture fixture)
     }
 
     [Fact]
+    public async Task AStaleEditLayoutIsRefusedAfterANewerVersionIsPublishedForOwnersAndSharedEditors()
+    {
+        var s = new StageBScenario(fixture, "c9-stale-layout");
+        await s.BootstrapAsync();
+        var form = await PublishIntakeV1Async(s, s.Clerk);
+        var record = await CreateRecordAsync(s, s.Clerk, form.FormId, new() { ["full_name"] = "Avery", ["phone_number"] = "555-0101" });
+        var ownerEdit = await EditAsync(s, s.Clerk, record); // the owner opens the editor on v1 (Latest)
+        Assert.Equal(form.V1, LayoutId(ownerEdit));
+        var shared = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "full_name" } });
+        Assert.True(shared.IsSuccess, shared.Body);
+        await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
+        var contributorWrites = await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/testing/contributor-writes", new { enabled = true });
+        Assert.True(contributorWrites.IsSuccess, contributorWrites.Body);
+        try
+        {
+            var sharedEdit = await EditAsync(s, s.Designer, record); // the share editor opens the editor on v1 too
+            Assert.Equal(form.V1, LayoutId(sharedEdit));
+            Assert.False(sharedEdit.GetProperty("permissions").GetProperty("isCompleteProjection").GetBoolean());
+
+            // v2 is published while both editors are open; both saves were prepared against v1.
+            form = await PublishIntakeV2Async(s, form);
+            var ownerStale = await PatchAsync(s, s.Clerk, record, Revision(ownerEdit), new() { ["full_name"] = "Avery B", ["alias_name"] = "Ave" }, form.V1);
+            Assert.Equal(HttpStatusCode.Conflict, ownerStale.Status);
+            Assert.Equal("EDIT_LAYOUT_CHANGED", ownerStale.ErrorCode);
+            var sharedStale = await PatchAsync(s, s.Designer, record, Revision(sharedEdit), new() { ["full_name"] = "Avery S" }, form.V1);
+            Assert.Equal(HttpStatusCode.Conflict, sharedStale.Status);
+            Assert.Equal("EDIT_LAYOUT_CHANGED", sharedStale.ErrorCode);
+            Assert.Equal("Avery", ValueOf(await ViewAsync(s, s.Clerk, record), "full_name")); // nothing was written
+
+            // After reloading onto v2 the share editor's save goes through, validated against v2.
+            sharedEdit = await EditAsync(s, s.Designer, record);
+            Assert.Equal(form.V2, LayoutId(sharedEdit));
+            var sharedSaved = await PatchAsync(s, s.Designer, record, Revision(sharedEdit), new() { ["full_name"] = "Avery S" }, form.V2);
+            Assert.True(sharedSaved.IsSuccess, sharedSaved.Body);
+            Assert.Equal(form.V2.ToString("D"), LastEdited(record));
+
+            // The owner reloads too: a submit prepared against the outdated v1 is also refused.
+            var staleSubmit = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/submit", s.Token(s.Clerk), new { expectedContentRevision = Revision(await ViewAsync(s, s.Clerk, record)), expectedLayoutVersionId = form.V1 });
+            Assert.Equal("EDIT_LAYOUT_CHANGED", staleSubmit.ErrorCode);
+        }
+        finally
+        {
+            Assert.True((await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/testing/contributor-writes", new { enabled = (bool?)null })).IsSuccess);
+        }
+    }
+
+    [Fact]
     public async Task DocumentsUploadsAndChildRecordsUseTheirFormsEditLayout()
     {
         var s = new StageBScenario(fixture, "c9-documents");
@@ -250,6 +297,19 @@ public sealed class FormVersionBehaviorTests(StageBFixture fixture)
 
         // Historical: the record's created version (v1) applies to the upload and its commit.
         await SetBehaviorAsync(s, s.AccusedFormId, "Historical");
+
+        // D9-5 for uploads: the page's expected edit layout travels with upload begin; a stale one is refused, the current one accepted.
+        var accusedView = await ViewAsync(s, s.Clerk, accused);
+        var v1Id = accusedView.GetProperty("editLayoutVersionId").GetGuid();
+        var v2Id = (await s.GetFormAsync(s.AccusedFormId)).GetProperty("summary").GetProperty("currentFormVersionId").GetGuid();
+        Assert.NotEqual(v1Id, v2Id);
+        Task<HttpResult> BeginExpectingAsync(Guid expected) => fixture.Api.PostAsync("/api/v1/upload-sessions", s.Token(s.Clerk), new { formRecordId = accused, fieldDefinitionId = s.AccusedFields["case_documents"], originalFileName = "note.txt", contentType = "text/plain", sizeBytes = bytes.LongLength, replacesFileAttachmentId = (Guid?)null, expectedLayoutVersionId = expected });
+        var staleUpload = await BeginExpectingAsync(v2Id); // the page loaded while the form was Latest (v2)
+        Assert.Equal(HttpStatusCode.Conflict, staleUpload.Status);
+        Assert.Equal("EDIT_LAYOUT_CHANGED", staleUpload.ErrorCode);
+        var currentUpload = await BeginExpectingAsync(v1Id);
+        Assert.Equal(HttpStatusCode.Created, currentUpload.Status);
+        Assert.True((await fixture.Api.SendAsync(HttpMethod.Delete, $"/api/v1/upload-sessions/{currentUpload.Root.GetProperty("uploadSessionId").GetGuid():D}", s.Token(s.Clerk), null, null)).IsSuccess);
         var committed = await s.UploadAsync(s.Clerk, accused, "note.txt", "text/plain", bytes);
         Assert.Equal(JsonValueKind.Object, committed.ValueKind);
         var documents = (await ViewAsync(s, s.Clerk, accused)).GetProperty("documents").EnumerateArray().Select(d => d.GetProperty("originalFileName").GetString()).ToList();

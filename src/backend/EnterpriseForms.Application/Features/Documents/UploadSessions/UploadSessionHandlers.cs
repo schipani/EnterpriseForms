@@ -50,6 +50,9 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
         // Authorization: the record must verify and the caller must hold Edit (owner or parent owner); document fields come from the layout.
         var verified = await reader.ReadAsync(context, request.FormRecordId, ProtectedAction.Edit, cancellationToken).ConfigureAwait(false);
         FormRecords.Lifecycle.RecordLifecycle.RequireContentEditable(verified);
+
+        // Phase C9 (D9-5): the upload policy comes from the record's edit layout; the one the client showed must still be it.
+        FormRecords.Projection.EditLayoutGuard.Require(verified, request.ExpectedLayoutVersionId);
         var edit = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, request.FormRecordId), ProtectedAction.Edit), cancellationToken).ConfigureAwait(false);
         if (!edit.Allowed)
         {

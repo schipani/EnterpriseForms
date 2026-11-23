@@ -306,6 +306,7 @@ public sealed record RecordVersionViewResponse(RecordVersionItemResponse Version
 /// (1–500 characters, recorded in the activity log). <c>AcknowledgePlaintext</c> must be true when the preview listed values that
 /// would now be stored as plaintext (OD-13).
 /// </summary>
+/// <summary><c>ExpectedLayoutVersionId</c> (Phase C9, D9-5, optional): the edit layout the restore preview validated against; a different current edit layout is 409 EDIT_LAYOUT_CHANGED. Omitted: validated against the current edit layout without stale-layout detection (compatibility exception).</summary>
 public sealed record RecordRestoreRequest(long ExpectedCurrentContentRevision, Guid SourceOperationId, string? RestoreReason, bool AcknowledgePlaintext = false, Guid? ExpectedLayoutVersionId = null);
 
 /// <summary>Phase C6 M3: the new accepted revision created by a restore (earlier revisions are unchanged).</summary>
@@ -350,7 +351,7 @@ public sealed record RestorePreviewResponse(
     Guid? LayoutVersionId = null,
     int? LayoutVersionNumber = null);
 
-/// <summary>Request of a lifecycle transition. <c>ExpectedStatus</c> guards against acting on a stale view; <c>Reason</c> is mandatory for Reopen (1..500 characters) and optional for Archive. <c>ExpectedLayoutVersionId</c> (Phase C9, Submit only, optional): the edit layout the client validated against.</summary>
+/// <summary>Request of a lifecycle transition. <c>ExpectedStatus</c> guards against acting on a stale view; <c>Reason</c> is mandatory for Reopen (1..500 characters) and optional for Archive. <c>ExpectedLayoutVersionId</c> (Phase C9, D9-5, Submit only, optional): the edit layout the client validated against; a different current edit layout is 409 EDIT_LAYOUT_CHANGED. Omitted: validated against the current edit layout without stale-layout detection (compatibility exception). Other transitions validate no content and ignore it.</summary>
 public sealed record RecordLifecycleRequest(long ExpectedContentRevision, string? ExpectedStatus = null, string? Reason = null, Guid? ExpectedLayoutVersionId = null);
 
 /// <summary>Result of a committed lifecycle transition (the new accepted revision and the state it produced).</summary>
@@ -372,7 +373,12 @@ public sealed record RecordActivityResponse(Guid FormRecordId, IReadOnlyList<Aud
 
 // ---- Documents (B-05) ----
 
-public sealed record BeginUploadRequest(Guid FormRecordId, Guid FieldDefinitionId, string OriginalFileName, string ContentType, long SizeBytes, Guid? ReplacesFileAttachmentId = null);
+/// <summary>
+/// <c>ExpectedLayoutVersionId</c> (Phase C9, D9-5, optional): the record's edit layout the client showed the upload policy for; a
+/// different current edit layout is 409 EDIT_LAYOUT_CHANGED. A client that omits it is checked against the current edit layout's policy
+/// without stale-layout detection (compatibility exception).
+/// </summary>
+public sealed record BeginUploadRequest(Guid FormRecordId, Guid FieldDefinitionId, string OriginalFileName, string ContentType, long SizeBytes, Guid? ReplacesFileAttachmentId = null, Guid? ExpectedLayoutVersionId = null);
 
 public sealed record UploadSessionResponse(Guid UploadSessionId, Guid FormRecordId, Guid FieldDefinitionId, string OriginalFileName, long DeclaredSizeBytes, int ChunkSizeBytes, int ExpectedChunkCount, IReadOnlyList<int> ReceivedChunkIndexes, long ReceivedBytes, string SessionState, string? FailureReasonCode, string ProcessingStage, DateTimeOffset SessionExpiresOn, Guid? FileAttachmentId, int? VersionNumber, string? ScanVerdict);
 

@@ -11,6 +11,8 @@ export interface UploadItem {
   fieldDefinitionId: string;
   /** Set when this upload becomes a new immutable version of an existing document (B-05 replace). */
   replacesFileAttachmentId: string | null;
+  /** Phase C9 (D9-5): the record's edit layout whose upload policy the page showed; a newer one refuses the upload. */
+  expectedLayoutVersionId: string | null;
   fileName: string;
   sizeBytes: number;
   contentType: string;
@@ -108,7 +110,7 @@ export class UploadManager {
     return this.snapshot().filter((item) => item.formRecordId === formRecordId);
   }
 
-  enqueue(files: readonly File[], target: { formRecordId: string; fieldDefinitionId: string; replacesFileAttachmentId?: string | null }): string[] {
+  enqueue(files: readonly File[], target: { formRecordId: string; fieldDefinitionId: string; replacesFileAttachmentId?: string | null; expectedLayoutVersionId?: string | null }): string[] {
     const ids: string[] = [];
     for (const file of files) {
       const clientUploadId = crypto.randomUUID();
@@ -119,6 +121,7 @@ export class UploadManager {
         formRecordId: target.formRecordId,
         fieldDefinitionId: target.fieldDefinitionId,
         replacesFileAttachmentId: target.replacesFileAttachmentId ?? null,
+        expectedLayoutVersionId: target.expectedLayoutVersionId ?? null,
         fileName: file.name,
         sizeBytes: file.size,
         contentType: file.type || "application/octet-stream",
@@ -228,7 +231,7 @@ export class UploadManager {
       if (item.uploadSessionId) {
         session = (await this.api.uploads.get(item.uploadSessionId)).result;
       } else {
-        session = (await this.api.uploads.begin({ formRecordId: item.formRecordId, fieldDefinitionId: item.fieldDefinitionId, originalFileName: file.name, contentType: item.contentType, sizeBytes: file.size, replacesFileAttachmentId: item.replacesFileAttachmentId })).result;
+        session = (await this.api.uploads.begin({ formRecordId: item.formRecordId, fieldDefinitionId: item.fieldDefinitionId, originalFileName: file.name, contentType: item.contentType, sizeBytes: file.size, replacesFileAttachmentId: item.replacesFileAttachmentId, expectedLayoutVersionId: item.expectedLayoutVersionId })).result;
       }
       this.patch(clientUploadId, { uploadSessionId: session.uploadSessionId, chunkCount: n(session.expectedChunkCount), receivedChunks: session.receivedChunkIndexes.length, transferredBytes: n(session.receivedBytes), phase: "Transferring" });
 
@@ -257,6 +260,13 @@ export class UploadManager {
       }
       const code = error instanceof OperationError ? error.errorCode : "UPLOAD_FAILED";
       const detail = error instanceof OperationError ? (error.problem?.detail ?? error.message) : error instanceof Error ? error.message : String(error);
+      if (code === "EDIT_LAYOUT_CHANGED") {
+        // Phase C9 (D9-5): the form changed since the page was loaded. Retrying would repeat the stale expectation, so the
+        // file is released and the person chooses it again after the record reloads with the current layout.
+        this.files.delete(clientUploadId);
+        this.patch(clientUploadId, { phase: "Failed", errorCode: code, errorDetail: "The form changed since this page was loaded. Reload the record and choose the file again.", hasBytes: false });
+        return;
+      }
       this.patch(clientUploadId, { phase: "Failed", errorCode: code, errorDetail: detail });
     } finally {
       this.controllers.delete(clientUploadId);
@@ -333,6 +343,7 @@ export class UploadManager {
       formRecordId: session.formRecordId,
       fieldDefinitionId: session.fieldDefinitionId,
       replacesFileAttachmentId: null,
+      expectedLayoutVersionId: null,
       fileName: session.originalFileName,
       sizeBytes: n(session.declaredSizeBytes),
       contentType: "application/octet-stream",

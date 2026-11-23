@@ -17,7 +17,7 @@ const formatBytes = (bytes: number | string) => {
  * app-shell upload manager), listing, authorized download (browser-native, server-decrypted), version history, remove.
  * A document is only shown as Ready when the server committed its verified version.
  */
-export function DocumentCollection({ formRecordId, fieldDefinitionId, label, documents, policy, canEdit, contentRevision, onChanged }: { formRecordId: string; fieldDefinitionId: string; label: string; documents: readonly DocumentSummaryResponse[]; policy: LayoutUploadPolicy | undefined; canEdit: boolean; contentRevision: number; onChanged: () => void }) {
+export function DocumentCollection({ formRecordId, fieldDefinitionId, label, documents, policy, canEdit, contentRevision, editLayoutVersionId = null, onChanged }: { formRecordId: string; fieldDefinitionId: string; label: string; documents: readonly DocumentSummaryResponse[]; policy: LayoutUploadPolicy | undefined; canEdit: boolean; contentRevision: number; editLayoutVersionId?: string | null; onChanged: () => void }) {
   useFormatter();
   const { uploads } = useRuntime();
   const api = useApi();
@@ -46,6 +46,13 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
       onChangedRef.current();
     }
   }, [readyCount]);
+  // Phase C9 (D9-5): an upload refused because the form layout changed re-reads the record, so the next upload uses the current layout.
+  const layoutChangedCount = items.filter((item) => item.errorCode === "EDIT_LAYOUT_CHANGED").length;
+  useEffect(() => {
+    if (layoutChangedCount > 0) {
+      onChangedRef.current();
+    }
+  }, [layoutChangedCount]);
 
   /** Replace = a new immutable version of an existing document through the same upload pipeline (B-05). */
   const acceptReplacement = (file: File, target: DocumentSummaryResponse) => {
@@ -58,7 +65,7 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
       return;
     }
     setRejected([]);
-    uploads.enqueue([file], { formRecordId, fieldDefinitionId, replacesFileAttachmentId: target.fileAttachmentId });
+    uploads.enqueue([file], { formRecordId, fieldDefinitionId, replacesFileAttachmentId: target.fileAttachmentId, expectedLayoutVersionId: editLayoutVersionId });
   };
   const accept = (files: FileList | File[]) => {
     const list = [...files];
@@ -78,7 +85,7 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
     }
     setRejected(problems);
     if (accepted.length > 0) {
-      uploads.enqueue(accepted, { formRecordId, fieldDefinitionId });
+      uploads.enqueue(accepted, { formRecordId, fieldDefinitionId, expectedLayoutVersionId: editLayoutVersionId });
     }
   };
   const onDrop = (event: DragEvent<HTMLDivElement>) => {

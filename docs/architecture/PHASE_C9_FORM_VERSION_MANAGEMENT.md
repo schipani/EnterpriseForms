@@ -77,7 +77,7 @@ consolidated acceptance scenarios, WP-8 close-out) need separate authorization.
   record's edit layout is `409 EDIT_LAYOUT_CHANGED`. The expectation is optional on the wire (a client that omits it is
   validated against the current edit layout, as before); the web application always sends it.
 
-Write paths (all through the edit layout): update (`UpdateFormRecordHandler`, owner and shared contributor), Submit
+Write paths (all through the edit layout; the D9-5 review is §4.5): update (`UpdateFormRecordHandler`, owner and shared contributor), Submit
 (`RecordLifecycleHandler`; Reopen/Archive/Unarchive validate no content and read the view layout, so they never fail
 for a missing edit layout), restore preview and restore (`RecordRestoreHandler`, D9-6), upload begin and commit and
 document removal (`UploadSessionHandlers`, `DocumentHandlers`), child-record creation and linking under a parent
@@ -119,6 +119,46 @@ sees zero. No value row is read.
   summary, a reason) — `features/form-designer/components/VersionBehaviorDialog.tsx`.
 - D9-8: no "Other recorded values" section; values outside the shown layout stay reachable through record history.
 
+### 4.5 D9-5 reconciliation (owner-directed review of PR #70, C-181)
+
+**Write paths.** Every first-party record write was checked for whether it validates content against the record's edit
+layout, and therefore whether it needs the expected edit layout:
+
+| Path (server handler) | Validates against the edit layout? | First-party client sends `expectedLayoutVersionId` | Stale → 409 `EDIT_LAYOUT_CHANGED` |
+|---|---|---|---|
+| Update, owner and share editor (`UpdateFormRecordHandler`) | Yes: values, rules, required, read-only, repeating sections | Yes (`EditRecordPage`, from the edit projection) | Yes; guard before the owner/share branch |
+| Submit (`RecordLifecycleHandler`) | Yes: submission validation | Yes (`LifecycleActions`, from the record page's `editLayoutVersionId`) | Yes |
+| Reopen, Archive, Unarchive | No (no content validation; view layout) | Not applicable (null) | Not applicable; ignored |
+| Restore (`RecordRestoreHandler`) | Yes (D9-6) | Yes (`RecordRestore`, from the preview's `layoutVersionId`) | Yes |
+| **Upload begin**, new document and replace (`UploadSessionHandlers.BeginAsync`) | **Yes: the document collection's upload policy (size, types, count)** | **Added in C-181** (`DocumentCollection` → upload manager, from the record page's `editLayoutVersionId`) | **Yes (added in C-181)** |
+| Upload chunks, complete, commit; document removal | No (the edit read only proves editability and access) | Not applicable | Not applicable |
+| Child record creation under a parent; unlink (`CreateFormRecordHandler`, `ChildRecordHandlers`) | No for the parent (editability and relationship capacity only); the child's values are validated as a new record of the child form | Not applicable | Not applicable |
+| New top-level record (`CreateFormRecordHandler`) | Not an opened record: validated against the form's current version | Not applicable (outside D9-5) | Not applicable (see observation below) |
+
+**Guarantee.** `EditLayoutGuard.Require` compares the supplied id with the edit layout resolved in the same verified read
+whose layout then validates and stages the write; a different id is refused before any value or policy validation and before
+staging, so a supplied stale id can never be validated against a newer layout. An unavailable edit layout fails first with
+`EDIT_LAYOUT_UNAVAILABLE`.
+
+**Compatibility exception.** `expectedLayoutVersionId` is optional on update, Submit, restore and upload begin. A legacy
+API client that omits it is validated against the record's current edit layout and receives **no guaranteed stale-layout
+detection**: a version published (or a behaviour change made) after that client loaded the record is applied without a
+409. The first-party web application always sends it. The other protections are unchanged for such clients (content
+revision CAS, the current edit layout's validation, authorization, encryption).
+
+**Reload with the new layout and keep my changes.** Values are matched by the field's permanent key (storage type is
+immutable and keys are never reused), so a value is never applied to a different field. Before C-181 a change to a field
+that the reloaded layout no longer let the person change (removed from the layout, made read-only, hidden from the form,
+or no longer shared for editing), or to a repeating section no longer placed, was silently left out of the save and still
+counted as "carried onto the latest version". Since C-181 such changes are **withheld**: the form shows the latest saved
+value, nothing withheld is sent, and the person sees "Some of your changes can't be carried over" with each field's label
+and the value they had entered. Changes the new layout accepts are carried over and validated against it (an option no
+longer available or a tightened rule is reported as a validation error, never accepted silently).
+
+**Observation (not changed).** Creating a record (top-level or child) validates against the form's current version at
+the time of the request; a version published while the new-record page is open is applied without a 409. This is outside
+D9-5 (no opened record) and unchanged from before C9.
+
 ### 4.4 What M1 does not change
 
 No business or Authority migration, no signed-row, Merkle, envelope or journal change, no new Authority command or
@@ -143,6 +183,7 @@ permission, no change to field identities, stored values, encryption or option v
   use a body revision and 409, not `If-Match`/412/428. Open platform-wide; not resolved by C9.
 - **G21** stays OPEN (K-8). **Deferred (D9-9):** translations in comparisons; organization-disabled catalog values;
   a separate publish permission.
-- `expectedLayoutVersionId` is optional for API compatibility; a client that omits it is validated against the current
-  edit layout without the D9-5 refusal.
+- **Compatibility exception (§4.5):** `expectedLayoutVersionId` is optional on update, Submit, restore and upload begin;
+  a legacy API client that omits it is validated against the current edit layout and receives no guaranteed stale-layout
+  detection. The web application always sends it.
 - M2/M3 (comparison, publish impact, version history comparison, consolidated §11 #1–#6 scenario, close-out) not started.
