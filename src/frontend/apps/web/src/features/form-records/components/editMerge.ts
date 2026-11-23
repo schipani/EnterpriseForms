@@ -113,3 +113,60 @@ export function mergeEdits(base: EditSnapshot, mine: EditSnapshot, theirs: EditS
   }
   return { values, groups, reapplied, conflicts, sectionConflicts };
 }
+
+/** A change this person made that the reloaded layout cannot take; it is shown to them, never sent or silently dropped. */
+export interface WithheldChange {
+  fieldKey: string;
+  mine: string;
+}
+
+export interface LayoutMergeResult extends MergeResult {
+  /** Field changes the new layout cannot carry (the field was removed, made read-only, hidden from the form or unshared). */
+  withheld: WithheldChange[];
+  /** Repeating sections changed by this person that the new layout no longer places. */
+  withheldSections: string[];
+}
+
+/**
+ * Phase C9 (D9-5): after reloading onto a different edit layout, a change to a field or repeating section that layout can
+ * no longer accept is withheld instead of being silently dropped by the save: the form shows the latest saved value for
+ * it, it is neither sent nor counted as carried over, and the person is told what they had entered. Values are matched by
+ * the field's permanent key, so nothing is ever applied to a different field.
+ */
+export function withholdUnaccepted(merge: MergeResult, base: EditSnapshot, mine: EditSnapshot, theirs: EditSnapshot, targets: { fieldKeys: ReadonlySet<string>; groupKeys: ReadonlySet<string> }): LayoutMergeResult {
+  const values: ValueMap = { ...merge.values };
+  const withheld: WithheldChange[] = [];
+  const fieldKeys = [...new Set([...Object.keys(base.values), ...Object.keys(mine.values)])].sort();
+  for (const key of fieldKeys) {
+    const m = value(mine.values, key);
+    if (m === value(base.values, key) || targets.fieldKeys.has(key)) {
+      continue;
+    }
+    withheld.push({ fieldKey: key, mine: m });
+    if (key in theirs.values) {
+      values[key] = theirs.values[key]!;
+    } else {
+      delete values[key];
+    }
+  }
+  const groups: GroupValueMap = { ...merge.groups };
+  const withheldSections: string[] = [];
+  const groupKeys = [...new Set([...Object.keys(base.groups), ...Object.keys(mine.groups)])].sort();
+  for (const key of groupKeys) {
+    if (sectionSignature(mine.groups, key) === sectionSignature(base.groups, key) || targets.groupKeys.has(key)) {
+      continue;
+    }
+    withheldSections.push(key);
+    groups[key] = theirs.groups[key] ?? [];
+  }
+  const dropped = new Set([...withheld.map((item) => item.fieldKey), ...withheldSections]);
+  return {
+    values,
+    groups,
+    reapplied: merge.reapplied.filter((key) => !dropped.has(key)),
+    conflicts: merge.conflicts.filter((item) => !dropped.has(item.fieldKey)),
+    sectionConflicts: merge.sectionConflicts.filter((key) => !dropped.has(key)),
+    withheld,
+    withheldSections,
+  };
+}

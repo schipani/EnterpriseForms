@@ -17,6 +17,7 @@ import { FormAccessPanel } from "../components/FormAccessPanel";
 import { GridOperationDialog } from "../components/GridOperationDialog";
 import { RemoveSectionDialog } from "../components/RemoveSectionDialog";
 import { RenameFormDialog, type RenameFormTarget } from "../components/RenameFormDialog";
+import { VERSION_BEHAVIOR_COPY, VersionBehaviorDialog, isVersionBehavior, type VersionBehaviorTarget } from "../components/VersionBehaviorDialog";
 
 type View = "design" | "fields" | "rules" | "preview" | "versions" | "settings" | "access" | "relationships";
 
@@ -112,6 +113,9 @@ export function DesignerPage() {
   const [positionsWarning, setPositionsWarning] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<RenameFormTarget | null>(null);
   const [renamedNotice, setRenamedNotice] = useState<string | null>(null);
+  // Phase C9: the form's version behaviour (which published layout records are shown and edited with).
+  const [behaviorTarget, setBehaviorTarget] = useState<VersionBehaviorTarget | null>(null);
+  const [behaviorNotice, setBehaviorNotice] = useState<string | null>(null);
   const announce = useCallback((message: string) => setAnnouncement((current) => (current === message ? `${message} ` : message)), []);
 
   const resetHistory = () => {
@@ -361,6 +365,7 @@ export function DesignerPage() {
   const form = detail.data;
   const canDesign = form.summary.canDesign;
   const openRename = () => setRenameTarget({ formDefinitionId, formDefinitionName: form.summary.formDefinitionName, formDefinitionRevision: form.summary.formDefinitionRevision });
+  const currentBehavior = isVersionBehavior(form.summary.versionBehavior) ? form.summary.versionBehavior : "Latest";
   const rendererFields: RendererField[] = form.fields.map((field) => ({ fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDisplayName: field.fieldDisplayName, fieldDataType: field.fieldDataType, optionSelectionMode: field.optionSelectionMode, options: field.options.map((option) => ({ ...option, optionSortOrder: Number(option.optionSortOrder) })), applicationEncrypted: field.fieldProtectionMode === "ApplicationEncrypted", groupDefinitionId: field.groupDefinitionId ?? null }));
   const relationships = form.relationships.map((relationship) => ({ formRelationshipDefinitionId: relationship.formRelationshipDefinitionId, relationshipDisplayName: relationship.relationshipDisplayName, childFormDefinitionName: relationship.childFormDefinitionName }));
   const dirty = layout !== null && serializeLayout(layout) !== baseJson;
@@ -828,6 +833,22 @@ export function DesignerPage() {
                 </Button>
               ) : null}
             </dd>
+            <dt className="font-medium">Record layout</dt>
+            <dd className="flex flex-wrap items-center gap-2">
+              <span>{VERSION_BEHAVIOR_COPY[currentBehavior].label}</span>
+              {canDesign ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={ActionIcons.edit}
+                  aria-label="Change record layout"
+                  onClick={() => setBehaviorTarget({ formDefinitionId, formDefinitionName: form.summary.formDefinitionName, formDefinitionRevision: form.summary.formDefinitionRevision, versionBehavior: currentBehavior })}
+                >
+                  Change
+                </Button>
+              ) : null}
+              <span className="basis-full text-muted">{VERSION_BEHAVIOR_COPY[currentBehavior].summary}</span>
+            </dd>
             <dt className="font-medium">Description</dt>
             <dd>{form.summary.formDefinitionDescription || <span className="text-muted">None</span>}</dd>
             <dt className="font-medium">Current version</dt>
@@ -941,6 +962,19 @@ export function DesignerPage() {
         {announcement}
       </div>
       {parseError ? <StatusMessage tone="danger" title="The stored layout could not be parsed">{parseError}</StatusMessage> : null}
+      {behaviorNotice !== null ? (
+        <StatusMessage
+          tone="success"
+          title="Record layout changed"
+          actions={
+            <Button size="sm" variant="ghost" onClick={() => setBehaviorNotice(null)}>
+              Dismiss
+            </Button>
+          }
+        >
+          {behaviorNotice} Record values, published versions and permissions are unchanged.
+        </StatusMessage>
+      ) : null}
       {renamedNotice !== null ? (
         <StatusMessage
           tone="success"
@@ -994,6 +1028,7 @@ export function DesignerPage() {
         }))}
       />
       <RenameFormDialog target={renameTarget} onClose={() => setRenameTarget(null)} onRenamed={setRenamedNotice} />
+      <VersionBehaviorDialog target={behaviorTarget} onClose={() => setBehaviorTarget(null)} onChanged={(behavior) => setBehaviorNotice(VERSION_BEHAVIOR_COPY[behavior].summary)} />
       {configTarget && inspectorProps ? <FieldConfigModal {...inspectorProps} open configKey={configTarget.key} initialTab={configTarget.tab} onClose={() => setConfigTarget(null)} /> : null}
 
       {removeSectionIndex !== null && layout ? (

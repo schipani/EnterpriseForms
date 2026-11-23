@@ -3,7 +3,7 @@ import { OperationError } from "@enterpriseforms/work-queue";
 import { describe, expect, it } from "vitest";
 import { UploadManager } from "./uploadManager";
 
-function fakeApi(script: { failChunk?: number; verdict?: "Clean" | "Infected"; conflictOnce?: boolean; chunkDelayMs?: number }) {
+function fakeApi(script: { failChunk?: number; verdict?: "Clean" | "Infected"; conflictOnce?: boolean; chunkDelayMs?: number; layoutChanged?: boolean }) {
   const calls: string[] = [];
   const beginRequests: unknown[] = [];
   const state = { received: new Set<number>(), state: "Open" as string, polls: 0, conflicted: false, chunkDelayMs: script.chunkDelayMs ?? 0 };
@@ -30,6 +30,9 @@ function fakeApi(script: { failChunk?: number; verdict?: "Clean" | "Infected"; c
       begin: async (request: unknown) => {
         calls.push("begin");
         beginRequests.push(request);
+        if (script.layoutChanged) {
+          throw new OperationError({ type: "failed", operationId: "x", status: 409, errorCode: "EDIT_LAYOUT_CHANGED", retryable: false, problem: { title: "conflict", detail: "the form layout this record is edited with has changed" } });
+        }
         return { result: session("s1", 10), status: 201 };
       },
       chunk: async (_id: string, index: number) => {
@@ -147,6 +150,27 @@ describe("UploadManager (ADR-PB-007 transfer ≠ commit)", () => {
     await waitFor(() => manager.snapshot()[0]?.phase === "Ready");
     expect(beginRequests[0]).toMatchObject({ replacesFileAttachmentId: "att-1", formRecordId: "rec", fieldDefinitionId: "fld" });
     expect(manager.snapshot()[0]?.replacesFileAttachmentId).toBe("att-1");
+  });
+
+  it("sends the edit layout the page showed the upload policy for (C9 D9-5)", async () => {
+    const { api, beginRequests } = fakeApi({});
+    const manager = new UploadManager(api, { pollIntervalMs: 5 });
+    manager.enqueue([new File([new Uint8Array(10)], "a.bin")], { formRecordId: "rec", fieldDefinitionId: "fld", expectedLayoutVersionId: "layout-2" });
+    await waitFor(() => manager.snapshot()[0]?.phase === "Ready");
+    expect(beginRequests[0]).toMatchObject({ expectedLayoutVersionId: "layout-2" });
+  });
+
+  it("does not retry an upload refused because the form layout changed: the file must be chosen again after a reload", async () => {
+    const { api, calls } = fakeApi({ layoutChanged: true });
+    const manager = new UploadManager(api, { pollIntervalMs: 5 });
+    const [id] = manager.enqueue([new File([new Uint8Array(10)], "a.bin")], { formRecordId: "rec", fieldDefinitionId: "fld", expectedLayoutVersionId: "layout-1" });
+    await waitFor(() => manager.snapshot()[0]?.phase === "Failed");
+    expect(manager.snapshot()[0]).toMatchObject({ errorCode: "EDIT_LAYOUT_CHANGED", hasBytes: false });
+    expect(manager.snapshot()[0]?.errorDetail).toMatch(/Reload the record and choose the file again/);
+    manager.retry(id!);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(calls.filter((call) => call === "begin")).toHaveLength(1);
+    expect(manager.snapshot()[0]?.phase).toBe("Failed");
   });
 
   it("limits concurrency to two active transfers per user", async () => {

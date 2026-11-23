@@ -7,6 +7,7 @@ using EnterpriseForms.Application.Features.FormRecords.Projection;
 using EnterpriseForms.Contracts.Features;
 using EnterpriseForms.Domain.Features.Audit;
 using EnterpriseForms.Domain.Features.Documents;
+using EnterpriseForms.Domain.Features.FormDefinitions;
 
 namespace EnterpriseForms.Application.Features.FormRecords.GetFormRecord;
 
@@ -25,10 +26,18 @@ public sealed class GetFormRecordHandler(VerifiedRecordReader reader, IBusinessS
 /// <summary>Verified read with layout, field metadata, authorized documents and permitted actions for the UI (PG-016).</summary>
 public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBusinessStore store, IAuthorizationAuthorityClient authority, TimeProvider clock)
 {
-    public async Task<RecordProjectionResponse> HandleAsync(RequestContext context, Guid formRecordId, CancellationToken cancellationToken)
+    public Task<RecordProjectionResponse> HandleAsync(RequestContext context, Guid formRecordId, CancellationToken cancellationToken) =>
+        HandleAsync(context, formRecordId, RecordLayoutPurpose.View, cancellationToken);
+
+    /// <summary>
+    /// Phase C9: <paramref name="purpose"/> selects the layout returned — the view layout for the record page, the edit layout
+    /// for the editor (CLAUDE.md §3; Hybrid differs). Access is the same Read decision either way; an unavailable edit layout
+    /// fails closed (409 EDIT_LAYOUT_UNAVAILABLE). The response always reports the current edit layout id for the D9-5 guard.
+    /// </summary>
+    public async Task<RecordProjectionResponse> HandleAsync(RequestContext context, Guid formRecordId, RecordLayoutPurpose purpose, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var verified = await reader.ReadAsync(context, formRecordId, ProtectedAction.Read, cancellationToken).ConfigureAwait(false);
+        var verified = await reader.ReadAsync(context, formRecordId, ProtectedAction.Read, purpose, cancellationToken).ConfigureAwait(false);
         var user = context.ToDelegatedUser();
         var decisions = await authority.CheckPermissionsBatchAsync(user,
         [
@@ -99,7 +108,12 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
             summary,
             sharedAccess,
             // Phase C6 M1: status from the Authority-verified signed header (also for a partial projection); transitions only for the owner.
-            new RecordLifecycleStateResponse(verified.Header.RecordStatus, verified.Header.SubmittedOn, verified.IsComplete ? Lifecycle.RecordLifecycle.AllowedFor(verified.Header.RecordStatus) : [], Lifecycle.RecordLifecycle.IsContentEditable(verified.Header.RecordStatus)));
+            new RecordLifecycleStateResponse(verified.Header.RecordStatus, verified.Header.SubmittedOn, verified.IsComplete ? Lifecycle.RecordLifecycle.AllowedFor(verified.Header.RecordStatus) : [], Lifecycle.RecordLifecycle.IsContentEditable(verified.Header.RecordStatus)),
+            verified.Definition.VersionBehavior,
+            verified.LayoutPurpose.ToString(),
+            verified.CreatedFormVersionNumber,
+            verified.EditLayoutVersion?.FormVersionId,
+            verified.EditLayoutVersion?.VersionNumber);
     }
 
     /// <summary>

@@ -31,6 +31,16 @@ public static class FormDesignerEndpoints
             .WithName("RenameFormDefinition")
             .WithSummary("Renames a form (display name only; no new version). Requires the Authority design permission on the form (404 otherwise); 409 FORM_DEFINITION_MODIFIED_CONCURRENTLY when expectedFormDefinitionRevision is stale; 422 for an empty, over-long or control-character name; audited (FORM_RENAMED).");
 
+        group.MapPut("/{formDefinitionId:guid}/version-behavior", static async Task<Ok<FormDefinitionDetailResponse>> (Guid formDefinitionId, ChangeVersionBehaviorRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.ChangeVersionBehaviorAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, request, cancellationToken).ConfigureAwait(false)))
+            .WithName("ChangeFormVersionBehavior")
+            .WithSummary("Phase C9: sets which published layout the form's records are viewed and edited with (Historical, Latest or Hybrid). Business metadata only: no record, value, version or permission changes. Requires the Authority design permission on the form (404 otherwise); 409 FORM_DEFINITION_MODIFIED_CONCURRENTLY when expectedFormDefinitionRevision is stale; 422 for an unknown behaviour or a change reason outside 3-500 characters; audited (FORM_VERSION_BEHAVIOR_CHANGED) in the same transaction. Re-sending the current behaviour changes nothing.");
+
+        group.MapGet("/{formDefinitionId:guid}/version-behavior-impact", static async Task<Ok<VersionBehaviorImpactResponse>> (Guid formDefinitionId, string? target, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.PreviewVersionBehaviorImpactAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, target, cancellationToken).ConfigureAwait(false)))
+            .WithName("PreviewFormVersionBehaviorImpact")
+            .WithSummary("Phase C9: approximate record-level impact of switching to target (Historical, Latest or Hybrid), counted only over records the caller can discover (Authority lookup); no field values are inspected or counted. Requires the Authority design permission on the form (404 otherwise); 422 for an unknown target.");
+
         group.MapPost("/designer", static async Task<Created<FormDefinitionDetailResponse>> (CreateFormDefinitionV2Request request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
             {
                 var response = await handlers.CreateAsync(BusinessAuthentication.RequireContext(http), request, FormDefinitionEndpoints.RequireIdempotencyKey(http), cancellationToken).ConfigureAwait(false);

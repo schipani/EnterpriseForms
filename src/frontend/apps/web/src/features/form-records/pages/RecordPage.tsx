@@ -11,6 +11,7 @@ import { ChildRecordList } from "../../related-forms";
 import { RecordAccessPanel } from "../../sharing";
 import { ErrorPanel } from "../../support";
 import { CopyReference } from "../components/CopyReference";
+import { ViewLayoutNotice, layoutBadgeText } from "../components/VersionLayoutNotice";
 import { LifecycleActions } from "../components/LifecycleActions";
 import { RecordHistory } from "../components/RecordHistory";
 import { formatDateTime, recordStatusLabel } from "../components/recordList";
@@ -59,7 +60,7 @@ export function RecordPage() {
 
   const renderDocuments = (element: DocumentElement) => {
     const field = data.fields.find((candidate) => candidate.fieldDefinitionId === element.fieldDefinitionId);
-    return <DocumentCollection key={element.fieldDefinitionId} formRecordId={formRecordId} fieldDefinitionId={element.fieldDefinitionId} label={element.label || field?.fieldDisplayName || "Documents"} documents={data.documents.filter((document) => document.fieldDefinitionId === element.fieldDefinitionId)} policy={element.upload} canEdit={data.permissions.canEdit && contentEditable} contentRevision={Number(data.record.contentRevision)} onChanged={() => void projection.refetch()} />;
+    return <DocumentCollection key={element.fieldDefinitionId} formRecordId={formRecordId} fieldDefinitionId={element.fieldDefinitionId} label={element.label || field?.fieldDisplayName || "Documents"} documents={data.documents.filter((document) => document.fieldDefinitionId === element.fieldDefinitionId)} policy={element.upload} canEdit={data.permissions.canEdit && contentEditable} contentRevision={Number(data.record.contentRevision)} editLayoutVersionId={data.editLayoutVersionId ?? null} onChanged={() => void projection.refetch()} />;
   };
 
   return (
@@ -193,9 +194,12 @@ function RecordSummary({ data }: { data: RecordProjectionResponse }) {
       <div className="mb-3 flex flex-wrap gap-2">
         <Badge tone={data.record.integrityStatus === "Verified" ? "success" : "danger"}>Integrity: {data.record.integrityStatus}</Badge>
         <Badge tone="neutral">Revision {String(data.record.contentRevision)}</Badge>
-        <Badge tone="neutral">Layout v{data.layoutVersion.versionNumber}</Badge>
+        <Badge tone="neutral">{layoutBadgeText(data)}</Badge>
         <Badge tone={data.lifecycle?.status === "Archived" ? "warning" : data.lifecycle?.status === "Submitted" ? "info" : "neutral"}>{recordStatusLabel(data.lifecycle?.status ?? data.record.recordStatus)}</Badge>
         {!complete ? <Badge tone="warning">Partial view (shared fields only)</Badge> : null}
+      </div>
+      <div className="mb-3 empty:hidden">
+        <ViewLayoutNotice projection={data} canEdit={data.permissions.canEdit && data.lifecycle?.contentEditable !== false} />
       </div>
       <DescriptionList
         items={[

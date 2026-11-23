@@ -29,6 +29,18 @@ public sealed record VerifiedRecord(
     IReadOnlyList<GroupDefinition> Groups,
     IReadOnlyList<StagedContentItem> ObservedItems)
 {
+    /// <summary>Phase C9: whether <see cref="LayoutVersion"/> is the record's view layout or its edit layout (CLAUDE.md §3).</summary>
+    public RecordLayoutPurpose LayoutPurpose { get; init; } = RecordLayoutPurpose.View;
+
+    /// <summary>
+    /// Phase C9: the version an edit of this record is validated against now. For an edit read it is <see cref="LayoutVersion"/>;
+    /// for a view read it is resolved as well, and is null when no edit layout is available (editing then fails closed).
+    /// </summary>
+    public FormVersion? EditLayoutVersion { get; init; }
+
+    /// <summary>Phase C9: number of the version the record was created with (the signed header's version id), when that version exists.</summary>
+    public int? CreatedFormVersionNumber { get; init; }
+
     public IReadOnlyDictionary<Guid, FieldDefinition> FieldsById => Fields.ToDictionary(f => f.FieldDefinitionId);
 
     public IReadOnlyDictionary<Guid, FieldOption> OptionsById => Options.ToDictionary(o => o.FieldOptionId);
@@ -95,8 +107,17 @@ public static class RecordGroupProjection
 /// </summary>
 public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAuthorityClient authority, RecordCandidateStager stager, Encryption.IFieldEncryptionService encryption, SecurityOperations.Incidents.ISecurityIncidentRecorder incidents)
 {
+    /// <summary>Verified read; the layout is the edit layout for <see cref="ProtectedAction.Edit"/> and the view layout otherwise (Phase C9).</summary>
     public Task<VerifiedRecord> ReadAsync(RequestContext context, Guid formRecordId, ProtectedAction action, CancellationToken cancellationToken) =>
-        ReadCoreAsync(context, formRecordId, action, null, cancellationToken);
+        ReadCoreAsync(context, formRecordId, action, action == ProtectedAction.Edit ? RecordLayoutPurpose.Edit : RecordLayoutPurpose.View, null, cancellationToken);
+
+    /// <summary>
+    /// Phase C9: verified read whose layout is chosen for <paramref name="purpose"/> independently of the Authority action
+    /// (the edit page reads with <see cref="ProtectedAction.Read"/> but needs the edit layout). An unavailable edit layout fails
+    /// closed with 409 EDIT_LAYOUT_UNAVAILABLE.
+    /// </summary>
+    public Task<VerifiedRecord> ReadAsync(RequestContext context, Guid formRecordId, ProtectedAction action, RecordLayoutPurpose purpose, CancellationToken cancellationToken) =>
+        ReadCoreAsync(context, formRecordId, action, purpose, null, cancellationToken);
 
     /// <summary>
     /// Phase C6 M2: verified read of one earlier accepted revision. <paramref name="historicOperationId"/> must come from the
@@ -105,9 +126,9 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
     /// current head are not touched. On any mismatch nothing is released (and, AC-4, the Authority quarantines the record).
     /// </summary>
     public Task<VerifiedRecord> ReadHistoricAsync(RequestContext context, Guid formRecordId, Guid historicOperationId, CancellationToken cancellationToken) =>
-        ReadCoreAsync(context, formRecordId, ProtectedAction.Read, historicOperationId, cancellationToken);
+        ReadCoreAsync(context, formRecordId, ProtectedAction.Read, RecordLayoutPurpose.View, historicOperationId, cancellationToken);
 
-    private async Task<VerifiedRecord> ReadCoreAsync(RequestContext context, Guid formRecordId, ProtectedAction action, Guid? historicOperationId, CancellationToken cancellationToken)
+    private async Task<VerifiedRecord> ReadCoreAsync(RequestContext context, Guid formRecordId, ProtectedAction action, RecordLayoutPurpose purpose, Guid? historicOperationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         var user = context.ToDelegatedUser();
@@ -164,6 +185,8 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
 
         FormDefinition definition;
         FormVersion version;
+        FormVersion? editVersion;
+        int? createdVersionNumber;
         List<FieldDefinition> fields;
         List<FieldOption> options;
         List<GroupDefinition> groups;
@@ -171,10 +194,11 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
         {
             definition = await scope.FindFormDefinitionAsync(context.OrganizationId, staged.Header.FormDefinitionId, cancellationToken).ConfigureAwait(false)
                          ?? throw new BusinessException("NOT_FOUND", 404, "form definition missing");
-            var versionId = definition.VersionBehavior == "Historical" ? staged.Header.CreatedFormVersionId : definition.CurrentFormVersionId ?? staged.Header.CreatedFormVersionId;
-            version = await scope.FindFormVersionAsync(versionId, cancellationToken).ConfigureAwait(false)
-                      ?? await scope.FindFormVersionAsync(staged.Header.CreatedFormVersionId, cancellationToken).ConfigureAwait(false)
-                      ?? throw new BusinessException("NOT_FOUND", 404, "form version missing");
+            // Phase C9 (CLAUDE.md §3): the view or edit layout of the form's version behaviour; an unavailable edit layout fails closed.
+            var selection = await RecordLayoutSelection.SelectAsync(definition, staged.Header.CreatedFormVersionId, purpose, id => scope.FindFormVersionAsync(id, cancellationToken)).ConfigureAwait(false);
+            version = selection.Layout;
+            editVersion = selection.EditLayout;
+            createdVersionNumber = selection.CreatedVersionNumber;
             fields = await scope.GetFieldDefinitionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
             options = await scope.GetFieldOptionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
             groups = await scope.GetGroupDefinitionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
@@ -194,6 +218,85 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
             }
         }
 
-        return new VerifiedRecord(head, verification, staged.Header, staged.Rows, authorizedRows, definition, version, FormLayoutCodec.Parse(version.LayoutJson), fields, options, encryption, groups, staged.Items);
+        return new VerifiedRecord(head, verification, staged.Header, staged.Rows, authorizedRows, definition, version, FormLayoutCodec.Parse(version.LayoutJson), fields, options, encryption, groups, staged.Items)
+        {
+            LayoutPurpose = purpose,
+            EditLayoutVersion = editVersion,
+            CreatedFormVersionNumber = createdVersionNumber,
+        };
+    }
+}
+
+/// <summary>The layouts chosen for one record read (Phase C9).</summary>
+public sealed record RecordLayoutSelectionResult(FormVersion Layout, FormVersion? EditLayout, int? CreatedVersionNumber);
+
+/// <summary>
+/// Phase C9 (CLAUDE.md §3; D9-1, D9-6): chooses the record's layout for a purpose with <see cref="FormVersionResolution"/>.
+/// Historical views and edits with the created version, Latest with the current version, Hybrid views with the created
+/// version and edits with the current one. A version row counts only when it belongs to the record's form. The edit layout
+/// is never substituted: an unresolvable, missing or foreign edit version is 409 EDIT_LAYOUT_UNAVAILABLE for an edit read
+/// (and reported as null for a view read). The view keeps the earlier tolerant fallback to the created version.
+/// </summary>
+public static class RecordLayoutSelection
+{
+    public static async Task<RecordLayoutSelectionResult> SelectAsync(FormDefinition definition, Guid createdFormVersionId, RecordLayoutPurpose purpose, Func<Guid, Task<FormVersion?>> findVersion)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(findVersion);
+        var found = new Dictionary<Guid, FormVersion?>();
+        async Task<FormVersion?> OwnAsync(Guid? id)
+        {
+            if (id is not { } versionId)
+            {
+                return null;
+            }
+
+            if (!found.TryGetValue(versionId, out var version))
+            {
+                var row = await findVersion(versionId).ConfigureAwait(false);
+                found[versionId] = version = row is not null && row.FormDefinitionId == definition.FormDefinitionId ? row : null;
+            }
+
+            return version;
+        }
+
+        var created = await OwnAsync(createdFormVersionId).ConfigureAwait(false);
+        var edit = await OwnAsync(FormVersionResolution.Resolve(definition.VersionBehavior, RecordLayoutPurpose.Edit, createdFormVersionId, definition.CurrentFormVersionId)).ConfigureAwait(false);
+        FormVersion layout;
+        if (purpose == RecordLayoutPurpose.Edit)
+        {
+            layout = edit ?? throw new BusinessException("EDIT_LAYOUT_UNAVAILABLE", 409, "the form version this record is edited with is not available; nothing was changed");
+        }
+        else
+        {
+            layout = await OwnAsync(FormVersionResolution.Resolve(definition.VersionBehavior, RecordLayoutPurpose.View, createdFormVersionId, definition.CurrentFormVersionId)).ConfigureAwait(false)
+                     ?? created
+                     ?? throw new BusinessException("NOT_FOUND", 404, "form version missing");
+        }
+
+        return new RecordLayoutSelectionResult(layout, edit, created?.VersionNumber);
+    }
+}
+
+/// <summary>
+/// Phase C9 (D9-5): a write made against an edit layout that is no longer the record's edit layout (a version was published,
+/// or the form's version behaviour changed, after the editor opened the record) is refused with 409 EDIT_LAYOUT_CHANGED,
+/// so the user reloads. The expectation is optional on the wire (a client that omits it is validated against the current
+/// edit layout, as before); the web application always sends it.
+/// </summary>
+public static class EditLayoutGuard
+{
+    public static void Require(VerifiedRecord verified, Guid? expectedLayoutVersionId)
+    {
+        ArgumentNullException.ThrowIfNull(verified);
+        if (verified.LayoutPurpose != RecordLayoutPurpose.Edit)
+        {
+            throw new InvalidOperationException("the edit-layout guard needs a record read for editing");
+        }
+
+        if (expectedLayoutVersionId is { } expected && expected != verified.LayoutVersion.FormVersionId)
+        {
+            throw new BusinessException("EDIT_LAYOUT_CHANGED", 409, "the form layout this record is edited with has changed; reload the record and try again");
+        }
     }
 }

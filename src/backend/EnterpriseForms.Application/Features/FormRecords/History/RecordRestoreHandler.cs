@@ -76,7 +76,8 @@ public sealed class RecordRestoreHandler(VerifiedRecordReader reader, IBusinessS
         var names = await NamesAsync(context, cancellationToken).ConfigureAwait(false);
         return new RestorePreviewResponse(formRecordId, RecordHistoryHandler.ToItem(loaded.Entry, names, new Dictionary<long, (string, Guid?, string)>()), loaded.Entry.CommittedOperationId,
             current.Head.CommittedContentRevision, current.ETag, current.Header.RecordStatus, blockedCode is null, blockedCode, blocked, plan.HasChanges,
-            plan.Fields, plan.Sections, current.AuthorizedAttachments.Count(), current.Layout.Elements.Any(e => e.Kind == LayoutElementKinds.RelatedFormList), validation, plan.PlaintextAcknowledgementFieldKeys);
+            plan.Fields, plan.Sections, current.AuthorizedAttachments.Count(), current.Layout.Elements.Any(e => e.Kind == LayoutElementKinds.RelatedFormList), validation, plan.PlaintextAcknowledgementFieldKeys,
+            current.LayoutVersion.FormVersionId, current.LayoutVersion.VersionNumber);
     }
 
     public async Task<RecordRestoreResponse> RestoreAsync(RequestContext context, Guid formRecordId, long contentRevision, RecordRestoreRequest request, string idempotencyKey, CancellationToken cancellationToken)
@@ -105,6 +106,9 @@ public sealed class RecordRestoreHandler(VerifiedRecordReader reader, IBusinessS
         {
             throw new BusinessException("CONTENT_REVISION_CONFLICT", 409, "the record changed since you reviewed the restore; review it again");
         }
+
+        // Phase C9 (D9-5, D9-6): restore validates against the record's edit layout; the one the preview showed must still be it.
+        EditLayoutGuard.Require(current, request.ExpectedLayoutVersionId);
 
         var loaded = await LoadSourceAsync(context, formRecordId, contentRevision, request.SourceOperationId, current, cancellationToken).ConfigureAwait(false);
         var plan = loaded.Plan;

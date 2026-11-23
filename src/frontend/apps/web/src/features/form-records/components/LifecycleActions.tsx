@@ -106,12 +106,20 @@ function LifecycleDialog({ copy, formRecordId, data, onClose, onDone }: { copy: 
           expectedContentRevision: Number(data.record.contentRevision),
           expectedStatus: data.lifecycle?.status ?? null,
           reason: reason.trim() === "" ? null : reason.trim(),
+          // Phase C9 (D9-5): Submit validates against the record's edit layout; a newer one since this page loaded is refused.
+          expectedLayoutVersionId: copy.transition === "submit" ? (data.editLayoutVersionId ?? null) : null,
         })
         .then((r) => r.result),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["records"] });
       onClose();
       onDone(copy.done);
+    },
+    onError: async (error) => {
+      // The layout changed under the page: refresh it so a retry validates against the current edit layout.
+      if (presentError(error).code === "EDIT_LAYOUT_CHANGED") {
+        await queryClient.invalidateQueries({ queryKey: ["records"] });
+      }
     },
   });
   const presented = mutation.isError ? presentError(mutation.error) : null;

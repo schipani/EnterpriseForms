@@ -6,8 +6,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { ErrorPanel } from "../../support";
-import { isDirty, mergeEdits, type EditSnapshot, type FieldConflict } from "../components/editMerge";
-import { layoutValues, parseProjectionLayout, toGroupInfos, toGroups, toRendererFields, toValueMap } from "../components/recordModel";
+import { isDirty, mergeEdits, withholdUnaccepted, type EditSnapshot, type FieldConflict } from "../components/editMerge";
+import { editableTargets, layoutValues, parseProjectionLayout, toGroupInfos, toGroups, toRendererFields, toValueMap } from "../components/recordModel";
+import { EditLayoutNotice } from "../components/VersionLayoutNotice";
 
 /** The version of the record this editing session is based on: layout, fields and values all come from it (C-31). */
 interface EditBase {
@@ -17,6 +18,9 @@ interface EditBase {
 
 interface MergeReport {
   reapplied: number;
+  /** Phase C9: changes the reloaded layout cannot take, with the label and value as this person saw them before the reload. */
+  withheld: Array<{ label: string; mine: string }>;
+  withheldSections: string[];
   conflicts: FieldConflict[];
   sectionConflicts: string[];
 }
@@ -50,7 +54,8 @@ export function EditRecordPage() {
   const api = useApi();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const projection = useQuery({ queryKey: ["records", "projection", formRecordId], queryFn: () => api.records.projection(formRecordId).then((r) => r.result) });
+  // Phase C9: the editor reads the edit layout of the form's version behaviour (Hybrid views and edits with different versions).
+  const projection = useQuery({ queryKey: ["records", "projection", formRecordId, "edit"], queryFn: ({ signal }) => api.records.projection(formRecordId, signal, "edit").then((r) => r.result) });
   const [base, setBase] = useState<EditBase | null>(null);
   const [values, setValues] = useState<ValueMap>({});
   const [groups, setGroups] = useState<GroupValueMap>({});
@@ -85,7 +90,9 @@ export function EditRecordPage() {
 
   const update = useMutation({
     // Every repeating section is sent as its complete entry list (stable ids kept, new entries without one, removed ones omitted).
-    mutationFn: (payload: { revision: number; values: Record<string, string>; groups: RecordGroupPayload[] }) => api.records.update(formRecordId, { expectedContentRevision: payload.revision, values: payload.values, groups: payload.groups }).then((r) => r.result),
+    // Phase C9 (D9-5): the edit layout the values were prepared with travels along; a different current one is refused (409).
+    mutationFn: (payload: { revision: number; layoutVersionId: string; values: Record<string, string>; groups: RecordGroupPayload[] }) =>
+      api.records.update(formRecordId, { expectedContentRevision: payload.revision, expectedLayoutVersionId: payload.layoutVersionId, values: payload.values, groups: payload.groups }).then((r) => r.result),
     onSuccess: async () => {
       leaving.current = true;
       await queryClient.invalidateQueries({ queryKey: ["records"] });
@@ -159,7 +166,9 @@ export function EditRecordPage() {
   const presented = update.isError ? presentError(update.error) : null;
   // A locked record (submitted or archived in the meantime) is a different answer from "someone else saved": no merge helps.
   const lockedNow = presented?.code === "RECORD_NOT_EDITABLE";
-  const conflict = presented?.kind === "conflict" && !lockedNow;
+  // Phase C9 (D9-5): a new edit layout (a version published, or the version behaviour changed) is not "someone else saved".
+  const layoutChanged = presented?.code === "EDIT_LAYOUT_CHANGED";
+  const conflict = presented?.kind === "conflict" && !lockedNow && !layoutChanged;
   const applyRules = data.permissions.isCompleteProjection;
   const infos = toGroupInfos(data.record.groups);
   const unresolved = report?.conflicts ?? [];
@@ -191,10 +200,10 @@ export function EditRecordPage() {
         setNothingToSave(true);
         return;
       }
-      update.mutate({ revision: Number(data.record.contentRevision), values: changed, groups: [] });
+      update.mutate({ revision: Number(data.record.contentRevision), layoutVersionId: data.layoutVersion.formVersionId, values: changed, groups: [] });
       return;
     }
-    update.mutate({ revision: Number(data.record.contentRevision), values: layoutValues(layout, fields, values, base.snapshot.values, applyRules), groups: groupPayload(layout, fields, values, groups, infos, applyRules) });
+    update.mutate({ revision: Number(data.record.contentRevision), layoutVersionId: data.layoutVersion.formVersionId, values: layoutValues(layout, fields, values, base.snapshot.values, applyRules), groups: groupPayload(layout, fields, values, groups, infos, applyRules) });
   };
 
   const loadLatest = async (keepMine: boolean) => {
@@ -206,10 +215,23 @@ export function EditRecordPage() {
       }
       const next = baseOf(latest.data);
       if (keepMine) {
-        const merged = mergeEdits(base.snapshot, { values, groups }, next.snapshot);
+        const mine = { values, groups };
+        // Phase C9 (D9-5): the latest version may come with another edit layout; what it cannot take is withheld and shown.
+        const nextLayout = parseProjectionLayout(latest.data).layout;
+        const nextShared = !latest.data.permissions.isCompleteProjection;
+        const targets = nextLayout
+          ? editableTargets(nextLayout, toRendererFields(latest.data.fields), toGroupInfos(latest.data.record.groups), nextShared ? new Set((latest.data.sharedFieldAccess ?? []).filter((item) => item.editable).map((item) => item.fieldKey)) : null)
+          : { fieldKeys: new Set<string>(), groupKeys: new Set<string>() };
+        const merged = withholdUnaccepted(mergeEdits(base.snapshot, mine, next.snapshot), base.snapshot, mine, next.snapshot, targets);
         setValues(merged.values);
         setGroups(merged.groups);
-        setReport({ reapplied: merged.reapplied.length, conflicts: merged.conflicts, sectionConflicts: merged.sectionConflicts });
+        setReport({
+          reapplied: merged.reapplied.length,
+          conflicts: merged.conflicts,
+          sectionConflicts: merged.sectionConflicts,
+          withheld: merged.withheld.map((item) => ({ label: labelForKey(layout, fields, item.fieldKey), mine: shown(layout, fields, item.fieldKey, item.mine) })),
+          withheldSections: merged.withheldSections.map((key) => sectionTitle(layout, infos, key)),
+        });
       } else {
         setValues(next.snapshot.values);
         setGroups(next.snapshot.groups);
@@ -245,6 +267,7 @@ export function EditRecordPage() {
   return (
     <>
       <PageHeader title={shared ? `Edit shared fields — ${data.formDefinitionName}` : `Edit ${data.formDefinitionName}`} lead={`Editing content revision ${String(data.record.contentRevision)} with layout v${data.layoutVersion.versionNumber}.`} />
+      <EditLayoutNotice projection={data} />
       {shared ? (
         <div className="mb-4">
           <StatusMessage tone="info" title={`You can change ${editableKeys.size} shared ${editableKeys.size === 1 ? "field" : "fields"}`}>
@@ -271,7 +294,24 @@ export function EditRecordPage() {
         }}
       >
         <div ref={summaryRef} tabIndex={-1} className="flex flex-col gap-3 outline-none">
-          {conflict ? (
+          {layoutChanged ? (
+            <StatusMessage
+              tone="warning"
+              title="The form layout changed while you were editing"
+              actions={
+                <>
+                  <Button size="sm" busy={reloading} onClick={() => void loadLatest(true)}>
+                    Reload with the new layout and keep my changes
+                  </Button>
+                  <Button size="sm" variant="secondary" busy={reloading} onClick={() => void loadLatest(false)}>
+                    Discard my changes and reload
+                  </Button>
+                </>
+              }
+            >
+              Your changes were not saved. A new form version was published, or the form&apos;s version setting changed, so this record is now edited with a different layout. Reload to continue: fields may have been added, removed or made required.
+            </StatusMessage>
+          ) : conflict ? (
             <StatusMessage
               tone="warning"
               title="Someone else saved this record while you were editing"
@@ -292,10 +332,25 @@ export function EditRecordPage() {
             <ErrorPanel error={update.error} />
           ) : null}
           {report ? (
-            <StatusMessage tone={unresolved.length > 0 || report.sectionConflicts.length > 0 ? "warning" : "info"} title={unresolved.length > 0 ? `Choose a value for ${unresolved.length} ${unresolved.length === 1 ? "field" : "fields"} you both changed` : "Your changes were reapplied to the latest version"}>
+            <StatusMessage tone={unresolved.length > 0 || report.sectionConflicts.length > 0 || report.withheld.length > 0 || report.withheldSections.length > 0 ? "warning" : "info"} title={unresolved.length > 0 ? `Choose a value for ${unresolved.length} ${unresolved.length === 1 ? "field" : "fields"} you both changed` : "Your changes were reapplied to the latest version"}>
               <p>
                 {report.reapplied === 0 ? "None of your changes needed reapplying." : report.reapplied === 1 ? "Your change was carried onto the latest version." : `${report.reapplied} of your changes were carried onto the latest version.`} Review the form, then save.
               </p>
+              {report.withheld.length > 0 || report.withheldSections.length > 0 ? (
+                <div className="mt-1">
+                  <p>Some of your changes can&apos;t be carried over, because the current layout no longer lets you change these parts of the form. They were not saved and the latest saved values are shown; copy anything you still need:</p>
+                  <ul className="mt-1 flex list-disc flex-col gap-1 pl-5" aria-label="Changes not carried over">
+                    {report.withheld.map((item) => (
+                      <li key={item.label}>
+                        {item.label}: you had entered &ldquo;{item.mine}&rdquo;
+                      </li>
+                    ))}
+                    {report.withheldSections.map((title) => (
+                      <li key={`section-${title}`}>{title}: your changes to its entries</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               {report.sectionConflicts.length > 0 ? <p className="mt-1">These sections were changed by both of you; they show the latest saved version and your changes there were not reapplied: {report.sectionConflicts.map((key) => sectionTitle(layout, infos, key)).join(", ")}.</p> : null}
               {unresolved.length > 0 ? (
                 <ul className="mt-2 flex flex-col gap-2">

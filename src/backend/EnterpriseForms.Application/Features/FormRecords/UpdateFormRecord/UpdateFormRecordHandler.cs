@@ -47,6 +47,9 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
             throw new BusinessException("CONTENT_REVISION_CONFLICT", 409, "expected_content_revision is stale");
         }
 
+        // Phase C9 (D9-5): the values were prepared against an edit layout that is no longer current: reload, never revalidate silently.
+        EditLayoutGuard.Require(verified, request.ExpectedLayoutVersionId);
+
         return verified.IsComplete
             ? await OwnerUpdateAsync(context, formRecordId, request, idempotencyKey, verified, cancellationToken).ConfigureAwait(false)
             : await SharedUpdateAsync(context, formRecordId, request, idempotencyKey, verified, cancellationToken).ConfigureAwait(false);

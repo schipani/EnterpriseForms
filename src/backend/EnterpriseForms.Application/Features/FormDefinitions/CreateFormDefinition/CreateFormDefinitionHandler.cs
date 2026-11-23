@@ -103,7 +103,7 @@ public sealed partial class CreateFormDefinitionHandler(IBusinessStore store, Au
             FormDefinitionName = request.FormDefinitionName,
             FormDefinitionDescription = request.FormDefinitionDescription ?? string.Empty,
             CurrentFormVersionId = versionId,
-            VersionBehavior = "Latest",
+            VersionBehavior = VersionBehaviors.Latest,
             LifecycleStatus = "Active",
             CreatedOn = now,
             CreatedByUserId = context.LocalUserId,

@@ -19,7 +19,8 @@ public sealed record CommandOutcome(Guid CommandId, string CommandStatus, long A
 public sealed record CreateFormRecordRequest(IReadOnlyDictionary<string, string> Values, Guid? OwnerTeamId = null, IReadOnlyList<RecordGroupValuesRequest>? Groups = null);
 
 /// <summary><c>Groups</c>: for each repeating section named, the complete new entry list in display order (listed ids are kept, entries without an id are new, omitted ids are removed). Sections not named are unchanged.</summary>
-public sealed record UpdateFormRecordRequest(long ExpectedContentRevision, IReadOnlyDictionary<string, string> Values, IReadOnlyList<RecordGroupValuesRequest>? Groups = null);
+/// <summary><c>ExpectedLayoutVersionId</c> (Phase C9, optional): the edit layout the client validated against; a different current edit layout is 409 EDIT_LAYOUT_CHANGED. Omitted: validated against the current edit layout without stale-layout detection (compatibility exception for older API clients).</summary>
+public sealed record UpdateFormRecordRequest(long ExpectedContentRevision, IReadOnlyDictionary<string, string> Values, IReadOnlyList<RecordGroupValuesRequest>? Groups = null, Guid? ExpectedLayoutVersionId = null);
 
 /// <summary>Values of one repeating section (Phase C3), keyed by the section's stable group key.</summary>
 public sealed record RecordGroupValuesRequest(string GroupKey, IReadOnlyList<RecordOccurrenceValuesRequest> Occurrences);

@@ -267,6 +267,8 @@ public static partial class AuditEventCatalog
         Add(AuditActions.FormVersionPublished, "Form version published", "An immutable form version was published.", [Count("versionNumber", "Version"), Count("elements", "Layout elements")], [ChangeReason]);
         Add(AuditActions.FormRenamed, "Form renamed", "The form's display name changed; identity, versions, records and permissions are unchanged.",
             [Name("previousFormDefinitionName", "Previous name"), Name("formDefinitionName", "New name"), Count("formDefinitionRevision", "Form revision"), Id("currentFormVersionId", "Current version")]);
+        Add(AuditActions.FormVersionBehaviorChanged, "Form version behaviour changed", "Which published layout the form's records are viewed and edited with changed; no record, value or version changed.",
+            [Code("previousVersionBehavior", "Previous behaviour"), Code("versionBehavior", "New behaviour"), Count("formDefinitionRevision", "Form revision"), Id("currentFormVersionId", "Current version")], [ChangeReason]);
         Add(AuditActions.FieldConfigurationChanged, "Field settings changed", "A field's catalog settings changed; its identity, key and type are unchanged.",
             [Code("dataType", "Data type"), Status("descriptionChanged", "Description changed"), Count("fieldDefinitionRevision", "Field revision")],
             [FieldKey, DesignLabel("previousDisplayName", "Previous field label"), DesignLabel("newDisplayName", "New field label")]);
