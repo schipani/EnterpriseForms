@@ -1,9 +1,9 @@
 # Phase C9 — Form Version Management: status
 
-- **Branches:** M1 `phase-c9/form-version-management` (from `198aeae`), squash-merged to `main` as `cd48e13` (PR #70; branch kept, tag `archive/c9-m1-form-version-management-9395ec5`). M2 `phase-c9/m2-version-comparison` (from `main` `cd48e13974d3539bfa18e65af6d94cbf06f91364`), not merged.
+- **Branches:** M1 `phase-c9/form-version-management` (from `198aeae`), squash-merged to `main` as `cd48e13` (PR #70; branch kept, tag `archive/c9-m1-form-version-management-9395ec5`). M2 `phase-c9/m2-version-comparison` (from `cd48e13`), squash-merged to `main` as `491fa9a` (PR #71; the branch was deleted automatically on merge; its commits are kept by tag `archive/c9-m2-version-comparison-03b5169`).
 - **Architecture:** `docs/architecture/PHASE_C9_FORM_VERSION_MANAGEMENT.md`.
-- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6).
-- **State (2026-11-23):** M1 merged to `main` (code integration only). **M2 (WP-3, WP-4, WP-5) implemented for Development/Testing; stopped for owner review.** Not owner-accepted, not independently reviewed, no production or Level 2 claim. M3 not started. G21 OPEN.
+- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6); C-184 (PR #71 merge record, §7).
+- **State (2026-11-23):** M1 and M2 merged to `main` (code integration only: `cd48e13`, `491fa9a`). Not final C9 acceptance, not independently reviewed, no production or Level 2 claim. M3 not started. G21 OPEN.
 
 ## 1. What M1 delivers
 
@@ -120,7 +120,7 @@ Verification (local, 2026-11-23):
 | Check | Result |
 |---|---|
 | .NET Release build (solution, Stage A and Stage B test projects) | Pass: 0 warnings, 0 errors; no OpenAPI drift |
-| `run_dotnet_tests.py` (full CI set) | 3,283 executed, 3,283 passed, 0 failed, 223 authorized skips (contract `FormVersionComparisonTests` 24, 8 new). A first run made while the Docker stack was still up had 2 failures in untouched timing-sensitive tests (`SecurityCommandTimelineTests.AuditEnvelopesWithholdCountsDetailsAndIdentityIdentifiers` in the Authority suite and `SearchIndexBuilderRunnerTests.CancellationDuringAPassEndsTheLoopPromptly`); each passed 3/3 alone, and the full run passed after the stack was removed |
+| `run_dotnet_tests.py` (full CI set) | 3,283 executed, 3,283 passed, 0 failed, 223 authorized skips (contract `FormVersionComparisonTests` 24, 8 new). A first run made while the Docker stack was still up had 2 failures in untouched tests (`SecurityCommandTimelineTests.AuditEnvelopesWithholdCountsDetailsAndIdentityIdentifiers` in the Authority suite and `SearchIndexBuilderRunnerTests.CancellationDuringAPassEndsTheLoopPromptly`); each passed 3/3 alone, and the full run passed after the stack was removed. *Correction (C-184):* the first of these is not timing-sensitive but nondeterministic — see §7 |
 | Stage B focused (fresh isolated stack, C-131 §1) | `FormVersionComparisonTests` 1/1; `DesignerTests` 3/3; `FormVersionBehaviorTests` 4/4 |
 | Playwright (isolation guard verified, port 5173 free) | `form-version-comparison` 3/3 (now also: a failed review keeps Publish disabled until it loads; axe scans pass); regression `form-version-behavior` 4/4, `designer-ux` 5/5, `form-management` 3/3 |
 | Frontend | Lint, typecheck and build pass; Vitest 69 files, 577 tests (13 new) |
@@ -128,3 +128,12 @@ Verification (local, 2026-11-23):
 | `validate-specifications.py --strict` | Pass |
 
 Remaining limitations: rules are still reported as added, removed or changed (not condition by condition); a replaced rule or pattern is shown as a behaviour change without a direction; manual screen-reader review of the review dialog and comparison is outstanding (PB-14).
+
+## 7. PR #71 merge record (C-184)
+
+- **Merged:** PR #71 squash-merged into `main` as **`491fa9a2cb53a00a834fd02d6e6fe3af0ecb5eb4`** under the owner's explicit authorization, with the expected-head guard (`03b5169fc98e31054a9d3a5e49b7ae20cc7a67cc`). Single parent `cd48e13974d3539bfa18e65af6d94cbf06f91364`; GitHub signature verified and valid; file tree identical to `03b5169`. Signed annotated tag `archive/c9-m2-version-comparison-03b5169` keeps the branch's three signed commits (`1f769d3`, `61d8005`, `03b5169`); the branch itself was deleted automatically on merge.
+- **Preconditions verified before merging:** PR open, CLEAN and mergeable; head and base as expected; exactly the three expected commits, all signed and verified; 27 files, none outside the M2 scope and none in the Authority, migrations, cryptography or signing; the four required checks and CodeQL passed; no reviews or review threads; 0 open code-scanning alerts.
+- **Post-merge checks on `491fa9a`:** CodeQL passed for all four languages (0 open alerts). The `ci` run (`45112841517`) passed specifications/vectors, frontend and Compose, but **the .NET job failed on one test**: `AuthorizationAuthority.Tests.SecurityCommandTimelineTests.AuditEnvelopesWithholdCountsDetailsAndIdentityIdentifiers`. The identical tree passed on the PR.
+- **Cause (pre-existing test defect, not an M2 regression):** the test asserts that the serialized audit envelope does not contain the text `917` (its withheld evaluated-record count), but the same envelope contains random UUIDs (`Guid.CreateVersion7()`), and in this run one was `01a206b2-97dc-737e-9178-…`. The test therefore fails at random whenever a generated UUID contains `917`. The test is unchanged by C9 (C8 M4-3 code); the earlier local failure in §6 was the same defect, not load.
+- **Not done (outside the authorization):** the test was not changed (Authority test project) and the workflow was not re-run. A follow-up needs a separate owner decision: assert that no envelope detail carries the withheld value (instead of searching the serialized envelope, which also holds random UUIDs, for its digits) and re-run CI on `main`.
+- **Unchanged and still open:** C9 M3; manual screen-reader review of the M1 and M2 interfaces (PB-14); hosted Stage B; the deferred D9-9 requirements; G21; the PB-06 concurrency convention; all C8/M4-5 obligations (§45.5 of the C8 status); the six Dependabot alerts; production certification.
