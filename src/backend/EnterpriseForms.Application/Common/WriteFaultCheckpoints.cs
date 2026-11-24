@@ -40,4 +40,10 @@ public static class WriteFaultCheckpoints
 
     /// <summary>After the Authority accepted the content (the response is lost).</summary>
     public const string ContentCommitted = "record-create:after-commit";
+
+    /// <summary>C-188 BF-1: after the Authority staged the version, before the business commit (the commit is lost: nothing is published).</summary>
+    public const string PublicationPrepared = "publish:after-prepare";
+
+    /// <summary>C-188 BF-1: after the business commit, before the publication is resolved with the Authority (the registration is lost).</summary>
+    public const string PublicationCommitted = "publish:after-commit";
 }

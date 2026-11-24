@@ -315,6 +315,11 @@ public interface IAuthorityScope : IAsyncDisposable
 
     void AddFieldFormBinding(FieldFormBinding binding);
 
+    /// <summary>C-188 BF-1: the form's Pending publication (tracked, so commands can resolve or supersede it), or null.</summary>
+    Task<FormVersionPublication?> FindPendingFormVersionPublicationAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken);
+
+    void AddFormVersionPublication(FormVersionPublication publication);
+
     /// <summary>Phase C7 M4: the entries of one snapshot for the given records only (read-only; uses the snapshot/record unique index).</summary>
     Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid searchCatalogueSnapshotId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
 

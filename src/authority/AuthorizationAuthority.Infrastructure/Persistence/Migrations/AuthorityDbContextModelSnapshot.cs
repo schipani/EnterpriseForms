@@ -1151,6 +1151,92 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.FieldSearch.FormVersionPublication", b =>
+                {
+                    b.Property<Guid>("FormVersionPublicationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_version_publication_id");
+
+                    b.Property<Guid>("BusinessFormVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("business_form_version_id");
+
+                    b.Property<string>("FieldManifestJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("field_manifest_json");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<string>("FormTitleSnapshot")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("form_title_snapshot");
+
+                    b.Property<int>("FormVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("form_version_number");
+
+                    b.Property<byte[]>("LayoutDigest")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("layout_digest");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid>("PreparedBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("prepared_by_security_command_id");
+
+                    b.Property<DateTimeOffset>("PreparedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("prepared_on");
+
+                    b.Property<string>("PublicationStateName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("publication_state_name");
+
+                    b.Property<Guid?>("ResolvedBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resolved_by_security_command_id");
+
+                    b.Property<DateTimeOffset?>("ResolvedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_on");
+
+                    b.HasKey("FormVersionPublicationId");
+
+                    b.HasIndex("PreparedBySecurityCommandId");
+
+                    b.HasIndex("ResolvedBySecurityCommandId");
+
+                    b.HasIndex("OrganizationId", "BusinessFormVersionId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_form_version_publication_business_version");
+
+                    b.HasIndex("OrganizationId", "FormDefinitionId")
+                        .HasDatabaseName("ix_form_version_publication_pending")
+                        .HasFilter("publication_state_name = 'Pending'");
+
+                    b.ToTable("form_version_publications", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_form_version_publication_digest", "octet_length(layout_digest) = 32");
+
+                            t.HasCheckConstraint("ck_form_version_publication_number", "form_version_number >= 1");
+
+                            t.HasCheckConstraint("ck_form_version_publication_resolution", "(publication_state_name = 'Pending') = (resolved_by_security_command_id IS NULL AND resolved_on IS NULL)");
+
+                            t.HasCheckConstraint("ck_form_version_publication_state", "publication_state_name IN ('Pending','Registered','Abandoned','Superseded')");
+                        });
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion", b =>
                 {
                     b.Property<Guid>("PublishedFormVersionId")
@@ -5215,6 +5301,29 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_field_search_approval_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.FieldSearch.FormVersionPublication", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_form_version_publication_org");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SecurityCommands.SecurityCommand", null)
+                        .WithMany()
+                        .HasForeignKey("PreparedBySecurityCommandId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_form_version_publication_prepared_command");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SecurityCommands.SecurityCommand", null)
+                        .WithMany()
+                        .HasForeignKey("ResolvedBySecurityCommandId")
+                        .HasConstraintName("fk_form_version_publication_resolved_command");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion", b =>

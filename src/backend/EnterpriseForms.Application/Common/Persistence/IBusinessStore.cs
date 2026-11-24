@@ -148,6 +148,13 @@ public interface IBusinessScope : IAsyncDisposable
 
     Task<FormDraft?> FindDraftAsync(Guid formDefinitionId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// C-188 BF-1: a transaction-scoped advisory lock on the form's publication (released at commit or rollback). Publishing holds it from
+    /// before the Authority stages the version until the business commit ends, and registration recovery holds it while it decides, so
+    /// recovery never sees a staged version whose business commit is still in flight: the version is either committed or never will be.
+    /// </summary>
+    Task LockFormPublicationAsync(Guid formDefinitionId, CancellationToken cancellationToken);
+
     /// <summary>Ids of the given forms that currently have a draft (one query for a catalog page).</summary>
     Task<HashSet<Guid>> GetFormDefinitionIdsWithDraftAsync(IReadOnlyCollection<Guid> formDefinitionIds, CancellationToken cancellationToken);
 

@@ -215,10 +215,149 @@ public sealed class FormVersionLifecycleContractTests
 
         Assert.Equal(1, v1.VersionNumber);
         Assert.False(v1.AuthorityRegistered);
+        Assert.True(v1.AuthorityRegistrationPending); // C-188 BF-1: staged, so the Authority keeps field search on the form closed
+        Assert.NotNull(store.Pending);
         var failed = Assert.Single(store.AuditEvents, e => e.EventAction == AuditActions.FormVersionAuthorityRegistrationFailed);
         Assert.Equal("Failed", failed.EventOutcome);
         Assert.Equal("AUTHORITY_NOT_READY", JsonDocument.Parse(failed.EventMetadataJson).RootElement.GetProperty("reason").GetString());
         Assert.All(store.AuditEvents, e => Assert.Contains(e.EventOutcome, AllowedOutcomes));
+    }
+
+    /// <summary>
+    /// C-188 BF-1: the Authority stages the version (under the form's publication lock) before the business adds and commits it, and the
+    /// publication is resolved only after the commit; each attempt uses a fresh idempotency key.
+    /// </summary>
+    [Fact]
+    public async Task ThePublicationIsStagedBeforeTheCommitAndResolvedAfterIt()
+    {
+        var store = new Store();
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        store.Steps.Clear();
+        var v1 = await PublishAsync(store, handlers, "v1");
+
+        Assert.Equal(["lock", "prepare", "add-version", "commit", "resolve:Registered", "commit"], store.Steps); // the last commit is the registration audit
+        Assert.True(v1.AuthorityRegistered);
+        Assert.False(v1.AuthorityRegistrationPending);
+        Assert.Null(store.Pending);
+        Assert.Equal(1, store.AuthorityRegistered);
+        var resolution = Assert.Single(store.Resolutions);
+        Assert.Equal(v1.FormVersionId, resolution.GetProperty("form_version_id").GetGuid());
+        Assert.Equal(store.Registrations.Single().GetProperty("layout_digest_hex").GetString(), resolution.GetProperty("layout_digest_hex").GetString());
+        Assert.Equal(store.IdempotencyKeys.Count, store.IdempotencyKeys.Distinct().Count());
+        var registered = Assert.Single(store.AuditEvents, e => e.EventAction == AuditActions.FormVersionAuthorityRegistered);
+        Assert.Equal("Publish", JsonDocument.Parse(registered.EventMetadataJson).RootElement.GetProperty("registrationSource").GetString());
+    }
+
+    /// <summary>C-188 BF-1: when the Authority refuses to stage the version, nothing is published, committed or registered.</summary>
+    [Fact]
+    public async Task ARefusedPrepareFailsThePublishAndPublishesNothing()
+    {
+        var store = new Store { PrepareFailure = "FORM_VERSION_UNTRUSTED" };
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        var commits = store.Commits;
+
+        var error = await Assert.ThrowsAsync<BusinessException>(() => PublishAsync(store, handlers, "v1"));
+        Assert.Equal(("FORM_VERSION_UNTRUSTED", 422), (error.ErrorCode, error.HttpStatusCode));
+        Assert.Empty(store.Versions);
+        Assert.Equal(commits, store.Commits);
+        Assert.Null(store.Definition.CurrentFormVersionId);
+        Assert.Empty(store.Resolutions);
+        Assert.DoesNotContain(store.AuditEvents, e => e.EventAction == AuditActions.FormVersionPublished);
+    }
+
+    /// <summary>C-188 BF-1: a busy Authority (a concurrent security command) is retried with fresh keys; if it stays busy nothing is published.</summary>
+    [Fact]
+    public async Task ABusyAuthorityIsRetriedWithFreshKeysAndNeverLeadsToAnUnstagedPublication()
+    {
+        var store = new Store { PrepareBusyAttempts = 2 };
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        var v1 = await PublishAsync(store, handlers, "v1 after two busy refusals");
+        Assert.True(v1.AuthorityRegistered);
+        var prepares = store.IdempotencyKeys.Where(k => k.StartsWith("form-version-prepare:", StringComparison.Ordinal)).ToList();
+        Assert.Equal(3, prepares.Count);
+        Assert.Equal(3, prepares.Distinct().Count()); // a refused key would only replay its refusal
+
+        var busy = new Store { PrepareBusyAttempts = 10 };
+        var busyHandlers = busy.Handlers(designAllowed: true);
+        await SaveAsync(busy, busyHandlers, V1Layout);
+        var error = await Assert.ThrowsAsync<BusinessException>(() => PublishAsync(busy, busyHandlers, "v1 while the Authority stays busy"));
+        Assert.Equal(("AUTHORITY_UNAVAILABLE", 503), (error.ErrorCode, error.HttpStatusCode));
+        Assert.Empty(busy.Versions);
+        Assert.Null(busy.Pending);
+    }
+
+    /// <summary>
+    /// C-188 BF-1 recovery without a new publication: a staged version this store committed is registered (from the Authority's staged
+    /// manifest; same id, number and digest), then the form reports Registered; a second recovery changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task RecoveryRegistersACommittedStagedVersionAndIsIdempotent()
+    {
+        var store = new Store { RegistrationFailure = "AUTHORITY_NOT_READY", NormalizeStoredLayouts = true }; // the stored text differs from the published text, as with jsonb
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        var v1 = await PublishAsync(store, handlers, "v1");
+        Assert.NotEqual(store.Registrations.Single().GetProperty("layout_digest_hex").GetString(), Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(store.Versions.Single().LayoutJson))));
+        Assert.Equal("Pending", (await handlers.GetAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None)).RegistrationState);
+
+        store.RegistrationFailure = null;
+        store.Steps.Clear();
+        var recovered = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("Registered", "Registered", 1, 1, (int?)null), (recovered.Outcome, recovered.RegistrationState, recovered.CurrentVersionNumber, recovered.RegisteredVersionNumber, recovered.PendingVersionNumber));
+        Assert.Equal("lock", store.Steps[0]); // decided under the publication lock
+        Assert.Equal(v1.FormVersionId, Assert.Single(store.Resolutions).GetProperty("form_version_id").GetGuid());
+        Assert.Contains(store.AuditEvents, e => e.EventAction == AuditActions.FormVersionAuthorityRegistered && JsonDocument.Parse(e.EventMetadataJson).RootElement.GetProperty("registrationSource").GetString() == "Recovery");
+
+        var again = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("AlreadyRegistered", "Registered"), (again.Outcome, again.RegistrationState));
+        Assert.Single(store.Resolutions); // nothing sent
+    }
+
+    /// <summary>C-188 BF-1: a staged version this store never committed is withdrawn (abandoned); the current registered version applies again.</summary>
+    [Fact]
+    public async Task RecoveryWithdrawsAStagedVersionThatWasNeverCommitted()
+    {
+        var store = new Store();
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        await PublishAsync(store, handlers, "v1");
+        var neverCommitted = Guid.CreateVersion7();
+        store.Pending = new AuthorityPendingFormVersionPublication(neverCommitted, 2, new string('a', 64), DateTimeOffset.UtcNow); // e.g. the commit failed after the prepare
+
+        var recovered = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("Abandoned", "Registered", 1), (recovered.Outcome, recovered.RegistrationState, recovered.RegisteredVersionNumber));
+        var resolution = store.Resolutions.Last();
+        Assert.Equal(("Abandoned", neverCommitted), (resolution.GetProperty("resolution").GetString(), resolution.GetProperty("form_version_id").GetGuid()));
+        Assert.Contains(store.AuditEvents, e => e.EventAction == AuditActions.FormVersionAuthorityPublicationAbandoned);
+        Assert.Single(store.Versions);
+    }
+
+    /// <summary>
+    /// C-188 BF-1: recovery never registers a stored version whose layout no longer has the staged digest (fail closed: the form stays
+    /// pending), and a current version the Authority never staged is reported as not recoverable (publish again; OD-3) - nothing is sent.
+    /// </summary>
+    [Fact]
+    public async Task RecoveryRefusesAMismatchedStoredVersionAndNeverRegistersAnUnstagedOne()
+    {
+        var store = new Store { RegistrationFailure = "AUTHORITY_NOT_READY" };
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        var v1 = await PublishAsync(store, handlers, "v1");
+        store.RegistrationFailure = null;
+        store.Pending = store.Pending! with { LayoutDigestHex = new string('b', 64) }; // the stored layout no longer matches what was staged
+        var refused = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("Refused", "STAGED_VERSION_MISMATCH", "Pending"), (refused.Outcome, refused.FailureReason, refused.RegistrationState));
+        Assert.Empty(store.Resolutions);
+        Assert.NotNull(store.Pending);
+
+        store.Pending = null; // a version published before the safeguard: the Authority never staged it
+        var legacy = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("NotRecoverable", "NotRegistered"), (legacy.Outcome, legacy.RegistrationState));
+        Assert.Empty(store.Resolutions);
+        Assert.Equal(v1.FormVersionId, store.Definition.CurrentFormVersionId);
     }
 
     // ---------------------------------------------------------------- in-memory store
@@ -266,7 +405,13 @@ public sealed class FormVersionLifecycleContractTests
             {
                 nameof(IAuthorizationAuthorityClient.CheckPermissionAsync) => Task.FromResult(new PermissionDecision(designAllowed, null, 9, 9, null, Guid.Empty)),
                 nameof(IAuthorizationAuthorityClient.DiscoverAuthorizedRecordsAsync) => Task.FromResult(new RecordDiscoveryPage([], 9, null)),
-                nameof(IAuthorizationAuthorityClient.SubmitSecurityCommandAsync) => Register((SecurityCommandRequest)args[1]!),
+                nameof(IAuthorizationAuthorityClient.SubmitSecurityCommandAsync) => Submit((SecurityCommandRequest)args[1]!, (string)args[2]!),
+                _ => throw new NotSupportedException(method.Name),
+            });
+            var fieldSearch = Stubs.Create<IFieldSearchPolicyAuthority>((method, _) => method.Name switch
+            {
+                nameof(IFieldSearchPolicyAuthority.GetFieldSearchCapabilitiesAsync) => Task.FromResult(new AuthorityFieldSearchCapabilities(Definition.FormDefinitionId, true, 1, 9, [],
+                    new AuthorityFieldSearchConfiguration(false, true, string.Empty, AuthorityRegistered, [], PendingPublication: Pending), Guid.Empty, Pending is not null)),
                 _ => throw new NotSupportedException(method.Name),
             });
             var store = Stubs.Create<IBusinessStore>((_, _) =>
@@ -274,21 +419,75 @@ public sealed class FormVersionLifecycleContractTests
                 ScopesOpened++;
                 return Task.FromResult(Scope());
             });
-            return new FormDesignerHandlers(store, authority, new AuthorityCommandAwaiter(authority, TimeProvider.System), TimeProvider.System, null!);
+            return new FormDesignerHandlers(store, authority, new AuthorityCommandAwaiter(authority, TimeProvider.System), TimeProvider.System, null!, fieldSearch);
         }
 
-        /// <summary>When set, the Authority refuses the registration with this error code (e.g. a gate closed by a concurrent command).</summary>
+        /// <summary>When set, the Authority refuses the resolution of a publication as registered with this error code (e.g. a gate closed by a concurrent command).</summary>
         public string? RegistrationFailure { get; set; }
 
-        private Task<SecurityCommandResult> Register(SecurityCommandRequest request)
+        /// <summary>C-188 BF-1: when set, the Authority refuses to stage a version with this error code (non-retryable, 422).</summary>
+        public string? PrepareFailure { get; set; }
+
+        /// <summary>C-188 BF-1: the number of prepare attempts refused with AUTHORITY_NOT_READY (503, retryable) before one is accepted.</summary>
+        public int PrepareBusyAttempts { get; set; }
+
+        /// <summary>C-188 BF-1: the Authority's view - its pending publication and latest registered version number (kept as the commands run).</summary>
+        public AuthorityPendingFormVersionPublication? Pending { get; set; }
+
+        public int? AuthorityRegistered { get; set; }
+
+        /// <summary>C-188 BF-1: resolutions sent (payloads) and every idempotency key used, in order.</summary>
+        public List<JsonElement> Resolutions { get; } = [];
+
+        public List<string> IdempotencyKeys { get; } = [];
+
+        /// <summary>C-188 BF-1: the order of publication-relevant operations (lock, prepare, add-version, commit, resolve).</summary>
+        public List<string> Steps { get; } = [];
+
+        private Task<SecurityCommandResult> Submit(SecurityCommandRequest request, string idempotencyKey)
         {
-            Assert.Equal(SecurityCommandKind.RegisterPublishedFormVersion, request.CommandKind);
-            if (RegistrationFailure is { } code)
+            IdempotencyKeys.Add(idempotencyKey);
+            var payload = request.CommandPayload;
+            switch (request.CommandKind)
             {
-                throw new AuthorityClientException(code, 503, true);
+                case SecurityCommandKind.PrepareFormVersionPublication:
+                    Steps.Add("prepare");
+                    if (PrepareBusyAttempts > 0)
+                    {
+                        PrepareBusyAttempts--;
+                        throw new AuthorityClientException("AUTHORITY_NOT_READY", 503, true);
+                    }
+
+                    if (PrepareFailure is { } refused)
+                    {
+                        throw new AuthorityClientException(refused, 422, false);
+                    }
+
+                    Registrations.Add(payload.Clone()); // the staged manifest the Authority will register
+                    Pending = new AuthorityPendingFormVersionPublication(payload.GetProperty("form_version_id").GetGuid(), payload.GetProperty("form_version_number").GetInt32(), payload.GetProperty("layout_digest_hex").GetString()!, DateTimeOffset.UtcNow);
+                    break;
+                case SecurityCommandKind.ResolveFormVersionPublication:
+                    Steps.Add("resolve:" + payload.GetProperty("resolution").GetString());
+                    if (RegistrationFailure is { } code && payload.GetProperty("resolution").GetString() == "Registered")
+                    {
+                        throw new AuthorityClientException(code, 503, true);
+                    }
+
+                    Assert.NotNull(Pending);
+                    Assert.Equal((Pending!.FormVersionId, Pending.FormVersionNumber, Pending.LayoutDigestHex),
+                        (payload.GetProperty("form_version_id").GetGuid(), payload.GetProperty("form_version_number").GetInt32(), payload.GetProperty("layout_digest_hex").GetString()));
+                    Resolutions.Add(payload.Clone());
+                    if (payload.GetProperty("resolution").GetString() == "Registered")
+                    {
+                        AuthorityRegistered = Pending.FormVersionNumber;
+                    }
+
+                    Pending = null;
+                    break;
+                default:
+                    throw new NotSupportedException(request.CommandKind.ToString());
             }
 
-            Registrations.Add(request.CommandPayload.Clone());
             return Task.FromResult(new SecurityCommandResult(Guid.CreateVersion7(), SecurityCommandStatus.Effective, 10, 10, "Open", null, Guid.Empty));
         }
 
@@ -307,9 +506,16 @@ public sealed class FormVersionLifecycleContractTests
             nameof(IBusinessScope.GetFormRecordsAsync) => Task.FromResult(new List<Domain.Features.FormRecords.FormRecord>()),
             nameof(IBusinessScope.AddAuditEvent) => Audit((AuditEvent)args[0]!),
             nameof(IBusinessScope.CommitAsync) => Commit(),
+            nameof(IBusinessScope.LockFormPublicationAsync) => Step("lock"),
             nameof(IAsyncDisposable.DisposeAsync) => ValueTask.CompletedTask,
             _ => throw new NotSupportedException(method.Name),
         });
+
+        private Task Step(string step)
+        {
+            Steps.Add(step);
+            return Task.CompletedTask;
+        }
 
         private object? SetDraft(FormDraft draft)
         {
@@ -317,8 +523,17 @@ public sealed class FormVersionLifecycleContractTests
             return null;
         }
 
+        /// <summary>C-188 BF-1: store layouts the way a jsonb column returns them (not byte for byte as published).</summary>
+        public bool NormalizeStoredLayouts { get; set; }
+
         private object? AddVersion(FormVersion version)
         {
+            Steps.Add("add-version");
+            if (NormalizeStoredLayouts)
+            {
+                version.LayoutJson = JsonNode.Parse(version.LayoutJson)!.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+            }
+
             Versions.Add(version);
             return null;
         }
@@ -331,6 +546,7 @@ public sealed class FormVersionLifecycleContractTests
 
         private Task Commit()
         {
+            Steps.Add("commit");
             Commits++;
             return Task.CompletedTask;
         }

@@ -19,6 +19,8 @@ namespace AuthorizationAuthority.Application.Features.SecurityCommands;
 /// never leave it effective.</item>
 /// </list>
 /// Fail closed: any missing fact makes the approval not effective. Nothing here writes.
+/// <para>C-188 BF-1: before any of that, <b>no</b> approval of a form whose publication is pending registration is effective, whatever its
+/// scope: the Authority does not know the form's current layout until the publication is resolved (PrepareFormVersionPublication).</para>
 /// </summary>
 public static class RetainedFieldApprovals
 {
@@ -40,17 +42,39 @@ public static class RetainedFieldApprovals
     };
 
     /// <summary>
-    /// The ids of the given Active RetainedField approvals that are <b>not</b> effective now (to be excluded from capabilities and
-    /// predicate authorization). Approvals of other scopes or states are never returned.
+    /// The ids of the given Active approvals that are <b>not</b> effective now (to be excluded from capabilities and predicate
+    /// authorization): every Active approval of a form with a pending publication (C-188 BF-1), and Active RetainedField approvals that
+    /// fail the conditions above. Approvals in other states are never returned (they are not effective anyway).
     /// </summary>
     public static async Task<HashSet<Guid>> IneffectiveAsync(IAuthorityScope scope, Guid organizationId, IEnumerable<FieldSearchApproval> approvals, OrganizationProtectionPolicy? policy, bool retainedEnabled, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(approvals);
         var ineffective = new HashSet<Guid>();
-        var latestManifests = new Dictionary<Guid, HashSet<Guid>?>();
-        foreach (var approval in approvals.Where(a => a.ApprovalStateName == FieldSearchApprovalStates.Active && a.ApprovalScopeName != FieldSearchApprovalScopes.CurrentVersion))
+        var active = approvals.Where(a => a.ApprovalStateName == FieldSearchApprovalStates.Active).ToList();
+        var pendingForms = new HashSet<Guid>();
+        foreach (var form in active.Select(a => a.FormDefinitionId).Distinct())
         {
+            if (await scope.FindPendingFormVersionPublicationAsync(organizationId, form, cancellationToken).ConfigureAwait(false) is not null)
+            {
+                pendingForms.Add(form);
+            }
+        }
+
+        var latestManifests = new Dictionary<Guid, HashSet<Guid>?>();
+        foreach (var approval in active)
+        {
+            if (pendingForms.Contains(approval.FormDefinitionId))
+            {
+                ineffective.Add(approval.FieldSearchApprovalId); // BF-1: fail closed, every scope
+                continue;
+            }
+
+            if (approval.ApprovalScopeName == FieldSearchApprovalScopes.CurrentVersion)
+            {
+                continue;
+            }
+
             if (!retainedEnabled || approval.ApprovalScopeName != FieldSearchApprovalScopes.RetainedField)
             {
                 ineffective.Add(approval.FieldSearchApprovalId);

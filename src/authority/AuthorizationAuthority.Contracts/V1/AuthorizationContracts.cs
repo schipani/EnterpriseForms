@@ -120,6 +120,12 @@ public enum SecurityCommandKind
 
     /// <summary>C8 M2 (AC-7.5): an owner edits a Pending request by atomically replacing it with a new request (new id, fresh expiry, no approval carried over).</summary>
     ReplaceOrganizationMembershipRequest,
+
+    /// <summary>C-188 BF-1: records a form version the business is about to commit (before it commits); field search on the form fails closed until it is resolved.</summary>
+    PrepareFormVersionPublication,
+
+    /// <summary>C-188 BF-1: resolves the form's pending publication - Registered (from the staged manifest) or Abandoned (never committed).</summary>
+    ResolveFormVersionPublication,
 }
 
 /// <summary>command_payload is validated against the exact command-specific schema in the authority; unknown fields are rejected.</summary>

@@ -71,6 +71,9 @@ public static class AuditActions
     public const string FormVersionAuthorityRegistered = "FORM_VERSION_AUTHORITY_REGISTERED";
     public const string FormVersionAuthorityRegistrationFailed = "FORM_VERSION_AUTHORITY_REGISTRATION_FAILED";
 
+    /// <summary>C-188 BF-1: a publication staged with the Authority was withdrawn because the business never committed it.</summary>
+    public const string FormVersionAuthorityPublicationAbandoned = "FORM_VERSION_AUTHORITY_PUBLICATION_ABANDONED";
+
     // Phase C8 M1 (F-C7-03 and D8-8): organization logo and display-only team rename.
     public const string OrganizationLogoUploaded = "ORGANIZATION_LOGO_UPLOADED";
     public const string OrganizationLogoReplaced = "ORGANIZATION_LOGO_REPLACED";

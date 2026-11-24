@@ -114,7 +114,8 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             command.CommandStateName = SecurityCommandStates.Rejected;
             command.RejectionReasonCode = ex.ErrorCode;
             scope.AddCommand(command);
-            if (request.CommandKind is SecurityCommandKind.ApproveFieldSearch or SecurityCommandKind.WithdrawFieldSearch or SecurityCommandKind.UpdateFieldSearchers or SecurityCommandKind.RegisterPublishedFormVersion)
+            if (request.CommandKind is SecurityCommandKind.ApproveFieldSearch or SecurityCommandKind.WithdrawFieldSearch or SecurityCommandKind.UpdateFieldSearchers or SecurityCommandKind.RegisterPublishedFormVersion
+                or SecurityCommandKind.PrepareFormVersionPublication or SecurityCommandKind.ResolveFormVersionPublication)
             {
                 // OD-8: refused AC-6 decisions are also hash-chained, archived evidence on the audit stream (no values, no predicates).
                 AuditJournal.Append(scope, state, "FieldSearchCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), form_definition_id = request.Resource.ResourceId, actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, rejection_detail = ex.ErrorCode is AuthorityErrorCodes.FieldSearchNotEligible ? ex.Message : null, correlation_id = correlationId }, clock);
@@ -266,6 +267,19 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
         {
             approval.ChangedBySecurityCommandId = command.SecurityCommandId;
             approval.StateChangedOn = now;
+        }
+
+        foreach (var resolved in plan.ResolvedPublications)
+        {
+            resolved.ResolvedBySecurityCommandId = command.SecurityCommandId;
+            resolved.ResolvedOn = now;
+        }
+
+        if (plan.NewPublication is { } publication)
+        {
+            publication.PreparedBySecurityCommandId = command.SecurityCommandId;
+            publication.PreparedOn = now;
+            scope.AddFormVersionPublication(publication);
         }
 
         foreach (var binding in plan.NewFieldFormBindings)

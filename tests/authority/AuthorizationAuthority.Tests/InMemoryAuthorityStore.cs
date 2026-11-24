@@ -97,6 +97,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
     public List<FieldFormBinding> FieldFormBindings { get; } = [];
 
+    /// <summary>C-188 BF-1: staged publications (the real table allows at most one Pending per form; enforced on add).</summary>
+    public List<FormVersionPublication> Publications { get; } = [];
+
     /// <summary>C-188: adds a binding with the real table's primary key (organization, field) enforced.</summary>
     public void AddFieldFormBindingForTest(FieldFormBinding binding)
     {
@@ -555,6 +558,20 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
             Task.FromResult(s.FieldFormBindings.FirstOrDefault(b => b.OrganizationId == organizationId && b.FieldDefinitionId == fieldDefinitionId));
 
         public void AddFieldFormBinding(FieldFormBinding binding) => s.AddFieldFormBindingForTest(binding);
+
+        public Task<FormVersionPublication?> FindPendingFormVersionPublicationAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Publications.FirstOrDefault(p => p.OrganizationId == organizationId && p.FormDefinitionId == formDefinitionId && p.PublicationStateName == FormVersionPublicationStates.Pending));
+
+        public void AddFormVersionPublication(FormVersionPublication publication)
+        {
+            if (publication.PublicationStateName == FormVersionPublicationStates.Pending
+                && s.Publications.Any(p => p.OrganizationId == publication.OrganizationId && p.FormDefinitionId == publication.FormDefinitionId && p.PublicationStateName == FormVersionPublicationStates.Pending))
+            {
+                throw new InvalidOperationException("duplicate key value violates unique constraint uq_form_version_publication_pending");
+            }
+
+            s.Publications.Add(publication);
+        }
 
         public Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid searchCatalogueSnapshotId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
             Task.FromResult(s.SnapshotEntries.Where(e => e.SearchCatalogueSnapshotId == searchCatalogueSnapshotId && formRecordIds.Contains(e.FormRecordId)).ToList());

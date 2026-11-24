@@ -700,6 +700,11 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public void AddFieldFormBinding(FieldFormBinding binding) => context.FieldFormBindings.Add(binding);
 
+        public Task<FormVersionPublication?> FindPendingFormVersionPublicationAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
+            context.FormVersionPublications.AsTracking().FirstOrDefaultAsync(p => p.OrganizationId == organizationId && p.FormDefinitionId == formDefinitionId && p.PublicationStateName == FormVersionPublicationStates.Pending, cancellationToken);
+
+        public void AddFormVersionPublication(FormVersionPublication publication) => context.FormVersionPublications.Add(publication);
+
         public Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid searchCatalogueSnapshotId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
             context.CatalogueSnapshotEntries.AsNoTracking().Where(e => e.SearchCatalogueSnapshotId == searchCatalogueSnapshotId && formRecordIds.Contains(e.FormRecordId)).ToListAsync(cancellationToken);
 

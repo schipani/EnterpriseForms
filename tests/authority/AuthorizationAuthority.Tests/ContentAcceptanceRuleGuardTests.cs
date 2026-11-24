@@ -242,10 +242,15 @@ public sealed class ContentAcceptanceRuleGuardTests
         Assert.DoesNotContain(migrations, f => File.ReadAllText(f).Contains("ck_content_operation_rule_floor", StringComparison.Ordinal)); // OD-M2-21: M2b-1F is a separate release
         Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix + "1", ContentAcceptanceRuleSql.UpSql, StringComparison.Ordinal);
         var ids = migrations.Select(Path.GetFileNameWithoutExtension).Where(n => n is not null && !n.EndsWith(".Designer", StringComparison.Ordinal) && n != "AuthorityDbContextModelSnapshot").Order(StringComparer.Ordinal).ToList();
-        // C-188: the retained-field search approval migration is the latest; it installs no floor (its SQL is the binding backfill, the
-        // scope fence and the no-revival trigger). Before it, C8 M4-3 (C-165 R-4): the two additive timeline indexes.
-        Assert.Equal("20261124031236_AuthorityC188RetainedFieldSearchApprovals", ids[^1]);
-        Assert.Equal("20261120081859_AuthoritySecurityCommandTimelineIndexes", ids[^2]);
+        // C-188 BF-1: the form version publication migration is the latest; it installs no floor (its SQL is the two publication triggers).
+        // Before it, C-188: the retained-field search approval migration (the binding backfill, the scope fence and the no-revival
+        // trigger); before that, C8 M4-3 (C-165 R-4): the two additive timeline indexes.
+        Assert.Equal("20261124103219_AuthorityC188FormVersionPublications", ids[^1]);
+        var publications = File.ReadAllText(migrations.Single(f => Path.GetFileName(f) == "20261124103219_AuthorityC188FormVersionPublications.cs"));
+        Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix, publications, StringComparison.Ordinal);
+        Assert.DoesNotContain("SECURITY DEFINER", publications, StringComparison.Ordinal);
+        Assert.Equal("20261124031236_AuthorityC188RetainedFieldSearchApprovals", ids[^2]);
+        Assert.Equal("20261120081859_AuthoritySecurityCommandTimelineIndexes", ids[^3]);
         var retainedField = File.ReadAllText(migrations.Single(f => Path.GetFileName(f) == "20261124031236_AuthorityC188RetainedFieldSearchApprovals.cs"));
         Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix, retainedField, StringComparison.Ordinal);
         Assert.DoesNotContain("SECURITY DEFINER", retainedField, StringComparison.Ordinal);
@@ -255,10 +260,10 @@ public sealed class ContentAcceptanceRuleGuardTests
         Assert.Equal(2, timelineIndexes.Split("migrationBuilder.CreateIndex(").Length - 1);
 
         // SEC-BL-01 G08 (A-7 §27): the journal immutability migration follows the ledger migration and installs no floor either.
-        Assert.Equal(JournalImmutabilitySql.MigrationId, ids[^3]);
+        Assert.Equal(JournalImmutabilitySql.MigrationId, ids[^4]);
         Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix, JournalImmutabilitySql.UpSql + JournalImmutabilitySql.DownSql, StringComparison.Ordinal);
-        Assert.Equal(ContentDataKeyLedgerSql.MigrationId, ids[^4]); // E3-M2e: the ledger migration follows the CARV migration and installs no floor (AM-1)
-        Assert.Equal(ContentAcceptanceRuleSql.MigrationId, ids[^5]);
+        Assert.Equal(ContentDataKeyLedgerSql.MigrationId, ids[^5]); // E3-M2e: the ledger migration follows the CARV migration and installs no floor (AM-1)
+        Assert.Equal(ContentAcceptanceRuleSql.MigrationId, ids[^6]);
         Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix, ContentDataKeyLedgerSql.TriggersSql, StringComparison.Ordinal);
         Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix, ContentDataKeyLedgerSql.LockTimeoutSql + ContentDataKeyLedgerSql.DownGuardSql, StringComparison.Ordinal);
     }

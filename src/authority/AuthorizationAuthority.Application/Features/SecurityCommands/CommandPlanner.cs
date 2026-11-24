@@ -41,6 +41,12 @@ public sealed class CommandPlan
     /// <summary>C-188 (D-H7): field-to-form bindings first established by this command (persisted in its transaction).</summary>
     public List<FieldFormBinding> NewFieldFormBindings { get; } = [];
 
+    /// <summary>C-188 BF-1: the publication staged by PrepareFormVersionPublication (persisted in its transaction).</summary>
+    public FormVersionPublication? NewPublication { get; set; }
+
+    /// <summary>C-188 BF-1: Pending publications this command resolved or superseded (tracked; their resolution is stamped in its transaction).</summary>
+    public List<FormVersionPublication> ResolvedPublications { get; } = [];
+
     /// <summary>IX-1: set by the one caller that applies the search-index coverage changes for these approvals in the same transaction.</summary>
     internal bool SearchIndexChangesAppliedByCaller { get; set; }
 
@@ -123,6 +129,8 @@ public static partial class CommandPlanner
             SecurityCommandKind.UpdateMandatoryPolicy => await UpdateMandatoryPolicyAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.ReclassifyField => await ReclassifyFieldAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RegisterPublishedFormVersion => await RegisterPublishedFormVersionAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.PrepareFormVersionPublication => await PrepareFormVersionPublicationAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.ResolveFormVersionPublication => await ResolveFormVersionPublicationAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.ApproveFieldSearch => await ApproveFieldSearchAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.WithdrawFieldSearch => await WithdrawFieldSearchAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateFieldSearchers => await UpdateFieldSearchersAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),

@@ -154,7 +154,10 @@ public sealed class FieldSearchApprovalTests(StageBFixture fixture)
         // Audit evidence: committed Authority commands, and the business activity of the administrator.
         Assert.Equal(1, CommittedCommands(w, "ApproveFieldSearch"));
         Assert.Equal(1, CommittedCommands(w, "UpdateFieldSearchers"));
-        Assert.True(CommittedCommands(w, "RegisterPublishedFormVersion") >= 1);
+        // C-188 BF-1: a publication is staged before the business commit and registered by its resolution (no one-step registration).
+        Assert.True(CommittedCommands(w, "PrepareFormVersionPublication") >= 1);
+        Assert.True(CommittedCommands(w, "ResolveFormVersionPublication") >= 1);
+        Assert.Equal(0, CommittedCommands(w, "RegisterPublishedFormVersion"));
         var activity = (await fixture.Api.GetAsync("/api/v1/my-activity?limit=100", w.S.Token(w.S.Administrator))).Root.EnumerateArray().Select(e => e.GetProperty("eventAction").GetString()).ToList();
         Assert.Contains("FIELD_SEARCH_APPROVED", activity);
         Assert.Contains("FIELD_SEARCHERS_CHANGED", activity);

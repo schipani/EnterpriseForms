@@ -841,6 +841,12 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
                 .AsTracking().FirstAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        public async Task LockFormPublicationAsync(Guid formDefinitionId, CancellationToken cancellationToken)
+        {
+            var lockKey = "form-publication|" + formDefinitionId.ToString("D");
+            await context.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", cancellationToken).ConfigureAwait(false);
+        }
+
         public async Task<SecurityIncident?> LockLatestSecurityIncidentAsync(Guid tenantId, string deduplicationKey, CancellationToken cancellationToken)
         {
             // Transaction-scoped advisory lock on (tenant, key): concurrent detections of the same problem serialize here even

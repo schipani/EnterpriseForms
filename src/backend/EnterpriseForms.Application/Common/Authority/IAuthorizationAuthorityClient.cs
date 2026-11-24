@@ -72,6 +72,12 @@ public enum SecurityCommandKind
 
     /// <summary>C8 M2 (AC-7.5): edit a Pending request by replacing it with a new request.</summary>
     ReplaceOrganizationMembershipRequest,
+
+    /// <summary>C-188 BF-1: record the version about to be committed (before the business commit); field search on the form fails closed until resolved.</summary>
+    PrepareFormVersionPublication,
+
+    /// <summary>C-188 BF-1: resolve the pending publication (Registered from the Authority's staged manifest, or Abandoned when never committed).</summary>
+    ResolveFormVersionPublication,
 }
 
 public enum SecurityCommandStatus
@@ -248,11 +254,15 @@ public sealed record AuthorityFieldSearchStatus(Guid FieldDefinitionId, string F
     string ApprovalState, string? InvalidationReason, IReadOnlyList<string> ApprovedOperators, IReadOnlyList<string> PermittedOperators,
     bool InCurrentVersion = true, int? LastPlacedVersionNumber = null, string? ApprovalScope = null);
 
-public sealed record AuthorityFieldSearchConfiguration(bool CanApprove, bool ApprovalOperational, string ApprovalUnavailableReason, int? RegisteredFormVersionNumber, IReadOnlyList<AuthorityFieldSearchStatus> Fields,
-    IReadOnlyList<FormAccessSubjectState>? FieldSearchers = null, bool RetainedFieldApprovalsEnabled = false);
+/// <summary>C-188 BF-1: the form's publication staged with the Authority and not yet resolved (business version id, number, layout digest).</summary>
+public sealed record AuthorityPendingFormVersionPublication(Guid FormVersionId, int FormVersionNumber, string LayoutDigestHex, DateTimeOffset PreparedOn);
 
+public sealed record AuthorityFieldSearchConfiguration(bool CanApprove, bool ApprovalOperational, string ApprovalUnavailableReason, int? RegisteredFormVersionNumber, IReadOnlyList<AuthorityFieldSearchStatus> Fields,
+    IReadOnlyList<FormAccessSubjectState>? FieldSearchers = null, bool RetainedFieldApprovalsEnabled = false, AuthorityPendingFormVersionPublication? PendingPublication = null);
+
+/// <remarks>C-188 BF-1: <c>PublicationPending</c> - a publication of the form awaits registration; no field of it is searchable until resolved.</remarks>
 public sealed record AuthorityFieldSearchCapabilities(Guid FormDefinitionId, bool PlaintextSearchPermitted, long SearchPolicyRevision, long AuthorizationRevision,
-    IReadOnlyList<AuthoritySearchableField> Fields, AuthorityFieldSearchConfiguration? Configuration, Guid CorrelationId);
+    IReadOnlyList<AuthoritySearchableField> Fields, AuthorityFieldSearchConfiguration? Configuration, Guid CorrelationId, bool PublicationPending = false);
 
 /// <summary>Phase C7 M3 (OD-8): evidence of one execution — field ids, operators, counts, outcome (never values or record ids).</summary>
 public sealed record SearchExecutionEvidence(IReadOnlyList<Guid> FieldDefinitionIds, IReadOnlyList<string> Operators, int ConditionCount, string Outcome, int? EvaluatedRecordCount, int? MatchedRecordCount, long ElapsedMilliseconds);

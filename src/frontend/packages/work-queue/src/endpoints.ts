@@ -71,6 +71,9 @@ export const ENDPOINTS = {
   "forms.restoreDraft": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/restore-draft" },
   "forms.versions": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/versions" },
   "forms.publishImpact": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/publish-impact" },
+  // C-188 BF-1: registration of the current published version with the Authorization Authority, and its recovery.
+  "forms.authorityRegistration": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/authority-registration" },
+  "forms.recoverAuthorityRegistration": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/authority-registration/recover" },
   "forms.compareVersions": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/versions/compare" },
   "forms.createRelationship": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/relationships" },
   "records.list": { method: "GET", path: "/api/v1/form-records" },

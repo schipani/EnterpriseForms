@@ -115,6 +115,8 @@ public static partial class SecurityCommandTimelineCatalog
         nameof(SecurityCommandKind.UnlinkChildRecord),
         nameof(SecurityCommandKind.RegisterFormDefinition),
         nameof(SecurityCommandKind.RegisterPublishedFormVersion),
+        nameof(SecurityCommandKind.PrepareFormVersionPublication),
+        nameof(SecurityCommandKind.ResolveFormVersionPublication),
         "ApproveOrganizationMembership",
         "BootstrapOrganization",
         "ProvisionFirstSecurityAdministrator",

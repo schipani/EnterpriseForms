@@ -68,7 +68,19 @@ public sealed record CreateGroupDefinitionRequest(string GroupKey, string GroupD
 public sealed record FieldOptionResponse(Guid FieldOptionId, string OptionKey, string OptionDisplayText, int OptionSortOrder, bool IsActive, Guid? OptionListItemId = null);
 
 /// <summary><c>AuthorityRegistered</c> (Phase C7 M2, OD-3): the publish response says whether the Authority recorded this version; only registered versions can have fields approved for search.</summary>
-public sealed record FormVersionResponse(Guid FormVersionId, int VersionNumber, int LayoutSchemaVersion, string LayoutJson, string ChangeReason, Guid? RestoredFromFormVersionId, DateTimeOffset PublishedOn, Guid PublishedByUserId, bool AuthorityRegistered = false);
+/// <remarks>C-188 BF-1: <c>AuthorityRegistrationPending</c> - the version is published but its registration with the Authority is not
+/// complete; field search on the form is unavailable (fails closed) until it is (designer action: retry registration).</remarks>
+public sealed record FormVersionResponse(Guid FormVersionId, int VersionNumber, int LayoutSchemaVersion, string LayoutJson, string ChangeReason, Guid? RestoredFromFormVersionId, DateTimeOffset PublishedOn, Guid PublishedByUserId, bool AuthorityRegistered = false, bool AuthorityRegistrationPending = false);
+
+/// <summary>
+/// C-188 BF-1: whether the form's current published version is registered with the Authorization Authority (designers only).
+/// <c>RegistrationState</c>: <c>Registered</c> (the Authority's latest registered version is the current one), <c>Pending</c> (a publication
+/// awaits registration; field search on the form is unavailable until it is resolved), <c>NotRegistered</c> (a current version the Authority
+/// never recorded and no longer awaits, e.g. one published before this safeguard: publish the form again), <c>NotPublished</c>.
+/// <c>Outcome</c> (recovery only): <c>AlreadyRegistered</c>, <c>Registered</c>, <c>Abandoned</c> (a staged publication that was never committed
+/// was withdrawn), <c>NotRecoverable</c> (publish the form again) or <c>Refused</c> (the Authority refused; see <c>FailureReason</c>).
+/// </summary>
+public sealed record FormAuthorityRegistrationResponse(Guid FormDefinitionId, int? CurrentVersionNumber, int? RegisteredVersionNumber, int? PendingVersionNumber, string RegistrationState, string? Outcome = null, string? FailureReason = null);
 
 public sealed record FormDraftResponse(Guid FormDraftId, Guid? BasedOnFormVersionId, int LayoutSchemaVersion, string LayoutJson, long DraftRevision, DateTimeOffset UpdatedOn);
 

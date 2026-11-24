@@ -90,4 +90,7 @@ public static class CatalogueInvalidationReasons
 
     /// <summary>C-188 (D-H18): retained-field approvals are disabled in this process and the form holds one; a user snapshot issued earlier (possibly while they were enabled) is no longer served.</summary>
     public const string RetainedApprovalsDisabled = "RETAINED_FIELD_APPROVALS_DISABLED";
+
+    /// <summary>C-188 BF-1: a publication of the snapshot's form is pending registration; a user search snapshot of it is no longer served.</summary>
+    public const string FormPublicationPending = "FORM_PUBLICATION_PENDING";
 }

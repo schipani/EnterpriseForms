@@ -4449,6 +4449,10 @@
           "correlation_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "publication_pending": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -4498,6 +4502,16 @@
           "retained_field_approvals_enabled": {
             "type": "boolean",
             "default": false
+          },
+          "pending_publication": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PendingFormVersionPublication"
+              }
+            ]
           }
         }
       },
@@ -8439,6 +8453,36 @@
           }
         }
       },
+      "PendingFormVersionPublication": {
+        "required": [
+          "form_version_id",
+          "form_version_number",
+          "layout_digest_hex",
+          "prepared_on"
+        ],
+        "type": "object",
+        "properties": {
+          "form_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_version_number": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "layout_digest_hex": {
+            "type": "string"
+          },
+          "prepared_on": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "PermissionCheckBatchRequest": {
         "required": [
           "checks"
@@ -11699,7 +11743,9 @@
           "EnableIdentityBinding",
           "RequestOrganizationMembership",
           "CancelOrganizationMembershipRequest",
-          "ReplaceOrganizationMembershipRequest"
+          "ReplaceOrganizationMembershipRequest",
+          "PrepareFormVersionPublication",
+          "ResolveFormVersionPublication"
         ]
       },
       "SecurityCommandOutcome": {

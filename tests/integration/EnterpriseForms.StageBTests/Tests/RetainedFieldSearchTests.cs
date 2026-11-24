@@ -96,7 +96,8 @@ public sealed class RetainedFieldSearchTests(StageBFixture fixture)
                 return published.Root.Clone();
             }
 
-            Assert.True(attempt < 80 && published.ErrorCode is "AUTHORITY_NOT_READY" or "STALE_AUTHORIZATION_REVISION" or "COMMAND_PENDING", "publish failed: " + published.Body);
+            // C-188 BF-1: AUTHORITY_UNAVAILABLE - the Authority stayed busy before it staged the version, so nothing was published.
+            Assert.True(attempt < 80 && published.ErrorCode is "AUTHORITY_NOT_READY" or "STALE_AUTHORIZATION_REVISION" or "COMMAND_PENDING" or "AUTHORITY_UNAVAILABLE", "publish failed: " + published.Body);
             await Task.Delay(250, Ct);
         }
     }
@@ -385,7 +386,8 @@ public sealed class RetainedFieldSearchTests(StageBFixture fixture)
     public async Task ConcurrentApprovalsAndAReturningPublicationLeaveAtMostOneConsistentActiveApproval()
     {
         var w = (await RemovedPhoneAsync("c188-concurrency")).W;
-        string[] transient = ["STALE_AUTHORIZATION_REVISION", "COMMAND_PENDING", "AUTHORITY_NOT_READY"];
+        // C-188 BF-1: an approval that meets the publication staged before the business commit is refused (FORM_PUBLICATION_PENDING).
+        string[] transient = ["STALE_AUTHORIZATION_REVISION", "COMMAND_PENDING", "AUTHORITY_NOT_READY", "FORM_PUBLICATION_PENDING"];
         List<string> Active() => Approvals(w).Where(r => r.Split('|')[1] == "Active").ToList();
 
         // Four concurrent retained approvals of the same removed field.
@@ -405,7 +407,7 @@ public sealed class RetainedFieldSearchTests(StageBFixture fixture)
             var approve = ApproveAsync(w, w.Phone, "RetainedField");
             var publish = PublishRacingAsync(w, draftRevision, currentVersion, $"c188 race {round}");
             await Task.WhenAll(approve, publish);
-            var registered = (await publish).GetProperty("authorityRegistered").GetBoolean(); // a registration refused while the gate was closed leaves V published but unregistered (C7)
+            var registered = (await publish).GetProperty("authorityRegistered").GetBoolean(); // a registration refused while the gate was closed leaves V published and pending (C-188 BF-1: field search on the form fails closed until resolved)
             await w.S.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
             var approved = await approve;
             var active = Active();
@@ -422,7 +424,14 @@ public sealed class RetainedFieldSearchTests(StageBFixture fixture)
             else
             {
                 Assert.True((approved.ErrorCode == "FORM_VERSION_UNTRUSTED" && phoneInLatest) || transient.Contains(approved.ErrorCode), approved.Body);
-                Assert.Empty(active);
+
+                // A definite refusal commits nothing. A transient answer can come after the approval committed (the business re-reads the
+                // configuration and the publication staged next moves the revision during that read - observed in the C-188 BF-1 run): the
+                // journal, not the response, decides; the consistency check below then applies to that approval like any other.
+                if (!transient.Contains(approved.ErrorCode))
+                {
+                    Assert.Empty(active);
+                }
             }
 
             Assert.DoesNotContain(active, r => r.Split('|')[3] == (phoneInLatest ? "RetainedField" : "CurrentVersion"));

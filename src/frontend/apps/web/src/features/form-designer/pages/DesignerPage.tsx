@@ -9,6 +9,7 @@ import { Link, useBlocker, useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ErrorPanel } from "../../support";
 import { AddFieldDialog, toKey } from "../components/AddFieldDialog";
+import { AuthorityRegistrationNotice, authorityRegistrationKey } from "../components/AuthorityRegistrationNotice";
 import { DesignerInspector, newElementFor, type DesignerInspectorProps, type PlacementTarget } from "../components/DesignerInspector";
 import { EditFieldDialog, type FieldEditSubmission } from "../components/EditFieldDialog";
 import { FieldConfigModal } from "../components/FieldConfigModal";
@@ -283,6 +284,8 @@ export function DesignerPage() {
       await invalidate();
       await queryClient.invalidateQueries({ queryKey: ["forms", formDefinitionId, "versions"] });
     },
+    // C-188 BF-1: a publish (successful or not) can leave a registration pending; re-read it.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: authorityRegistrationKey(formDefinitionId) }),
   });
   // Phase C9 M2 (WP-4): the publish review is read while the dialog is open, for the draft revision it would publish.
   const publishImpact = usePublishImpact(formDefinitionId, Number(detail.data?.draft?.draftRevision ?? 0), publishOpen && detail.data?.draft !== null && detail.data?.draft !== undefined);
@@ -995,6 +998,7 @@ export function DesignerPage() {
           The form is now called “{renamedNotice}”. Published versions and your unsaved draft changes are unaffected.
         </StatusMessage>
       ) : null}
+      <AuthorityRegistrationNotice formDefinitionId={formDefinitionId} />
       {/* Phase C3 designer UX refinement: the form name, draft status and primary actions stay reachable while the
           canvas (or any tab's content) scrolls, without a second independently-scrolling box. Height is measured
           (pinnedRef) so the nav list and quick inspector below can offset by exactly this much. */}

@@ -1961,7 +1961,7 @@
         "tags": [
           "FormDesigner"
         ],
-        "summary": "Atomically publishes the draft as an immutable version and advances the current pointer (expected draft revision + current version number).",
+        "summary": "Atomically publishes the draft as an immutable version and advances the current pointer (expected draft revision + current version number). C-188 BF-1: the Authority stages the version first (503 AUTHORITY_UNAVAILABLE or the Authority's refusal code when it cannot or will not; nothing is then published); authorityRegistrationPending true means the version is published but not yet registered, so field search on the form is unavailable until registration is recovered.",
         "operationId": "PublishFormVersion",
         "parameters": [
           {
@@ -1991,6 +1991,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FormVersionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/authority-registration": {
+      "get": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "C-188 BF-1: whether the form's current published version is registered with the Authorization Authority (Registered, Pending, NotRegistered, NotPublished). Requires the Authority design permission on the form (404 otherwise); 503 AUTHORITY_UNAVAILABLE.",
+        "operationId": "GetFormAuthorityRegistration",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormAuthorityRegistrationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/authority-registration/recover": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "C-188 BF-1: completes a pending registration without publishing again - registers the version the Authority staged when this store committed it (its layout must still have the staged digest), or withdraws a staged version that was never committed. Idempotent; audited; requires the Authority design permission on the form (404 otherwise). Outcome AlreadyRegistered, Registered, Abandoned, NotRecoverable (publish again) or Refused (failureReason).",
+        "operationId": "RecoverFormAuthorityRegistration",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormAuthorityRegistrationResponse"
                 }
               }
             }
@@ -9928,6 +9992,64 @@
           }
         }
       },
+      "FormAuthorityRegistrationResponse": {
+        "required": [
+          "formDefinitionId",
+          "currentVersionNumber",
+          "registeredVersionNumber",
+          "pendingVersionNumber",
+          "registrationState"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currentVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "registeredVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pendingVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "registrationState": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "failureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "FormDefinitionDetailResponse": {
         "required": [
           "summary",
@@ -10280,6 +10402,10 @@
             "format": "uuid"
           },
           "authorityRegistered": {
+            "type": "boolean",
+            "default": false
+          },
+          "authorityRegistrationPending": {
             "type": "boolean",
             "default": false
           }

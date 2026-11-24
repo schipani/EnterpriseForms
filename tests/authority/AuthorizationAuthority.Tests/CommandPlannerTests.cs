@@ -552,6 +552,10 @@ public sealed class CommandPlannerTests
 
         public void AddFieldFormBinding(AuthorizationAuthority.Domain.Features.FieldSearch.FieldFormBinding binding) => throw new NotSupportedException();
 
+        public Task<AuthorizationAuthority.Domain.Features.FieldSearch.FormVersionPublication?> FindPendingFormVersionPublicationAsync(Guid org, Guid form, CancellationToken ct) => Task.FromResult<AuthorizationAuthority.Domain.Features.FieldSearch.FormVersionPublication?>(null);
+
+        public void AddFormVersionPublication(AuthorizationAuthority.Domain.Features.FieldSearch.FormVersionPublication publication) => throw new NotSupportedException();
+
         public Task<List<AuthorizationAuthority.Domain.Features.Catalogue.SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid snapshot, IReadOnlyCollection<Guid> records, CancellationToken ct) => throw new NotSupportedException();
 
         public Task<List<AuthorityResource>> GetResourcesByTypeAsync(Guid org, IReadOnlyCollection<string> types, IReadOnlyCollection<string> states, CancellationToken ct) => throw new NotSupportedException();

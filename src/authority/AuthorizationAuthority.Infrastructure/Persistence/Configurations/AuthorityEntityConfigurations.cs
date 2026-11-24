@@ -516,6 +516,35 @@ public sealed class FieldSearchApprovalConfiguration : IEntityTypeConfiguration<
     }
 }
 
+/// <summary>
+/// C-188 BF-1: publications staged before the business commits. At most one Pending per form is enforced by a deferred constraint
+/// trigger checked at commit (a supersede updates the old row and inserts the new one in the same transaction, in whatever order EF
+/// sends them); terminal rows are immutable (trigger). Both triggers are created by the migration.
+/// </summary>
+public sealed class FormVersionPublicationConfiguration : IEntityTypeConfiguration<FormVersionPublication>
+{
+    public void Configure(EntityTypeBuilder<FormVersionPublication> builder)
+    {
+        builder.MapSnakeCase("form_version_publications");
+        builder.HasKey(e => e.FormVersionPublicationId);
+        builder.Property(e => e.FieldManifestJson).HasColumnType("jsonb");
+        builder.Property(e => e.FormTitleSnapshot).HasMaxLength(300);
+        builder.Property(e => e.PublicationStateName).HasMaxLength(20);
+        builder.HasIndex(e => new { e.OrganizationId, e.FormDefinitionId }).HasFilter("publication_state_name = 'Pending'").HasDatabaseName("ix_form_version_publication_pending");
+        builder.HasIndex(e => new { e.OrganizationId, e.BusinessFormVersionId }).IsUnique().HasDatabaseName("uq_form_version_publication_business_version");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_form_version_publication_org");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.PreparedBySecurityCommandId).HasConstraintName("fk_form_version_publication_prepared_command");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.ResolvedBySecurityCommandId).HasConstraintName("fk_form_version_publication_resolved_command");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_form_version_publication_state", "publication_state_name IN ('Pending','Registered','Abandoned','Superseded')");
+            t.HasCheckConstraint("ck_form_version_publication_number", "form_version_number >= 1");
+            t.HasCheckConstraint("ck_form_version_publication_digest", "octet_length(layout_digest) = 32");
+            t.HasCheckConstraint("ck_form_version_publication_resolution", "(publication_state_name = 'Pending') = (resolved_by_security_command_id IS NULL AND resolved_on IS NULL)");
+        });
+    }
+}
+
 /// <summary>C-188 (D-H7): one form per field definition per organization; written by commands (or the migration backfill) only.</summary>
 public sealed class FieldFormBindingConfiguration : IEntityTypeConfiguration<FieldFormBinding>
 {

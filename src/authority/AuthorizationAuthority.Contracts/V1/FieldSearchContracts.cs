@@ -16,6 +16,24 @@ public sealed record PublishedFieldEntry(Guid FieldDefinitionId, string FieldDat
 public sealed record PublishedOptionEntry(Guid FieldOptionId, string OptionLabel);
 
 /// <summary>
+/// C-188 BF-1: sent by the business publish request <b>before</b> it commits the version (same entries as
+/// <see cref="RegisterPublishedFormVersionPayload"/>, plus the business FormVersionId). The Authority stages it as the form's pending
+/// publication; until it is resolved no field search approval of the form confers search. A later prepare of the same form supersedes it.
+/// </summary>
+public sealed record PrepareFormVersionPublicationPayload(Guid FormDefinitionId, Guid FormVersionId, int FormVersionNumber, string LayoutDigestHex, IReadOnlyList<PublishedFieldEntry> Fields, string? FormTitle = null);
+
+/// <summary>
+/// C-188 BF-1: resolves the form's pending publication, which must be exactly this one (version id, number and layout digest).
+/// <c>Resolution</c> <c>Registered</c>: the business committed it - the Authority registers the manifest it staged at prepare time (never
+/// one rebuilt later from business rows, OD-3). <c>Abandoned</c>: the business never committed it - the pending state ends, nothing is
+/// registered. Either way field search on the form resumes from the Authority's latest registered version.
+/// </summary>
+public sealed record ResolveFormVersionPublicationPayload(Guid FormDefinitionId, Guid FormVersionId, int FormVersionNumber, string LayoutDigestHex, string Resolution);
+
+/// <summary>C-188 BF-1: the form's pending publication as shown to designers and security administrators (configuration view).</summary>
+public sealed record PendingFormVersionPublication(Guid FormVersionId, int FormVersionNumber, string LayoutDigestHex, DateTimeOffset PreparedOn);
+
+/// <summary>
 /// AC-6: approve plaintext value search of one field for the given operators. Only <c>administer_security</c>; requires
 /// step-up evidence the Authority accepts (none in production or staging until PB-08); <c>step_up_evidence</c> is the
 /// development-only synthetic marker where that path is enabled.
@@ -52,16 +70,20 @@ public sealed record FieldSearchStatus(Guid FieldDefinitionId, string FieldLabel
 
 /// <remarks><c>FieldSearchers</c>: who holds <c>field_searcher</c> on the form — returned only to security administrators (who alone may change it), otherwise null.</remarks>
 /// <remarks>C-188: <c>RetainedFieldApprovalsEnabled</c> — whether this Authority accepts and honours retained-field approvals (FieldSearch:RetainedFieldApprovals).</remarks>
+/// <remarks>C-188 BF-1: <c>PendingPublication</c> - the publication staged and not yet resolved (null when none); while it is set no approval of
+/// the form confers search and new approvals are refused.</remarks>
 public sealed record FieldSearchConfiguration(bool CanApprove, bool ApprovalOperational, string ApprovalUnavailableReason, int? RegisteredFormVersionNumber, IReadOnlyList<FieldSearchStatus> Fields,
-    IReadOnlyList<FormAccessSubject>? FieldSearchers = null, bool RetainedFieldApprovalsEnabled = false);
+    IReadOnlyList<FormAccessSubject>? FieldSearchers = null, bool RetainedFieldApprovalsEnabled = false, PendingFormVersionPublication? PendingPublication = null);
 
 /// <summary>
 /// Capabilities for one form. <c>Fields</c> is empty unless the caller holds <c>query_fields</c> on the form and approvals
 /// exist; a caller with no access gets the same answer as for a form that does not exist. <c>Configuration</c> is null
 /// unless the caller may see field search configuration.
 /// </summary>
+/// <remarks>C-188 BF-1: <c>PublicationPending</c> - a publication of the form awaits registration, so <c>Fields</c> is empty (field search
+/// fails closed). Reported only to callers who may know the form (otherwise false, the same answer as for an unknown form).</remarks>
 public sealed record FieldSearchCapabilitiesResponse(Guid FormDefinitionId, bool PlaintextSearchPermitted, long SearchPolicyRevision, long AuthorizationRevision,
-    IReadOnlyList<SearchableFieldCapability> Fields, FieldSearchConfiguration? Configuration, Guid CorrelationId);
+    IReadOnlyList<SearchableFieldCapability> Fields, FieldSearchConfiguration? Configuration, Guid CorrelationId, bool PublicationPending = false);
 
 // ---- Phase C7 M3: search-approval administration for security administrators (no Designer or record access needed) ----
 

@@ -67,8 +67,10 @@ public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPol
             .Where(f => f.InCurrentVersion && (f.ApprovalState != "Active" || !capabilities.PlaintextSearchPermitted))
             .Select(f => new FieldSearchNotSearchableField(f.FieldDefinitionId, f.FieldLabel, f.Eligibility == "Encrypted" ? "ENCRYPTED" : "NOT_APPROVED"))
             .ToList();
-        return new FieldSearchCapabilitiesResponse(formDefinitionId, limits.ExecutionEnabled, limits.ExecutionEnabled ? null : SearchUnavailableReasons.TrustedSearchNotEnabled,
-            limits.MaximumConditions, ConditionJoinAnd, fields, notSearchable, capabilities.SearchPolicyRevision);
+        // C-188 BF-1: while a publication of the form awaits registration the Authority returns no searchable field; say why.
+        var unavailable = !limits.ExecutionEnabled ? SearchUnavailableReasons.TrustedSearchNotEnabled : capabilities.PublicationPending ? SearchUnavailableReasons.FormPublicationPending : null;
+        return new FieldSearchCapabilitiesResponse(formDefinitionId, limits.ExecutionEnabled && !capabilities.PublicationPending, unavailable,
+            limits.MaximumConditions, ConditionJoinAnd, fields, capabilities.PublicationPending ? [] : notSearchable, capabilities.SearchPolicyRevision);
     }
 
     /// <summary>Authorizes every condition against the Authority's capabilities, then (gate on) runs the verified search.</summary>
@@ -119,6 +121,12 @@ public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPol
                     throw;
                 }
             }
+        }
+
+        if (capabilities.PublicationPending)
+        {
+            // C-188 BF-1: the Authority already returned no searchable field (fail closed); refuse with the reason rather than per condition.
+            throw SearchException.FormPublicationPending();
         }
 
         var allowed = capabilities.PlaintextSearchPermitted ? capabilities.Fields.ToDictionary(f => f.FieldDefinitionId) : [];

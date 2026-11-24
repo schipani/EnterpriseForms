@@ -676,11 +676,12 @@ public sealed partial class IndexedSearchService(
     /// as V1 (the caller's query_fields permission and the organization policy, the field's Active approval and value type, the
     /// approved operator set, the frozen option snapshot), then coverage Complete. Returns the approval id per condition.
     /// </summary>
-    private static Guid[] AuthorizePredicates(IReadOnlyList<PreparedIndexedCondition> conditions, SearchQueryStateFacts facts, bool mayQuery, bool plaintextPermitted, HashSet<Guid> ineffectiveRetained)
+    private static Guid[] AuthorizePredicates(IReadOnlyList<PreparedIndexedCondition> conditions, SearchQueryStateFacts facts, bool mayQuery, bool plaintextPermitted, HashSet<Guid> ineffective)
     {
-        // C-188: an Active retained-field approval that is not effective now is treated exactly like no approval (same denial).
+        // C-188: an Active approval that is not effective now (a retained one failing its conditions, or - BF-1 - any approval of a form whose
+        // publication is pending registration) is treated exactly like no approval (same denial).
         var active = mayQuery && plaintextPermitted && facts.FormLifecycleState == ResourceLifecycleStates.Active
-            ? facts.Approvals.Where(a => a.ApprovalStateName == FieldSearchApprovalStates.Active && !ineffectiveRetained.Contains(a.FieldSearchApprovalId)).GroupBy(a => a.FieldDefinitionId).ToDictionary(g => g.Key, g => g.ToList())
+            ? facts.Approvals.Where(a => a.ApprovalStateName == FieldSearchApprovalStates.Active && !ineffective.Contains(a.FieldSearchApprovalId)).GroupBy(a => a.FieldDefinitionId).ToDictionary(g => g.Key, g => g.ToList())
             : [];
         // Pass 1, every condition (V1 order): field, value type, operator, option. Only then pass 2: coverage, so an authorization
         // refusal is never masked by a not-ready answer for an earlier condition.

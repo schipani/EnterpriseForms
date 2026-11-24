@@ -283,6 +283,14 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ProjectionInte
             reason = CatalogueInvalidationReasons.RetainedApprovalsDisabled;
         }
 
+        // C-188 BF-1: a user search snapshot of a form whose publication is pending registration is not served (field search on the form
+        // fails closed until the publication is resolved). Prepare advances the authorization revision too; this does not depend on it.
+        if (reason is null && snapshot.SnapshotScopeKind == CatalogueScopeKinds.UserSearch
+            && await scope.FindPendingFormVersionPublicationAsync(snapshot.OrganizationId, snapshot.FormDefinitionId, cancellationToken).ConfigureAwait(false) is not null)
+        {
+            reason = CatalogueInvalidationReasons.FormPublicationPending;
+        }
+
         if (reason is null && await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false) != ProjectionGateState.Ready)
         {
             // A closed gate is transient: report it without recording an invalidation.
