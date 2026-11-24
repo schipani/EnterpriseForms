@@ -2,8 +2,8 @@
 
 - **Branches:** M3 `phase-c9/m3-acceptance` (from `fc9e404`, the authorized baseline; tests and documentation only). M1 `phase-c9/form-version-management` (from `198aeae`), squash-merged to `main` as `cd48e13` (PR #70; branch kept, tag `archive/c9-m1-form-version-management-9395ec5`). M2 `phase-c9/m2-version-comparison` (from `cd48e13`), squash-merged to `main` as `491fa9a` (PR #71; the branch was deleted automatically on merge; its commits are kept by tag `archive/c9-m2-version-comparison-03b5169`).
 - **Architecture:** `docs/architecture/PHASE_C9_FORM_VERSION_MANAGEMENT.md`.
-- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6); C-184 (PR #71 merge record, §7); C-185 (PR #73 merge record and failed post-merge CI, §8); C-186 (test-host startup race, PR #74 and CI recovery, §9); C-187 (M3 authorized and implemented; awaiting owner review, §10).
-- **State (2026-11-24):** M1 and M2 merged to `main` (code integration only: `cd48e13`, `491fa9a`). Post-merge CI on `main` failed at `491fa9a` (§7) and at `7d0c879` (§8), each time on a test defect, and has been green since `3d930f6` (§9). **M3 (WP-7, WP-8) implemented on `phase-c9/m3-acceptance` from `fc9e404` (§10); awaiting owner review; not merged.** Manual screen-reader review OPEN. Not final C9 acceptance, not independently reviewed, no production or Level 2 claim. G21 OPEN.
+- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6); C-184 (PR #71 merge record, §7); C-185 (PR #73 merge record and failed post-merge CI, §8); C-186 (test-host startup race, PR #74 and CI recovery, §9); C-187 (M3 authorized and implemented; awaiting owner review, §10); C-188 (§11 #2 searchability of off-layout historical values recorded as UNMET — deferred, §10.4).
+- **State (2026-11-24):** M1 and M2 merged to `main` (code integration only: `cd48e13`, `491fa9a`). Post-merge CI on `main` failed at `491fa9a` (§7) and at `7d0c879` (§8), each time on a test defect, and has been green since `3d930f6` (§9). **M3 (WP-7, WP-8) implemented on `phase-c9/m3-acceptance` from `fc9e404` (§10); awaiting owner review; not merged.** Manual screen-reader review OPEN. CLAUDE.md §11 #2 searchability of off-layout historical values UNMET — deferred (C-188). Not final C9 acceptance, not independently reviewed, no production or Level 2 claim. G21 OPEN.
 
 ## 1. What M1 delivers
 
@@ -245,7 +245,7 @@ local runs in §10.2.
 | 2.1 | V2 removes phone from the layout and adds email | SB1, CT, PW2 | pass | T |
 | 2.2 | V1 records not migrated or deleted; phone values intact; created version unchanged | SB1, PW2/PW5 | pass | T |
 | 2.3 | Historical values available through authorized history | SB1 | pass | T |
-| 2.4 | Historical values searchable through supported search paths after V2 | SB1 | **not supported by the existing search** (approval invalidated, `SEARCH_FIELD_NOT_ALLOWED`); recorded, not changed (architecture §8.3) | O (finding) |
+| 2.4 | Historical values searchable through supported search paths after V2 | SB1 | **UNMET — deferred** (C-188). Evidence: V1 search succeeds with approval; V2 invalidates the approval (`FORM_VERSION_CHANGED`); search refuses with `SEARCH_FIELD_NOT_ALLOWED`; V3 restores the field but not the approval; administrator re-approval restores eligibility (architecture §8.3). Authorized history (2.3) does not satisfy this requirement. | **D (unmet; deferred by owner decision C-188)** |
 | 2.5 | New records use V2 | SB1 | pass | T |
 | 2.6 | Version comparison identifies added and removed elements | SB1, CT, PW2 (publish review), PW3 (Versions tab) | pass | T |
 | 2.7 | Publish-impact notices describe potential effects (new required field, removed element); counts over discoverable records only; no values | SB1, CT, PW2 | pass | T |
@@ -288,9 +288,11 @@ local runs in §10.2.
   existing verified field search binds approvals to the latest registered version: V2 invalidated the phone approval
   (`Invalidated|FORM_VERSION_CHANGED`), searches on phone were refused (`422 SEARCH_FIELD_NOT_ALLOWED`, no partial
   result) until a security administrator approved phone again after V3; the approval then carried over to V4. CLAUDE.md
-  §11 #2's "searchable with authorization" is therefore met through authorized history, not through search, while the
-  field is outside the current version. Not changed (owner instruction: no unsupported search functionality); a change
-  needs a new owner decision.
+  §11 #2's requirement that these values remain **searchable** with authorization while the field is outside the current
+  version is therefore **UNMET — deferred pending a separate owner-approved security design (C-188)**; it is neither
+  implemented nor passed. Authorized history keeps the values readable, but history access is a different capability and
+  does not satisfy searchability. The owner accepted the fail-closed approval behaviour as it is; supporting approved
+  searches of off-layout historical fields requires a separate design and security authorization.
 - **Encrypted fields are not searchable** (ADR-PB-004): the email field (Confidential, encrypted by default) is refused
   by search, as designed.
 - **Unknown stored behaviour** (fail closed) cannot be produced on the real stack (database CHECK); it is covered by the
@@ -317,6 +319,6 @@ Not recurred: it passed in the full .NET run of §10.2 (0.26 s, TRX `artifacts/t
 ### 10.7 Outstanding obligations
 
 Owner review of M3 and of this pull request; the manual screen-reader review (§10.5); final C9 acceptance (not
-claimed); hosted Stage B (release-only, C-131); a decision on search of fields outside the current version (§10.4);
+claimed); hosted Stage B (release-only, C-131); the unmet §11 #2 searchability requirement for fields outside the current version (deferred pending a separate owner-approved security design, C-188; §10.4);
 the D9-9 deferrals; G21 and the platform-wide PB-06 concurrency convention (D9-3); all C8/M4-5 obligations (§45.5 of
 the C8 status); the six Dependabot alerts; independent third-party assessment and production certification.

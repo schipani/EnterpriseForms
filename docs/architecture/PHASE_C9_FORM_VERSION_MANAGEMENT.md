@@ -190,8 +190,8 @@ permission, no change to field identities, stored values, encryption or option v
   detection. The web application always sends it.
 - M2 implemented (§7, C-182) and merged; M3 implemented (§8, C-187), awaiting owner review.
 - **Search of values of fields no longer in the current version (§8.3):** not supported by the existing verified field
-  search; CLAUDE.md §11 #2 ("searchable with authorization") is met only through record history and through search after
-  the field is placed again and re-approved. Not changed by C9.
+  search. CLAUDE.md §11 #2's searchability requirement is **UNMET — deferred** pending a separate owner-approved security
+  design (C-188); authorized record history is a different capability and does not satisfy it. Not changed by C9.
 
 ## 7. M2 design (WP-3, WP-4, WP-5; authorized by the owner, C-182)
 
@@ -313,7 +313,7 @@ pointing `current_form_version_id` at another form's version or at nothing (the 
   for update, Submit and upload begin after a behaviour change; the compatibility exception (omitted
   `expectedLayoutVersionId`) is exercised and unchanged.
 
-### 8.3 Finding recorded, not changed: search of values of fields removed from the layout
+### 8.3 Unmet requirement (deferred, C-188): search of values of fields removed from the layout
 
 CLAUDE.md §11 #2 asks that old phone values remain "searchable with authorization" after V2. **The existing verified
 field search does not support this.** Search approvals are bound to the Authority's registration of the latest
@@ -321,9 +321,16 @@ published version (C7 M2, OD-3): registering a version that does not place an ap
 (`FORM_VERSION_CHANGED`), and the search then refuses the field (`422 SEARCH_FIELD_NOT_ALLOWED`, no partial result).
 Restoring the field (V3) does not reinstate the approval; a security administrator approves it again, after which the
 original values are found on the original records, and an unchanged field's approval carries over to the next version
-(V4). The values themselves are never lost: they remain in verified projections and authorized history throughout.
-M3 tests this behaviour as it is and adds no search capability (owner instruction). Supporting search of fields outside
-the current version would need a new owner decision on approvals bound to a field across versions.
+(V4). The values themselves are kept and remain readable through verified projections and authorized record history
+throughout; **that is preservation and authorized access, not searchability**, and does not satisfy §11 #2.
+
+**Owner decision (C-188):** the fail-closed search-approval behaviour is accepted as it is. The §11 #2 requirement that
+historical values remain searchable with authorization while the field is absent from the current published version is
+recorded as **UNMET — deferred pending a separate owner-approved security design**; it is neither implemented nor
+passed. Supporting approved searches of off-layout historical fields requires a separate design (for example, how an
+approval binds to a field across versions, what the Authority registers for fields outside the current layout, and how
+completeness and revocation are proven) and its own security authorization. M3 tests the existing behaviour as it is,
+changes no test expectation and adds no search capability.
 
 ### 8.4 Not changed by M3
 
