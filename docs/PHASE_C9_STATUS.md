@@ -1,9 +1,9 @@
 # Phase C9 — Form Version Management: status
 
-- **Branches:** M3 `phase-c9/m3-acceptance` (from `fc9e404`, the authorized baseline; tests and documentation only). M1 `phase-c9/form-version-management` (from `198aeae`), squash-merged to `main` as `cd48e13` (PR #70; branch kept, tag `archive/c9-m1-form-version-management-9395ec5`). M2 `phase-c9/m2-version-comparison` (from `cd48e13`), squash-merged to `main` as `491fa9a` (PR #71; the branch was deleted automatically on merge; its commits are kept by tag `archive/c9-m2-version-comparison-03b5169`).
+- **Branches:** C-188 `c188/retained-field-search` (from `9903844`; local only, §11). M3 `phase-c9/m3-acceptance` (from `fc9e404`, the authorized baseline; tests and documentation only), squash-merged to `main` as `9903844` (PR #75). M1 `phase-c9/form-version-management` (from `198aeae`), squash-merged to `main` as `cd48e13` (PR #70; branch kept, tag `archive/c9-m1-form-version-management-9395ec5`). M2 `phase-c9/m2-version-comparison` (from `cd48e13`), squash-merged to `main` as `491fa9a` (PR #71; the branch was deleted automatically on merge; its commits are kept by tag `archive/c9-m2-version-comparison-03b5169`).
 - **Architecture:** `docs/architecture/PHASE_C9_FORM_VERSION_MANAGEMENT.md`.
-- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6); C-184 (PR #71 merge record, §7); C-185 (PR #73 merge record and failed post-merge CI, §8); C-186 (test-host startup race, PR #74 and CI recovery, §9); C-187 (M3 authorized and implemented; awaiting owner review, §10); C-188 (§11 #2 searchability of off-layout historical values recorded as UNMET — deferred, §10.4).
-- **State (2026-11-24):** M1 and M2 merged to `main` (code integration only: `cd48e13`, `491fa9a`). Post-merge CI on `main` failed at `491fa9a` (§7) and at `7d0c879` (§8), each time on a test defect, and has been green since `3d930f6` (§9). **M3 (WP-7, WP-8) implemented on `phase-c9/m3-acceptance` from `fc9e404` (§10); awaiting owner review; not merged.** Manual screen-reader review OPEN. CLAUDE.md §11 #2 searchability of off-layout historical values UNMET — deferred (C-188). Not final C9 acceptance, not independently reviewed, no production or Level 2 claim. G21 OPEN.
+- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6); C-184 (PR #71 merge record, §7); C-185 (PR #73 merge record and failed post-merge CI, §8); C-186 (test-host startup race, PR #74 and CI recovery, §9); C-187 (M3 authorized and implemented; awaiting owner review, §10); C-188 (§11 #2 searchability of off-layout historical values recorded as UNMET — deferred, §10.4); C-189 (Option B authorized and implemented in Development/Test; awaiting owner review, §11).
+- **State (2026-11-24):** M1 and M2 merged to `main` (code integration only: `cd48e13`, `491fa9a`). Post-merge CI on `main` failed at `491fa9a` (§7) and at `7d0c879` (§8), each time on a test defect, and has been green since `3d930f6` (§9). M3 (WP-7, WP-8; §10) squash-merged to `main` as `9903844` (PR #75); post-merge CI and CodeQL green. **C-188 Option B implemented in Development/Test on the local branch `c188/retained-field-search` (§11, C-189); not pushed, not reviewed, not merged.** Manual screen-reader review OPEN. CLAUDE.md §11 #2 searchability of off-layout historical values remains UNMET until the owner accepts the C-189 evidence. Not final C9 acceptance, not independently reviewed, no production or Level 2 claim. G21 OPEN.
 
 ## 1. What M1 delivers
 
@@ -322,3 +322,82 @@ Owner review of M3 and of this pull request; the manual screen-reader review (§
 claimed); hosted Stage B (release-only, C-131); the unmet §11 #2 searchability requirement for fields outside the current version (deferred pending a separate owner-approved security design, C-188; §10.4);
 the D9-9 deferrals; G21 and the platform-wide PB-06 concurrency convention (D9-3); all C8/M4-5 obligations (§45.5 of
 the C8 status); the six Dependabot alerts; independent third-party assessment and production certification.
+
+## 11. C-188 Option B — retained-field search approvals (C-189)
+
+Authorized by the owner on 2026-11-24 (owner decisions D-H1…D-H18; H1–H6 in Development/Test only). Implemented on the
+local branch `c188/retained-field-search` from `9903844` (the PR #75 squash merge). **Not pushed, no pull request, not
+merged, not deployed; not owner-accepted and not independently reviewed.** CLAUDE.md §11 #2 searchability stays
+**UNMET** in the requirement register until the owner accepts the evidence below.
+
+### 11.1 Delivered
+
+The design and its behaviour are recorded in `docs/architecture/PHASE_C7_ADVANCED_FIELD_SEARCH.md` §6G (Authority,
+migration, compatibility fence, flag, effectiveness check, rollback). In short: a security administrator can approve
+searching the **latest retained value** of a field that the latest registered version no longer places
+(`approvalScope = RetainedField`, step-up, governance reference, audited); removal still invalidates the ordinary
+approval; a returning unchanged field converts the retained approval to an ordinary one only after full eligibility
+revalidation, otherwise it is invalidated; Withdrawn and Invalidated approvals never become Active again (planner and
+database trigger); the field-to-form binding is enforced in version registration, approvals and the protection
+commands; the feature is behind `FieldSearch:RetainedFieldApprovals` (default Disabled; enabled only in the disposable
+security-test overlay). Business API, generated clients, Search approvals and Advanced Search show "No longer in the
+form".
+
+### 11.2 Persistent development Authority (D-H17)
+
+The three read-only detection queries of the readiness assessment §4.2, plus one added check, were run against the
+persistent development Authority database (`enterpriseforms-dev-authority-db-1`, started for inspection only, queries in
+a `READ ONLY` transaction ending in `ROLLBACK`, container stopped afterwards): **0** field ids registered in manifests of
+more than one form; **0** protection requirements whose parent form differs from a form that registered the field;
+**0** Active approvals whose field is absent from the form's latest registered manifest; **0** Active approvals of a
+form with no registered version (added check). The database held 31 registered form versions and 3 approvals, so the
+checks were not vacuous. That database is at migration
+`20261101221445_OwnerRecovery` (behind `main`); no migration was applied and no data changed. This is **not** a claim of
+persistent-environment compatibility: the migration has run only on disposable Development/Test databases.
+
+### 11.3 Verification (local, 2026-11-24)
+
+All runs are local, against disposable Development/Test databases and the isolated security-test stack (`enterpriseforms-sectest`); nothing ran against the persistent development stack except the read-only queries of §11.2. Hosted Stage B was not run (release-only, C-131).
+
+| Suite | Result |
+|---|---|
+| Authority unit `RetainedFieldSearchApprovalTests` (T2–T4a, T7, T9–T11, T13–T15, T17, T23 as built) | 22/22 |
+| Contract `RetainedFieldSearchContractTests` (capabilities marker, not-searchable hint, wire compatibility with an older Authority) | 3/3 |
+| Contract `FormVersionLifecycleContractTests` (existing 9 plus the registration-failure regression test, §11.4) | 10/10 |
+| Stage B `RetainedFieldSearchTests` (fresh stack; run `20261124-014839-a3c033f8`): lifecycle on both engines incl. latest-value-only, behaviour independence, record authorization, cross-organization, no-revival trigger, return conversion (T1–T15); withdrawal with an open page and changed return (T12, T14); concurrency (T16); migration fence, grants and backfill abort (T21); rollback rehearsal with the flag off (T22) | 5/5 |
+| Playwright `retained-field-search.spec.ts` (approval from Search approvals, Advanced Search label and results, withdrawal; axe WCAG 2.2 A/AA) | 4/4 |
+| Vitest (full; 4 new in `FieldSearchSection.retained.test.tsx`) | 581/581 |
+| Full .NET CI-equivalent set (`run_dotnet_tests.py`, Release) | 3,331/3,331 executed, 223 authorized skips (main: 3,305 / 223; +22 Authority, +4 contract) |
+| Existing Stage B regressions on the same branch: `FieldSearchApprovalTests` 5/5, `FieldSearchExecutionTests` 14/14, `FormVersion*` 8/8, `DesignerTests` 3/3, `FieldProtectionDowngradeTests` 8/8, `FieldProtectionMigrationTests` 8/8, `IndexedSearchQueryStackTests` 21/21, `SearchIndexBuilderStackTests` 12/12 (fresh stack), `SearchCatalogueTests` 11/12 (see §11.4) | as stated |
+| Existing Playwright regressions: `field-search-approval` 5/5, `field-search-execution` 6/6, `form-version-acceptance` 5/5 | passed |
+| Frontend lint, typecheck, build | clean |
+| `validate-specifications.py --strict`, integrity vectors (Python and Node, 46 checks each), CI self-tests (37) | passed |
+
+T16 (concurrency): four concurrent retained approvals left exactly one Active approval (the others superseded); in each of three races between a retained approval and the publication that returns the field, the approval's command closed the Authority gate first, the registration was refused and the version stayed published but unregistered, and the retained approval correctly remained Active while the Authority's latest registered version still omitted the field. The other two orderings (approval first then conversion; publication first then refusal) did not occur in these races; they are covered deterministically by the Stage B lifecycle fact (T13) and the Authority unit tests.
+
+Order of events in this session: a first regression batch on a two-hour-old stack failed `SearchIndexBuilderStackTests` 6/12 (the worker's index builder stopped submitting between 04:14 and 05:13 UTC until a test recreated the worker) and `SearchCatalogueTests` 2/12; on a recreated stack the builder class passed 12/12 and the catalogue class failed only its benchmark, which fails the same way on unmodified `main` (below). The first full .NET run, executed concurrently with Vitest, failed `SearchIndexBuilderRunnerTests.CancellationDuringTheDelayEndsTheLoopPromptly` once (shutdown 5.6 s against a 5 s bound); the class then passed 25/25 five times and the full set passed without concurrent load (the class is unchanged from `main`; cf. §10.6).
+
+### 11.4 Deviations and limitations
+
+- **D-H10:** the owner approved correcting C7 architecture §4.4 for a later package. This branch corrects that row now,
+  because the implemented behaviour would otherwise contradict it (documentation only; the owner can ask for it to be
+  reverted to the D-H10 timing).
+- **D-H16:** a retained approval whose field is back in the latest version (possible only after an older binary
+  registered that version) is treated as not effective at every use and is converted or invalidated at the next
+  registration; there is no separate sweep-time invalidation.
+- **Rollback** is forward-only (flag off, withdraw, verify zero Active retained approvals). The migration's `Down` is
+  for disposable databases only; it is not a rollback procedure.
+- **Mixed versions:** an older Authority binary cannot see retained approvals (row-level security fence), so it fails
+  closed; it would not invalidate them either, which is why every use re-checks eligibility. A single Authority instance
+  is required during any authorized rollout (D-H12).
+- **PB-08:** step-up is development-only; retained approvals, like ordinary ones, are unavailable in staging and
+  production until PB-08 provider step-up exists.
+- **Pre-existing defect found and fixed (separate commit, outside C-188's scope; the owner may drop it):** since C7 (PR #29) the business publish handler recorded a refused Authority registration with audit outcome `Failure`, which `ck_audit_events_outcome` rejects (`Success`/`Denied`/`Failed`); the insert failed, the failure's audit evidence was lost and the designer received `503 STORE_UNAVAILABLE` although the version had been published. The handler now records `Failed`; contract test `ARefusedAuthorityRegistrationIsReportedAndAuditedWithAnAllowedOutcome` fails without the fix and passes with it; the Stage B concurrency fact exercises the same path on the real database (201, `authorityRegistered=false`).
+- **Pre-existing, not fixed:** `SearchCatalogueTests.BenchmarkTheVerifiedScopeAt50And150And480Records` fails on unmodified `main` (`9903844`, fresh stack) as on this branch: verified scope p50 about 1.5 s for 50 records and 4.9 s for 150 records (C7 M1 recorded 0.59 s and 1.8 s at `b146907`), and the 480-record scope exceeds the time limit (`SEARCH_VERIFICATION_LIMIT`). Not caused by C-188; needs its own investigation.
+- **Registration during a concurrent security command:** a publication whose Authority registration meets a closed gate stays published but unregistered (existing C7 behaviour: only a stale revision is retried); until the form is published again, field search follows the previous registered version — for retained approvals, the field still counts as absent.
+- **Test plan items as built:** T20 adds no step to `FormVersionAcceptanceTests` (the retained lifecycle is its own Stage B class); T22 simulates the older binary through the runtime role without the scope-awareness setting rather than starting a previous image; T23 differs from the plan: with the flag off the Authority starts and treats existing retained approvals as not effective (a refusal to start would block the authorized rollback step of turning the flag off); an unknown flag value refuses startup.
+
+### 11.5 Outstanding obligations
+
+Owner review and acceptance of this implementation; push, pull request, merge and any deployment (each separately
+authorized); recording §11 #2 as met only after acceptance; the obligations of §10.7.

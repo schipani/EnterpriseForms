@@ -265,7 +265,7 @@ How each G21 substitution is defeated:
 | Strengthening (`PublishFormSecurityRevision` to ApplicationEncrypted, or reclassification to Confidential/Restricted) | **Same command and revision** sets the approval `Invalidated` (`FIELD_STRENGTHENED`). Search of historical plaintext is never re-enabled; re-approval is impossible while the field is encrypted. |
 | A1 downgrade (encrypted → plaintext) completes | Does **not** create an approval. A new explicit approval is required after the migration's verified completion (which itself depends on the AC-5 migration catalogue). |
 | Organization turns `plaintext_search_permitted` off, or raises `minimum_field_classification` | All non-conforming approvals `Invalidated` in the same revision |
-| New form version published with a different field type or classification (impossible for type; classification only strengthens) | Approval `Invalidated` (`FORM_VERSION_CHANGED`) — **OD-3** |
+| A newly registered version that omits the field, or changes its type, classification, protection, label or options, or places it in a repeating section (corrected by C-188/D-H10 to match the implementation recorded in §6B.1 and §6C.1; the original design row named only type and classification) | A current-version approval is `Invalidated` (`FORM_VERSION_CHANGED`) — **OD-3**. C-188: a *retained-field* approval is not invalidated by omission; see §6G |
 | Field retired | `Invalidated` |
 
 Every change advances the authorization revision, so every outstanding search snapshot dies (§3.4).
@@ -590,6 +590,38 @@ Normative detail, residual-exposure inventory, runbook and test map: `docs/secur
 | Frontend | Edit field → Security & Encryption: Authority-verified badge only on a complete attestation under the current decision; attestation counts, worker observations, basis; **Verify completeness…** with a reason. |
 
 **What M4 does not establish:** G19 stays **OPEN** (independent review, Azure staging, production verifier identity); retained history, retired records, WAL, replicas and backups are not migrated (DR-C7-4); the organization coverage view is verifier-only (DR-C7-5); AUD-C7-01 archival durability unverified.
+
+## 6G. C-188 — retained-field search approvals (Option B; owner decisions D-H1…D-H18, C-189)
+
+CLAUDE.md §11 #2 (historical values searchable with authorization after a field leaves the current version). Development/Test
+implementation; not owner-accepted, not independently reviewed, no production claim. Design and readiness assessment: the C-188
+design review package and H0/H1 assessment (owner-led); decisions in `docs/decisions/PHASE_C_DECISION_LOG.md` C-189.
+
+| Element | Implementation |
+|---|---|
+| Semantics (D-H1) | Search the **latest retained value** in each record's current committed content head; earlier revisions are never searched. Records without a value never match (no emptiness operator). |
+| Approval scope (D-H2, D-H11) | `field_search_approvals.approval_scope_name` `CurrentVersion` (all existing rows, default) or `RetainedField`; `source_form_version_number` set exactly for retained approvals (CHECKs). One Active approval per field, either scope (unchanged unique index). |
+| Removal (D-H3) | Unchanged: registering a version without the field invalidates its current-version approval (`FORM_VERSION_CHANGED`). Search is refused until an explicit retained approval. |
+| Retained approval (D-H5, D-H14) | `ApproveFieldSearch` with `approval_scope = RetainedField`: `administer_security`, step-up, governance reference, operators as today; the field must be absent from the latest registered version and present in an earlier registered version **of the same form**; the approval binds that most recent placing entry (type, classification, protection, label, options, version number and digest) and current eligibility. A field only in unregistered versions (pre-C7 or failed registration) is refused. Refused when the feature is disabled (`RETAINED_FIELD_APPROVALS_DISABLED`). |
+| Return of the field (D-H4) | In the registration command (same transaction and search-policy revision): unchanged entry **and** enabled **and** still eligible under current facts and policy → the same approval becomes `CurrentVersion` (no index purge: the entry seal does not cover scope or version); otherwise `Invalidated` (`FORM_VERSION_CHANGED`, `FIELD_STRENGTHENED` or `ORGANIZATION_POLICY_CHANGED`). Still absent → unchanged. |
+| No revival (D-H15) | Only four planner assignments change approval state (none to Active from another state); database trigger `trg_field_search_approval_transition` makes Withdrawn/Invalidated rows final, freezes identity and snapshot columns, forbids CurrentVersion → RetainedField and changes of a retained source version. |
+| Effectiveness at use (D-H16) | Capabilities and indexed predicate authorization honour a retained approval only while it is effective now: enabled, field still absent from the latest version, bound to the form, and eligible from Authority-held facts and current policy (`RetainedFieldApprovals.IneffectiveAsync`). An ineffective one is treated exactly like no approval (`SEARCH_FIELD_NOT_ALLOWED`). |
+| Field identity (D-H7, D-H13) | `authority.field_form_bindings` (PK organization + field; runtime insert-only). Written by registrations and protection commands; any registration, approval, `PublishFormSecurityRevision` (both directions) or `ReclassifyField` naming a field bound to another form — or whose protection resource records another form — is refused `FIELD_BOUND_TO_ANOTHER_FORM`. The migration backfills bindings from manifests and protection-resource parents and **aborts** on a conflict (no repair). |
+| Compatibility fence (D-H11) | Row-level security on `field_search_approvals` (enabled and forced): `RetainedField` rows are visible only to sessions that set `authority.field_search_scope_aware = on`, which this build declares per connection (runtime and search reader; never a role default). An older Authority binary never sees a retained approval, so it cannot list, honour, index, convert or update one: it fails closed (its sweep withdraws the coverage; its deep check reports the derived approval missing). |
+| Configuration (D-H18) | `FieldSearch:RetainedFieldApprovals` `Disabled` (default when absent) or `Enabled`; anything else refuses startup. Enabled only in the disposable security-test overlay; never in persistent environments. Disabled: no new retained approvals; existing ones not effective; a returning retained field is invalidated; V1 snapshots issued before the process started are invalidated (`RETAINED_FIELD_APPROVALS_DISABLED`) for forms that hold one; withdrawal, strengthening and policy invalidation keep working. |
+| Index and completeness | No change: postings are derived per field id from covered Active approvals at the committed head; a new retained approval gets a Building coverage and the form is Complete only after backfill; until then the indexed engine refuses (`SEARCH_INDEX_NOT_READY`) and V1 either completes or refuses. Withdrawal purges and invalidates snapshots as before. |
+| Visibility (D-H8, D-H9) | Configuration (designers of the form, security administrators) lists fields of earlier registered versions that the latest one no longer places, with `inCurrentVersion=false` and `lastPlacedVersionNumber`; searchers see only effective approvals, marked "no longer in the form"; the administration list counts active retained approvals (review inventory). |
+| Business and UI | `approvalScope` relayed and audited (`FIELD_SEARCH_APPROVED` metadata); capability field `inCurrentVersion`; Search approvals "Removed fields searchable" column and "(no longer in the form)" cards; Advanced Search option label "(no longer in the form)". |
+
+**Rollback (forward-compatible, fail-closed):** set `FieldSearch:RetainedFieldApprovals=Disabled` on a single Authority instance
+(retained approvals stop being effective at once, open indexed pages end, earlier V1 snapshots end); withdraw every Active retained
+approval through `WithdrawFieldSearch` (audited; advances the revision; purges coverage); confirm
+`SELECT count(*) FROM authority.field_search_approvals WHERE approval_scope_name = 'RetainedField' AND approval_state_name = 'Active'`
+is 0. Never drop the columns or the binding table (journal and audit history refer to them). An older binary is safe against the
+migrated schema because the fence hides retained rows from it.
+
+**Not established:** production or staging behaviour (PB-08 step-up still unavailable there); independent review; deployed-data
+compatibility beyond the read-only check of the persistent development Authority (C-189).
 
 ## 7. Proposed milestones
 
