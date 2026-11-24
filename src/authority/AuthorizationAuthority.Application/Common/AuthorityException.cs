@@ -93,6 +93,12 @@ public static class AuthorityErrorCodes
     public const string RecoveryNotApplicable = "RECOVERY_NOT_APPLICABLE";
     public const string FormVersionUntrusted = "FORM_VERSION_UNTRUSTED";
 
+    /// <summary>C-188 (D-H7, D-H13): the field definition is bound to another form in this organization's Authority; nothing is registered, approved or published.</summary>
+    public const string FieldBoundToAnotherForm = "FIELD_BOUND_TO_ANOTHER_FORM";
+
+    /// <summary>C-188 (D-H18): approvals of retained (removed) fields are disabled by deployment configuration (FieldSearch:RetainedFieldApprovals).</summary>
+    public const string RetainedFieldApprovalsDisabled = "RETAINED_FIELD_APPROVALS_DISABLED";
+
     /// <summary>
     /// AC-2 (Phase C6): a share editor's content write targets a record whose accepted, signed header status is not Draft
     /// (Submitted or Archived). Decided from the signed header bound to the accepted head, never from a business projection.

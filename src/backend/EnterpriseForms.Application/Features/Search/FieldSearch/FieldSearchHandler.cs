@@ -61,9 +61,10 @@ public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPol
         var fields = capabilities.Fields.Select(f => new FieldSearchCapabilityField(f.FieldDefinitionId, f.FieldLabel, f.FieldDataType, Ordered(f),
             f.Options.Select(o => new FieldSearchOptionChoice(o.FieldOptionId, o.OptionLabel)).ToList(),
             f.FieldDataType == FieldSearchValueTypes.StringType ? limits.MinimumPartialTextLength : null,
-            f.FieldDataType == FieldSearchValueTypes.StringType ? limits.MaximumTextValueLength : null)).ToList();
+            f.FieldDataType == FieldSearchValueTypes.StringType ? limits.MaximumTextValueLength : null, f.InCurrentVersion)).ToList();
+        // C-188: the not-searchable hint lists fields of the current version only; removed fields appear only when approved (above).
         var notSearchable = (capabilities.Configuration?.Fields ?? [])
-            .Where(f => f.ApprovalState != "Active" || !capabilities.PlaintextSearchPermitted)
+            .Where(f => f.InCurrentVersion && (f.ApprovalState != "Active" || !capabilities.PlaintextSearchPermitted))
             .Select(f => new FieldSearchNotSearchableField(f.FieldDefinitionId, f.FieldLabel, f.Eligibility == "Encrypted" ? "ENCRYPTED" : "NOT_APPROVED"))
             .ToList();
         return new FieldSearchCapabilitiesResponse(formDefinitionId, limits.ExecutionEnabled, limits.ExecutionEnabled ? null : SearchUnavailableReasons.TrustedSearchNotEnabled,

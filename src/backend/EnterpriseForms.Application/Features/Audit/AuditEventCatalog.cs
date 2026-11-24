@@ -322,7 +322,7 @@ public static partial class AuditEventCatalog
             [Code("previous.minimumFieldClassification", "Previous minimum classification"), Status("previous.plaintextInternalFieldsPermitted", "Previously: plaintext Internal fields"), Status("previous.plaintextDowngradePermitted", "Previously: encryption release"),
                 Status("previous.plaintextSearchPermitted", "Previously: plaintext search"), Code("minimumFieldClassification", "Minimum classification"), Status("plaintextInternalFieldsPermitted", "Plaintext Internal fields"),
                 Status("plaintextDowngradePermitted", "Encryption release"), Status("plaintextSearchPermitted", "Plaintext search"), Status("loosened", "Loosened"), Count("revision", "Policy revision"), AuthorityCommandId]);
-        Add(AuditActions.FieldSearchApproved, "Field search approved", "Plaintext value search was approved for a field.", [Code("operators", "Operators")], [FreeText("approvalReference", "Approval reference")]);
+        Add(AuditActions.FieldSearchApproved, "Field search approved", "Plaintext value search was approved for a field.", [Code("operators", "Operators"), Code("approvalScope", "Approval scope")], [FreeText("approvalReference", "Approval reference")]);
         Add(AuditActions.FieldSearchWithdrawn, "Field search withdrawn", "A plaintext value search approval was withdrawn for a field.", [], [Reason]);
         Add(AuditActions.FieldSearchersChanged, "Field search access changed", "Who may search the form's fields changed.",
             [Count("grantUsers", "Users granted"), Count("grantTeams", "Teams granted"), Count("revokeUsers", "Users revoked"), Count("revokeTeams", "Teams revoked")]);

@@ -18,7 +18,7 @@ const available: FieldSearchCapabilitiesResponse = {
   ...unavailable,
   fieldValueSearchAvailable: true,
   unavailableReasonCode: null,
-  fields: [{ fieldDefinitionId: "0199a2b3-c4d5-7e6f-8123-456789abcde1", displayLabel: "Given name", valueType: "String", operators: ["equals"], options: [], minimumTextLength: 3, maximumTextLength: 200 }],
+  fields: [{ fieldDefinitionId: "0199a2b3-c4d5-7e6f-8123-456789abcde1", displayLabel: "Given name", valueType: "String", operators: ["equals"], options: [], minimumTextLength: 3, maximumTextLength: 200, inCurrentVersion: true }],
   notSearchableFields: [{ fieldDefinitionId: "0199a2b3-c4d5-7e6f-8123-456789abcde9", displayLabel: "Case notes", reasonCode: "ENCRYPTED" }],
 };
 

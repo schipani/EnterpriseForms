@@ -9,8 +9,8 @@ namespace AuthorizationAuthority.Infrastructure.Persistence;
 /// </summary>
 public static class AuthorityRuntimeGrants
 {
-    /// <summary>R-53 (C-148): tables the runtime may only read and insert (no UPDATE, no DELETE). E3-M2e (L-8): the data-key ledger.</summary>
-    public static readonly string[] InsertOnlyTables = ["content_item_identities", "content_data_key_bindings"];
+    /// <summary>R-53 (C-148): tables the runtime may only read and insert (no UPDATE, no DELETE). E3-M2e (L-8): the data-key ledger. C-188 (D-H7): field-to-form bindings.</summary>
+    public static readonly string[] InsertOnlyTables = ["content_item_identities", "content_data_key_bindings", "field_form_bindings"];
 
     private static readonly string[] AppendOnlyTables =
     [

@@ -31,7 +31,8 @@ public static class AuthorityInfrastructureRegistration
 
         // E3-M2b-1: a versioned application name on every Authority store connection, so an operator can confirm from
         // pg_stat_activity that no pre-CARV instance remains before the separate floor migration (contract §19.9 step 3).
-        var connectionString = ContentAcceptanceRuleConnection.WithVersionedApplicationName(configuration.GetConnectionString("AuthorityDb"));
+        // C-188: every runtime connection declares that it understands retained-field approvals (FieldSearchScopeConnection).
+        var connectionString = FieldSearchScopeConnection.WithScopeAwareness(ContentAcceptanceRuleConnection.WithVersionedApplicationName(configuration.GetConnectionString("AuthorityDb")));
         services.AddDbContextFactory<AuthorityDbContext>(options =>
         {
             options.UseNpgsql(connectionString ?? "Host=unconfigured.invalid;Database=unconfigured;Username=unconfigured;Password=unconfigured", npgsql => npgsql.MigrationsHistoryTable("ef_migrations_history", AuthorityDbContext.SchemaName));

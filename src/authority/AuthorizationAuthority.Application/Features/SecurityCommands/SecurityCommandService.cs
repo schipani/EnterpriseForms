@@ -268,6 +268,13 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             approval.StateChangedOn = now;
         }
 
+        foreach (var binding in plan.NewFieldFormBindings)
+        {
+            binding.BoundBySecurityCommandId = command.SecurityCommandId;
+            binding.BoundOn = now;
+            scope.AddFieldFormBinding(binding);
+        }
+
         if (plan.SearchPolicyToAdvance is { } searchPolicy)
         {
             searchPolicy.SearchPolicyRevision++;

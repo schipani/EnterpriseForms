@@ -71,6 +71,8 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
 
     public DbSet<FieldSearchApproval> FieldSearchApprovals => Set<FieldSearchApproval>();
 
+    public DbSet<FieldFormBinding> FieldFormBindings => Set<FieldFormBinding>();
+
     public DbSet<ProtectionCensusResult> ProtectionCensusResults => Set<ProtectionCensusResult>();
 
     public DbSet<ProtectionReconciliationAttestation> ProtectionAttestations => Set<ProtectionReconciliationAttestation>();

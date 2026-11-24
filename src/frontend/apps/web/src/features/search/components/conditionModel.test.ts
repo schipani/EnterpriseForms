@@ -17,11 +17,11 @@ const capabilities: FieldSearchCapabilitiesResponse = {
   policyRevision: 7,
   notSearchableFields: [],
   fields: [
-    { fieldDefinitionId: name, displayLabel: "Given name", valueType: "String", operators: ["equals", "startsWith"], options: [], minimumTextLength: 3, maximumTextLength: 200 },
-    { fieldDefinitionId: age, displayLabel: "Age", valueType: "Integer", operators: ["equals", "between"], options: [], minimumTextLength: null, maximumTextLength: null },
-    { fieldDefinitionId: born, displayLabel: "Born", valueType: "Date", operators: ["equals", "before"], options: [], minimumTextLength: null, maximumTextLength: null },
-    { fieldDefinitionId: custody, displayLabel: "In custody", valueType: "Boolean", operators: ["isTrue", "isFalse"], options: [], minimumTextLength: null, maximumTextLength: null },
-    { fieldDefinitionId: status, displayLabel: "Status", valueType: "Option", operators: ["is"], options: [{ fieldOptionId: active, displayText: "Active" }], minimumTextLength: null, maximumTextLength: null },
+    { fieldDefinitionId: name, displayLabel: "Given name", valueType: "String", operators: ["equals", "startsWith"], options: [], minimumTextLength: 3, maximumTextLength: 200, inCurrentVersion: true },
+    { fieldDefinitionId: age, displayLabel: "Age", valueType: "Integer", operators: ["equals", "between"], options: [], minimumTextLength: null, maximumTextLength: null, inCurrentVersion: true },
+    { fieldDefinitionId: born, displayLabel: "Born", valueType: "Date", operators: ["equals", "before"], options: [], minimumTextLength: null, maximumTextLength: null, inCurrentVersion: true },
+    { fieldDefinitionId: custody, displayLabel: "In custody", valueType: "Boolean", operators: ["isTrue", "isFalse"], options: [], minimumTextLength: null, maximumTextLength: null, inCurrentVersion: true },
+    { fieldDefinitionId: status, displayLabel: "Status", valueType: "Option", operators: ["is"], options: [{ fieldOptionId: active, displayText: "Active" }], minimumTextLength: null, maximumTextLength: null, inCurrentVersion: true },
   ],
 };
 
@@ -119,7 +119,7 @@ describe("Advanced Search condition model", () => {
   });
 
   it("sends an unambiguous UTC instant for a date-time value", () => {
-    const withDateTime: FieldSearchCapabilitiesResponse = { ...capabilities, fields: [{ fieldDefinitionId: born, displayLabel: "Arrested", valueType: "DateTime", operators: ["after"], options: [], minimumTextLength: null, maximumTextLength: null }] };
+    const withDateTime: FieldSearchCapabilitiesResponse = { ...capabilities, fields: [{ fieldDefinitionId: born, displayLabel: "Arrested", valueType: "DateTime", operators: ["after"], options: [], minimumTextLength: null, maximumTextLength: null, inCurrentVersion: true }] };
     const [list, key] = one();
     const filled = setValue(setField(list, key, born, withDateTime), key, "value", "2026-10-23T14:30");
     const request = toFieldSearchRequest(withDateTime.formDefinitionId, filled, withDateTime, { pageSize: 25 });

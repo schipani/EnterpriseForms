@@ -420,6 +420,12 @@ public sealed class ArchiveProcessorTests
 
         public void AddFieldSearchApproval(AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval approval) => throw new NotSupportedException();
 
+        public Task<List<AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion>> GetPublishedFormVersionsAsync(Guid org, Guid form, CancellationToken ct) => Task.FromResult(new List<AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion>());
+
+        public Task<AuthorizationAuthority.Domain.Features.FieldSearch.FieldFormBinding?> FindFieldFormBindingAsync(Guid org, Guid field, CancellationToken ct) => Task.FromResult<AuthorizationAuthority.Domain.Features.FieldSearch.FieldFormBinding?>(null);
+
+        public void AddFieldFormBinding(AuthorizationAuthority.Domain.Features.FieldSearch.FieldFormBinding binding) => throw new NotSupportedException();
+
         public Task<List<AuthorizationAuthority.Domain.Features.Catalogue.SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid snapshot, IReadOnlyCollection<Guid> records, CancellationToken ct) => throw new NotSupportedException();
 
         public Task<List<AuthorityResource>> GetResourcesByTypeAsync(Guid org, IReadOnlyCollection<string> types, IReadOnlyCollection<string> states, CancellationToken ct) => throw new NotSupportedException();

@@ -2292,6 +2292,7 @@ export interface components {
             approvalReference: null | string;
             /** @default false */
             useDevelopmentStepUp: boolean;
+            approvalScope?: null | string;
         };
         AuditAccessEvidenceResponse: {
             /** Format: int64 */
@@ -2996,6 +2997,11 @@ export interface components {
             activeApprovalCount: number | string;
             /** Format: int32 */
             invalidatedApprovalCount: number | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            retainedApprovalCount: number | string;
         };
         FieldSearchAdministrationResponse: {
             plaintextSearchPermitted: boolean;
@@ -3027,6 +3033,8 @@ export interface components {
             minimumTextLength: null | number | string;
             /** Format: int32 */
             maximumTextLength: null | number | string;
+            /** @default true */
+            inCurrentVersion: boolean;
         };
         FieldSearchCondition: {
             /** Format: uuid */
@@ -3050,6 +3058,8 @@ export interface components {
             registeredFormVersionNumber: null | number | string;
             fields: components["schemas"]["FieldSearchStatusResponse"][];
             fieldSearchers?: null | components["schemas"]["FormAccessSubjectResponse"][];
+            /** @default false */
+            retainedFieldApprovalsEnabled: boolean;
         };
         FieldSearchNotSearchableField: {
             /** Format: uuid */
@@ -3111,6 +3121,11 @@ export interface components {
             invalidationReason: null | string;
             approvedOperators: string[];
             permittedOperators: string[];
+            /** @default true */
+            inCurrentVersion: boolean;
+            /** Format: int32 */
+            lastPlacedVersionNumber?: null | number | string;
+            approvalScope?: null | string;
         };
         FieldValueResponse: {
             /** Format: uuid */

@@ -6478,6 +6478,12 @@
           "useDevelopmentStepUp": {
             "type": "boolean",
             "default": false
+          },
+          "approvalScope": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -9288,6 +9294,15 @@
               "string"
             ],
             "format": "int32"
+          },
+          "retainedApprovalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
           }
         }
       },
@@ -9428,6 +9443,10 @@
               "string"
             ],
             "format": "int32"
+          },
+          "inCurrentVersion": {
+            "type": "boolean",
+            "default": true
           }
         }
       },
@@ -9529,6 +9548,10 @@
             "items": {
               "$ref": "#/components/schemas/FormAccessSubjectResponse"
             }
+          },
+          "retainedFieldApprovalsEnabled": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -9773,6 +9796,25 @@
             "items": {
               "type": "string"
             }
+          },
+          "inCurrentVersion": {
+            "type": "boolean",
+            "default": true
+          },
+          "lastPlacedVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalScope": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

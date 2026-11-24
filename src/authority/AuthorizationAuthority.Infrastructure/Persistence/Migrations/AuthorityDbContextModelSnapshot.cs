@@ -972,6 +972,50 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.FieldSearch.FieldFormBinding", b =>
+                {
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<string>("BindingSourceName")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("binding_source_name");
+
+                    b.Property<Guid?>("BoundBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bound_by_security_command_id");
+
+                    b.Property<DateTimeOffset>("BoundOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("bound_on");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.HasKey("OrganizationId", "FieldDefinitionId")
+                        .HasName("pk_field_form_bindings");
+
+                    b.HasIndex("BoundBySecurityCommandId");
+
+                    b.HasIndex("OrganizationId", "FormDefinitionId")
+                        .HasDatabaseName("ix_field_form_bindings_form");
+
+                    b.ToTable("field_form_bindings", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_field_form_binding_command", "binding_source_name = 'Backfill' OR bound_by_security_command_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_field_form_binding_source", "binding_source_name IN ('Backfill','VersionRegistration','ProtectionCommand')");
+                        });
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval", b =>
                 {
                     b.Property<Guid>("FieldSearchApprovalId")
@@ -984,6 +1028,14 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("approval_reference_text");
+
+                    b.Property<string>("ApprovalScopeName")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("CurrentVersion")
+                        .HasColumnName("approval_scope_name");
 
                     b.Property<string>("ApprovalStateName")
                         .IsRequired()
@@ -1063,6 +1115,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
 
+                    b.Property<int?>("SourceFormVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_form_version_number");
+
                     b.Property<DateTimeOffset?>("StateChangedOn")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("state_changed_on");
@@ -1086,6 +1142,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_field_search_approval_digest", "octet_length(approved_layout_digest) = 32");
 
                             t.HasCheckConstraint("ck_field_search_approval_protection", "approved_protection_mode = 'Standard'");
+
+                            t.HasCheckConstraint("ck_field_search_approval_scope", "approval_scope_name IN ('CurrentVersion','RetainedField')");
+
+                            t.HasCheckConstraint("ck_field_search_approval_source_version", "(approval_scope_name = 'RetainedField') = (source_form_version_number IS NOT NULL) AND (source_form_version_number IS NULL OR source_form_version_number >= 1)");
 
                             t.HasCheckConstraint("ck_field_search_approval_state", "approval_state_name IN ('Active','Withdrawn','Invalidated')");
                         });
@@ -5121,6 +5181,22 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_manifest_leaf_commit");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.FieldSearch.FieldFormBinding", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SecurityCommands.SecurityCommand", null)
+                        .WithMany()
+                        .HasForeignKey("BoundBySecurityCommandId")
+                        .HasConstraintName("fk_field_form_binding_command");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_form_binding_org");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval", b =>

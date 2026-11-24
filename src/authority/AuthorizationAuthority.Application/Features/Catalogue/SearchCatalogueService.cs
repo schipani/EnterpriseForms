@@ -10,6 +10,8 @@ using AuthorizationAuthority.Domain.Features.Content;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Organizations;
 
+using AuthorizationAuthority.Domain.Features.FieldSearch;
+
 namespace AuthorizationAuthority.Application.Features.Catalogue;
 
 /// <summary>Configuration section <c>Catalogue</c> (bound and validated by the host). Provisional engineering limits (C-56 D4), not production capacity promises.</summary>
@@ -55,8 +57,13 @@ public sealed class CatalogueOptions
 /// registry state changed. Issuance and denials are journaled on the non-gating audit stream (OD-8).
 /// </para>
 /// </summary>
-public sealed class SearchCatalogueService(IAuthorityStore store, ProjectionIntegrityVerifier verifier, TimeProvider clock, CatalogueOptions options)
+public sealed class SearchCatalogueService(IAuthorityStore store, ProjectionIntegrityVerifier verifier, TimeProvider clock, CatalogueOptions options, SecurityCommands.FieldSearchApprovalGate? approvalGate = null)
 {
+    /// <summary>C-188 (D-H18): when this (singleton) service was created, i.e. when this Authority process started serving catalogues.</summary>
+    private readonly DateTimeOffset startedOn = clock.GetUtcNow();
+
+    private readonly bool retainedFieldApprovalsEnabled = approvalGate?.RetainedFieldApprovalsEnabled ?? false;
+
     private static readonly string[] UserScopeStates = [ResourceLifecycleStates.Active, ResourceLifecycleStates.Quarantined];
 
     /// <summary>The verifier's population includes records whose registration is not yet effective (they hold no content).</summary>
@@ -265,6 +272,15 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ProjectionInte
         if (reason is null && snapshot.SnapshotExpiresOn <= clock.GetUtcNow())
         {
             reason = CatalogueInvalidationReasons.Expired;
+        }
+
+        // C-188 (D-H18): with retained-field approvals disabled, a user snapshot issued before this process started is not served for a form
+        // that holds an Active retained approval (it may come from a process that had them enabled), so an open V1 page ends at once.
+        if (reason is null && !retainedFieldApprovalsEnabled && snapshot.SnapshotScopeKind == CatalogueScopeKinds.UserSearch && snapshot.SnapshotIssuedOn < startedOn
+            && (await scope.GetFieldSearchApprovalsAsync(snapshot.OrganizationId, snapshot.FormDefinitionId, cancellationToken).ConfigureAwait(false))
+                .Any(a => a.ApprovalStateName == FieldSearchApprovalStates.Active && a.ApprovalScopeName == FieldSearchApprovalScopes.RetainedField))
+        {
+            reason = CatalogueInvalidationReasons.RetainedApprovalsDisabled;
         }
 
         if (reason is null && await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false) != ProjectionGateState.Ready)

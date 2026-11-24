@@ -42,11 +42,11 @@ const previewCapabilities: FieldSearchCapabilitiesResponse = {
   conditionJoin: "And",
   policyRevision: null,
   fields: [
-    { fieldDefinitionId: ids.name, displayLabel: "Given name (sample)", valueType: "String", operators: ["equals", "startsWith"], options: [], minimumTextLength: 3, maximumTextLength: 200 },
-    { fieldDefinitionId: ids.age, displayLabel: "Age (sample)", valueType: "Integer", operators: ["equals", "greaterThan", "lessThan", "between"], options: [], minimumTextLength: null, maximumTextLength: null },
-    { fieldDefinitionId: ids.dob, displayLabel: "Date of birth (sample)", valueType: "Date", operators: ["equals", "before", "after", "between"], options: [], minimumTextLength: null, maximumTextLength: null },
-    { fieldDefinitionId: ids.custody, displayLabel: "In custody (sample)", valueType: "Boolean", operators: ["isTrue", "isFalse"], options: [], minimumTextLength: null, maximumTextLength: null },
-    { fieldDefinitionId: ids.status, displayLabel: "Status (sample)", valueType: "Option", operators: ["is"], options: [{ fieldOptionId: "0199a2b3-c4d5-7e6f-8123-456789abcdf1", displayText: "Active" }, { fieldOptionId: "0199a2b3-c4d5-7e6f-8123-456789abcdf2", displayText: "Closed" }], minimumTextLength: null, maximumTextLength: null },
+    { fieldDefinitionId: ids.name, displayLabel: "Given name (sample)", valueType: "String", operators: ["equals", "startsWith"], options: [], minimumTextLength: 3, maximumTextLength: 200, inCurrentVersion: true },
+    { fieldDefinitionId: ids.age, displayLabel: "Age (sample)", valueType: "Integer", operators: ["equals", "greaterThan", "lessThan", "between"], options: [], minimumTextLength: null, maximumTextLength: null, inCurrentVersion: true },
+    { fieldDefinitionId: ids.dob, displayLabel: "Date of birth (sample)", valueType: "Date", operators: ["equals", "before", "after", "between"], options: [], minimumTextLength: null, maximumTextLength: null, inCurrentVersion: true },
+    { fieldDefinitionId: ids.custody, displayLabel: "In custody (sample)", valueType: "Boolean", operators: ["isTrue", "isFalse"], options: [], minimumTextLength: null, maximumTextLength: null, inCurrentVersion: true },
+    { fieldDefinitionId: ids.status, displayLabel: "Status (sample)", valueType: "Option", operators: ["is"], options: [{ fieldOptionId: "0199a2b3-c4d5-7e6f-8123-456789abcdf1", displayText: "Active" }, { fieldOptionId: "0199a2b3-c4d5-7e6f-8123-456789abcdf2", displayText: "Closed" }], minimumTextLength: null, maximumTextLength: null, inCurrentVersion: true },
   ],
   notSearchableFields: [{ fieldDefinitionId: "0199a2b3-c4d5-7e6f-8123-456789abcdfa", displayLabel: "Case notes (sample)", reasonCode: "ENCRYPTED" }],
 };

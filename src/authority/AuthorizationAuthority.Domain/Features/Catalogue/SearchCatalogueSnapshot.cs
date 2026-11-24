@@ -87,4 +87,7 @@ public static class CatalogueInvalidationReasons
     public const string RecordUnavailable = "RECORD_UNAVAILABLE";
     public const string GateClosed = "ORGANIZATION_GATE_CLOSED";
     public const string CommandSuperseded = "SCOPING_COMMAND_SUPERSEDED";
+
+    /// <summary>C-188 (D-H18): retained-field approvals are disabled in this process and the form holds one; a user snapshot issued earlier (possibly while they were enabled) is no longer served.</summary>
+    public const string RetainedApprovalsDisabled = "RETAINED_FIELD_APPROVALS_DISABLED";
 }

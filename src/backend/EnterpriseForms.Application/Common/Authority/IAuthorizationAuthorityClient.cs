@@ -241,13 +241,15 @@ public sealed record FieldSearchCapabilitiesQuery(Guid OrganizationId, Guid Form
 
 public sealed record FieldSearchOptionSnapshot(Guid FieldOptionId, string OptionLabel);
 
-public sealed record AuthoritySearchableField(Guid FieldDefinitionId, string FieldLabel, string FieldDataType, IReadOnlyList<string> Operators, IReadOnlyList<FieldSearchOptionSnapshot> Options, int ApprovedFormVersionNumber);
+/// <remarks>C-188: <c>InCurrentVersion</c> false for a field searched under a retained-field approval (no longer in the form).</remarks>
+public sealed record AuthoritySearchableField(Guid FieldDefinitionId, string FieldLabel, string FieldDataType, IReadOnlyList<string> Operators, IReadOnlyList<FieldSearchOptionSnapshot> Options, int ApprovedFormVersionNumber, bool InCurrentVersion = true);
 
 public sealed record AuthorityFieldSearchStatus(Guid FieldDefinitionId, string FieldLabel, string FieldDataType, string FieldClassification, string ProtectionMode, string Eligibility,
-    string ApprovalState, string? InvalidationReason, IReadOnlyList<string> ApprovedOperators, IReadOnlyList<string> PermittedOperators);
+    string ApprovalState, string? InvalidationReason, IReadOnlyList<string> ApprovedOperators, IReadOnlyList<string> PermittedOperators,
+    bool InCurrentVersion = true, int? LastPlacedVersionNumber = null, string? ApprovalScope = null);
 
 public sealed record AuthorityFieldSearchConfiguration(bool CanApprove, bool ApprovalOperational, string ApprovalUnavailableReason, int? RegisteredFormVersionNumber, IReadOnlyList<AuthorityFieldSearchStatus> Fields,
-    IReadOnlyList<FormAccessSubjectState>? FieldSearchers = null);
+    IReadOnlyList<FormAccessSubjectState>? FieldSearchers = null, bool RetainedFieldApprovalsEnabled = false);
 
 public sealed record AuthorityFieldSearchCapabilities(Guid FormDefinitionId, bool PlaintextSearchPermitted, long SearchPolicyRevision, long AuthorizationRevision,
     IReadOnlyList<AuthoritySearchableField> Fields, AuthorityFieldSearchConfiguration? Configuration, Guid CorrelationId);
@@ -257,7 +259,7 @@ public sealed record SearchExecutionEvidence(IReadOnlyList<Guid> FieldDefinition
 
 public sealed record FieldSearchAdministrationQuery(Guid OrganizationId);
 
-public sealed record AuthorityFieldSearchAdministrationForm(Guid FormDefinitionId, string? FormTitle, int RegisteredFormVersionNumber, DateTimeOffset RegisteredOn, int FieldCount, int EligibleFieldCount, int ActiveApprovalCount, int InvalidatedApprovalCount);
+public sealed record AuthorityFieldSearchAdministrationForm(Guid FormDefinitionId, string? FormTitle, int RegisteredFormVersionNumber, DateTimeOffset RegisteredOn, int FieldCount, int EligibleFieldCount, int ActiveApprovalCount, int InvalidatedApprovalCount, int RetainedApprovalCount = 0);
 
 public sealed record AuthorityFieldSearchAdministration(bool PlaintextSearchPermitted, bool ApprovalOperational, string ApprovalUnavailableReason, IReadOnlyList<AuthorityFieldSearchAdministrationForm> Forms, long AuthorizationRevision, Guid CorrelationId);
 

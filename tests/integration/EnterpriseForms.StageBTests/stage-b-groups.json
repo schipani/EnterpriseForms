@@ -26,7 +26,7 @@
     {
       "name": "search-catalogue",
       "title": "Field Search Catalogue and Approvals",
-      "classes": ["SearchCatalogueTests", "FieldSearchApprovalTests", "SearchIndexBuilderStackTests", "SearchAccessItemIdentityTests", "SearchAccessProjectionStackTests", "SearchAccessValueProjectionStackTests", "IndexedCommitReadStageMeasurementTests"]
+      "classes": ["SearchCatalogueTests", "FieldSearchApprovalTests", "RetainedFieldSearchTests", "SearchIndexBuilderStackTests", "SearchAccessItemIdentityTests", "SearchAccessProjectionStackTests", "SearchAccessValueProjectionStackTests", "IndexedCommitReadStageMeasurementTests"]
     },
     {
       "name": "search-execution",

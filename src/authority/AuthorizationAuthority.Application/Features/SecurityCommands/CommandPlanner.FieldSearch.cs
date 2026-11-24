@@ -14,8 +14,12 @@ public static partial class CommandPlanner
     /// OD-3: records a newly published form version (designer of the form or an organization administrator). Version
     /// numbers only increase; a field the Authority knows to be encrypted cannot be declared Standard. Active approvals of
     /// fields whose recorded entry changed, or that are no longer in the version, are invalidated in the same revision.
+    /// <para>C-188: every field entry is bound to this form (a field bound to another form refuses the whole registration,
+    /// FIELD_BOUND_TO_ANOTHER_FORM). A RetainedField approval stays as it is while its field is still absent; when the field
+    /// returns it becomes a CurrentVersion approval only if retained approvals are enabled, the entry is unchanged and the field
+    /// is still eligible (D-H4) - otherwise it is invalidated. Withdrawn and Invalidated approvals are never touched.</para>
     /// </summary>
-    private static async Task<CommandPlan> RegisterPublishedFormVersionAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
+    private static async Task<CommandPlan> RegisterPublishedFormVersionAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, FieldSearchApprovalGate gate, CancellationToken cancellationToken)
     {
         var payload = CanonicalJson.Deserialize<RegisterPublishedFormVersionPayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.FormDefinition, payload.FormDefinitionId);
@@ -75,12 +79,49 @@ public static partial class CommandPlanner
             FormTitleSnapshot = string.IsNullOrWhiteSpace(payload.FormTitle) ? null : payload.FormTitle.Trim(),
         };
 
+        // C-188 (D-H7): every placed field belongs to this form and to no other.
+        foreach (var field in payload.Fields)
+        {
+            await RequireFieldFormBindingAsync(scope, organizationId, field.FieldDefinitionId, payload.FormDefinitionId, plan, FieldFormBindingSources.VersionRegistration, cancellationToken).ConfigureAwait(false);
+        }
+
         var entries = payload.Fields.ToDictionary(f => f.FieldDefinitionId);
+        OrganizationProtectionPolicy? policy = null;
         foreach (var approval in await ActiveApprovalsAsync(scope, organizationId, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false))
         {
-            if (!entries.TryGetValue(approval.FieldDefinitionId, out var entry) || !SameApprovedEntry(approval, entry))
+            var present = entries.TryGetValue(approval.FieldDefinitionId, out var entry);
+            if (approval.ApprovalScopeName == FieldSearchApprovalScopes.RetainedField)
             {
-                Invalidate(plan, approval, FieldSearchInvalidationReasons.FormVersionChanged);
+                if (!present)
+                {
+                    continue; // still not in the form: the retained approval is unchanged
+                }
+
+                // D-H4: the field returns. Convert only when enabled, unchanged and still eligible; otherwise invalidate. Never revive.
+                if (!gate.RetainedFieldApprovalsEnabled || !SameApprovedEntry(approval, entry!))
+                {
+                    Invalidate(plan, approval, FieldSearchInvalidationReasons.FormVersionChanged);
+                    continue;
+                }
+
+                policy ??= await scope.FindProtectionPolicyAsync(organizationId, cancellationToken).ConfigureAwait(false);
+                var facts = await FieldSearchRules.ReadProtectionFactsAsync(scope, organizationId, approval.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
+                var eligibility = FieldSearchRules.Eligibility(entry!, policy, facts);
+                if (eligibility != FieldSearchEligibility.Eligible)
+                {
+                    Invalidate(plan, approval, RetainedFieldApprovals.InvalidationReasonFor(eligibility));
+                    continue;
+                }
+
+                approval.ApprovalScopeName = FieldSearchApprovalScopes.CurrentVersion;
+                approval.SourceFormVersionNumber = null;
+                approval.ApprovedFormVersionNumber = payload.FormVersionNumber;
+                approval.ApprovedLayoutDigest = digest;
+                plan.ChangedApprovals.Add(approval);
+            }
+            else if (!present || !SameApprovedEntry(approval, entry!))
+            {
+                Invalidate(plan, approval, FieldSearchInvalidationReasons.FormVersionChanged); // D-H3: removal still invalidates a current-version approval
             }
             else
             {
@@ -113,11 +154,46 @@ public static partial class CommandPlanner
             throw AuthorityException.Invalid("approval_reference (1..200 characters) identifying the governance decision is required");
         }
 
+        var approvalScope = payload.ApprovalScope ?? FieldSearchApprovalScopes.CurrentVersion;
+        if (!FieldSearchApprovalScopes.IsKnown(approvalScope))
+        {
+            throw AuthorityException.Invalid("approval_scope must be CurrentVersion or RetainedField");
+        }
+
+        if (approvalScope == FieldSearchApprovalScopes.RetainedField && !gate.RetainedFieldApprovalsEnabled)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.RetainedFieldApprovalsDisabled, 422, false, "approvals of fields that are no longer in the form are disabled in this environment");
+        }
+
         await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.FormDefinition, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false);
         var latest = await scope.FindLatestPublishedFormVersionAsync(organizationId, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false)
                      ?? throw new AuthorityException(AuthorityErrorCodes.FormVersionUntrusted, 422, false, "no published version of this form is registered with the Authority; publish the form again");
-        var entry = FieldSearchRules.ReadManifest(latest).FirstOrDefault(f => f.FieldDefinitionId == payload.FieldDefinitionId)
-                    ?? throw new AuthorityException(AuthorityErrorCodes.FormVersionUntrusted, 422, false, "the field is not part of the latest registered version of the form");
+        var inLatest = FieldSearchRules.ReadManifest(latest).FirstOrDefault(f => f.FieldDefinitionId == payload.FieldDefinitionId);
+        var source = latest;
+        PublishedFieldEntry entry;
+        if (approvalScope == FieldSearchApprovalScopes.CurrentVersion)
+        {
+            entry = inLatest ?? throw new AuthorityException(AuthorityErrorCodes.FormVersionUntrusted, 422, false, "the field is not part of the latest registered version of the form");
+        }
+        else
+        {
+            if (inLatest is not null)
+            {
+                throw new AuthorityException(AuthorityErrorCodes.FormVersionUntrusted, 422, false, "the field is part of the latest registered version; approve it for the current version");
+            }
+
+            // D-H14: bound to the most recent registered version that placed the field; a field only in unregistered versions is refused.
+            var placed = (await scope.GetPublishedFormVersionsAsync(organizationId, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false))
+                .Select(v => (Version: v, Entry: FieldSearchRules.ReadManifest(v).FirstOrDefault(f => f.FieldDefinitionId == payload.FieldDefinitionId)))
+                .FirstOrDefault(x => x.Entry is not null);
+            if (placed.Entry is null)
+            {
+                throw new AuthorityException(AuthorityErrorCodes.FormVersionUntrusted, 422, false, "the field was never part of a registered version of this form");
+            }
+
+            (source, entry) = (placed.Version, placed.Entry);
+        }
+
         var policy = await scope.FindProtectionPolicyAsync(organizationId, cancellationToken).ConfigureAwait(false);
         var facts = await FieldSearchRules.ReadProtectionFactsAsync(scope, organizationId, payload.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
         var eligibility = FieldSearchRules.Eligibility(entry, policy, facts);
@@ -133,6 +209,7 @@ public static partial class CommandPlanner
         }
 
         var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload with { ApprovalReference = payload.ApprovalReference.Trim(), StepUpEvidence = null }) };
+        await RequireFieldFormBindingAsync(scope, organizationId, payload.FieldDefinitionId, payload.FormDefinitionId, plan, FieldFormBindingSources.VersionRegistration, cancellationToken).ConfigureAwait(false);
         foreach (var previous in await ActiveApprovalsAsync(scope, organizationId, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false))
         {
             if (previous.FieldDefinitionId == payload.FieldDefinitionId)
@@ -149,8 +226,8 @@ public static partial class CommandPlanner
             OrganizationId = organizationId,
             FormDefinitionId = payload.FormDefinitionId,
             FieldDefinitionId = payload.FieldDefinitionId,
-            ApprovedFormVersionNumber = latest.FormVersionNumber,
-            ApprovedLayoutDigest = latest.LayoutDigest,
+            ApprovedFormVersionNumber = source.FormVersionNumber,
+            ApprovedLayoutDigest = source.LayoutDigest,
             ApprovedFieldDataType = entry.FieldDataType,
             ApprovedFieldClassification = entry.FieldClassification,
             ApprovedProtectionMode = entry.ProtectionMode,
@@ -159,6 +236,8 @@ public static partial class CommandPlanner
             ApprovedOptionSnapshotJson = FieldSearchRules.WriteOptions(entry.Options),
             ApprovalReferenceText = payload.ApprovalReference.Trim(),
             ApprovalStateName = FieldSearchApprovalStates.Active,
+            ApprovalScopeName = approvalScope,
+            SourceFormVersionNumber = approvalScope == FieldSearchApprovalScopes.RetainedField ? source.FormVersionNumber : null,
         });
         await AdvanceSearchPolicyAsync(scope, organizationId, plan, cancellationToken).ConfigureAwait(false);
         return plan;
@@ -269,6 +348,37 @@ public static partial class CommandPlanner
         if (plan.ChangedApprovals.Count > 0)
         {
             await AdvanceSearchPolicyAsync(scope, organizationId, plan, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// C-188 (D-H7, D-H13): the field must belong to <paramref name="formDefinitionId"/> - bound earlier in this command, bound in the
+    /// store, or (first naming) bound now. A field bound to another form refuses the command; the binding is never moved.
+    /// </summary>
+    private static async Task RequireFieldFormBindingAsync(IAuthorityScope scope, Guid organizationId, Guid fieldDefinitionId, Guid formDefinitionId, CommandPlan plan, string source, CancellationToken cancellationToken)
+    {
+        var bound = plan.NewFieldFormBindings.FirstOrDefault(b => b.FieldDefinitionId == fieldDefinitionId)?.FormDefinitionId
+                    ?? (await scope.FindFieldFormBindingAsync(organizationId, fieldDefinitionId, cancellationToken).ConfigureAwait(false))?.FormDefinitionId;
+        if (bound is { } existing && existing != formDefinitionId)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.FieldBoundToAnotherForm, 422, false, "the field belongs to another form");
+        }
+
+        if (bound is null)
+        {
+            plan.NewFieldFormBindings.Add(new FieldFormBinding { OrganizationId = organizationId, FieldDefinitionId = fieldDefinitionId, FormDefinitionId = formDefinitionId, BindingSourceName = source });
+        }
+    }
+
+    /// <summary>
+    /// C-188 (D-H13): a protection resource of the field (requirement, release, reclassification) that records a form must record this
+    /// one. A resource without a recorded form carries no evidence either way; the field-to-form binding then decides.
+    /// </summary>
+    private static void RequireSameFormResource(AuthorityResource? resource, Guid formDefinitionId)
+    {
+        if (resource?.ParentResourceEntityId is { } recorded && recorded != formDefinitionId)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.FieldBoundToAnotherForm, 422, false, "the field's protection record belongs to another form");
         }
     }
 

@@ -4314,6 +4314,15 @@
               "string"
             ],
             "format": "int32"
+          },
+          "retained_approval_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
           }
         }
       },
@@ -4485,6 +4494,10 @@
             "items": {
               "$ref": "#/components/schemas/FormAccessSubject"
             }
+          },
+          "retained_field_approvals_enabled": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -4558,6 +4571,25 @@
             "items": {
               "type": "string"
             }
+          },
+          "in_current_version": {
+            "type": "boolean",
+            "default": true
+          },
+          "last_placed_version_number": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approval_scope": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -10514,6 +10546,10 @@
               "string"
             ],
             "format": "int32"
+          },
+          "in_current_version": {
+            "type": "boolean",
+            "default": true
           }
         }
       },

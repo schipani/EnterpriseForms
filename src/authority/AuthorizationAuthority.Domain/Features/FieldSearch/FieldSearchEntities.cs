@@ -74,6 +74,55 @@ public sealed class FieldSearchApproval
     public DateTimeOffset ApprovedOn { get; set; }
 
     public DateTimeOffset? StateChangedOn { get; set; }
+
+    /// <summary>
+    /// C-188: <see cref="FieldSearchApprovalScopes.CurrentVersion"/> (the field is in the latest registered version) or
+    /// <see cref="FieldSearchApprovalScopes.RetainedField"/> (an explicit approval to search the latest retained values of a field
+    /// that is no longer in the form). A retained approval may become CurrentVersion only when the field returns unchanged and
+    /// still eligible; never the other way round.
+    /// </summary>
+    public string ApprovalScopeName { get; set; } = FieldSearchApprovalScopes.CurrentVersion;
+
+    /// <summary>C-188: for a RetainedField approval, the most recent registered version that placed the field (whose entry the approval binds); null otherwise.</summary>
+    public int? SourceFormVersionNumber { get; set; }
+}
+
+/// <summary>C-188 (D-H2): the scope of a field search approval.</summary>
+public static class FieldSearchApprovalScopes
+{
+    public const string CurrentVersion = "CurrentVersion";
+    public const string RetainedField = "RetainedField";
+
+    public static bool IsKnown(string? scope) => scope is CurrentVersion or RetainedField;
+}
+
+/// <summary>
+/// C-188 (D-H7, D-H13): the one form a field definition belongs to in this organization's Authority. Written the first time a
+/// version registration or a protection command names the field (or by the C-188 migration from existing records); afterwards
+/// any command naming the field for another form is refused (FIELD_BOUND_TO_ANOTHER_FORM). Never changed or deleted by the runtime.
+/// </summary>
+public sealed class FieldFormBinding
+{
+    public Guid OrganizationId { get; set; }
+
+    public Guid FieldDefinitionId { get; set; }
+
+    public Guid FormDefinitionId { get; set; }
+
+    /// <summary><see cref="FieldFormBindingSources"/>: Backfill (the C-188 migration), VersionRegistration or ProtectionCommand.</summary>
+    public string BindingSourceName { get; set; } = FieldFormBindingSources.VersionRegistration;
+
+    /// <summary>The security command that created the binding; null only for <see cref="FieldFormBindingSources.Backfill"/>.</summary>
+    public Guid? BoundBySecurityCommandId { get; set; }
+
+    public DateTimeOffset BoundOn { get; set; }
+}
+
+public static class FieldFormBindingSources
+{
+    public const string Backfill = "Backfill";
+    public const string VersionRegistration = "VersionRegistration";
+    public const string ProtectionCommand = "ProtectionCommand";
 }
 
 public static class FieldSearchApprovalStates

@@ -498,6 +498,7 @@ public sealed class FieldSearchApprovalConfiguration : IEntityTypeConfiguration<
         builder.Property(e => e.ApprovalReferenceText).HasMaxLength(200);
         builder.Property(e => e.ApprovalStateName).HasMaxLength(20);
         builder.Property(e => e.InvalidationReasonCode).HasMaxLength(60);
+        builder.Property(e => e.ApprovalScopeName).HasMaxLength(20).HasDefaultValue(FieldSearchApprovalScopes.CurrentVersion);
         builder.HasIndex(e => new { e.OrganizationId, e.FormDefinitionId, e.FieldDefinitionId }).HasDatabaseName("ix_field_search_approvals_field");
         builder.HasIndex(e => new { e.OrganizationId, e.FieldDefinitionId }).IsUnique().HasFilter("approval_state_name = 'Active'").HasDatabaseName("uq_field_search_approval_active");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_field_search_approval_org");
@@ -508,6 +509,28 @@ public sealed class FieldSearchApprovalConfiguration : IEntityTypeConfiguration<
             t.HasCheckConstraint("ck_field_search_approval_classification", "approved_field_classification IN ('Public','Internal')");
             t.HasCheckConstraint("ck_field_search_approval_protection", "approved_protection_mode = 'Standard'");
             t.HasCheckConstraint("ck_field_search_approval_digest", "octet_length(approved_layout_digest) = 32");
+            // C-188: the scope, and a source version exactly for retained approvals.
+            t.HasCheckConstraint("ck_field_search_approval_scope", "approval_scope_name IN ('CurrentVersion','RetainedField')");
+            t.HasCheckConstraint("ck_field_search_approval_source_version", "(approval_scope_name = 'RetainedField') = (source_form_version_number IS NOT NULL) AND (source_form_version_number IS NULL OR source_form_version_number >= 1)");
+        });
+    }
+}
+
+/// <summary>C-188 (D-H7): one form per field definition per organization; written by commands (or the migration backfill) only.</summary>
+public sealed class FieldFormBindingConfiguration : IEntityTypeConfiguration<FieldFormBinding>
+{
+    public void Configure(EntityTypeBuilder<FieldFormBinding> builder)
+    {
+        builder.MapSnakeCase("field_form_bindings");
+        builder.HasKey(e => new { e.OrganizationId, e.FieldDefinitionId }).HasName("pk_field_form_bindings");
+        builder.Property(e => e.BindingSourceName).HasMaxLength(30);
+        builder.HasIndex(e => new { e.OrganizationId, e.FormDefinitionId }).HasDatabaseName("ix_field_form_bindings_form");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_field_form_binding_org");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.BoundBySecurityCommandId).HasConstraintName("fk_field_form_binding_command");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_field_form_binding_source", "binding_source_name IN ('Backfill','VersionRegistration','ProtectionCommand')");
+            t.HasCheckConstraint("ck_field_form_binding_command", "binding_source_name = 'Backfill' OR bound_by_security_command_id IS NOT NULL");
         });
     }
 }

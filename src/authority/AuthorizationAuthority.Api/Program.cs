@@ -111,7 +111,9 @@ public sealed class Program
         builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.SecurityCommands.FieldSearchApprovalGate.Create(
             builder.Configuration[AuthorizationAuthority.Application.Features.SecurityCommands.FieldSearchApprovalGate.ConfigurationKey],
             builder.Environment.EnvironmentName,
-            builder.Configuration["Identity:UserAssertion:ProviderKind"]));
+            builder.Configuration["Identity:UserAssertion:ProviderKind"])
+            // C-188 (D-H18): retained-field approvals are off unless FieldSearch:RetainedFieldApprovals=Enabled; an unknown value refuses startup.
+            .WithRetainedFieldApprovals(builder.Configuration[AuthorizationAuthority.Application.Features.SecurityCommands.FieldSearchApprovalGate.RetainedFieldApprovalsKey]));
         // DR-C7-3: dual-controlled operator approvals for first/recovery Security Administrators. Unavailable unless configured;
         // Create refuses the development-only synthetic approver keys outside Development/Testing (startup failure).
         builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.OperatorPlane.OperatorApprovalVerifier.Create(

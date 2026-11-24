@@ -20,7 +20,10 @@ public sealed record PublishedOptionEntry(Guid FieldOptionId, string OptionLabel
 /// step-up evidence the Authority accepts (none in production or staging until PB-08); <c>step_up_evidence</c> is the
 /// development-only synthetic marker where that path is enabled.
 /// </summary>
-public sealed record ApproveFieldSearchPayload(Guid FormDefinitionId, Guid FieldDefinitionId, IReadOnlyList<string> Operators, string ApprovalReference, string? StepUpEvidence = null);
+/// <remarks>C-188: <c>ApprovalScope</c> null or <c>CurrentVersion</c> approves a field of the latest registered version (unchanged
+/// behaviour); <c>RetainedField</c> approves searching the latest retained values of a field that is no longer in the form, bound to
+/// the most recent registered version that placed it.</remarks>
+public sealed record ApproveFieldSearchPayload(Guid FormDefinitionId, Guid FieldDefinitionId, IReadOnlyList<string> Operators, string ApprovalReference, string? StepUpEvidence = null, string? ApprovalScope = null);
 
 public sealed record WithdrawFieldSearchPayload(Guid FormDefinitionId, Guid FieldDefinitionId, string WithdrawalReason);
 
@@ -33,19 +36,24 @@ public sealed record FieldSearchCapabilitiesRequest(Guid OrganizationId, Guid Fo
 public sealed record FieldSearchOption(Guid FieldOptionId, string OptionLabel);
 
 /// <summary>A field the caller may query: label, type, operators and options from the Authority's approval snapshot.</summary>
-public sealed record SearchableFieldCapability(Guid FieldDefinitionId, string FieldLabel, string FieldDataType, IReadOnlyList<string> Operators, IReadOnlyList<FieldSearchOption> Options, int ApprovedFormVersionNumber);
+/// <remarks>C-188: <c>InCurrentVersion</c> false for a field searched under a retained-field approval ("No longer in the form").</remarks>
+public sealed record SearchableFieldCapability(Guid FieldDefinitionId, string FieldLabel, string FieldDataType, IReadOnlyList<string> Operators, IReadOnlyList<FieldSearchOption> Options, int ApprovedFormVersionNumber, bool InCurrentVersion = true);
 
 /// <summary>
 /// Configuration view of one field of the latest registered version (only for callers with <c>design</c> on the form or
 /// <c>administer_security</c>). <c>Eligibility</c>: Eligible, Encrypted, ClassificationNotPermitted, OrganizationSearchDisabled,
 /// ProtectionPending, TypeNotSearchable, OrganizationPolicyMissing. <c>ApprovalState</c>: None, Active, Withdrawn, Invalidated.
 /// </summary>
+/// <remarks>C-188: <c>InCurrentVersion</c> false for a field of an earlier registered version that the latest version no longer places
+/// (described from <c>LastPlacedVersionNumber</c>'s entry); <c>ApprovalScope</c> is the scope of the latest approval (null when none).</remarks>
 public sealed record FieldSearchStatus(Guid FieldDefinitionId, string FieldLabel, string FieldDataType, string FieldClassification, string ProtectionMode, string Eligibility,
-    string ApprovalState, string? InvalidationReason, IReadOnlyList<string> ApprovedOperators, IReadOnlyList<string> PermittedOperators);
+    string ApprovalState, string? InvalidationReason, IReadOnlyList<string> ApprovedOperators, IReadOnlyList<string> PermittedOperators,
+    bool InCurrentVersion = true, int? LastPlacedVersionNumber = null, string? ApprovalScope = null);
 
 /// <remarks><c>FieldSearchers</c>: who holds <c>field_searcher</c> on the form — returned only to security administrators (who alone may change it), otherwise null.</remarks>
+/// <remarks>C-188: <c>RetainedFieldApprovalsEnabled</c> — whether this Authority accepts and honours retained-field approvals (FieldSearch:RetainedFieldApprovals).</remarks>
 public sealed record FieldSearchConfiguration(bool CanApprove, bool ApprovalOperational, string ApprovalUnavailableReason, int? RegisteredFormVersionNumber, IReadOnlyList<FieldSearchStatus> Fields,
-    IReadOnlyList<FormAccessSubject>? FieldSearchers = null);
+    IReadOnlyList<FormAccessSubject>? FieldSearchers = null, bool RetainedFieldApprovalsEnabled = false);
 
 /// <summary>
 /// Capabilities for one form. <c>Fields</c> is empty unless the caller holds <c>query_fields</c> on the form and approvals
@@ -63,7 +71,8 @@ public sealed record FieldSearchAdministrationRequest(Guid OrganizationId);
 /// One form with an Authority-registered published version, as a security administrator needs it to administer search:
 /// the title and field facts recorded at registration and approval counts. Never record contents.
 /// </summary>
-public sealed record FieldSearchAdministrationForm(Guid FormDefinitionId, string? FormTitle, int RegisteredFormVersionNumber, DateTimeOffset RegisteredOn, int FieldCount, int EligibleFieldCount, int ActiveApprovalCount, int InvalidatedApprovalCount);
+/// <remarks>C-188 (D-H8): <c>RetainedApprovalCount</c> — Active approvals of fields no longer in the form (the review inventory).</remarks>
+public sealed record FieldSearchAdministrationForm(Guid FormDefinitionId, string? FormTitle, int RegisteredFormVersionNumber, DateTimeOffset RegisteredOn, int FieldCount, int EligibleFieldCount, int ActiveApprovalCount, int InvalidatedApprovalCount, int RetainedApprovalCount = 0);
 
 /// <summary>Only for <c>administer_security</c>; forms of the caller's organization whose form resource is Active.</summary>
 public sealed record FieldSearchAdministrationResponse(bool PlaintextSearchPermitted, bool ApprovalOperational, string ApprovalUnavailableReason, IReadOnlyList<FieldSearchAdministrationForm> Forms, long AuthorizationRevision, Guid CorrelationId);

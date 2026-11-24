@@ -692,6 +692,14 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public void AddFieldSearchApproval(FieldSearchApproval approval) => context.FieldSearchApprovals.Add(approval);
 
+        public Task<List<PublishedFormVersion>> GetPublishedFormVersionsAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
+            context.PublishedFormVersions.AsNoTracking().Where(v => v.OrganizationId == organizationId && v.FormDefinitionId == formDefinitionId).OrderByDescending(v => v.FormVersionNumber).ToListAsync(cancellationToken);
+
+        public Task<FieldFormBinding?> FindFieldFormBindingAsync(Guid organizationId, Guid fieldDefinitionId, CancellationToken cancellationToken) =>
+            context.FieldFormBindings.AsNoTracking().FirstOrDefaultAsync(b => b.OrganizationId == organizationId && b.FieldDefinitionId == fieldDefinitionId, cancellationToken);
+
+        public void AddFieldFormBinding(FieldFormBinding binding) => context.FieldFormBindings.Add(binding);
+
         public Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid searchCatalogueSnapshotId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
             context.CatalogueSnapshotEntries.AsNoTracking().Where(e => e.SearchCatalogueSnapshotId == searchCatalogueSnapshotId && formRecordIds.Contains(e.FormRecordId)).ToListAsync(cancellationToken);
 

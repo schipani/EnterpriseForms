@@ -13,8 +13,13 @@ import { operatorLabel } from "./conditionModel";
  * only a security administrator (administer_security) sees the approval controls, and they stay nonfunctional wherever
  * the Authority cannot accept approvals (production and staging until PB-08 step-up exists). There is no control here
  * that changes a field's encryption; an encrypted field is simply not searchable.
+ *
+ * C-188: a field that earlier published versions placed but the latest one no longer does is shown "No longer in the form".
+ * Where the environment enables it, a security administrator can approve searching its latest retained values (a separate,
+ * explicit retained-field approval; earlier revisions are never searched). Removing a field still ends its normal approval.
  */
 export const ENCRYPTED_NOT_SEARCHABLE = "Encrypted for privacy — not searchable.";
+export const NO_LONGER_IN_THE_FORM = "No longer in the form";
 
 const ELIGIBILITY: Record<string, { tone: "success" | "neutral" | "warning"; label: string; detail: string }> = {
   Eligible: { tone: "success", label: "Can be approved", detail: "A plaintext Public or Internal field. A security administrator can approve it for Advanced Search." },
@@ -35,7 +40,7 @@ const APPROVAL: Record<string, { tone: "success" | "neutral" | "warning"; label:
 
 const INVALIDATION: Record<string, string> = {
   FIELD_STRENGTHENED: "The field's protection was strengthened after it was approved.",
-  FORM_VERSION_CHANGED: "A later published version changed this field (type, classification, protection, label or choices).",
+  FORM_VERSION_CHANGED: "A later published version changed or removed this field (type, classification, protection, label or choices).",
   ORGANIZATION_POLICY_CHANGED: "The organization's data-protection policy changed after it was approved.",
 };
 
@@ -79,11 +84,23 @@ export function FieldSearchSection({ formDefinitionId, fieldDefinitionId }: { fo
         </StatusMessage>
       ) : (
         <>
+          {status.inCurrentVersion === false ? <RetainedFieldNotice status={status} /> : null}
           <FieldSearchFacts status={status} versionNumber={Number(data.registeredFormVersionNumber)} />
           <ApprovalControls formDefinitionId={formDefinitionId} data={data} status={status} />
         </>
       )}
     </div>
+  );
+}
+
+/** C-188 (D-H9): a field of an earlier published version that the latest version no longer places. */
+function RetainedFieldNotice({ status }: { status: FieldSearchStatusResponse }) {
+  const lastPlaced = status.lastPlacedVersionNumber === null || status.lastPlacedVersionNumber === undefined ? null : Number(status.lastPlacedVersionNumber);
+  return (
+    <StatusMessage tone="info" title={NO_LONGER_IN_THE_FORM}>
+      {lastPlaced === null ? "The latest published version does not include this field." : `Last included in published version ${lastPlaced}; the latest published version does not include it.`}{" "}
+      Its stored values are kept. Searching it needs a separate approval for retained values, and searches cover only each record's latest retained value — never earlier revisions.
+    </StatusMessage>
   );
 }
 
@@ -110,7 +127,11 @@ function FieldSearchFacts({ status, versionNumber }: { status: FieldSearchStatus
       <dt className="font-medium">Approval</dt>
       <dd className="m-0">
         <Badge tone={approval.tone}>{approval.label}</Badge>
-        {status.approvalState === "Active" ? <p className="m-0 mt-1 text-muted">{`Approved for version ${versionNumber}: ${status.approvedOperators.map((operator) => operatorLabel(operator, status.fieldDataType)).join(", ")}.`}</p> : null}
+        {status.approvalState === "Active" && status.approvalScope === "RetainedField" ? (
+          <p className="m-0 mt-1 text-muted">{`Approved for its latest retained values: ${status.approvedOperators.map((operator) => operatorLabel(operator, status.fieldDataType)).join(", ")}.`}</p>
+        ) : status.approvalState === "Active" ? (
+          <p className="m-0 mt-1 text-muted">{`Approved for version ${versionNumber}: ${status.approvedOperators.map((operator) => operatorLabel(operator, status.fieldDataType)).join(", ")}.`}</p>
+        ) : null}
         {status.approvalState === "Invalidated" ? <p className="m-0 mt-1 text-muted">{INVALIDATION[status.invalidationReason ?? ""] ?? "The approval no longer matches the field."} A security administrator can review and approve it again.</p> : null}
       </dd>
     </dl>
@@ -124,13 +145,17 @@ function ApprovalControls({ formDefinitionId, data, status }: { formDefinitionId
   const [reference, setReference] = useState("");
   const [stepUp, setStepUp] = useState(false);
   const [withdrawReason, setWithdrawReason] = useState("");
+  const retained = status.inCurrentVersion === false;
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: fieldSearchKey(formDefinitionId) });
     await queryClient.invalidateQueries({ queryKey: ["search", "capabilities", formDefinitionId] });
     await queryClient.invalidateQueries({ queryKey: ["organization", "search-approvals"] });
   };
   const approve = useMutation({
-    mutationFn: () => api.forms.approveFieldSearch(formDefinitionId, status.fieldDefinitionId, { operators, approvalReference: reference.trim(), useDevelopmentStepUp: stepUp }).then((r) => r.result),
+    mutationFn: () =>
+      api.forms
+        .approveFieldSearch(formDefinitionId, status.fieldDefinitionId, { operators, approvalReference: reference.trim(), useDevelopmentStepUp: stepUp, approvalScope: retained ? "RetainedField" : null })
+        .then((r) => r.result),
     onSuccess: async () => {
       setReference("");
       setStepUp(false);
@@ -166,9 +191,15 @@ function ApprovalControls({ formDefinitionId, data, status }: { formDefinitionId
           </div>
         </fieldset>
       ) : null}
-      {!active && eligible ? (
+      {!active && eligible && retained && !data.retainedFieldApprovalsEnabled ? (
+        <StatusMessage tone="info" title="Searching removed fields is not enabled here">
+          Approving the retained values of a field that is no longer in the form is turned off in this environment.
+        </StatusMessage>
+      ) : null}
+      {!active && eligible && (!retained || data.retainedFieldApprovalsEnabled) ? (
         <fieldset className="flex flex-col gap-3 rounded-control border border-line p-3" aria-describedby={data.approvalOperational ? undefined : "field-search-approval-unavailable"}>
-          <legend className={`px-1 ${legendClass}`}>Approve for search</legend>
+          <legend className={`px-1 ${legendClass}`}>{retained ? "Approve searching retained values" : "Approve for search"}</legend>
+          {retained ? <p className={`m-0 ${helpTextClass}`}>Searches will find each record's latest retained value of this field. Earlier revisions are never searched.</p> : null}
           {!data.approvalOperational ? (
             <div id="field-search-approval-unavailable">
               <StatusMessage tone="info" title="Approval is not available in this environment">
@@ -200,7 +231,7 @@ function ApprovalControls({ formDefinitionId, data, status }: { formDefinitionId
           {approve.error ? <ErrorPanel error={approve.error} /> : null}
           <div>
             <Button size="sm" disabled={!data.approvalOperational || operators.length === 0 || reference.trim() === "" || !stepUp} busy={approve.isPending} onClick={() => approve.mutate()}>
-              Approve for search
+              {retained ? "Approve retained values" : "Approve for search"}
             </Button>
           </div>
         </fieldset>

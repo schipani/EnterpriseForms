@@ -94,6 +94,19 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public int TimelineReads { get; set; }
     public List<PublishedFormVersion> PublishedVersions { get; } = [];
     public List<FieldSearchApproval> Approvals { get; } = [];
+
+    public List<FieldFormBinding> FieldFormBindings { get; } = [];
+
+    /// <summary>C-188: adds a binding with the real table's primary key (organization, field) enforced.</summary>
+    public void AddFieldFormBindingForTest(FieldFormBinding binding)
+    {
+        if (FieldFormBindings.Any(b => b.OrganizationId == binding.OrganizationId && b.FieldDefinitionId == binding.FieldDefinitionId))
+        {
+            throw new InvalidOperationException("duplicate key value violates unique constraint pk_field_form_bindings");
+        }
+
+        FieldFormBindings.Add(binding);
+    }
     public List<OrganizationProtectionPolicy> Policies { get; } = [];
     public List<ProtectionCensusResult> CensusResults { get; } = [];
     public List<ProtectionReconciliationAttestation> Attestations { get; } = [];
@@ -534,6 +547,14 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
             Task.FromResult(s.Approvals.Where(a => a.OrganizationId == organizationId && (formDefinitionId == null || a.FormDefinitionId == formDefinitionId)).ToList());
 
         public void AddFieldSearchApproval(FieldSearchApproval approval) => s.Approvals.Add(approval);
+
+        public Task<List<PublishedFormVersion>> GetPublishedFormVersionsAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PublishedVersions.Where(v => v.OrganizationId == organizationId && v.FormDefinitionId == formDefinitionId).OrderByDescending(v => v.FormVersionNumber).ToList());
+
+        public Task<FieldFormBinding?> FindFieldFormBindingAsync(Guid organizationId, Guid fieldDefinitionId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.FieldFormBindings.FirstOrDefault(b => b.OrganizationId == organizationId && b.FieldDefinitionId == fieldDefinitionId));
+
+        public void AddFieldFormBinding(FieldFormBinding binding) => s.AddFieldFormBindingForTest(binding);
 
         public Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid searchCatalogueSnapshotId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
             Task.FromResult(s.SnapshotEntries.Where(e => e.SearchCatalogueSnapshotId == searchCatalogueSnapshotId && formRecordIds.Contains(e.FormRecordId)).ToList());

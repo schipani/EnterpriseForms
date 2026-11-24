@@ -203,7 +203,7 @@ function ConditionRow({ number, condition, field, fields, enabled, errors, remov
           label="Field"
           value={condition.fieldDefinitionId}
           placeholder={enabled ? (fields.length > 0 ? "Choose a field" : "No searchable fields") : "No searchable fields"}
-          options={fields.map((candidate) => ({ value: candidate.fieldDefinitionId, label: candidate.displayLabel }))}
+          options={fields.map((candidate) => ({ value: candidate.fieldDefinitionId, label: candidate.inCurrentVersion === false ? `${candidate.displayLabel} (no longer in the form)` : candidate.displayLabel }))}
           disabled={!enabled || fields.length === 0}
           error={errors.field}
           onValueChange={chosen(onFieldChange)}
