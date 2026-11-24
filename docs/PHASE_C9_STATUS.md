@@ -1,9 +1,9 @@
 # Phase C9 — Form Version Management: status
 
-- **Branches:** C-188 `c188/retained-field-search` (from `9903844`; local only, §11). M3 `phase-c9/m3-acceptance` (from `fc9e404`, the authorized baseline; tests and documentation only), squash-merged to `main` as `9903844` (PR #75). M1 `phase-c9/form-version-management` (from `198aeae`), squash-merged to `main` as `cd48e13` (PR #70; branch kept, tag `archive/c9-m1-form-version-management-9395ec5`). M2 `phase-c9/m2-version-comparison` (from `cd48e13`), squash-merged to `main` as `491fa9a` (PR #71; the branch was deleted automatically on merge; its commits are kept by tag `archive/c9-m2-version-comparison-03b5169`).
+- **Branches:** C-188 `c188/retained-field-search` (from `9903844`; pushed, PR #76 open, not merged, §11). M3 `phase-c9/m3-acceptance` (from `fc9e404`, the authorized baseline; tests and documentation only), squash-merged to `main` as `9903844` (PR #75). M1 `phase-c9/form-version-management` (from `198aeae`), squash-merged to `main` as `cd48e13` (PR #70; branch kept, tag `archive/c9-m1-form-version-management-9395ec5`). M2 `phase-c9/m2-version-comparison` (from `cd48e13`), squash-merged to `main` as `491fa9a` (PR #71; the branch was deleted automatically on merge; its commits are kept by tag `archive/c9-m2-version-comparison-03b5169`).
 - **Architecture:** `docs/architecture/PHASE_C9_FORM_VERSION_MANAGEMENT.md`.
-- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6); C-184 (PR #71 merge record, §7); C-185 (PR #73 merge record and failed post-merge CI, §8); C-186 (test-host startup race, PR #74 and CI recovery, §9); C-187 (M3 authorized and implemented; awaiting owner review, §10); C-188 (§11 #2 searchability of off-layout historical values recorded as UNMET — deferred, §10.4); C-189 (Option B authorized and implemented in Development/Test; awaiting owner review, §11).
-- **State (2026-11-24):** M1 and M2 merged to `main` (code integration only: `cd48e13`, `491fa9a`). Post-merge CI on `main` failed at `491fa9a` (§7) and at `7d0c879` (§8), each time on a test defect, and has been green since `3d930f6` (§9). M3 (WP-7, WP-8; §10) squash-merged to `main` as `9903844` (PR #75); post-merge CI and CodeQL green. **C-188 Option B implemented in Development/Test on the local branch `c188/retained-field-search` (§11, C-189); not pushed, not reviewed, not merged.** Manual screen-reader review OPEN. CLAUDE.md §11 #2 searchability of off-layout historical values remains UNMET until the owner accepts the C-189 evidence. Not final C9 acceptance, not independently reviewed, no production or Level 2 claim. G21 OPEN.
+- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6); C-184 (PR #71 merge record, §7); C-185 (PR #73 merge record and failed post-merge CI, §8); C-186 (test-host startup race, PR #74 and CI recovery, §9); C-187 (M3 authorized and implemented; awaiting owner review, §10); C-188 (§11 #2 searchability of off-layout historical values recorded as UNMET — deferred, §10.4); C-189 (Option B authorized and implemented in Development/Test; awaiting owner review, §11); C-190 (BF-1 remediation, §11.6).
+- **State (2026-11-24):** M1 and M2 merged to `main` (code integration only: `cd48e13`, `491fa9a`). Post-merge CI on `main` failed at `491fa9a` (§7) and at `7d0c879` (§8), each time on a test defect, and has been green since `3d930f6` (§9). M3 (WP-7, WP-8; §10) squash-merged to `main` as `9903844` (PR #75); post-merge CI and CodeQL green. **C-188 Option B implemented in Development/Test on `c188/retained-field-search` (§11, C-189), pushed with PR #76 (owner-authorized); BF-1 remediated on the same branch (§11.6, C-190); not reviewed, not merged.** Manual screen-reader review OPEN. CLAUDE.md §11 #2 searchability of off-layout historical values remains UNMET until the owner accepts the C-189 evidence. Not final C9 acceptance, not independently reviewed, no production or Level 2 claim. G21 OPEN.
 
 ## 1. What M1 delivers
 
@@ -326,8 +326,9 @@ the C8 status); the six Dependabot alerts; independent third-party assessment an
 ## 11. C-188 Option B — retained-field search approvals (C-189)
 
 Authorized by the owner on 2026-11-24 (owner decisions D-H1…D-H18; H1–H6 in Development/Test only). Implemented on the
-local branch `c188/retained-field-search` from `9903844` (the PR #75 squash merge). **Not pushed, no pull request, not
-merged, not deployed; not owner-accepted and not independently reviewed.** CLAUDE.md §11 #2 searchability stays
+branch `c188/retained-field-search` from `9903844` (the PR #75 squash merge), pushed and opened as PR #76 with owner
+authorization; BF-1 remediated on the same branch (§11.6). **Not merged, not deployed; not owner-accepted and not independently
+reviewed.** CLAUDE.md §11 #2 searchability stays
 **UNMET** in the requirement register until the owner accepts the evidence below.
 
 ### 11.1 Delivered
@@ -394,10 +395,73 @@ Order of events in this session: a first regression batch on a two-hour-old stac
   production until PB-08 provider step-up exists.
 - **Pre-existing defect found and fixed (separate commit, outside C-188's scope; the owner may drop it):** since C7 (PR #29) the business publish handler recorded a refused Authority registration with audit outcome `Failure`, which `ck_audit_events_outcome` rejects (`Success`/`Denied`/`Failed`); the insert failed, the failure's audit evidence was lost and the designer received `503 STORE_UNAVAILABLE` although the version had been published. The handler now records `Failed`; contract test `ARefusedAuthorityRegistrationIsReportedAndAuditedWithAnAllowedOutcome` fails without the fix and passes with it; the Stage B concurrency fact exercises the same path on the real database (201, `authorityRegistered=false`).
 - **Pre-existing, not fixed:** `SearchCatalogueTests.BenchmarkTheVerifiedScopeAt50And150And480Records` fails on unmodified `main` (`9903844`, fresh stack) as on this branch: verified scope p50 about 1.5 s for 50 records and 4.9 s for 150 records (C7 M1 recorded 0.59 s and 1.8 s at `b146907`), and the 480-record scope exceeds the time limit (`SEARCH_VERIFICATION_LIMIT`). Not caused by C-188; needs its own investigation.
-- **Registration during a concurrent security command:** a publication whose Authority registration meets a closed gate stays published but unregistered (existing C7 behaviour: only a stale revision is retried); until the form is published again, field search follows the previous registered version — for retained approvals, the field still counts as absent.
+- **Registration during a concurrent security command (superseded by BF-1, §11.6):** a publication whose Authority registration meets a closed gate stays published but unregistered (existing C7 behaviour: only a stale revision is retried); until the form is published again, field search follows the previous registered version — for retained approvals, the field still counts as absent.
 - **Test plan items as built:** T20 adds no step to `FormVersionAcceptanceTests` (the retained lifecycle is its own Stage B class); T22 simulates the older binary through the runtime role without the scope-awareness setting rather than starting a previous image; T23 differs from the plan: with the flag off the Authority starts and treats existing retained approvals as not effective (a refusal to start would block the authorized rollback step of turning the flag off); an unknown flag value refuses startup.
 
 ### 11.5 Outstanding obligations
 
-Owner review and acceptance of this implementation; push, pull request, merge and any deployment (each separately
-authorized); recording §11 #2 as met only after acceptance; the obligations of §10.7.
+Owner review and acceptance of this implementation and of the BF-1 remediation; merge and any deployment (each separately
+authorized); recording §11 #2 as met only after acceptance; the BF-1 rollout prerequisites (§11.7); PB-08 provider step-up; manual
+NVDA/VoiceOver review (PB14-47, PB14-48); an independent security review; the obligations of §10.7.
+
+### 11.6 BF-1 remediation — publication registration barrier (C-190)
+
+PR #76 review (owner-requested verification) found **BF-1**: a publication that removes an approved field and whose Authority
+registration is refused (e.g. a gate closed by a concurrent security command) stayed current in the business while the Authority
+kept the previous registered version, so the field's ordinary approval stayed Active and searchable - its retained values without
+the explicit retained approval Option B requires - until a later registered publication, with no time limit. The C7 retry of a stale
+revision could never succeed either: it reused an idempotency key the Authority had stored with the refusal. The owner approved
+remediation on 2026-11-24 with the decision "fail closed whenever an active published form version is not registered with the
+Authorization Authority" and authorized implementation on this branch and PR #76.
+
+**Resolution** (design as built: `docs/architecture/PHASE_C7_ADVANCED_FIELD_SEARCH.md` §6H). The preferred option - keep a new
+version inactive until registered - would change the C9 version lifecycle, so the owner's alternative was implemented: the business
+stages every version with the Authority (`PrepareFormVersionPublication`, full manifest of the publish request) **before** committing
+it, under a per-form advisory lock; while a publication is pending, no approval of the form is effective in the Authority
+(capabilities, both engines, open pages, catalogue snapshots, new approvals); only `ResolveFormVersionPublication` (registered from
+the Authority's staged manifest, or abandoned) ends it. Recovery (`POST …/authority-registration/recover`, "Retry registration" in the
+designer) completes or withdraws a pending publication without a new publication, decided under the same lock. No existing security
+invariant was weakened: OD-3 holds (nothing is registered from later business rows), D-H3/D-H4, revocation, completeness, integrity
+and tenant isolation are unchanged.
+
+**Verification (local, 2026-11-24).**
+
+All runs local, against disposable Development/Test databases and the isolated security-test stack; nothing ran against a persistent environment. Hosted Stage B was not run (release-only, C-131).
+
+| Suite | Result |
+|---|---|
+| Authority unit `FormVersionPublicationTests` (barrier on removal and on return, abandonment, exact resolution only, approvals and one-step registration refused while pending, supersede, re-validation, D-H7 at prepare, single pending) | 9/9 |
+| Contract `FormVersionLifecycleContractTests` (existing 10, the C7 registration-failure test adapted to the pending state; new: stage-before-commit order, refused prepare publishes nothing, busy Authority retried with fresh keys, recovery registers (with jsonb-normalized storage) and is idempotent, recovery abandons, mismatched or unstaged versions never registered) | 16/16 |
+| Stage B `FormVersionPublicationBarrierTests` (fresh stack, run `20261124-060623-3ea3a67d`): lost registration of a removal closed on business and Authority capabilities, V1 engine, open V1 page, indexed engine, open indexed page and approvals, then recovered and idempotent; lost commit abandoned; field return under a retained approval; concurrent security commands (4 rounds); database guards | 5/5 |
+| Playwright `form-publication-registration.spec.ts` (Advanced Search unavailable with the reason; designer Retry registration; search resumes without the removed field; axe WCAG 2.2 A/AA on both pages) | 4/4 |
+| Vitest (full; 4 new in `AuthorityRegistrationNotice.test.tsx`) | 585/585 |
+| Full .NET CI-equivalent set (`run_dotnet_tests.py`, Release) | 3,346/3,346 executed, 223 authorized skips (unchanged) |
+| Existing Stage B regressions (focused): `RetainedFieldSearchTests` 5/5 and `FieldSearchApprovalTests` 5/5 (fresh stack, after two test assertions were corrected, below); `FieldSearchExecutionTests` 14/14; `FormVersion*` 13/13; `DesignerTests` 3/3; `FieldProtectionDowngradeTests` 8/8; `FieldProtectionMigrationTests` 8/8; `SecurityCommandTimelineTests` 4/4; `IndexedSearchQueryStackTests` 21/21; `SearchIndexBuilderStackTests` 12/12; `SearchCatalogueTests` 11/12 (fresh stack; only the 50/150/480 benchmark already failing on `main`, §11.4) | as stated |
+| Existing Playwright regressions: `retained-field-search` 4/4, `field-search-approval` 5/5, `field-search-execution` 6/6, `form-version-acceptance` 5/5 | passed |
+| Frontend lint, typecheck; OpenAPI and generated clients regenerated without drift; CI self-tests (37) | passed |
+
+Two existing Stage B assertions were corrected, not weakened: `FieldSearchApprovalTests` expected the one-step `RegisterPublishedFormVersion` command in the journal (publications now commit `PrepareFormVersionPublication` and `ResolveFormVersionPublication`; the test now requires both and no one-step command); the C-188 race (`RetainedFieldSearchTests`) assumed that a transient answer to an approval means nothing was committed - the journal of run `20261124-061002-d789bb6f` shows the approval committed and Effective, then converted by the registration (D-H4), while the business answered a transient error because the publication staged next moved the revision during its configuration re-read (possible in C7 too; an administrator can be told an approval failed when it succeeded). In the BF-1 race all four publications registered and the concurrent re-approvals were refused while the publication was in flight (12, 12, 7 and 12 of 12); the pending branch is proven by the fault-driven facts. A first regression batch on a stack that had run for over an hour failed `SearchCatalogueTests.BenchmarkA200RecordScopeSequentiallyAndUnderConcurrency` (no sequential verification within the time budget); on a fresh stack it passed.
+
+**Defect found by the Stage B run and fixed before commit:** recovery compared the staged digest with the digest of the stored layout
+text, but the business column is `jsonb` and does not keep the published bytes, so every recovery of a committed version was refused
+`STAGED_VERSION_MISMATCH` (fail closed - the form stayed unsearchable - but never recoverable). Recovery now canonicalizes the stored
+layout exactly as publishing does; the contract test reproduces the jsonb case and fails without the fix.
+
+### 11.7 BF-1 limitations and rollout prerequisites
+
+- **Mixed versions:** a business binary built before BF-1 does not stage publications (its publications keep the C7 window); an
+  Authority binary built before BF-1 does not enforce the barrier. Deploy the Authority first and the business second as one release;
+  a rollback of the Authority alone reopens BF-1. A single Authority instance during rollout (D-H12) as before.
+- **Versions left unregistered before this change** have no staged publication, so the Authority cannot know about them; the
+  registration status reports them as `NotRegistered` (publish again, OD-3). Before any rollout, a read-only business-side inventory is
+  required: forms whose current version has a `FORM_VERSION_AUTHORITY_REGISTRATION_FAILED` audit event and no later
+  `FORM_VERSION_AUTHORITY_REGISTERED` event for the same version. Not run on any persistent environment (not authorized).
+- **Availability:** search on a form with a pending publication is unavailable until a designer retries the registration or publishes
+  again; there is no automatic background retry (it would need a non-human registration identity - a governance change not made).
+- **A staged version whose stored layout no longer has the staged digest** (tampering, or a defect) is never registered; the form stays
+  unsearchable until a new publication supersedes it.
+- **Abandonment** is decided by the business from its own store under the lock; a designer with direct Authority access could withdraw
+  a committed version's staging, recreating the C7 window for that form (audited; it grants no search that the approval did not).
+- **Race coverage:** in the Stage B race the four publications all registered while the concurrent re-approvals were refused
+  (pending or transient); the pending branch is proven deterministically with the Testing-only fault checkpoints, not by the race.
+- **Concurrent C7 limitation recorded in §11.4** ("Registration during a concurrent security command") is superseded by this section.
