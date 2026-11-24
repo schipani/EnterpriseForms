@@ -1,9 +1,9 @@
 # Phase C9 — Form Version Management: status
 
-- **Branches:** M1 `phase-c9/form-version-management` (from `198aeae`), squash-merged to `main` as `cd48e13` (PR #70; branch kept, tag `archive/c9-m1-form-version-management-9395ec5`). M2 `phase-c9/m2-version-comparison` (from `cd48e13`), squash-merged to `main` as `491fa9a` (PR #71; the branch was deleted automatically on merge; its commits are kept by tag `archive/c9-m2-version-comparison-03b5169`).
+- **Branches:** M3 `phase-c9/m3-acceptance` (from `fc9e404`, the authorized baseline; tests and documentation only). M1 `phase-c9/form-version-management` (from `198aeae`), squash-merged to `main` as `cd48e13` (PR #70; branch kept, tag `archive/c9-m1-form-version-management-9395ec5`). M2 `phase-c9/m2-version-comparison` (from `cd48e13`), squash-merged to `main` as `491fa9a` (PR #71; the branch was deleted automatically on merge; its commits are kept by tag `archive/c9-m2-version-comparison-03b5169`).
 - **Architecture:** `docs/architecture/PHASE_C9_FORM_VERSION_MANAGEMENT.md`.
-- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6); C-184 (PR #71 merge record, §7); C-185 (PR #73 merge record and failed post-merge CI, §8); C-186 (test-host startup race, PR #74 and CI recovery, §9).
-- **State (2026-11-23):** M1 and M2 merged to `main` (code integration only: `cd48e13`, `491fa9a`). Post-merge CI on `main` failed at `491fa9a` (§7) and at `7d0c879` (§8), each time on a test defect, and has been green since `3d930f6` (§9). Not final C9 acceptance, not independently reviewed, no production or Level 2 claim. M3 not started. G21 OPEN.
+- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6); C-184 (PR #71 merge record, §7); C-185 (PR #73 merge record and failed post-merge CI, §8); C-186 (test-host startup race, PR #74 and CI recovery, §9); C-187 (M3 authorized and implemented; awaiting owner review, §10); C-188 (§11 #2 searchability of off-layout historical values recorded as UNMET — deferred, §10.4).
+- **State (2026-11-24):** M1 and M2 merged to `main` (code integration only: `cd48e13`, `491fa9a`). Post-merge CI on `main` failed at `491fa9a` (§7) and at `7d0c879` (§8), each time on a test defect, and has been green since `3d930f6` (§9). **M3 (WP-7, WP-8) implemented on `phase-c9/m3-acceptance` from `fc9e404` (§10); awaiting owner review; not merged.** Manual screen-reader review OPEN. CLAUDE.md §11 #2 searchability of off-layout historical values UNMET — deferred (C-188). Not final C9 acceptance, not independently reviewed, no production or Level 2 claim. G21 OPEN.
 
 ## 1. What M1 delivers
 
@@ -183,3 +183,142 @@ Remaining limitations: rules are still reported as added, removed or changed (no
 - **`main` became green at `3d930f6`, not at `7d0c879`.** Runs `45112841517` (`491fa9a`) and `45158422231` (`7d0c879`, both attempts) remain recorded as failed.
 - **Remaining limitations:** the migrated tests are not individually run under a forced race (the helper's two orderings are); a future framework rename of the startup-failure event would fail those tests visibly; why the race hit two consecutive attempts is not explained; the `SearchIndexBuilderRunnerTests` cancellation failure seen once locally (§6) is not explained.
 - **Unchanged and still open:** C9 M3; manual screen-reader review of the M1 and M2 interfaces (PB-14); hosted Stage B (release-only, C-131); the deferred D9-9 requirements; G21 and the platform-wide PB-06 concurrency convention (D9-3); all C8/M4-5 obligations (§45.5 of the C8 status); the six Dependabot alerts; production certification. Final C9 acceptance is not claimed.
+
+## 10. M3 — consolidated acceptance and close-out preparation (C-187)
+
+Authorized by the owner on the baseline `fc9e4044068e5d99df5921045a3ba8feb7bb4f42` (WP-7 and WP-8 only; implementation,
+local Development/Testing validation, signed commits and one pull request; no merge, deployment, hosted Stage B,
+production acceptance or further milestone). Branch `phase-c9/m3-acceptance`. Design: architecture §8.
+
+### 10.1 Delivered
+
+| Work package | Delivered |
+|---|---|
+| WP-7 Stage B | `tests/integration/EnterpriseForms.StageBTests/Tests/FormVersionAcceptanceTests.cs` (group `forms-documents`), three facts on the real stack: (1) V1 → V2 → V3 (restored from V1) → V4 (original email re-added); (2) Historical / Latest / Hybrid on three forms with equivalent histories, fail-closed edit layouts, stale layouts; (3) changing the behaviour after records exist. |
+| WP-7 contract | `tests/features/EnterpriseForms.Api.ContractTests/FormVersionLifecycleContractTests.cs`, 9 tests: the designer lifecycle through the real `FormDesignerHandlers` over an in-memory store (identities, byte-identical restore, restore lineage, immutable snapshots, counts-only publish audit, Authority registration per version, comparisons and publish impact, stale/unauthorized/foreign refusals that change nothing) and the layout selection of each behaviour over the four-version history. |
+| WP-7 browser | `src/frontend/e2e/form-version-acceptance.spec.ts`, 5 serial tests: publishing with the review, the Latest record indicator, Restore to draft (v3), the existing-field picker (v4) and the v3 → v4 comparison, the Record layout dialog (Hybrid), the Hybrid record indicators, and a stale-layout reload that keeps the email change and withholds the phone change; axe scans of every surface. |
+| WP-8 | Architecture §8; this section (verification, requirement matrix, findings, obligations); decision C-187; PB-14 manual review checklist `docs/testing/PHASE_C9_MANUAL_ACCESSIBILITY_CHECKLIST.md` (OPEN) and register rows PB14-44…46; manifests regenerated. |
+
+No production code, API contract, OpenAPI, migration, Authority, cryptographic, signing, Merkle or journal change.
+
+### 10.2 Verification (local, 2026-11-23/24)
+
+Focused integration and browser runs followed C-131 §1 (`scripts/dev/test.ps1 -Level 2 -Class` / `-Spec`) on the isolated
+security-test stack (`enterpriseforms-sectest`), started from empty volumes (`down -v`) and removed afterwards; the
+browser isolation guard verified the target (`http://127.0.0.1:5199`, stack `enterpriseforms-security-test`). Synthetic
+data only. TRX and Playwright reports were written under `artifacts/` (not committed).
+
+| Check | Result |
+|---|---|
+| Stage B `FormVersionAcceptanceTests` (new), fresh stack | **3/3** (1 min 46 s) |
+| Contract `FormVersionLifecycleContractTests` (new) | **9/9**. One expectation was corrected during development: the first version's publish audit counts 4 added elements (its section and three fields), as `FormLayoutComparison` reports for a first version; the code was right, the expectation wrong. |
+| Playwright `form-version-acceptance.spec.ts` (new) | **5/5** first run, then 5/5 again in the regression run; axe: no violations on any scanned surface |
+| Stage B regressions, same stack | `*FormVersion*` 8/8 (M1 4, M2 1, M3 3), `DesignerTests` 3/3, `RecordRestoreTests` 11/11, `DocumentTests` 3/3, `RecordLifecycleTests` 12/12 |
+| Playwright regressions, same stack | `form-version-*` 12/12 (M1 4, M2 3, M3 5), `designer-ux` 5/5, `form-management` 3/3, `record-restore` 5/5, `repeating-groups` 2/2 |
+| .NET Release build of `EnterpriseForms.All.slnx`, Stage A and Stage B test projects | Pass: 0 warnings, 0 errors |
+| OpenAPI | No drift (`git diff --exit-code -- contracts/openapi`) |
+| Test-result accounting and Stage B grouping self-tests | 37/37 pass (`FormVersionAcceptanceTests` registered in `forms-documents`) |
+| Frontend | Lint and typecheck pass; the new spec type-checks under `--strict`; Vitest 69 files, 577/577 (no new frontend unit tests: M3 adds no frontend production code); build passes |
+| Integrity vectors | Python 46/46 and Node 46/46; regenerated vectors identical to the committed ones (Windows CRLF working-copy difference only, restored) |
+| Compose profiles (dev, integration, security-test) | `config` validates |
+| Full .NET CI set (`run_dotnet_tests.py`) | **3,305 executed, 3,305 passed, 0 failed, 223 authorized skips** (Authority 1,894 + 211 skips, contract 1,088 + 12, architecture 227, integrity 73, platform console 23). Against the 3,296 baseline: +9, the new `FormVersionLifecycleContractTests`; skips unchanged. Architecture and dependency-boundary tests are the 227. Run with the Docker stack removed. |
+| `validate-specifications.py --strict` | Pass (manifests regenerated with `scripts/generate-spec-manifest.py`; 308 tracked files) |
+
+Not run: hosted Stage B and the full local Stage B suite (release-only, C-131); manual workflow dispatches; deployment.
+
+### 10.3 Requirement → test → result
+
+Classifications: **T** implemented and tested; **M** implemented, awaiting independent or manual verification;
+**D** deferred by an existing owner decision; **B** blocked or failed; **O** outside M3 scope. Test references: SB =
+Stage B `FormVersionAcceptanceTests` (1 = lifecycle, 2 = behaviours, 3 = setting); CT = contract
+`FormVersionLifecycleContractTests`; PW = Playwright `form-version-acceptance.spec.ts` (tests 1–5). Results are the
+local runs in §10.2.
+
+| # | Requirement (owner authorization §3–§6) | Tests | Result | Class |
+|---|---|---|---|---|
+| 1.1 | V1 with first name, last name, phone; records created and submitted with phone values | SB1, CT, PW1 | pass | T |
+| 1.2 | Correct field identities (each value's `fieldDefinitionId`) | SB1, CT | pass | T |
+| 1.3 | Created-version metadata (`created_form_version_id`, `createdFormVersionNumber`) | SB1 | pass | T |
+| 1.4 | Authorized record retrieval; denial without grant, across organizations, without query permission | SB1 | pass | T |
+| 1.5 | Authorized verified search of the phone value (discoverable records only) | SB1 | pass | T |
+| 1.6 | Stored values and history | SB1 | pass | T |
+| 2.1 | V2 removes phone from the layout and adds email | SB1, CT, PW2 | pass | T |
+| 2.2 | V1 records not migrated or deleted; phone values intact; created version unchanged | SB1, PW2/PW5 | pass | T |
+| 2.3 | Historical values available through authorized history | SB1 | pass | T |
+| 2.4 | Historical values searchable through supported search paths after V2 | SB1 | **UNMET — deferred** (C-188). Evidence: V1 search succeeds with approval; V2 invalidates the approval (`FORM_VERSION_CHANGED`); search refuses with `SEARCH_FIELD_NOT_ALLOWED`; V3 restores the field but not the approval; administrator re-approval restores eligibility (architecture §8.3). Authorized history (2.3) does not satisfy this requirement. | **D (unmet; deferred by owner decision C-188)** |
+| 2.5 | New records use V2 | SB1 | pass | T |
+| 2.6 | Version comparison identifies added and removed elements | SB1, CT, PW2 (publish review), PW3 (Versions tab) | pass | T |
+| 2.7 | Publish-impact notices describe potential effects (new required field, removed element); counts over discoverable records only; no values | SB1, CT, PW2 | pass | T |
+| 2.8 | Removed fields not exposed through unauthorized projections (partial share; history whole-record only) | SB1, SB2 | pass | T |
+| 3.1 | V1 restored as a draft and published as a new immutable V3 (`restoredFromFormVersionId`) | SB1, CT, PW3 | pass | T |
+| 3.2 | Phone reappears with its original identity; existing phone values with the correct records | SB1, CT, PW5 | pass | T |
+| 3.3 | V2 unchanged; email values still stored; history works | SB1, CT | pass | T |
+| 4.1 | Original email `FieldDefinitionId` re-used; no duplicate logical field (`FIELD_KEY_EXISTS` for a new one) | SB1, CT, PW3 | pass | T |
+| 4.2 | Email values with their own records; no crossover | SB1 | pass | T |
+| 4.3 | V1, V2, V3 snapshots unchanged after V4 | SB1, CT | pass | T |
+| 4.4 | V3 → V4 comparison reports the email addition only | SB1, CT, PW3 | pass | T |
+| 5.1 | Historical / Latest / Hybrid view and edit layouts and version numbers | SB2, CT | pass | T |
+| 5.2 | `created_form_version_id` unchanged; `last_edited_form_version_id` = applicable edit layout after update | SB2 | pass | T |
+| 5.3 | Values outside the selected layout preserved | SB2, SB1 | pass | T |
+| 5.4 | Authorization and field-level visibility unchanged by the behaviour | SB2 | pass | T |
+| 5.5 | Restore validates against the applicable edit layout (D9-6) | SB2 | pass | T |
+| 5.6 | Missing or foreign edit version fails closed (`409 EDIT_LAYOUT_UNAVAILABLE`); Historical unaffected | SB2, CT | pass; an *unknown stored behaviour* is covered by the M1 contract tests only (the database CHECK prevents it on the stack) | T |
+| 5.7 | Stale layout after a publish: update, Submit, restore, upload begin → `409 EDIT_LAYOUT_CHANGED` | SB2 | pass | T |
+| 5.8 | Stale layout after a behaviour change: update, Submit, upload begin | SB2 | pass | T |
+| 5.9 | No partial write or silent data loss on refusal | SB2 | pass | T |
+| 5.10 | Reload keeps permitted changes and withholds incompatible ones | PW5 (and M1 `form-version-behavior`) | pass | T |
+| 5.11 | Legacy clients omitting `expectedLayoutVersionId`: contract unchanged | SB2 | pass | T |
+| 6.1 | Impact preview before confirmation; approximate; discoverable records only; no confidential counts or values | SB3, PW4 | pass | T |
+| 6.2 | DesignForm enforced; other organization denied | SB3 | pass | T |
+| 6.3 | Reason 3–500 characters (2 and 501 refused; 3 and 500 accepted) | SB3 | pass | T |
+| 6.4 | Stale form revision rejected | SB3 | pass | T |
+| 6.5 | Setting and audit event atomic (one event per change; none for refused attempts) | SB3 (observable), M1 contract (same commit) | pass | T |
+| 6.6 | No values, records or versions migrated or deleted | SB3 | pass | T |
+| 6.7 | Subsequent view and edit follow the selected mode | SB3, PW5 | pass | T |
+| A.1 | Automated accessibility (axe) of the dialog, review, comparison, indicators, stale-layout and withheld states | PW1–PW5, M1/M2 specs | pass (axe: 0 violations) | T |
+| A.2 | Manual screen-reader review (NVDA, VoiceOver) | checklist prepared | not performed | **M (OPEN)** |
+| W8.1 | Documentation, evidence locations, deviations, obligations | this section, architecture §8, C-187 | done | T |
+| W8.2 | Final C9 acceptance | — | not claimed | O |
+| — | Translations in comparisons; organization-disabled catalog values; separate publish permission | — | — | D (D9-9) |
+
+### 10.4 Findings, deviations and limitations
+
+- **No product defect found.** Every scenario passed against the merged M1/M2 implementation without a code change.
+- **Search of a field no longer in the current version is not supported** (requirement 2.4; architecture §8.3). The
+  existing verified field search binds approvals to the latest registered version: V2 invalidated the phone approval
+  (`Invalidated|FORM_VERSION_CHANGED`), searches on phone were refused (`422 SEARCH_FIELD_NOT_ALLOWED`, no partial
+  result) until a security administrator approved phone again after V3; the approval then carried over to V4. CLAUDE.md
+  §11 #2's requirement that these values remain **searchable** with authorization while the field is outside the current
+  version is therefore **UNMET — deferred pending a separate owner-approved security design (C-188)**; it is neither
+  implemented nor passed. Authorized history keeps the values readable, but history access is a different capability and
+  does not satisfy searchability. The owner accepted the fail-closed approval behaviour as it is; supporting approved
+  searches of off-layout historical fields requires a separate design and security authorization.
+- **Encrypted fields are not searchable** (ADR-PB-004): the email field (Confidential, encrypted by default) is refused
+  by search, as designed.
+- **Unknown stored behaviour** (fail closed) cannot be produced on the real stack (database CHECK); it is covered by the
+  M1 contract tests only. "Invalid" edit versions on the stack are represented by a foreign and a missing current pointer.
+- **Atomicity** of the behaviour change with its audit event is observable on the stack only as "one event per change,
+  none for refused attempts"; the same-commit property is proven by the M1 contract test.
+- **Deviation from the plan:** none in scope. The contract scenario uses the real designer handlers over an in-memory
+  store (no database); the database-backed proof is the Stage B class.
+
+### 10.5 Accessibility (PB-14)
+
+Automated: axe scans (WCAG 2.0/2.1/2.2 A/AA tags) of the publish review dialog, the Versions-tab comparison, the Record
+layout dialog, the record page under Latest and Hybrid, the editor's layout-changed state and the withheld-changes state
+found no violations; keyboard-free role and name queries locate every control. **Manual screen-reader review: OPEN —
+manual evidence outstanding.** Checklist, required reviewer, environment and assistive technology:
+`docs/testing/PHASE_C9_MANUAL_ACCESSIBILITY_CHECKLIST.md` (register rows PB14-44…46). No WCAG 2.2 AA or AODA
+conformance or certification is claimed. M3 can be implementation-complete with this open; final C9 acceptance stays
+blocked on it unless the owner explicitly resolves that dependency.
+
+### 10.6 Test-stability observation: `SearchIndexBuilderRunnerTests.CancellationDuringAPassEndsTheLoopPromptly`
+
+Not recurred: it passed in the full .NET run of §10.2 (0.26 s, TRX `artifacts/test-results/EnterpriseForms.Api.ContractTests/`). The test is unchanged (not weakened, skipped or removed). The single earlier failure (§6) remains unexplained; no cause is attributed to timing or Docker load without evidence.
+
+### 10.7 Outstanding obligations
+
+Owner review of M3 and of this pull request; the manual screen-reader review (§10.5); final C9 acceptance (not
+claimed); hosted Stage B (release-only, C-131); the unmet §11 #2 searchability requirement for fields outside the current version (deferred pending a separate owner-approved security design, C-188; §10.4);
+the D9-9 deferrals; G21 and the platform-wide PB-06 concurrency convention (D9-3); all C8/M4-5 obligations (§45.5 of
+the C8 status); the six Dependabot alerts; independent third-party assessment and production certification.

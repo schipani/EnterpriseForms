@@ -99,8 +99,8 @@
     },
     {
       "path": "docs/PHASE_C9_STATUS.md",
-      "sha256": "98e6cd4c4a332385b4affe5d496c887d88c1a0279498aeab1f5fa6740369a5b1",
-      "bytes": 28758
+      "sha256": "c01f41ce57f01ef7dff0b0baf3c99c5d910e815a23fbe48140c6027496e54ae4",
+      "bytes": 43729
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -374,8 +374,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C9_FORM_VERSION_MANAGEMENT.md",
-      "sha256": "42cf2bf3b39a4d9655a69226b3feed42e8868b68f2d78cf44bb48d908ed8745f",
-      "bytes": 24201
+      "sha256": "c7549ce752e806acc60a5d248c803773e545b3424645310a35d17cfa0101aa0d",
+      "bytes": 30045
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -479,8 +479,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "d9736d32fbd67aa75899dd7bbcde68953b7bac9ac885300df864794a0dd4eea6",
-      "bytes": 336249
+      "sha256": "8bc45562c070a341d4e48a4ffd36ff66f12dcba7e5c50b0ae4c5786bd8bc211f",
+      "bytes": 340266
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -919,13 +919,18 @@
     },
     {
       "path": "docs/testing/PB14_UI_DESIGN_ACCEPTANCE_TESTS.csv",
-      "sha256": "5bd048435810e8f6ff8b974b670d3ee2d70ea3a31d3d9087e74f07af993ce3ea",
-      "bytes": 5177
+      "sha256": "9558188c9a88c19b368723c97d22455e09b6b90c54fefadfa52212f13f600557",
+      "bytes": 6224
     },
     {
       "path": "docs/testing/PHASE_C8_M1_MANUAL_ACCESSIBILITY_CHECKLIST.md",
       "sha256": "530d093715f15fac6343623ab8b010fce091ca3b22cb1031937c0f71b5dee2af",
       "bytes": 4006
+    },
+    {
+      "path": "docs/testing/PHASE_C9_MANUAL_ACCESSIBILITY_CHECKLIST.md",
+      "sha256": "d96e68cfdc68adf7f5a9e821a3e71e79c36ba30bc03b014436f1329a4461271d",
+      "bytes": 8589
     },
     {
       "path": "docs/testing/STAGE_B_RELEASE_ONLY_POLICY.md",

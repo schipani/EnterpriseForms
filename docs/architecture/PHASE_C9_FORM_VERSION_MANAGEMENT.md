@@ -1,7 +1,9 @@
-# Phase C9 — Form Version Management: architecture, M1 and M2 design
+# Phase C9 — Form Version Management: architecture, M1, M2 and M3
 
-Status: **M1 merged to `main` (`cd48e13`, PR #70). M2 (WP-3, WP-4, WP-5, §7) implemented for Development/Testing;
-awaiting owner review.** Not independently reviewed; not a production or Level 2 claim. Owner decisions D9-1…D9-9 are recorded in C-179; this document is the implementation baseline.
+Status: **M1 merged to `main` (`cd48e13`, PR #70); M2 merged (`491fa9a`, PR #71). M3 (WP-7 consolidated acceptance,
+WP-8 close-out preparation, §8) implemented for Development/Testing on `phase-c9/m3-acceptance`; awaiting owner
+review.** Not independently reviewed; not final C9 acceptance; not a production or Level 2 claim. Owner decisions
+D9-1…D9-9 are recorded in C-179; this document is the implementation baseline.
 
 Scope of C9 (CLAUDE.md §1, §3, §5, §11 tests #1–#6): per-form version behaviour (Historical / Latest / Hybrid), the
 Designer setting, publish impact reports, draft-versus-published comparison, version-aware record viewing and editing,
@@ -186,7 +188,10 @@ permission, no change to field identities, stored values, encryption or option v
 - **Compatibility exception (§4.5):** `expectedLayoutVersionId` is optional on update, Submit, restore and upload begin;
   a legacy API client that omits it is validated against the current edit layout and receives no guaranteed stale-layout
   detection. The web application always sends it.
-- M2 implemented (§7, C-182); M3 (consolidated §11 #1–#6 scenario, close-out) not started.
+- M2 implemented (§7, C-182) and merged; M3 implemented (§8, C-187), awaiting owner review.
+- **Search of values of fields no longer in the current version (§8.3):** not supported by the existing verified field
+  search. CLAUDE.md §11 #2's searchability requirement is **UNMET — deferred** pending a separate owner-approved security
+  design (C-188); authorized record history is a different capability and does not satisfy it. Not changed by C9.
 
 ## 7. M2 design (WP-3, WP-4, WP-5; authorized by the owner, C-182)
 
@@ -271,3 +276,63 @@ organization-disabled catalog values remain deferred (D9-9).
   while both sides exist; a side that no longer exists (for example a removed draft) resets the comparison to the
   defaults with a visible notice, so something that is gone is never compared. A draft comparison is re-read whenever the
   draft revision changes (the revision is part of the query key and of the option label).
+
+## 8. M3 — consolidated acceptance and close-out preparation (WP-7, WP-8; authorized by the owner, C-187)
+
+M3 adds **tests and documentation only**: no production code, API contract, migration, Authority, cryptographic,
+signing, Merkle or journal change. It demonstrates CLAUDE.md §11 #1–#6 end to end with the M1 and M2 implementation as
+merged, and records what the existing implementation does and does not support.
+
+### 8.1 Scenario design
+
+| Scenario | Stage B (real stack) | Contract (handlers, in-memory store) | Browser (Playwright) |
+|---|---|---|---|
+| 1. V1 (first name, last name, phone); records with phone | `FormVersionAcceptanceTests.TheV1ToV4Lifecycle…` | `FormVersionLifecycleContractTests` (lifecycle) | `form-version-acceptance.spec.ts` test 1 |
+| 2. V2: phone removed, email added; publish review; comparison | same fact | same class (comparisons, impact) | test 2 |
+| 3. V1 restored as a draft, published as V3 | same fact | same class (restore lineage, snapshots) | test 3 (Versions tab "Restore to draft") |
+| 4. The original email field re-added in V4 | same fact | same class (identity, no duplicate) | test 3 (existing-field picker; v3 → v4 comparison) |
+| 5. Historical / Latest / Hybrid on three forms; stale layouts; fail-closed edit layouts | `…HistoricalLatestAndHybridFollowTheirLayoutsOnEquivalentHistories` | `…EachBehaviourSelectsItsLayoutsOverTheFourVersionHistory` | tests 4–5 (Hybrid; stale-layout reload with a withheld change) |
+| 6. Changing the behaviour after records exist | `…ChangingTheBehaviourAfterRecordsExistIsDesignOnlyValidatedAuditedAndMigratesNothing` | (M1 `FormVersionBehaviorTests`) | test 4 (impact preview, reason) |
+
+Each Stage B fact uses its own synthetic organization (plus a second organization for cross-tenant denials). Values
+are read only through verified projections and authorized history; created and last-edited versions are read from the
+business database with the read-only test identity (as the M1 tests do). Fail-closed edit layouts are provoked by
+pointing `current_form_version_id` at another form's version or at nothing (the M1 technique), restored afterwards.
+
+### 8.2 What the scenarios pin down (beyond M1/M2 coverage)
+
+- A V3 restored from V1 has **exactly** V1's snapshot (byte-identical layout JSON in the contract test; no semantic
+  differences on the real stack), `restoredFromFormVersionId` = V1, and leaves V1 and V2 unchanged.
+- V4 re-uses the original email `FieldDefinitionId`; a second field with key `email_address` is refused
+  (`409 FIELD_KEY_EXISTS`); the form keeps exactly four field definitions; values stay with their own records.
+- Every published version is registered with the Authority with exactly the fields it places.
+- The three behaviours on equivalent histories, including restore against the edit layout (D9-6), reader share
+  projections that never include fields outside their scope whatever the layout, and refused writes that change
+  neither the content revision, the values nor `last_edited_form_version_id`.
+- Stale-layout refusals (`409 EDIT_LAYOUT_CHANGED`) for update, Submit, restore and upload begin after a publish, and
+  for update, Submit and upload begin after a behaviour change; the compatibility exception (omitted
+  `expectedLayoutVersionId`) is exercised and unchanged.
+
+### 8.3 Unmet requirement (deferred, C-188): search of values of fields removed from the layout
+
+CLAUDE.md §11 #2 asks that old phone values remain "searchable with authorization" after V2. **The existing verified
+field search does not support this.** Search approvals are bound to the Authority's registration of the latest
+published version (C7 M2, OD-3): registering a version that does not place an approved field invalidates that approval
+(`FORM_VERSION_CHANGED`), and the search then refuses the field (`422 SEARCH_FIELD_NOT_ALLOWED`, no partial result).
+Restoring the field (V3) does not reinstate the approval; a security administrator approves it again, after which the
+original values are found on the original records, and an unchanged field's approval carries over to the next version
+(V4). The values themselves are kept and remain readable through verified projections and authorized record history
+throughout; **that is preservation and authorized access, not searchability**, and does not satisfy §11 #2.
+
+**Owner decision (C-188):** the fail-closed search-approval behaviour is accepted as it is. The §11 #2 requirement that
+historical values remain searchable with authorization while the field is absent from the current published version is
+recorded as **UNMET — deferred pending a separate owner-approved security design**; it is neither implemented nor
+passed. Supporting approved searches of off-layout historical fields requires a separate design (for example, how an
+approval binds to a field across versions, what the Authority registers for fields outside the current layout, and how
+completeness and revocation are proven) and its own security authorization. M3 tests the existing behaviour as it is,
+changes no test expectation and adds no search capability.
+
+### 8.4 Not changed by M3
+
+D9-1…D9-9 including the compatibility exception (§4.5) and the D9-9 deferrals; G21; the PB-06 concurrency convention;
+the observation that record creation validates against the current version without a 409 (§4.5).
