@@ -102,7 +102,7 @@ public static class AuthorityErrorCodes
     /// <summary>C-188 BF-1: a publication of the form is pending registration (approvals and one-step registration are refused until it is resolved).</summary>
     public const string FormPublicationPending = "FORM_PUBLICATION_PENDING";
 
-    /// <summary>C-188 BF-1: the resolution names a publication that is not the form's pending one (already resolved, superseded or never prepared).</summary>
+    /// <summary>C-188 BF-1: the resolution names a publication that is not the form's pending one (already resolved or never prepared).</summary>
     public const string FormPublicationNotPending = "FORM_PUBLICATION_NOT_PENDING";
 
     /// <summary>

@@ -14,8 +14,8 @@ namespace AuthorizationAuthority.Tests;
 /// every approval of the form ineffective - including the ordinary approval of a field the new version removes, and a retained
 /// approval of a field it brings back - until it is resolved; only a resolution matching the staged version ends that state; a
 /// registration from the staged manifest applies D-H3/D-H4 exactly as a one-step registration did; abandonment registers nothing;
-/// approvals and one-step registrations are refused meanwhile; a later prepare supersedes; and resolution re-validates against current
-/// facts. The real-stack proof (journal, both engines, open pages, snapshots, business recovery, concurrency) is the Stage B class
+/// approvals, one-step registrations and any other prepare of the form are refused meanwhile (C-191: a pending publication is never
+/// superseded); and resolution re-validates against current facts. The real-stack proof (journal, both engines, open pages, snapshots, business recovery, concurrency) is the Stage B class
 /// FormVersionPublicationBarrierTests.
 /// </summary>
 public sealed class FormVersionPublicationTests
@@ -243,25 +243,83 @@ public sealed class FormVersionPublicationTests
         Assert.Equal(FieldSearchApprovalStates.Withdrawn, phone.ApprovalStateName);
     }
 
-    /// <summary>A later prepare supersedes the pending one (the form stays pending); the superseded one can no longer be resolved.</summary>
+    private static PublishedFieldEntry PhoneRelabelled => PhoneEntry with { FieldLabel = "Mobile" };
+
+    /// <summary>
+    /// C-191: v2 (Phone removed) is committed in the business and its resolution is lost. No later version (v3 bringing Phone back), no
+    /// other v2 (keeping Phone) and no repeat of v2 can be staged until v2 is resolved; nothing is staged by the refusals and the barrier
+    /// stays. Resolving v2 applies D-H3 (Phone invalidated), and v3 bringing Phone back never revives it. At 34a5dae the v3 prepare
+    /// superseded v2: registering v3 left Phone Active at v3 (D-H3 skipped) and registering the other v2 left it effective on a manifest
+    /// the business never made current.
+    /// </summary>
     [Fact]
-    public async Task ALaterPrepareSupersedesThePendingPublicationAndKeepsTheFormPending()
+    public async Task APendingPublicationIsNeverSupersededSoACommittedRemovalTakesEffectBeforeAnyLaterVersion()
     {
         await RegisterOneStepAsync(1, FirstEntry, PhoneEntry);
         var phone = await ApproveAsync(Phone);
-        var neverCommitted = await PrepareAsync(2, FirstEntry);
-        var retry = await PrepareAsync(2, FirstEntry, EmailEntry); // the business rolled back and published again
-        Assert.Equal(FormVersionPublicationStates.Superseded, store.Publications.Single(p => p.BusinessFormVersionId == neverCommitted).PublicationStateName);
-        Assert.Equal(retry, Pending!.BusinessFormVersionId);
-        Assert.Equal([phone.FieldSearchApprovalId], await IneffectiveAsync());
-        await RejectedAsync(() => ResolveAsync(neverCommitted, 2, FormVersionPublicationResolutions.Registered), AuthorityErrorCodes.FormPublicationNotPending);
-        await RejectedAsync(() => PrepareAsync(1, FirstEntry), AuthorityErrorCodes.FormVersionUntrusted); // never a number at or below the registered one
+        var v2 = await PrepareAsync(2, FirstEntry); // committed in the business; its resolution is lost
 
-        var next = await PrepareAsync(3, FirstEntry, PhoneEntry); // a committed v2 being replaced by v3
-        Assert.Equal(FormVersionPublicationStates.Superseded, store.Publications.Single(p => p.BusinessFormVersionId == retry).PublicationStateName);
-        await ResolveAsync(next, 3, FormVersionPublicationResolutions.Registered);
-        Assert.Equal((FieldSearchApprovalStates.Active, 3), (phone.ApprovalStateName, phone.ApprovedFormVersionNumber));
-        Assert.Equal(1, store.Publications.Count(p => p.PublicationStateName == FormVersionPublicationStates.Registered));
+        await RejectedAsync(() => PrepareAsync(3, FirstEntry, PhoneEntry), AuthorityErrorCodes.FormPublicationPending); // a later version
+        await RejectedAsync(() => PrepareAsync(2, FirstEntry, PhoneEntry), AuthorityErrorCodes.FormPublicationPending); // another v2
+        await RejectedAsync(() => RunAsync(Designer, SecurityCommandKind.PrepareFormVersionPublication, new PrepareFormVersionPublicationPayload(Form, v2, 2, Digest(2), [FirstEntry], "Intake")), AuthorityErrorCodes.FormPublicationPending); // v2 again
+        await RejectedAsync(() => RunAsync(Administrator, SecurityCommandKind.PrepareFormVersionPublication, new PrepareFormVersionPublicationPayload(Form, Guid.CreateVersion7(), 3, Digest(3), [FirstEntry, PhoneEntry])), AuthorityErrorCodes.FormPublicationPending); // an administrator too
+        var only = Assert.Single(store.Publications); // the refusals staged nothing
+        Assert.Equal((v2, FormVersionPublicationStates.Pending), (only.BusinessFormVersionId, only.PublicationStateName));
+        Assert.Equal([phone.FieldSearchApprovalId], await IneffectiveAsync()); // the barrier stays
+        Assert.Single(store.PublishedVersions);
+
+        await ResolveAsync(v2, 2, FormVersionPublicationResolutions.Registered); // recovery
+        Assert.Equal((FieldSearchApprovalStates.Invalidated, FieldSearchInvalidationReasons.FormVersionChanged, 1), (phone.ApprovalStateName, phone.InvalidationReasonCode, phone.ApprovedFormVersionNumber)); // D-H3
+
+        var v3 = await PrepareAsync(3, FirstEntry, PhoneEntry); // now accepted: Phone returns
+        await ResolveAsync(v3, 3, FormVersionPublicationResolutions.Registered);
+        Assert.Equal((FieldSearchApprovalStates.Invalidated, 1), (phone.ApprovalStateName, phone.ApprovedFormVersionNumber)); // never revived
+        Assert.Empty(await IneffectiveAsync());
+        Assert.DoesNotContain(store.Approvals, a => a.FieldDefinitionId == Phone && a.ApprovalStateName == FieldSearchApprovalStates.Active);
+        Assert.Equal([1, 2, 3], store.PublishedVersions.Select(v => v.FormVersionNumber).Order());
+    }
+
+    /// <summary>
+    /// C-191: the barrier of a committed v2 cannot be lifted through a later version: a v3 that was refused staging cannot be abandoned
+    /// (nothing of it is pending). At 34a5dae, v3 superseded v2 and abandoning v3 (its business commit failed) lifted the barrier with the
+    /// Authority judging v1 while the business was at v2 - the removed field's ordinary approval searchable again (BF-1 reopened).
+    /// </summary>
+    [Fact]
+    public async Task ARefusedLaterVersionCannotBeAbandonedToLiftTheBarrierOfACommittedRemoval()
+    {
+        await RegisterOneStepAsync(1, FirstEntry, PhoneEntry);
+        var phone = await ApproveAsync(Phone);
+        var v2 = await PrepareAsync(2, FirstEntry); // committed; resolution lost
+        var v3 = Guid.CreateVersion7();
+        await RejectedAsync(() => RunAsync(Designer, SecurityCommandKind.PrepareFormVersionPublication, new PrepareFormVersionPublicationPayload(Form, v3, 3, Digest(3), [FirstEntry, PhoneEntry])), AuthorityErrorCodes.FormPublicationPending);
+        await RejectedAsync(() => ResolveAsync(v3, 3, FormVersionPublicationResolutions.Abandoned), AuthorityErrorCodes.FormPublicationNotPending);
+        await RejectedAsync(() => ResolveAsync(v3, 3, FormVersionPublicationResolutions.Registered), AuthorityErrorCodes.FormPublicationNotPending);
+        Assert.Equal(v2, Pending!.BusinessFormVersionId);
+        Assert.Equal(FieldSearchApprovalStates.Active, phone.ApprovalStateName);
+        Assert.Equal([phone.FieldSearchApprovalId], await IneffectiveAsync()); // still closed
+    }
+
+    /// <summary>
+    /// C-191, retained variant: v3 brings a retained field back with a changed entry (committed, resolution lost) and v4 would remove it again.
+    /// v4 cannot be staged until v3 is resolved; resolving v3 invalidates the retained approval (D-H4: changed entry), and v4 does not
+    /// revive it. At 34a5dae, v4 superseded v3 and the retained approval stayed effective although the business had changed the field.
+    /// </summary>
+    [Fact]
+    public async Task ARetainedApprovalIsJudgedAgainstEveryCommittedVersionNotOnlyTheLastOne()
+    {
+        await RegisterOneStepAsync(1, FirstEntry, PhoneEntry);
+        await RegisterOneStepAsync(2, FirstEntry);
+        var retained = await ApproveAsync(Phone, FieldSearchApprovalScopes.RetainedField);
+        var v3 = await PrepareAsync(3, FirstEntry, PhoneRelabelled); // committed; resolution lost
+        await RejectedAsync(() => PrepareAsync(4, FirstEntry), AuthorityErrorCodes.FormPublicationPending);
+        Assert.Equal([retained.FieldSearchApprovalId], await IneffectiveAsync());
+
+        await ResolveAsync(v3, 3, FormVersionPublicationResolutions.Registered);
+        Assert.Equal((FieldSearchApprovalStates.Invalidated, FieldSearchInvalidationReasons.FormVersionChanged), (retained.ApprovalStateName, retained.InvalidationReasonCode)); // D-H4
+        var v4 = await PrepareAsync(4, FirstEntry);
+        await ResolveAsync(v4, 4, FormVersionPublicationResolutions.Registered);
+        Assert.Equal(FieldSearchApprovalStates.Invalidated, retained.ApprovalStateName);
+        Assert.Empty(await IneffectiveAsync());
     }
 
     /// <summary>Registration from the staged manifest re-checks current facts: an encryption requirement recorded meanwhile refuses it, and the form stays pending.</summary>

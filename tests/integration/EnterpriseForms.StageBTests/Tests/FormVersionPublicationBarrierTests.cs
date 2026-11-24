@@ -16,7 +16,9 @@ namespace EnterpriseForms.StageBTests.Tests;
 /// closed on every path - business and Authority capabilities, the V1 (verified scan) and indexed engines, open pages of both, and new
 /// approvals - including when the publication removes an approved field (BF-1) and when it brings back a field under a retained
 /// approval. Recovery completes or withdraws the pending publication without a new publication; concurrent security commands never
-/// open a window; the database refuses to revive, rewrite or duplicate a pending publication, and the runtime cannot delete one.
+/// open a window; the database refuses to revive, rewrite or duplicate a pending publication, and the runtime cannot delete one. C-191: a
+/// committed but unresolved publication is never superseded - no later version, other version of the same number or repeat is staged,
+/// by the business or directly at the Authority, and the database admits no superseded state - so it is resolved before anything else.
 /// Lost registrations and lost commits are produced with the Testing-only publication fault checkpoints. Synthetic data only.
 /// </summary>
 [Collection(StageBStackCollectionDefinition.Name)]
@@ -388,6 +390,94 @@ public sealed class FormVersionPublicationBarrierTests(StageBFixture fixture)
         Assert.Equal(2, await PublishAsync(w, (w.First, "First name"), (w.Email, "Email")));
         Assert.Equal("Invalidated|FORM_VERSION_CHANGED|CurrentVersion", Tail(Approvals(w, w.Phone).Single()));
         AssertNotAllowed(await SearchAsync(w, w.Phone, "equals", "555-0401"));
+    }
+
+    // ---------------------------------------------------------------- C-191: a committed, unresolved publication is never superseded
+
+    /// <summary>A direct Authority command (internal API, the user's delegated assertion), retried only while the gate is transiently closed.</summary>
+    private async Task<HttpResult> SubmitAsync(Ws w, TestUser user, string commandKind, object payload)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            var gate = await fixture.Authority.GateAsync(w.S.OrganizationId);
+            var result = await fixture.Authority.SendAsync(HttpMethod.Post, "/internal/v1/security-commands", TestIdentity.WorkloadToken(), new
+            {
+                organization_id = w.S.OrganizationId,
+                command_kind = commandKind,
+                resource = new { resource_kind = "FormDefinition", resource_id = w.FormId },
+                expected_authorization_revision = gate.GetProperty("authorization_revision").GetInt64(),
+                command_payload = payload,
+                change_reason = "harness: direct command",
+            }, w.S.Token(user), Guid.NewGuid().ToString("N"));
+            if (result.IsSuccess || attempt >= 40 || result.ErrorCode is not ("AUTHORITY_NOT_READY" or "STALE_AUTHORIZATION_REVISION"))
+            {
+                return result;
+            }
+
+            await Task.Delay(500, Ct);
+        }
+    }
+
+    private static object Entry(Guid field, string label) => new { field_definition_id = field, field_data_type = "String", field_classification = "Internal", protection_mode = "Standard", field_label = label, options = (object?)null, in_repeating_group = false };
+
+    /// <summary>
+    /// V2 removes Phone; the business commits it and its resolution is lost. Before V2 is resolved: the business refuses to publish V3 (which
+    /// brings Phone back) with FORM_PUBLICATION_PENDING and publishes nothing; the Authority refuses, from the designer directly, to stage V3,
+    /// another V2 that keeps Phone, or V2 again, and has no V3 to abandon; the database refuses a superseded state. Phone stays closed. After
+    /// recovery the removal in V2 takes effect (D-H3), and V3 bringing Phone back does not revive its approval. At 34a5dae the V3 prepare
+    /// superseded V2: registering V3 carried the V1 approval over (D-H3 skipped), and abandoning a V3 whose commit failed reopened Phone
+    /// search while the business was at V2.
+    /// </summary>
+    [Fact]
+    public async Task ACommittedUnresolvedRemovalIsNeverSupersededAndTakesEffectBeforeALaterVersion()
+    {
+        var w = await WorkspaceAsync("bf1-supersede");
+        Assert.Equal(1, await PublishAsync(w, (w.First, "First name"), (w.Phone, "Phone")));
+        Assert.True((await ApproveAsync(w, w.Phone)).IsSuccess);
+        var r1 = await CreateAsync(w, new() { ["first_name"] = "Drew", ["phone_number"] = "555-0801" });
+        Assert.Equal([r1], Matches(await SearchAsync(w, w.Phone, "equals", "555-0801")));
+        var clerk = await SessionAsync(w, w.S.Clerk);
+
+        var lost = await PublishWithFaultAsync(w, LostRegistration, (w.First, "First name"), (w.Email, "Email"));
+        Assert.Equal("TESTING_FAULT_INJECTED", lost.ErrorCode);
+        Assert.Equal((2, 1), (await CurrentVersionAsync(w), LatestRegistered(w)));
+        Assert.Equal(["1|Registered", "2|Pending"], Publications(w));
+        var v2 = Guid.Parse(Scalar($"SELECT business_form_version_id FROM form_version_publications WHERE organization_id = '{w.S.OrganizationId:D}' AND form_definition_id = '{w.FormId:D}' AND publication_state_name = 'Pending';"));
+
+        // The business: V3 (Phone back) is refused and nothing is published.
+        var draftRevision = await w.S.SaveDraftAsync(w.FormId, LayoutOf(w, (w.First, "First name"), (w.Phone, "Phone"), (w.Email, "Email")));
+        var refused = await fixture.Api.PostAsync($"/api/v1/form-definitions/{w.FormId:D}/publish", w.S.Token(w.S.Designer), new { expectedDraftRevision = draftRevision, expectedCurrentVersionNumber = 2, changeReason = "bf1 v3 before recovery" });
+        Assert.Equal((HttpStatusCode.Conflict, "FORM_PUBLICATION_PENDING"), (refused.Status, refused.ErrorCode));
+        Assert.Equal(2, await CurrentVersionAsync(w));
+        Assert.Equal(["1|Registered", "2|Pending"], Publications(w));
+
+        // The Authority directly (the designer's own assertion): no later version, no other V2, no repeat; nothing of V3 to abandon.
+        var digest = new string('c', 64);
+        var v3 = Guid.CreateVersion7();
+        Assert.Equal("FORM_PUBLICATION_PENDING", (await SubmitAsync(w, w.S.Designer, "PrepareFormVersionPublication", new { form_definition_id = w.FormId, form_version_id = v3, form_version_number = 3, layout_digest_hex = digest, fields = new[] { Entry(w.First, "First name"), Entry(w.Phone, "Phone") }, form_title = "BF-1" })).ErrorCode);
+        Assert.Equal("FORM_PUBLICATION_PENDING", (await SubmitAsync(w, w.S.Designer, "PrepareFormVersionPublication", new { form_definition_id = w.FormId, form_version_id = Guid.CreateVersion7(), form_version_number = 2, layout_digest_hex = digest, fields = new[] { Entry(w.First, "First name"), Entry(w.Phone, "Phone") }, form_title = "BF-1" })).ErrorCode);
+        Assert.Equal("FORM_PUBLICATION_PENDING", (await SubmitAsync(w, w.S.Designer, "PrepareFormVersionPublication", new { form_definition_id = w.FormId, form_version_id = v2, form_version_number = 2, layout_digest_hex = digest, fields = new[] { Entry(w.First, "First name") }, form_title = "BF-1" })).ErrorCode);
+        Assert.Equal("FORM_PUBLICATION_NOT_PENDING", (await SubmitAsync(w, w.S.Designer, "ResolveFormVersionPublication", new { form_definition_id = w.FormId, form_version_id = v3, form_version_number = 3, layout_digest_hex = digest, resolution = "Abandoned" })).ErrorCode);
+        Assert.Equal(["1|Registered", "2|Pending"], Publications(w));
+
+        // The database admits no superseded state.
+        Assert.Contains("ck_form_version_publication_state", fixture.Stack.AuthorityAdministratorSql(
+            $"BEGIN; UPDATE form_version_publications SET publication_state_name = 'Superseded', resolved_by_security_command_id = prepared_by_security_command_id, resolved_on = now() WHERE organization_id = '{w.S.OrganizationId:D}' AND form_definition_id = '{w.FormId:D}' AND form_version_number = 2; ROLLBACK;", throwOnError: false), StringComparison.Ordinal);
+
+        // Still closed on both engines; the approval is untouched until the outcome is known.
+        AssertPending(await SearchAsync(w, w.Phone, "equals", "555-0801"));
+        AssertNotAllowed((await IndexedAsync(w, clerk, w.Phone, "555-08")).Result);
+        Assert.Equal("Active||CurrentVersion", Tail(Approvals(w, w.Phone).Single()));
+
+        // Recovery registers V2 (D-H3), then V3 brings Phone back without reviving its approval.
+        Assert.Equal("Registered", Describe(await RecoverAsync(w)).Outcome);
+        Assert.Equal("Invalidated|FORM_VERSION_CHANGED|CurrentVersion", Tail(Approvals(w, w.Phone).Single()));
+        Assert.Equal(3, await PublishAsync(w, (w.First, "First name"), (w.Phone, "Phone"), (w.Email, "Email")));
+        Assert.Equal(["1|Registered", "2|Registered", "3|Registered"], Publications(w));
+        Assert.Equal("Invalidated|FORM_VERSION_CHANGED|CurrentVersion", Tail(Approvals(w, w.Phone).Single()));
+        AssertNotAllowed(await SearchAsync(w, w.Phone, "equals", "555-0801"));
+        AssertNotAllowed((await IndexedAsync(w, clerk, w.Phone, "555-08")).Result);
+        Assert.DoesNotContain((await CapabilitiesAsync(w)).GetProperty("fields").EnumerateArray(), f => f.GetProperty("fieldDefinitionId").GetGuid() == w.Phone);
     }
 
     // ---------------------------------------------------------------- the field-return case (C-188 retained approval)

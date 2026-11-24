@@ -360,6 +360,37 @@ public sealed class FormVersionLifecycleContractTests
         Assert.Equal(v1.FormVersionId, store.Definition.CurrentFormVersionId);
     }
 
+    /// <summary>
+    /// C-191: while the previous version's resolution is pending (v1 committed, resolution lost) a new publish is refused by the Authority
+    /// with FORM_PUBLICATION_PENDING; the business answers 409, commits nothing and leaves v1 pending. After recovery the publish succeeds.
+    /// </summary>
+    [Fact]
+    public async Task APublishWhileThePreviousVersionIsPendingIsRefusedAndPublishesNothingUntilRecovery()
+    {
+        var store = new Store { RegistrationFailure = "AUTHORITY_NOT_READY" };
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        var v1 = await PublishAsync(store, handlers, "v1, resolution lost");
+        Assert.True(v1.AuthorityRegistrationPending);
+        store.RegistrationFailure = null;
+        await SaveAsync(store, handlers, V2Layout);
+        var commits = store.Commits;
+
+        var error = await Assert.ThrowsAsync<BusinessException>(() => PublishAsync(store, handlers, "v2 before recovery"));
+        Assert.Equal(("FORM_PUBLICATION_PENDING", 409), (error.ErrorCode, error.HttpStatusCode));
+        Assert.Equal(commits, store.Commits);
+        Assert.Equal(v1.FormVersionId, Assert.Single(store.Versions).FormVersionId);
+        Assert.Equal(v1.FormVersionId, store.Definition.CurrentFormVersionId);
+        Assert.Equal((v1.FormVersionId, 1), (store.Pending!.FormVersionId, store.Pending.FormVersionNumber));
+        Assert.Empty(store.Resolutions);
+
+        var recovered = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("Registered", "Registered"), (recovered.Outcome, recovered.RegistrationState));
+        var v2 = await PublishAsync(store, handlers, "v2 after recovery");
+        Assert.Equal((2, true), (v2.VersionNumber, v2.AuthorityRegistered));
+        Assert.Equal(2, store.AuthorityRegistered);
+    }
+
     // ---------------------------------------------------------------- in-memory store
 
     private sealed class Store
@@ -461,6 +492,11 @@ public sealed class FormVersionLifecycleContractTests
                     if (PrepareFailure is { } refused)
                     {
                         throw new AuthorityClientException(refused, 422, false);
+                    }
+
+                    if (Pending is not null)
+                    {
+                        throw new AuthorityClientException("FORM_PUBLICATION_PENDING", 409, false); // C-191: the Authority never supersedes a pending publication
                     }
 
                     Registrations.Add(payload.Clone()); // the staged manifest the Authority will register

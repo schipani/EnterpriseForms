@@ -36,7 +36,7 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     table.CheckConstraint("ck_form_version_publication_digest", "octet_length(layout_digest) = 32");
                     table.CheckConstraint("ck_form_version_publication_number", "form_version_number >= 1");
                     table.CheckConstraint("ck_form_version_publication_resolution", "(publication_state_name = 'Pending') = (resolved_by_security_command_id IS NULL AND resolved_on IS NULL)");
-                    table.CheckConstraint("ck_form_version_publication_state", "publication_state_name IN ('Pending','Registered','Abandoned','Superseded')");
+                    table.CheckConstraint("ck_form_version_publication_state", "publication_state_name IN ('Pending','Registered','Abandoned')");
                     table.ForeignKey(
                         name: "fk_form_version_publication_org",
                         column: x => x.organization_id,
@@ -85,9 +85,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                 columns: new[] { "organization_id", "business_form_version_id" },
                 unique: true);
 
-            // C-188 BF-1: a resolved (Registered, Abandoned, Superseded) publication is final, and a Pending one may change only to a terminal
-            // state with its resolution stamps - the fail-closed state can never be re-entered or rewritten, and the staged manifest, digest and
-            // identities are immutable.
+            // C-188 BF-1: a resolved (Registered or Abandoned) publication is final, and a Pending one may change only to a terminal state
+            // with its resolution stamps - the fail-closed state can never be re-entered or rewritten, and the staged manifest, digest and
+            // identities are immutable. C-191: a pending publication is never superseded by a later prepare (the check constraint admits no
+            // such state).
             migrationBuilder.Sql("""
                 CREATE FUNCTION authority.guard_form_version_publication_transition() RETURNS trigger
                 LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp
@@ -97,7 +98,7 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         RAISE EXCEPTION 'C-188 BF-1: a % form version publication is final and cannot change', OLD.publication_state_name USING ERRCODE = 'check_violation';
                     END IF;
                     IF NEW.publication_state_name = 'Pending' THEN
-                        RAISE EXCEPTION 'C-188 BF-1: a pending form version publication changes only by being resolved or superseded' USING ERRCODE = 'check_violation';
+                        RAISE EXCEPTION 'C-188 BF-1: a pending form version publication changes only by being resolved' USING ERRCODE = 'check_violation';
                     END IF;
                     IF NEW.form_version_publication_id IS DISTINCT FROM OLD.form_version_publication_id
                        OR NEW.organization_id IS DISTINCT FROM OLD.organization_id

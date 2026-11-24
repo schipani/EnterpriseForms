@@ -315,7 +315,7 @@ public interface IAuthorityScope : IAsyncDisposable
 
     void AddFieldFormBinding(FieldFormBinding binding);
 
-    /// <summary>C-188 BF-1: the form's Pending publication (tracked, so commands can resolve or supersede it), or null.</summary>
+    /// <summary>C-188 BF-1: the form's Pending publication (tracked, so a resolution can resolve it), or null.</summary>
     Task<FormVersionPublication?> FindPendingFormVersionPublicationAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken);
 
     void AddFormVersionPublication(FormVersionPublication publication);

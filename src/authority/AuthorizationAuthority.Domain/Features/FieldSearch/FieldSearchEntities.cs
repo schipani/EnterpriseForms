@@ -124,8 +124,9 @@ public sealed class FieldFormBinding
 /// no field search approval of the form confers search (capabilities, both engines, open pages, catalogue snapshots) and no new approval is
 /// accepted: the Authority cannot know whether the business has made the new layout current, so it fails closed. Only
 /// <c>ResolveFormVersionPublication</c> ends it - Registered (the staged manifest becomes a registered version; never a later business copy,
-/// OD-3) or Abandoned (the business never committed it) - or a later <c>PrepareFormVersionPublication</c> of the same form (Superseded; the
-/// form stays pending). Terminal rows never change (trigger <c>trg_form_version_publication_transition</c>).
+/// OD-3) or Abandoned (the business never committed it). A pending publication is never superseded (C-191): a later prepare of the form is
+/// refused until it is resolved (<c>FORM_PUBLICATION_PENDING</c>), and the database accepts no other state. Terminal rows never change
+/// (trigger <c>trg_form_version_publication_transition</c>).
 /// </summary>
 public sealed class FormVersionPublication
 {
@@ -163,7 +164,6 @@ public static class FormVersionPublicationStates
     public const string Pending = "Pending";
     public const string Registered = "Registered";
     public const string Abandoned = "Abandoned";
-    public const string Superseded = "Superseded";
 }
 
 /// <summary>C-188 BF-1: how a pending publication is resolved.</summary>

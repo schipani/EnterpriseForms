@@ -437,6 +437,17 @@ public sealed class RetainedFieldSearchTests(StageBFixture fixture)
             Assert.DoesNotContain(active, r => r.Split('|')[3] == (phoneInLatest ? "RetainedField" : "CurrentVersion"));
             TestContext.Current.TestOutputHelper?.WriteLine($"C188-RACE round={round} registered={registered} approval={(approved.IsSuccess ? "Success" : approved.ErrorCode)} active={(active.Count == 0 ? "none" : active[0].Split('|')[3])}");
 
+            // C-191: a publication left pending is never superseded by the next publish (it would be refused FORM_PUBLICATION_PENDING); the
+            // designer resolves it first, as the product requires. Registering it applies D-H4 to the approval like any registration.
+            if ((await publish).GetProperty("authorityRegistrationPending").GetBoolean())
+            {
+                var recovered = await fixture.Api.PostAsync($"/api/v1/form-definitions/{w.FormId:D}/authority-registration/recover", w.S.Token(w.S.Designer), new { });
+                Assert.True(recovered.IsSuccess && recovered.Root.GetProperty("outcome").GetString() == "Registered", recovered.Body);
+                await w.S.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
+                Assert.DoesNotContain(Active(), r => r.Split('|')[3] == "RetainedField"); // phone is in the registered version now
+                TestContext.Current.TestOutputHelper?.WriteLine($"C188-RACE round={round} pending publication recovered");
+            }
+
             // Phone removed again (registered): a current-version approval is invalidated (D-H3); a retained one stays while phone is absent.
             await PublishAsync(w, (w.First, "First name"), (w.Email, "Email"));
             Assert.DoesNotContain(Active(), r => r.Split('|')[3] == "CurrentVersion");

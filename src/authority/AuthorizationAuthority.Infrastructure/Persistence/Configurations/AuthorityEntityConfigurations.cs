@@ -537,7 +537,7 @@ public sealed class FormVersionPublicationConfiguration : IEntityTypeConfigurati
         builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.ResolvedBySecurityCommandId).HasConstraintName("fk_form_version_publication_resolved_command");
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_form_version_publication_state", "publication_state_name IN ('Pending','Registered','Abandoned','Superseded')");
+            t.HasCheckConstraint("ck_form_version_publication_state", "publication_state_name IN ('Pending','Registered','Abandoned')");
             t.HasCheckConstraint("ck_form_version_publication_number", "form_version_number >= 1");
             t.HasCheckConstraint("ck_form_version_publication_digest", "octet_length(layout_digest) = 32");
             t.HasCheckConstraint("ck_form_version_publication_resolution", "(publication_state_name = 'Pending') = (resolved_by_security_command_id IS NULL AND resolved_on IS NULL)");

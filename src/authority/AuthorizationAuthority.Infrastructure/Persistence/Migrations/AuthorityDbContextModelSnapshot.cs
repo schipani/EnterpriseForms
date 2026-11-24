@@ -1233,7 +1233,7 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_form_version_publication_resolution", "(publication_state_name = 'Pending') = (resolved_by_security_command_id IS NULL AND resolved_on IS NULL)");
 
-                            t.HasCheckConstraint("ck_form_version_publication_state", "publication_state_name IN ('Pending','Registered','Abandoned','Superseded')");
+                            t.HasCheckConstraint("ck_form_version_publication_state", "publication_state_name IN ('Pending','Registered','Abandoned')");
                         });
                 });
 

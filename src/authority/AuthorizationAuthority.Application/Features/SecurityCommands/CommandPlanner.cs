@@ -44,7 +44,7 @@ public sealed class CommandPlan
     /// <summary>C-188 BF-1: the publication staged by PrepareFormVersionPublication (persisted in its transaction).</summary>
     public FormVersionPublication? NewPublication { get; set; }
 
-    /// <summary>C-188 BF-1: Pending publications this command resolved or superseded (tracked; their resolution is stamped in its transaction).</summary>
+    /// <summary>C-188 BF-1: Pending publications this command resolved (tracked; their resolution is stamped in its transaction).</summary>
     public List<FormVersionPublication> ResolvedPublications { get; } = [];
 
     /// <summary>IX-1: set by the one caller that applies the search-index coverage changes for these approvals in the same transaction.</summary>

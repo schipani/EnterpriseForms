@@ -104,6 +104,12 @@ public sealed partial class FormDesignerHandlers
         {
             await SubmitPublicationCommandAsync(context, SecurityCommandKind.PrepareFormVersionPublication, formDefinitionId, payload, $"form-version-prepare:{version.FormVersionId:N}", $"stage version {version.VersionNumber} before publishing", cancellationToken).ConfigureAwait(false);
         }
+        catch (AuthorityClientException ex) when (ex.ErrorCode == "FORM_PUBLICATION_PENDING")
+        {
+            // C-191: the Authority never lets a new version replace a pending one (it may already be current here); the designer resolves it
+            // first with Retry registration (RecoverAuthorityRegistrationAsync).
+            throw new BusinessException("FORM_PUBLICATION_PENDING", 409, "the previous version of this form is not yet registered with the Authority, so nothing was published; retry its registration, then publish again");
+        }
         catch (AuthorityClientException ex)
         {
             throw ex.Retryable || ex.HttpStatusCode >= 500

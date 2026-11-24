@@ -18,7 +18,7 @@ public sealed record PublishedOptionEntry(Guid FieldOptionId, string OptionLabel
 /// <summary>
 /// C-188 BF-1: sent by the business publish request <b>before</b> it commits the version (same entries as
 /// <see cref="RegisterPublishedFormVersionPayload"/>, plus the business FormVersionId). The Authority stages it as the form's pending
-/// publication; until it is resolved no field search approval of the form confers search. A later prepare of the same form supersedes it.
+/// publication; until it is resolved no field search approval of the form confers search. Another prepare of the form is refused until it is resolved (C-191).
 /// </summary>
 public sealed record PrepareFormVersionPublicationPayload(Guid FormDefinitionId, Guid FormVersionId, int FormVersionNumber, string LayoutDigestHex, IReadOnlyList<PublishedFieldEntry> Fields, string? FormTitle = null);
 

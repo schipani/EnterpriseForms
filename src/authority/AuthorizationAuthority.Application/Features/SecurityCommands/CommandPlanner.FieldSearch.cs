@@ -36,8 +36,11 @@ public static partial class CommandPlanner
     /// that could never be registered is refused while the business can still roll back. From this revision until the publication is
     /// resolved, no approval of the form confers search (<see cref="RetainedFieldApprovals.IneffectiveAsync"/>) and new approvals are
     /// refused: the Authority cannot know whether the business has made the new layout current, so field search on the form fails closed.
-    /// A pending publication of the same form is superseded and the form stays pending: the business serializes its publications per form,
-    /// so the earlier one was either committed and is now being replaced, or never committed.
+    /// <para>C-191: refused while a publication of the form is pending (<c>FORM_PUBLICATION_PENDING</c>), including a repeated prepare of
+    /// the same version and another version with the same number. A pending publication is never superseded: it may already be committed
+    /// and current in the business, and a later prepare that replaced it could be registered (skipping its D-H3/D-H4 consequences) or
+    /// abandoned (lifting the barrier onto the previous registered manifest). Only <see cref="ResolveFormVersionPublicationAsync"/> naming
+    /// it exactly ends the pending state.</para>
     /// </summary>
     private static async Task<CommandPlan> PrepareFormVersionPublicationAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
     {
@@ -49,6 +52,8 @@ public static partial class CommandPlanner
         }
 
         var digest = await ValidatePublicationAsync(scope, organizationId, actor, graph, payload.FormDefinitionId, payload.FormVersionNumber, payload.LayoutDigestHex, payload.Fields, payload.FormTitle, cancellationToken).ConfigureAwait(false);
+        // C-191: a pending publication of the form is resolved first, never superseded.
+        await RequireNoPendingPublicationAsync(scope, organizationId, payload.FormDefinitionId, "staging another version", cancellationToken).ConfigureAwait(false);
         var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
 
         // D-H7 is checked now, so a version that can never be registered is refused before the business commits it; the bindings themselves
@@ -57,23 +62,6 @@ public static partial class CommandPlanner
         foreach (var field in payload.Fields)
         {
             await RequireFieldFormBindingAsync(scope, organizationId, field.FieldDefinitionId, payload.FormDefinitionId, probe, FieldFormBindingSources.VersionRegistration, cancellationToken).ConfigureAwait(false);
-        }
-
-        var pending = await scope.FindPendingFormVersionPublicationAsync(organizationId, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false);
-        if (pending is not null)
-        {
-            if (pending.BusinessFormVersionId == payload.FormVersionId)
-            {
-                throw AuthorityException.Invalid("this form version is already prepared");
-            }
-
-            if (payload.FormVersionNumber < pending.FormVersionNumber)
-            {
-                throw new AuthorityException(AuthorityErrorCodes.FormVersionUntrusted, 409, false, "a later version of this form is already being published");
-            }
-
-            pending.PublicationStateName = FormVersionPublicationStates.Superseded;
-            plan.ResolvedPublications.Add(pending);
         }
 
         plan.NewPublication = new FormVersionPublication
