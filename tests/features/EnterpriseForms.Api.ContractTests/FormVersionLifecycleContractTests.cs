@@ -33,6 +33,9 @@ public sealed class FormVersionLifecycleContractTests
     private static readonly Guid Phone = Guid.CreateVersion7();
     private static readonly Guid Email = Guid.CreateVersion7();
 
+    /// <summary>The audit outcomes the database accepts (ck_audit_events_outcome).</summary>
+    private static readonly string[] AllowedOutcomes = ["Success", "Denied", "Failed"];
+
     private static string Element(Guid fieldId, string label, bool required = false) =>
         JsonSerializer.Serialize(new { kind = "field", fieldDefinitionId = fieldId, control = "text", label, required, layout = new { columnSpan = 4, startOnNewRow = false }, validation = new { } });
 
@@ -196,6 +199,28 @@ public sealed class FormVersionLifecycleContractTests
         }
     }
 
+    /// <summary>
+    /// A registration the Authority refuses (here: its gate closed by a concurrent command) leaves the version published and reported as
+    /// not registered, with a FORM_VERSION_AUTHORITY_REGISTRATION_FAILED audit event whose outcome the database accepts
+    /// (ck_audit_events_outcome: Success, Denied or Failed). Found during C-188 verification: the handler wrote "Failure", the insert
+    /// failed and the publish answered 503 STORE_UNAVAILABLE without its audit evidence.
+    /// </summary>
+    [Fact]
+    public async Task ARefusedAuthorityRegistrationIsReportedAndAuditedWithAnAllowedOutcome()
+    {
+        var store = new Store { RegistrationFailure = "AUTHORITY_NOT_READY" };
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        var v1 = await PublishAsync(store, handlers, "v1 while the Authority is busy");
+
+        Assert.Equal(1, v1.VersionNumber);
+        Assert.False(v1.AuthorityRegistered);
+        var failed = Assert.Single(store.AuditEvents, e => e.EventAction == AuditActions.FormVersionAuthorityRegistrationFailed);
+        Assert.Equal("Failed", failed.EventOutcome);
+        Assert.Equal("AUTHORITY_NOT_READY", JsonDocument.Parse(failed.EventMetadataJson).RootElement.GetProperty("reason").GetString());
+        Assert.All(store.AuditEvents, e => Assert.Contains(e.EventOutcome, AllowedOutcomes));
+    }
+
     // ---------------------------------------------------------------- in-memory store
 
     private sealed class Store
@@ -252,9 +277,17 @@ public sealed class FormVersionLifecycleContractTests
             return new FormDesignerHandlers(store, authority, new AuthorityCommandAwaiter(authority, TimeProvider.System), TimeProvider.System, null!);
         }
 
+        /// <summary>When set, the Authority refuses the registration with this error code (e.g. a gate closed by a concurrent command).</summary>
+        public string? RegistrationFailure { get; set; }
+
         private Task<SecurityCommandResult> Register(SecurityCommandRequest request)
         {
             Assert.Equal(SecurityCommandKind.RegisterPublishedFormVersion, request.CommandKind);
+            if (RegistrationFailure is { } code)
+            {
+                throw new AuthorityClientException(code, 503, true);
+            }
+
             Registrations.Add(request.CommandPayload.Clone());
             return Task.FromResult(new SecurityCommandResult(Guid.CreateVersion7(), SecurityCommandStatus.Effective, 10, 10, "Open", null, Guid.Empty));
         }

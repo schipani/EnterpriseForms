@@ -1387,7 +1387,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         AuditRecorder.Record(scope, context, clock, AuditCategories.Form, failure is null ? AuditActions.FormVersionAuthorityRegistered : AuditActions.FormVersionAuthorityRegistrationFailed,
             failure is null ? "published version registered with the Authority" : "published version could not be registered with the Authority", formDefinitionId: formDefinitionId, targetEntityType: "form_version", targetEntityId: version.FormVersionId,
-            metadata: new { versionNumber = version.VersionNumber, fields = fields.Count, reason = failure }, outcome: failure is null ? "Success" : "Failure");
+            metadata: new { versionNumber = version.VersionNumber, fields = fields.Count, reason = failure }, outcome: failure is null ? "Success" : "Failed"); // ck_audit_events_outcome: Success/Denied/Failed
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return failure is null;
     }
