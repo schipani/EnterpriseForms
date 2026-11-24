@@ -327,7 +327,7 @@ the C8 status); the six Dependabot alerts; independent third-party assessment an
 
 Authorized by the owner on 2026-11-24 (owner decisions D-H1…D-H18; H1–H6 in Development/Test only). Implemented on the
 branch `c188/retained-field-search` from `9903844` (the PR #75 squash merge), pushed and opened as PR #76 with owner
-authorization; BF-1 remediated on the same branch (§11.6). **Not merged, not deployed; not owner-accepted and not independently
+authorization; BF-1 remediated on the same branch (§11.6), and the final BF-1 check corrected (§11.8, C-191). **Not merged, not deployed; not owner-accepted and not independently
 reviewed.** CLAUDE.md §11 #2 searchability stays
 **UNMET** in the requirement register until the owner accepts the evidence below.
 
@@ -456,12 +456,48 @@ layout exactly as publishing does; the contract test reproduces the jsonb case a
   registration status reports them as `NotRegistered` (publish again, OD-3). Before any rollout, a read-only business-side inventory is
   required: forms whose current version has a `FORM_VERSION_AUTHORITY_REGISTRATION_FAILED` audit event and no later
   `FORM_VERSION_AUTHORITY_REGISTERED` event for the same version. Not run on any persistent environment (not authorized).
-- **Availability:** search on a form with a pending publication is unavailable until a designer retries the registration or publishes
-  again; there is no automatic background retry (it would need a non-human registration identity - a governance change not made).
-- **A staged version whose stored layout no longer has the staged digest** (tampering, or a defect) is never registered; the form stays
-  unsearchable until a new publication supersedes it.
+- **Availability:** search on a form with a pending publication is unavailable until a designer retries the registration (since C-191
+  a new publication is refused until then, also after a failed commit); there is no automatic background retry (it would need a non-human registration identity - a governance change not made).
+- **A staged version whose stored layout no longer has the staged digest** (tampering, or a defect) is never registered. Since C-191 a
+  new publication cannot supersede it either, so the form stays unsearchable and unpublishable until it is resolved outside the product
+  flow (investigation, then an explicit resolution); there is no in-product path. Owner decision pending (§11.8).
 - **Abandonment** is decided by the business from its own store under the lock; a designer with direct Authority access could withdraw
   a committed version's staging, recreating the C7 window for that form (audited; it grants no search that the approval did not).
 - **Race coverage:** in the Stage B race the four publications all registered while the concurrent re-approvals were refused
   (pending or transient); the pending branch is proven deterministically with the Testing-only fault checkpoints, not by the race.
 - **Concurrent C7 limitation recorded in §11.4** ("Registration during a concurrent security command") is superseded by this section.
+
+### 11.8 BF-1 final check — a pending publication is never superseded (C-191)
+
+Owner check of `34a5dae`: a new `PrepareFormVersionPublication` must never supersede a committed, unresolved publication in a way that
+lets the Authority reopen search on an obsolete field manifest. **It did not hold.** Sequence: V1 (First, Phone) registered and Phone
+approved; V2 removes Phone, the business commits it and the resolution is lost. A prepare of V3, or of another V2, was accepted and
+marked V2 `Superseded`:
+
+- registering V3 (Phone back) applied D-H3/D-H4 against V1, so the Phone approval carried over to V3 although V2 had removed Phone;
+- registering another V2 that kept Phone left the approval effective on a manifest the business never made current (direct Authority
+  access);
+- abandoning V3 after a failed business commit lifted the barrier with the Authority judging V1 while the business was at V2: the
+  removed field's ordinary approval was searchable again (BF-1 reopened). The publish path reached the first and third cases without
+  any direct access: it never resolved a pending publication before preparing the next one.
+
+Characterization tests run against the unchanged `34a5dae` code reproduced all three (3/3 passed, i.e. the defect present).
+
+**Correction (smallest fail-closed):** the Authority refuses every prepare of a form while a publication of it is pending
+(`FORM_PUBLICATION_PENDING`) - a later version, another version with the same number, or the same version again - and stages nothing;
+the `Superseded` state is removed from the code and from the database check constraint (the migration is on this unmerged branch and
+was never applied to a persistent environment). The business answers such a publish `409 FORM_PUBLICATION_PENDING`, commits nothing,
+and the designer resolves the pending publication with Retry registration first. No security invariant is weakened; the cost is
+availability (a publish after a lost resolution or a failed commit needs the retry first).
+
+**Abandoned resolution.** An `Abandoned` resolution of a version already committed in the business would clear the barrier. The
+Authority does **not** enforce this independently: it cannot see the business store and accepts `Abandoned` from any caller with
+design permission on the form. Through the product it relies on trusted business-side sequencing - the publish path never abandons
+after a commit (a failed or ambiguous commit leaves the publication pending), and recovery decides from the business store under the
+per-form publication lock (Stage B: lost registration recovered as `Registered`, lost commit as `Abandoned`). A caller able to submit
+Authority commands directly could abandon a committed version; that caller could equally register an invented manifest, since the
+manifest is declared by the business (OD-3), so independent enforcement of abandonment alone would not close that class. Options for
+an owner decision (not implemented): business-side evidence the Authority can verify, or a conservative abandonment that also applies
+the staged manifest's invalidations.
+
+**Verification (local, 2026-11-24; nothing on a persistent environment):** Authority unit FormVersionPublicationTests 11/11 (3 new; the supersede test replaced; the three fail with the refusal removed); full Authority unit project 2,138 (1,927 passed, 211 authorized skips); contract FormVersionLifecycleContractTests 17/17 (1 new); Stage B FormVersionPublicationBarrierTests 6/6 on a freshly recreated stack (run 20261124-165940-9c181d41; 1 new); focused Stage B regressions on the same stack: RetainedFieldSearchTests 5/5 (race adapted: a pending publication is recovered before the next publish; in this run all three rounds registered, so that branch was not exercised), FieldSearchApprovalTests 5/5, FieldSearchExecutionTests 14/14, FormVersion* 14/14, DesignerTests 3/3; Playwright form-publication-registration 4/4; Release build without OpenAPI drift; full .NET CI-equivalent set 3,349/3,349 with 223 authorized skips (unchanged); characterization tests against unchanged 34a5dae reproduced the three superseding cases (3/3, not committed).
