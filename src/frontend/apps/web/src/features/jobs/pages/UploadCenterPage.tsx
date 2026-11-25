@@ -31,7 +31,7 @@ export function phaseTone(phase: UploadItem["phase"]): "info" | "success" | "war
   }
 }
 
-/** PG-021 Upload Center: in-tab uploads (durable across SPA navigation) plus server sessions that need a re-selected file. */
+/** PG-010 Upload Center: in-tab uploads (durable across SPA navigation) plus server sessions that need a re-selected file. */
 export function UploadCenterPage() {
   useFormatter();
   const { uploads } = useRuntime();

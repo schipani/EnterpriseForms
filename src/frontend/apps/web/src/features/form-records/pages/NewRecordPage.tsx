@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { ErrorPanel } from "../../support";
 import { layoutValues, toGroupInfos, toRendererFields } from "../components/recordModel";
 
-/** PG-016 create record from the current published version; the creator becomes the owner in the authority. */
+/** PG-014 create record from the current published version; the creator becomes the owner in the authority. */
 export function NewRecordPage() {
   const { formDefinitionId } = useParams({ from: "/app/forms/$formDefinitionId/records/new" });
   const api = useApi();

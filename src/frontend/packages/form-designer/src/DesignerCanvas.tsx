@@ -47,7 +47,7 @@ export interface DesignerCanvasProps {
 const TYPE_LABEL: Record<string, string> = { String: "Text", Integer: "Whole number", Decimal: "Decimal", Date: "Date", DateTime: "Date and time", Guid: "Identifier", Boolean: "Yes/No toggle", Option: "Dropdown", File: "Document collection" };
 
 /**
- * Designer canvas (PG-033, C1 designer rebuild): the form as a stack of titled, collapsible sections, each with its own
+ * Designer canvas (PG-029, C1 designer rebuild): the form as a stack of titled, collapsible sections, each with its own
  * four-column grid of compact field previews. A tile is selected by clicking (or Enter/Space on its name); the
  * inspector — not the tile — owns property editing. Double-click a name to rename the display label inline. Empty
  * "+ Add Field" cells mark exact insertion positions. Tiles move by drag-and-drop between and within sections, or

@@ -7,7 +7,7 @@ import { useState } from "react";
 import { ErrorPanel } from "../../support";
 
 /**
- * Reusable child-record list (PG-019): each item is an independent FormRecord linked through the relationship.
+ * Reusable child-record list (PG-018): each item is an independent FormRecord linked through the relationship.
  * Add navigates to the child editor; view/edit open the child record; unlink keeps the child's data and history.
  */
 export function ChildRecordList({ parentFormRecordId, relationship, label, canEdit, summaryFieldKeys }: { parentFormRecordId: string; relationship: RelationshipDefinitionResponse; label: string; canEdit: boolean; summaryFieldKeys: readonly string[] }) {

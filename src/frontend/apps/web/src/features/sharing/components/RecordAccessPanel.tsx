@@ -21,7 +21,7 @@ const rolesFor = (contributorWritesEnabled: boolean) => [
 const SHARED_EDIT_DESCRIPTION = "shared fields changed by a person with shared edit access";
 
 /**
- * PG-017 Access tab (CLAUDE.md §4H, ADR-PB-002 Stage B item 5): the caller's effective permissions as decided by the
+ * PG-022 Access tab (CLAUDE.md §4H, ADR-PB-002 Stage B item 5): the caller's effective permissions as decided by the
  * authority for this request, and — for access managers — the record's explicit field-scoped shares with create and
  * revoke. Every list row is a local projection of an authority command; it confers nothing. New fields, child records
  * and documents are never covered by an existing share.

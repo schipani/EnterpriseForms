@@ -6,7 +6,7 @@ import { useState } from "react";
 import { RenameFormDialog, type RenameFormTarget } from "../../form-designer";
 import { ErrorPanel } from "../../support";
 
-/** PG-029 form catalog: what the authority lets this user design or use. */
+/** PG-012 form catalog: what the authority lets this user design or use. */
 export function FormsPage() {
   useFormatter();
   const api = useApi();
