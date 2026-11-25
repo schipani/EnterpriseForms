@@ -1,6 +1,6 @@
 # Stage B Status — Enterprise Forms Application (Accused vertical slice)
 
-**Date:** 2026-10-19 · **Branch:** `stage-b/accused-vertical-slice` (PR #10 → `stage-a/level2-security-foundation`) ·
+**Date:** 2026-10-19 · **Branch:** `stage-b/accused-vertical-slice` (PR #10 → `stage-a/level2-security-foundation`; update 2026-11-25: PR #10 was retargeted to `main` and merged as `556c562` on 2026-10-19) ·
 **Evidence commits:** `5d7da9f` (Stage B rounds 1–4), `a0f0b37` (B-28), this head (B-29, §4.7; hosted run links in §4.6) · **Scope:** ADR-PB-002 Stage B — the working Accused + AccusedAddress + document
 workflow from Form Designer to browser, on the unchanged Stage A Level 2 foundation.
 

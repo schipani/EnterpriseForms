@@ -3,6 +3,10 @@
 Branch `feature/form-rename`, based on the owner-accepted baseline `ui/dashboard-security-monitoring` (`c042215`, C-91).
 Not merged; awaiting owner acceptance. Development feature, not production Level 2 evidence.
 
+**Update (2026-11-25):** merged into `main` as `75b2e8d` (PR #41, 2026-11-02, the signed replacement for PR #38). No
+decision recording owner acceptance of the form rename was found (C-92 records it as awaiting acceptance), so the merge is
+recorded as code integration only. Open observations (for example FR-OBS-1) are unchanged.
+
 ## 1. Behaviour
 
 | Item | Implementation |

@@ -305,4 +305,4 @@ This is an owner functional review. It is **not** an independent security review
 
 * **Branch protection on `main`:** the four `ci` checks above are required, with strict up-to-date (the branch is based on current `main`, `cf45a9e`); signed commits and linear history (satisfied by a GitHub squash merge); a pull request with no required approvals.
 * **Required checks:** pass on `1fc1393`, and must pass again on the documentation-only closure head.
-* **Not merged.** The merge is the owner's decision. The red, non-required Stage B integration run (§12.3) is disclosed for that decision.
+* **Not merged.** The merge is the owner's decision. *(Update 2026-11-25: later squash-merged into `main` as `f859e42`, PR #15, 2026-10-22.)* The red, non-required Stage B integration run (§12.3) is disclosed for that decision.
