@@ -554,8 +554,8 @@
     },
     {
       "path": "docs/governance/PROPOSED_DEVELOPMENT_AI_REVIEW_AMENDMENT.md",
-      "sha256": "dc0c38b4ab7e1edf713d42c0d3f6d9a44b5959c38415b9fcf9515fb2ffadbe79",
-      "bytes": 5401
+      "sha256": "3215a59e0971f223e962e0e6d84ec71d8f3863f4f6aaee68a48bf312c7ad4a23",
+      "bytes": 6052
     },
     {
       "path": "docs/governance/REVIEW_AND_AUTHORIZATION_WORKFLOW.md",
@@ -564,8 +564,8 @@
     },
     {
       "path": "docs/governance/WORK_PACKAGE_REGISTER.md",
-      "sha256": "bbb7c64b11d9a4b80507cb1100d2f1519787f169da005964fb8127512849d160",
-      "bytes": 17425
+      "sha256": "c3820006b05e04d10a34bb483184a68bbf96cf4235f884827517a051d92c7693",
+      "bytes": 17610
     },
     {
       "path": "docs/identity/PB08_IDENTITY_ASSURANCE_STANDARD.md",
