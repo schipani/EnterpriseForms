@@ -595,15 +595,40 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
 
     /// <summary>The value the running Authority container was configured with (the image has no shell, so the container's
     /// environment is read); null when it cannot be read, never a guessed default.</summary>
+    /// <remarks>BH-1 corrective: ComposeStack.Run can throw on process startup/timeout; compose output may mix errors with
+    /// container IDs. Permit only a single safe hexadecimal Docker container ID and return null on any expected failure.
+    /// Never emit the container environment to output (it may contain configuration values).</remarks>
     private string? AuthorityConfiguredValue(string key)
     {
-        var container = fixture.Stack.Compose("ps -q authority", 60, throwOnError: false).Trim();
-        if (container.Length == 0)
+        string container;
+        try
+        {
+            container = fixture.Stack.Compose("ps -q authority", 60).Trim();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or System.ComponentModel.Win32Exception)
+        {
+            // Process.Start throws Win32Exception for file not found, access denied, etc.; ComposeStack.Run throws
+            // InvalidOperationException for null process or non-zero exit, TimeoutException for timeout. All are expected
+            // failures for an optional diagnostics probe.
+            return null;
+        }
+
+        // Permit only a single valid Docker container ID (12 or 64 hex characters, no other output).
+        if (container.Length == 0 || !System.Text.RegularExpressions.Regex.IsMatch(container, @"^[0-9a-f]{12}([0-9a-f]{52})?$"))
         {
             return null;
         }
 
-        var environment = ComposeStack.Run("docker", "inspect --format \"{{range .Config.Env}}{{println .}}{{end}}\" " + container, 60, throwOnError: false);
+        string environment;
+        try
+        {
+            environment = ComposeStack.Run("docker", "inspect --format \"{{range .Config.Env}}{{println .}}{{end}}\" " + container, 60);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
+
         return environment.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
             .FirstOrDefault(line => line.StartsWith(key + "=", StringComparison.Ordinal))?[(key.Length + 1)..];
     }

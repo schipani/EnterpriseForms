@@ -1084,8 +1084,8 @@
     },
     {
       "path": "scripts/ci/test_stage_b_groups.py",
-      "sha256": "5bb6258940e03fd5e4b04c0159a579e9aa4f6fb4a9e208b222d29de8bbab7fae",
-      "bytes": 15169
+      "sha256": "e4c052060551d068b3003eec939a8452f39ec70ffc632b931a82f5aad945b14d",
+      "bytes": 16488
     },
     {
       "path": "scripts/ci/test_test_results.py",
@@ -1219,8 +1219,8 @@
     },
     {
       "path": "scripts/dev/test.ps1",
-      "sha256": "a81f05da347e3b995ed81adec004f45cd97b4d93c3d568a5df0b56cb0979351c",
-      "bytes": 11847
+      "sha256": "da8f49c6166b38c5fd1903c27a015be8db35a2147103fe4a52e4b7d8c3a282c9",
+      "bytes": 13518
     },
     {
       "path": "scripts/dev/wp5b-mutations.py",

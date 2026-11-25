@@ -227,6 +227,23 @@ class StackEnvironmentTests(unittest.TestCase):
         self.assertEqual(self.run_tool(MANIFEST_ENV, "--groups", "gamma")[0], 1)
         self.assertEqual(self.run_tool(MANIFEST_ENV, "--class-pattern", "Nothing")[0], 1)
 
+    def test_exact_class_requires_one_manifest_class_bh1_corrective(self) -> None:
+        """BH-1 corrective: --class (exact match) must resolve to exactly one manifest class. A partial name that could
+        match multiple classes (via --class-pattern) is refused by --class, preserving the C-131 focused authorization
+        exception which requires exactly one manifest class before touching the stack."""
+        # --class requires the full class name and matches exactly one
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--class", "TwoTests")[0], 0)
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--class", "ThreeTests")[0], 0)
+        # A partial name that could match multiple classes via --class-pattern is refused by --class
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--class", "Tests")[0], 1)
+        # Even a unique substring is refused by --class (exact match semantics)
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--class", "Two")[0], 1)
+        # --class-pattern with a substring that matches multiple groups still succeeds (merges their environments)
+        code, out = self.run_tool(MANIFEST_ENV, "--class-pattern", "Tests")
+        self.assertEqual(code, 0)
+        # The shortest interval wins when multiple groups are matched
+        self.assertIn("10", out)
+
     def test_an_invalid_manifest_is_refused_by_the_command(self) -> None:
         bad = {**MANIFEST_ENV, "groups": [{**MANIFEST_ENV["groups"][1], "stackEnvironment": {"IX1_SEARCH_SWEEP_INTERVAL_SECONDS": "0"}}]}
         self.assertEqual(self.run_tool(bad, "--groups", "all")[0], 1)

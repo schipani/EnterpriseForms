@@ -143,8 +143,11 @@ jobs:
           echo "EXPECTED_TESTS=$COUNT" >> "$GITHUB_ENV"
       # BH-1 (C-193): the group's declared environment for the disposable security-test stack (stage-b-groups.json
       # stackEnvironment, allowlisted keys only; an empty value keeps the overlay default). Applied before the stack starts.
+      # BH-1 corrective: pipefail ensures a failed resolver is not hidden by tee; a failed resolver must fail the step.
       - name: Apply this group's disposable stack environment
-        run: python scripts/ci/stage_b_groups.py stack-env --groups "$GROUP" | tee -a "$GITHUB_ENV"
+        run: |
+          set -o pipefail
+          python scripts/ci/stage_b_groups.py stack-env --groups "$GROUP" | tee -a "$GITHUB_ENV"
       - name: Start the disposable stack with Stage B services (synthetic credentials)
         uses: ./.github/actions/start-stack
         with:
