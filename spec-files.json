@@ -538,6 +538,11 @@
       "bytes": 4619
     },
     {
+      "path": "docs/governance/AUTONOMOUS_DEVELOPMENT_POLICY.md",
+      "sha256": "b4c84fc00eef2811cae998a08b4687f1b60d1351d1941d57fe1c919ba375e966",
+      "bytes": 4373
+    },
+    {
       "path": "docs/governance/PB12_RELEASE_EVIDENCE_SCHEMA.json",
       "sha256": "a13142a0ffec26598d642a8da4c4f1c01349ea4ed7c47e2c7f77aa059bca5700",
       "bytes": 4650
@@ -554,8 +559,8 @@
     },
     {
       "path": "docs/governance/WORK_PACKAGE_REGISTER.md",
-      "sha256": "6e5aefcfa9a4164cc1dfae3d73ce49a539dc92e108debf04ca3dde12f4322695",
-      "bytes": 9758
+      "sha256": "d1079f4831b46839fbbe4dca2a8328cfe20cd462d1995abc79088992bc2099ae",
+      "bytes": 12779
     },
     {
       "path": "docs/identity/PB08_IDENTITY_ASSURANCE_STANDARD.md",

@@ -45,3 +45,20 @@ For each package record its ID and scope, authorization, allowed and prohibited 
 - **Acceptance criteria:** WP-0 §9 M1-WP1 through M1-WP12 and §4 tests 1–20. Trace verified evidence to §11 #23–#27 and #56–#62. Keep G27 open for its provider step-up and owner-acceptance obligations.
 - **Permitted scope:** Authority implementation, minimal business adapters and SRC-1 in disposable Development/Test. Use the normal approval mechanism for the Claude invocation and authorized local checks. Excludes M2 read endpoints, M3 pages, executed legacy migration, restricted activation, staging/production, Stage B execution, and merging the M1 PR.
 - **Checkpoint:** Integration dependencies blocked. No M1 worktree, delegation, implementation, technical review or owner acceptance. Resume by checking integrated base, hosted findings relevant to M1, and the approved WP-0 boundaries.
+
+## Standing mandate checkpoint — 2026-11-25
+
+The owner delegated ongoing Development/Test coordination in the EnterpriseForms Standing Autonomous Development Mandate. See the [operating policy](AUTONOMOUS_DEVELOPMENT_POLICY.md). C9 close-out and dependency integration precede C10 M1. G27 remains open, and the six Dependabot alerts on main remain tracked.
+
+- **PR #80 compatibility correction.** Claude Code is the sole implementation writer in C:/t/coord-zod-compat on review/zod-v4-compatibility, based on 1f9fbdff29425fa7761c48a5f0fe6e2785514202. The brief preserves Zod v3 integer behavior in the two affected renderer schema fields while keeping patched v4. The coordinator owns verification, signing and the normal PR update. Use the separate results checkpoint to determine completion.
+- **PR #78 rehearsal.** Git merged the candidate #77 and #78 trees without conflicts. Recalculation from candidate tree 2222aaeef150b3df8c6fffb17f0a99bd697776bf matched both checked-in manifests across 312 files. After #77 is integrated, regenerate from the actual combined checkout and require fresh CI before considering #78 for merge.
+- **C-195.** The completed review and the original SHA, inputs, measurements and RB-13 evidence remain in draft [PR #82](https://github.com/schipani/EnterpriseForms/pull/82). It remains a separate evidence change. Regenerate the manifests if its eventual authorized integration base changes.
+- **C10 M1.** The 12 WP-0 §9 packages remain the implementation scope, subject to #77–#80 and the prerequisite check above. No owner acceptance has been recorded for this milestone.
+
+### Main ruleset reconciliation
+
+Live ruleset 25341169 is active with no bypass actors and the four approved required checks. Its history records the drop from one approving review to zero on October 19 (versions 53685602 and 53862490) and the removal of approval after the last push later that day (version 53863694). The November 7 C-132 removal of Stage B from required checks retained those older settings. The current [checked-in ruleset](../../.github/rulesets/main-branch-protection.json) and [ADR-PB-011 A-21](../decisions/ADR-PB-011-GITHUB-ACTIONS-SECURE-DELIVERY.md) still call for one approval and approval after the last push. Only the owner account currently appears as a direct collaborator.
+
+1. The owner designates an eligible non-author reviewer who can approve the latest push. Use a manual, recorded security-owner review for paths defined in BUILD-00 §4.1. Enforceable CODEOWNERS review has a separate recorded dependency.
+2. The owner restores the approving-review count to 1 and approval after the last push to true, retaining the strict required checks, stale-review dismissal, thread resolution, signed commits, linear history and absence of bypass actors. Preserve the release-only Stage B policy.
+3. Read back the complete active rules and exact-head approvals. Resume at #77 only after the governance requirements are satisfied. Repeat the check at each successor's updated head.
