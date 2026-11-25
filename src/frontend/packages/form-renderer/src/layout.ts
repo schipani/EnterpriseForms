@@ -15,9 +15,15 @@ const placement = z
   .object({ columnSpan: z.number().int().min(1).max(4), startOnNewRow: z.boolean(), columnStart: z.number().int().min(1).max(4).optional() })
   .strict()
   .refine((value) => value.columnStart === undefined || value.columnStart + value.columnSpan - 1 <= 4, "The field extends beyond the four-column grid");
+/**
+ * Zod v4 compatibility: int() now rejects unsafe integers (> MAX_SAFE_INTEGER). The designer's transient layout state
+ * may hold large digits the user typed before finishing, so the two client-unbounded integer fields (minLength,
+ * sortOrder) must accept any finite integer representation for client parsing. The server enforces 32-bit persistence.
+ */
+const jsInteger = () => z.number().refine((n) => Number.isInteger(n), "Expected integer");
 const validation = z
   .object({
-    minLength: z.number().int().min(0).optional(),
+    minLength: jsInteger().refine((n) => n >= 0, "Expected nonnegative integer").optional(),
     maxLength: z.number().int().min(1).max(4000).optional(),
     pattern: z.string().max(200).optional(),
     minimum: z.number().optional(),
@@ -39,7 +45,7 @@ const upload = z
 const protection = z.object({ classification: z.enum(["Public", "Internal", "Confidential", "Restricted"]), protectionMode: z.enum(["Standard", "ApplicationEncrypted"]) }).strict();
 
 /** Option as published (snapshot): stable id and key, the label and order shown at publish time, and whether it was selectable. */
-const optionSnapshot = z.object({ fieldOptionId: z.guid(), optionKey: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), label: z.string().max(200), sortOrder: z.number().int(), isActive: z.boolean() }).strict();
+const optionSnapshot = z.object({ fieldOptionId: z.guid(), optionKey: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), label: z.string().max(200), sortOrder: jsInteger(), isActive: z.boolean() }).strict();
 
 const ruleSchema = ruleConditionSchema.refine((condition) => ruleShapeProblem(condition) === null, "The rule is nested too deeply or has too many conditions");
 

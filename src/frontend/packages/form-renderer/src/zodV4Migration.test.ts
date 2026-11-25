@@ -2,7 +2,7 @@
 // validation semantics the migration must preserve: GUID acceptance, strict objects, collection bounds, defaults, text
 // safety and the server-range integers. The server (FormLayoutCodec, the Authority) remains the authority for every rule.
 import { describe, expect, it } from "vitest";
-import { formLayoutSchema, parseLayout, tryParseLayout } from "./layout";
+import { formLayoutSchema, parseLayout, serializeLayout, tryParseLayout } from "./layout";
 import { RULE_MAX_CHILDREN, RULE_MAX_SET_VALUES, RULE_MAX_VALUE_LENGTH, parseCondition, ruleConditionSchema } from "./rules";
 
 const id = (n: number) => `0199a2b3-c4d5-7e6f-8123-${n.toString(16).padStart(12, "0")}`;
@@ -125,20 +125,53 @@ describe("required values, defaults and text safety", () => {
   });
 });
 
-describe("integers: the server's 32-bit range is accepted; v4 refuses unsafe integers", () => {
-  // The only behaviour difference found by the v3/v4 differential comparison: zod v4's int() also refuses integers beyond
-  // Number.MAX_SAFE_INTEGER on the two otherwise unbounded fields. The server stores both as 32-bit integers
-  // (LayoutValidation.MinLength, LayoutOption.SortOrder), so no persisted layout can contain such a value.
+describe("integers: v3 semantics preserved for transient designer state (ZOD-80-COMPAT)", () => {
+  // Zod v4's int() rejects unsafe integers (> MAX_SAFE_INTEGER). The designer's transient layout state may hold
+  // digits beyond safe range before the user finishes editing. jsInteger() preserves v3 acceptance of any finite
+  // integer representation; the server enforces 32-bit persistence limits.
   const option = (sortOrder: number) => layoutWith(field({ control: "select", options: [{ fieldOptionId: id(2), optionKey: "a", label: "A", sortOrder, isActive: true }] }));
+
   it("accepts the full 32-bit range", () => {
     expect(ok(option(2_147_483_647))).toBe(true);
     expect(ok(option(-2_147_483_648))).toBe(true);
     expect(ok(layoutWith(field({ validation: { minLength: 2_147_483_647 } })))).toBe(true);
   });
-  it("refuses unsafe integers and non-integers", () => {
-    expect(ok(option(2 ** 53 + 2))).toBe(false);
+
+  it("accepts unsafe positive integers for transient designer state (serializeLayout regression)", () => {
+    // The coordinator observed 9007199254740992 (2^53, exactly MAX_SAFE_INTEGER + 1) during transient editing
+    expect(ok(layoutWith(field({ validation: { minLength: 2 ** 53 } })))).toBe(true);
+    expect(ok(layoutWith(field({ validation: { minLength: 2 ** 53 + 2 } })))).toBe(true);
+    expect(ok(option(2 ** 53))).toBe(true);
+    expect(ok(option(2 ** 53 + 2))).toBe(true);
+
+    // Verify serializeLayout does not throw on transient unsafe integer (the actual regression scenario)
+    const transientLayout = formLayoutSchema.parse(layoutWith(field({ validation: { minLength: 2 ** 53 } })));
+    const serialized = serializeLayout(transientLayout);
+    expect(serialized).toContain(String(2 ** 53));
+  });
+
+  it("accepts unsafe negative integers for sortOrder (signed)", () => {
+    expect(ok(option(-(2 ** 53)))).toBe(true);
+    expect(ok(option(-(2 ** 53 + 2)))).toBe(true);
+  });
+
+  it("refuses negative minLength (nonnegative constraint preserved)", () => {
+    expect(ok(layoutWith(field({ validation: { minLength: -1 } })))).toBe(false);
+    expect(ok(layoutWith(field({ validation: { minLength: -(2 ** 53) } })))).toBe(false);
+  });
+
+  it("refuses fractional values (integer constraint preserved)", () => {
     expect(ok(option(1.5))).toBe(false);
-    expect(ok(layoutWith(field({ validation: { minLength: 2 ** 53 + 2 } })))).toBe(false);
+    expect(ok(option(-1.5))).toBe(false);
+    expect(ok(layoutWith(field({ validation: { minLength: 1.5 } })))).toBe(false);
+  });
+
+  it("refuses Infinity and NaN", () => {
+    expect(ok(option(Infinity))).toBe(false);
+    expect(ok(option(-Infinity))).toBe(false);
+    expect(ok(option(NaN))).toBe(false);
+    expect(ok(layoutWith(field({ validation: { minLength: Infinity } })))).toBe(false);
+    expect(ok(layoutWith(field({ validation: { minLength: NaN } })))).toBe(false);
   });
 });
 
