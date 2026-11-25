@@ -200,11 +200,23 @@ public sealed record RegisterRecordPayload(Guid FormRecordId, Guid FormDefinitio
 /// <summary>Removes the parent edge of a child record; the acting user becomes its owner (data preserved, no cascade delete).</summary>
 public sealed record UnlinkChildRecordPayload(Guid FormRecordId, Guid ParentFormRecordId);
 
-public sealed record TransferOwnershipPayload(Guid FormRecordId, Guid? NewOwnerUserId, Guid? NewOwnerTeamId);
+/// <summary>
+/// G27: Transfer ownership requires step-up assurance. <c>StepUpEvidence</c> is the development-only synthetic marker
+/// where the synthetic path is enabled; it is stripped from the journaled payload.
+/// </summary>
+public sealed record TransferOwnershipPayload(Guid FormRecordId, Guid? NewOwnerUserId, Guid? NewOwnerTeamId, string? StepUpEvidence = null);
 
-public sealed record CreateSharePayload(Guid RecordShareId, Guid FormRecordId, Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole, IReadOnlyList<Guid> FieldItemIds);
+/// <summary>
+/// G27: Creating a share requires step-up assurance. <c>StepUpEvidence</c> is the development-only synthetic marker
+/// where the synthetic path is enabled; it is stripped from the journaled payload.
+/// </summary>
+public sealed record CreateSharePayload(Guid RecordShareId, Guid FormRecordId, Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole, IReadOnlyList<Guid> FieldItemIds, string? StepUpEvidence = null);
 
-public sealed record RevokeSharePayload(Guid RecordShareId, Guid FormRecordId);
+/// <summary>
+/// G27: Revoking a share requires step-up assurance. <c>StepUpEvidence</c> is the development-only synthetic marker
+/// where the synthetic path is enabled; it is stripped from the journaled payload.
+/// </summary>
+public sealed record RevokeSharePayload(Guid RecordShareId, Guid FormRecordId, string? StepUpEvidence = null);
 
 public static class RecipientRoles
 {

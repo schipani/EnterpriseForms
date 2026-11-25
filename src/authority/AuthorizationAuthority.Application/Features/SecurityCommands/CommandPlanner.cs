@@ -109,11 +109,13 @@ public static partial class CommandPlanner
         CancellationToken cancellationToken,
         FieldSearchApprovalGate? approvalGate = null,
         DateTimeOffset? now = null,
-        FormPublicationAbandonmentVerifier? abandonmentVerifier = null)
+        FormPublicationAbandonmentVerifier? abandonmentVerifier = null,
+        HumanCommandStepUpGate? humanCommandGate = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         var at = now ?? DateTimeOffset.UtcNow;
         var gate = approvalGate ?? FieldSearchApprovalGate.Unavailable;
+        var humanGate = humanCommandGate ?? HumanCommandStepUpGate.Unavailable;
         var plan = request.CommandKind switch
         {
             SecurityCommandKind.RegisterTeam => await RegisterTeamAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
@@ -122,9 +124,9 @@ public static partial class CommandPlanner
             SecurityCommandKind.RegisterFormDefinition => await RegisterFormDefinitionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateFormUsers => await UpdateFormUsersAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RegisterRecord => await RegisterRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.TransferOwnership => await TransferOwnershipAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.CreateShare => await CreateShareAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.RevokeShare => await RevokeShareAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.TransferOwnership => await TransferOwnershipAsync(scope, organizationId, actor, request, graph, humanGate, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.CreateShare => await CreateShareAsync(scope, organizationId, actor, request, graph, humanGate, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.RevokeShare => await RevokeShareAsync(scope, organizationId, actor, request, graph, humanGate, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UnlinkChildRecord => await UnlinkChildRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.PublishFormSecurityRevision => await PublishFormSecurityRevisionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateMandatoryPolicy => await UpdateMandatoryPolicyAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
@@ -728,10 +730,14 @@ public static partial class CommandPlanner
         return plan;
     }
 
-    private static async Task<CommandPlan> TransferOwnershipAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
+    private static async Task<CommandPlan> TransferOwnershipAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, HumanCommandStepUpGate humanGate, CancellationToken cancellationToken)
     {
         var payload = CanonicalJson.Deserialize<TransferOwnershipPayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.FormRecord, payload.FormRecordId);
+
+        // G27: TransferOwnership is a human command requiring step-up assurance.
+        humanGate.RequireStepUp(payload.StepUpEvidence);
+
         await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.FormRecord, payload.FormRecordId, cancellationToken).ConfigureAwait(false);
         if ((payload.NewOwnerUserId is null) == (payload.NewOwnerTeamId is null))
         {
@@ -752,7 +758,8 @@ public static partial class CommandPlanner
             throw AuthorityException.Forbidden("an administrator override cannot transfer a record to the administrator or a team they belong to");
         }
 
-        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
+        // Strip step-up evidence from the journaled payload.
+        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload with { StepUpEvidence = null }) };
         plan.RemoveEdges.AddRange(graph.EdgesOf(ResourceTypeNames.FormRecord, payload.FormRecordId, "owner"));
         if (payload.NewOwnerUserId is { } userId)
         {
@@ -768,10 +775,14 @@ public static partial class CommandPlanner
         return plan;
     }
 
-    private static async Task<CommandPlan> CreateShareAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
+    private static async Task<CommandPlan> CreateShareAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, HumanCommandStepUpGate humanGate, CancellationToken cancellationToken)
     {
         var payload = CanonicalJson.Deserialize<CreateSharePayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.FormRecord, payload.FormRecordId);
+
+        // G27: CreateShare is a human command requiring step-up assurance.
+        humanGate.RequireStepUp(payload.StepUpEvidence);
+
         await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.FormRecord, payload.FormRecordId, cancellationToken).ConfigureAwait(false);
         if ((payload.RecipientUserId is null) == (payload.RecipientTeamId is null))
         {
@@ -837,7 +848,8 @@ public static partial class CommandPlanner
             await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.Team, payload.RecipientTeamId!.Value, cancellationToken).ConfigureAwait(false);
         }
 
-        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
+        // Strip step-up evidence from the journaled payload.
+        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload with { StepUpEvidence = null }) };
         plan.RegisterResources.Add(NewResource(organizationId, ResourceTypeNames.RecordShare, payload.RecordShareId, payload.FormRecordId));
         plan.AddEdges.Add((ResourceTypeNames.FormRecord, payload.FormRecordId, "shared_via", ResourceTypeNames.RecordShare, payload.RecordShareId, string.Empty));
         if (payload.RecipientUserId is { } recipientUser)
@@ -857,10 +869,14 @@ public static partial class CommandPlanner
         return plan;
     }
 
-    private static async Task<CommandPlan> RevokeShareAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
+    private static async Task<CommandPlan> RevokeShareAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, HumanCommandStepUpGate humanGate, CancellationToken cancellationToken)
     {
         var payload = CanonicalJson.Deserialize<RevokeSharePayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.FormRecord, payload.FormRecordId);
+
+        // G27: RevokeShare is a human command requiring step-up assurance.
+        humanGate.RequireStepUp(payload.StepUpEvidence);
+
         var share = await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.RecordShare, payload.RecordShareId, cancellationToken).ConfigureAwait(false);
         if (share.ParentResourceEntityId != payload.FormRecordId)
         {
@@ -877,7 +893,8 @@ public static partial class CommandPlanner
             }
         }
 
-        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
+        // Strip step-up evidence from the journaled payload.
+        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload with { StepUpEvidence = null }) };
         plan.RemoveEdges.AddRange(graph.EdgesWithSubject(ResourceTypeNames.RecordShare, payload.RecordShareId));
         plan.RemoveEdges.AddRange(graph.EdgesOf(ResourceTypeNames.RecordShare, payload.RecordShareId));
         share.ResourceLifecycleState = ResourceLifecycleStates.Revoked;

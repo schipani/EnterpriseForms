@@ -11,6 +11,7 @@ namespace EnterpriseForms.Application.Features.Sharing.CreateShare;
 /// <summary>Explicit item-scoped share (CLAUDE.md §4H): field keys map to the accepted manifest's item ids; the authority validates scope, delegation and recipient.</summary>
 public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock)
 {
+    public const string SyntheticStepUpMarker = "synthetic-development-step-up";
     public async Task<ShareResponse> HandleAsync(RequestContext context, Guid formRecordId, CreateShareRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -64,6 +65,7 @@ public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAutho
         }
 
         var recordShareId = CreateFormDefinitionHandler.DeterministicId(idempotencyKey, "share");
+        // G27: UseDevelopmentStepUp emits the synthetic step-up marker to the Authority in dev/test only.
         var payload = JsonSerializer.SerializeToElement(new
         {
             record_share_id = recordShareId,
@@ -72,6 +74,7 @@ public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAutho
             recipient_team_id = request.RecipientTeamId,
             recipient_role = request.RecipientRole,
             field_item_ids = items.Select(i => i.ItemId).ToList(),
+            step_up_evidence = request.UseDevelopmentStepUp == true ? SyntheticStepUpMarker : null,
         });
         var command = await awaiter.SubmitAndAwaitAsync(user, new SecurityCommandRequest(context.OrganizationId, SecurityCommandKind.CreateShare, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), head.AuthorizationRevision, payload, "share"), "share:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
         var outcome = new CommandOutcome(command.CommandId, command.CommandStatus.ToString(), command.AuthorizationRevision, command.CommandStatus == SecurityCommandStatus.Effective);

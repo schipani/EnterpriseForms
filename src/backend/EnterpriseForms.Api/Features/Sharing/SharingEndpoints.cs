@@ -33,12 +33,14 @@ public static class SharingEndpoints
             .WithName("ListRecordShares")
             .WithSummary("Shares of a record for its access managers (local projection; the authority decides every recipient's access).");
 
-        group.MapPost("/{recordShareId:guid}/revoke", static async Task<Ok<CommandStatusResponse>> (Guid formRecordId, Guid recordShareId, HttpContext http, RevokeShareHandler handler, CancellationToken cancellationToken) =>
+        // G27: useDevelopmentStepUp is a bool query parameter (default false) since this endpoint has no body.
+        group.MapPost("/{recordShareId:guid}/revoke", static async Task<Ok<CommandStatusResponse>> (Guid formRecordId, Guid recordShareId, HttpContext http, RevokeShareHandler handler, CancellationToken cancellationToken, bool useDevelopmentStepUp = false) =>
             {
                 var context = BusinessAuthentication.RequireContext(http);
-                return TypedResults.Ok(await handler.HandleAsync(context, formRecordId, recordShareId, FormDefinitionEndpoints.RequireIdempotencyKey(http), cancellationToken).ConfigureAwait(false));
+                return TypedResults.Ok(await handler.HandleAsync(context, formRecordId, recordShareId, FormDefinitionEndpoints.RequireIdempotencyKey(http), useDevelopmentStepUp, cancellationToken).ConfigureAwait(false));
             })
-            .WithName("RevokeRecordShare");
+            .WithName("RevokeRecordShare")
+            .WithSummary("Revokes a share via authority command; effective immediately at the authority barrier. G27: useDevelopmentStepUp (bool query, default false) for the synthetic test path only.");
 
         return endpoints;
     }

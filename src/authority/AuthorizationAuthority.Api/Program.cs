@@ -114,6 +114,12 @@ public sealed class Program
             builder.Configuration["Identity:UserAssertion:ProviderKind"])
             // C-188 (D-H18): retained-field approvals are off unless FieldSearch:RetainedFieldApprovals=Enabled; an unknown value refuses startup.
             .WithRetainedFieldApprovals(builder.Configuration[AuthorizationAuthority.Application.Features.SecurityCommands.FieldSearchApprovalGate.RetainedFieldApprovalsKey]));
+        // G27: Human commands (CreateShare, RevokeShare, TransferOwnership) require step-up assurance (PB-08), which is not available.
+        // The synthetic path is accepted only in Development/Testing with the synthetic TestIdentityProvider.
+        builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.SecurityCommands.HumanCommandStepUpGate.Create(
+            builder.Configuration[AuthorizationAuthority.Application.Features.SecurityCommands.HumanCommandStepUpGate.ConfigurationKey],
+            builder.Environment.EnvironmentName,
+            builder.Configuration["Identity:UserAssertion:ProviderKind"]));
         // C-191: an Abandoned resolution of a pending form publication needs the business publication coordinator's attestation, signed with
         // this dedicated key (distinct from every other credential; absent => no abandonment is ever accepted and the publication stays pending).
         builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.SecurityCommands.FormPublicationAbandonmentVerifier.Create(

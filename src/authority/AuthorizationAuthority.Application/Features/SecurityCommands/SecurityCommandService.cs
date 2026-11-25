@@ -9,8 +9,11 @@ using AuthorizationAuthority.Domain.Features.SecurityCommands;
 namespace AuthorizationAuthority.Application.Features.SecurityCommands;
 
 /// <summary>Authoritative security-commit point (CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md §2 "Command sequence").</summary>
-public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock, FieldSearchApprovalGate approvalGate, AuthorizationAuthority.Application.Features.SearchIndex.SearchIndexWriter? searchIndex = null, IOperationTimingObserver? timing = null, FormPublicationAbandonmentVerifier? abandonmentVerifier = null)
+public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock, FieldSearchApprovalGate approvalGate, AuthorizationAuthority.Application.Features.SearchIndex.SearchIndexWriter? searchIndex = null, IOperationTimingObserver? timing = null, FormPublicationAbandonmentVerifier? abandonmentVerifier = null, HumanCommandStepUpGate? humanCommandGate = null)
 {
+    // G27: HumanCommandStepUpGate is optional and defaults to Unavailable, so existing callers and fixtures compile
+    // while the host registers the gate from configuration.
+    private readonly HumanCommandStepUpGate effectiveHumanGate = humanCommandGate ?? HumanCommandStepUpGate.Unavailable;
     public async Task<OperationStatus> SubmitAsync(VerifiedActor actor, SecurityCommandRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -54,7 +57,10 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             CommandIdempotencyKey = idempotencyKey,
             CommandRequestDigest = requestDigest,
             ExpectedAuthorizationRevision = request.ExpectedAuthorizationRevision,
-            CommandPayloadJson = request.CommandPayload.GetRawText(),
+            // G27: keep untrusted step-up evidence out of rejected commands, including refusals before planning.
+            CommandPayloadJson = request.CommandKind is SecurityCommandKind.CreateShare or SecurityCommandKind.RevokeShare or SecurityCommandKind.TransferOwnership
+                ? "{}"
+                : request.CommandPayload.GetRawText(),
             CommandReasonText = request.ChangeReason,
             CorrelationIdentifier = correlationId,
             CommandCreatedOn = clock.GetUtcNow(),
@@ -80,7 +86,7 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             var graph = new DesiredStateGraph(edges);
             graphMs = timer.ElapsedMilliseconds - graphStarted;
             var planStarted = timer.ElapsedMilliseconds;
-            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate, command.CommandCreatedOn, abandonmentVerifier).ConfigureAwait(false);
+            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate, command.CommandCreatedOn, abandonmentVerifier, effectiveHumanGate).ConfigureAwait(false);
             command.CommandPayloadJson = plan.NormalizedPayloadJson;
             if (plan.CommandReasonOverride is { } reasonOverride)
             {

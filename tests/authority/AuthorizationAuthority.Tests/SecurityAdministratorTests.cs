@@ -64,7 +64,8 @@ public sealed class SecurityAdministratorTests
         await using var scope = await store.BeginScopeAsync(Ct);
         var graph = new DesiredStateGraph(store.Edges.Where(e => e.RemovedBySecurityCommandId is null).ToList());
         var request = new SecurityCommandRequest(Org, kind, new ResourceRef(resourceKind, resourceId), 3, JsonSerializer.SerializeToElement(payload, CanonicalJson.Options));
-        return await CommandPlanner.PlanAsync(scope, Org, Actor(user), request, graph, Ct, gate ?? Synthetic);
+        var humanGate = HumanCommandStepUpGate.Create(HumanCommandStepUpGate.SyntheticMode, "Testing", "TestIdentityProvider");
+        return await CommandPlanner.PlanAsync(scope, Org, Actor(user), request, graph, Ct, gate ?? Synthetic, humanCommandGate: humanGate);
     }
 
     private Task<CommandPlan> AppointAsync(Guid actor, Guid target, string? stepUp = FieldSearchApprovalGate.SyntheticStepUpEvidence, string role = OrganizationRoleNames.SystemAdministrator, FieldSearchApprovalGate? gate = null) =>
@@ -143,10 +144,10 @@ public sealed class SecurityAdministratorTests
     [Fact]
     public async Task AnAdministratorOverrideNeverMakesTheAdministratorOrTheirTeamTheRecordOwner()
     {
-        Assert.Equal(AuthorityErrorCodes.Forbidden, await RejectedAsync(() => PlanAsync(Administrator, SecurityCommandKind.TransferOwnership, ResourceKind.FormRecord, Record, new TransferOwnershipPayload(Record, Administrator, null))));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, await RejectedAsync(() => PlanAsync(Administrator, SecurityCommandKind.TransferOwnership, ResourceKind.FormRecord, Record, new TransferOwnershipPayload(Record, Administrator, null, HumanCommandStepUpGate.SyntheticStepUpEvidence))));
         store.Edges.Add(Edge(ResourceTypeNames.Team, Team, "member", Administrator));
-        Assert.Equal(AuthorityErrorCodes.Forbidden, await RejectedAsync(() => PlanAsync(Administrator, SecurityCommandKind.TransferOwnership, ResourceKind.FormRecord, Record, new TransferOwnershipPayload(Record, null, Team))));
-        var toOther = await PlanAsync(Administrator, SecurityCommandKind.TransferOwnership, ResourceKind.FormRecord, Record, new TransferOwnershipPayload(Record, Designer, null));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, await RejectedAsync(() => PlanAsync(Administrator, SecurityCommandKind.TransferOwnership, ResourceKind.FormRecord, Record, new TransferOwnershipPayload(Record, null, Team, HumanCommandStepUpGate.SyntheticStepUpEvidence))));
+        var toOther = await PlanAsync(Administrator, SecurityCommandKind.TransferOwnership, ResourceKind.FormRecord, Record, new TransferOwnershipPayload(Record, Designer, null, HumanCommandStepUpGate.SyntheticStepUpEvidence));
         Assert.Contains(toOther.AddEdges, e => e.Item3 == "owner" && e.Item5 == Designer);
     }
 
