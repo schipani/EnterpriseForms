@@ -58,6 +58,22 @@ function StackUpAll {
   Stack (@('up', '-d', '--wait') + $services); if ($LASTEXITCODE -ne 0) { throw 'stack did not become healthy' }
 }
 
+# BH-1 (C-193): apply the disposable stack environment the selected Stage B tests need (stage-b-groups.json stackEnvironment,
+# resolved by scripts/ci/stage_b_groups.py stack-env; when several groups share this stack the shortest sweep interval wins). An
+# empty value removes the variable, so the security-test overlay default applies; a value set by hand in this shell is replaced,
+# with a notice. Affects the enterpriseforms-sectest compose project only; never the dev stack or production configuration.
+function ApplyStackEnvironment([string[]]$Selection) {
+  $lines = @(python (Join-Path $root 'scripts/ci/stage_b_groups.py') stack-env @Selection)
+  if ($LASTEXITCODE -ne 0) { throw 'cannot resolve the Stage B stack environment of the selected tests' }
+  foreach ($line in $lines) {
+    $key, $value = $line -split '=', 2
+    $current = [Environment]::GetEnvironmentVariable($key)
+    if ($current -and $current -ne $value) { Write-Host "Replacing $key=$current from this shell with '$value' (empty = overlay default) for the selected tests." -ForegroundColor Yellow }
+    [Environment]::SetEnvironmentVariable($key, $(if ($value) { $value } else { $null }))
+    Write-Host "Stack environment: $key=$(if ($value) { $value } else { '(overlay default)' })"
+  }
+}
+
 Set-Location $root
 if ($List) {
   dotnet build $project -c Release -v q --nologo | Out-Null
@@ -79,8 +95,13 @@ if ($All) { $selected = @(Tool @('list') | ForEach-Object { ($_ -split '\s+')[0]
 elseif ($Group) { $selected = @($Group) }
 elseif (-not $Class) { Write-Host 'Specify -List, -Group <name>, -Class <name> or -All.'; exit 2 }
 
+if ($Class) { ApplyStackEnvironment @('--class', $Class) } else { ApplyStackEnvironment @('--groups', ($selected -join ',')) }
 if ($Fresh) { Stack @('down', '-v', '--remove-orphans') }
-if ($Fresh -or $Rebuild -or -not (StackRunning)) { StackUpAll } else { Write-Host 'Reusing the running sectest stack (use -Rebuild after code changes).' }
+if ($Fresh -or $Rebuild -or -not (StackRunning)) { StackUpAll } else {
+  Write-Host 'Reusing the running sectest stack (use -Rebuild after code changes).'
+  # BH-1: compose recreates the authority only when its configuration differs from the stack environment applied above.
+  Stack @('up', '-d', '--no-deps', '--wait', 'authority'); if ($LASTEXITCODE -ne 0) { throw 'authority did not become healthy with the selected stack environment' }
+}
 
 if ($ExcludeBenchmarks -and -not $Class) { Write-Host '-ExcludeBenchmarks applies to focused -Class runs only; release runs keep every test.' -ForegroundColor Red; exit 2 }
 
