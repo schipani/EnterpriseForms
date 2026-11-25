@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "27f6914b1029c94f2bcafb89615a6ef7c423cab9db5192c0a0aa30f5e8c37f6f",
-      "bytes": 36596
+      "sha256": "abade3fa71a492bf2de0ed74231ee953270ccfb032798b67bda608c021352c22",
+      "bytes": 37806
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -99,8 +99,8 @@
     },
     {
       "path": "docs/PHASE_C9_STATUS.md",
-      "sha256": "970c4ed20df6141b52015160949d26b32230cd58a5ccb96ed2f10500271a0738",
-      "bytes": 81718
+      "sha256": "bfb2a71eec9ee2e519b1afa87250681b1c48dcfefc55da9ef1673051ec547dbc",
+      "bytes": 81852
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -146,6 +146,11 @@
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
       "sha256": "9beca18d8d9e03ab02f9e00a99bddec469c47b2081e99de0b57c2364e09be475",
       "bytes": 20346
+    },
+    {
+      "path": "docs/architecture/FORWARD_ROADMAP_PROPOSAL.md",
+      "sha256": "b86cb5d3fa38c84b926cfbae153e708f178905e036841377f49caeb047abecbe",
+      "bytes": 18642
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_C149_EVIDENCE.md",
@@ -281,6 +286,11 @@
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
       "sha256": "ba289a52bf305eff68b87a74e690fce323053bfc9a789dd1e935601ba2b25aa7",
       "bytes": 7852
+    },
+    {
+      "path": "docs/architecture/PHASE_C10_WP0_SHARING_OWNERSHIP_PROPOSAL.md",
+      "sha256": "b7f44baac370b036938d3fd47c564b6236a134db77b36096e206f13f5502d1eb",
+      "bytes": 39106
     },
     {
       "path": "docs/architecture/PHASE_C3_REPEATING_GROUPS_AND_DEPENDENT_DROPDOWNS.md",
@@ -479,8 +489,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "43fb113e8a0afdc1965a73889e2fdfc63aa6c2d5e1fdb99392000348b6930224",
-      "bytes": 356562
+      "sha256": "38460bbbad1e929ce470f6a3b67d400986f59c0bbbdbcc31e55edccbfbcb3e6d",
+      "bytes": 361266
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -886,6 +896,16 @@
       "path": "docs/security/stage-a-vault-transit-vectors.json",
       "sha256": "037be3608ab900e9e4da7e1941d6e6303d82d33cdf40b350b08d960a32a9c987",
       "bytes": 5272
+    },
+    {
+      "path": "docs/testing/CLAUDE_MD_S11_REQUIREMENTS_REGISTER.csv",
+      "sha256": "fdd0783721364962173735dc45900c3524c0279ff5831ed789b29281f07f8843",
+      "bytes": 56667
+    },
+    {
+      "path": "docs/testing/CLAUDE_MD_S11_REQUIREMENTS_REGISTER.md",
+      "sha256": "f004a7995fdad3d86f780b84fcba44b1bf662622eae0e37b4afd04ba343004a8",
+      "bytes": 3770
     },
     {
       "path": "docs/testing/FAST_FEEDBACK_TESTING.md",
