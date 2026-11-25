@@ -1,6 +1,6 @@
 # Business API/BFF image. Multi-stage, non-root, ICU-enabled runtime (string normalization in the integrity library).
 # Base images are tag-pinned here; the PB-11 build pipeline pins and verifies digests before promotion.
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY src/shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj src/shared/EnterpriseForms.Integrity/

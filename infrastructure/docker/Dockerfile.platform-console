@@ -1,7 +1,7 @@
 # Platform Console BFF image (C8 M2 Stage 3). SEPARATELY deployed from the business application and the Authority: it contains only
 # the console and the Authority's published wire contract — no business assembly, no Authority logic, no key material.
 # Development/Testing only until PB-08; the PB-11 security pipeline would build, sign and promote it separately.
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY src/authority/AuthorizationAuthority.Contracts/AuthorizationAuthority.Contracts.csproj src/authority/AuthorizationAuthority.Contracts/
