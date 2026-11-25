@@ -39,7 +39,7 @@ const upload = z
 const protection = z.object({ classification: z.enum(["Public", "Internal", "Confidential", "Restricted"]), protectionMode: z.enum(["Standard", "ApplicationEncrypted"]) }).strict();
 
 /** Option as published (snapshot): stable id and key, the label and order shown at publish time, and whether it was selectable. */
-const optionSnapshot = z.object({ fieldOptionId: z.string().uuid(), optionKey: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), label: z.string().max(200), sortOrder: z.number().int(), isActive: z.boolean() }).strict();
+const optionSnapshot = z.object({ fieldOptionId: z.guid(), optionKey: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), label: z.string().max(200), sortOrder: z.number().int(), isActive: z.boolean() }).strict();
 
 const ruleSchema = ruleConditionSchema.refine((condition) => ruleShapeProblem(condition) === null, "The rule is nested too deeply or has too many conditions");
 
@@ -53,7 +53,7 @@ const optionKey = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
  */
 const optionFilter = z
   .object({
-    parentFieldDefinitionId: z.string().uuid(),
+    parentFieldDefinitionId: z.guid(),
     parentOptionKeysByOption: z.record(optionKey, z.array(optionKey).max(500)).refine((map) => Object.keys(map).length <= 500, "At most 500 options can be mapped"),
   })
   .strict();
@@ -61,7 +61,7 @@ const optionFilter = z
 /** "Allow multiple entries" (Phase C3): the section places a repeating group; its fields have one value per entry. */
 const repeat = z
   .object({
-    groupDefinitionId: z.string().uuid(),
+    groupDefinitionId: z.guid(),
     minOccurrences: z.number().int().min(0).max(50),
     maxOccurrences: z.number().int().min(1).max(50),
     allowAdd: z.boolean(),
@@ -77,7 +77,7 @@ export const REPEAT_CEILING = 50;
 const fieldElement = z
   .object({
     kind: z.literal("field"),
-    fieldDefinitionId: z.string().uuid(),
+    fieldDefinitionId: z.guid(),
     control: z.enum(["text", "textarea", "number", "decimal", "date", "dateTime", "guid", "checkbox", "select", "multiselect"]).default("text"),
     label: safeText(200).default(""),
     helpText: safeText(1000).optional(),
@@ -106,7 +106,7 @@ const fieldElement = z
 const documentElement = z
   .object({
     kind: z.literal("documentCollection"),
-    fieldDefinitionId: z.string().uuid(),
+    fieldDefinitionId: z.guid(),
     /** The server serializes the File control name; it is implied by the kind. */
     control: z.literal("fileUpload").optional(),
     label: safeText(200).default(""),
@@ -121,7 +121,7 @@ const documentElement = z
 const relatedElement = z
   .object({
     kind: z.literal("relatedFormList"),
-    formRelationshipDefinitionId: z.string().uuid(),
+    formRelationshipDefinitionId: z.guid(),
     label: safeText(200).default(""),
     helpText: safeText(1000).optional(),
     layout: placement.default({ columnSpan: 4, startOnNewRow: true }),
