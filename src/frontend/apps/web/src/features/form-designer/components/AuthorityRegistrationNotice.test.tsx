@@ -56,11 +56,28 @@ describe("AuthorityRegistrationNotice", () => {
 
   it("reports a refused recovery and keeps the warning", async () => {
     api.forms.authorityRegistration.mockResolvedValueOnce(status("Pending"));
-    api.forms.recoverAuthorityRegistration.mockResolvedValueOnce(status("Pending", { outcome: "Refused", failureReason: "STAGED_VERSION_MISMATCH" }));
+    api.forms.recoverAuthorityRegistration.mockResolvedValueOnce(status("Pending", { outcome: "Refused", failureReason: "ABANDONMENT_ATTESTATION_UNAVAILABLE" }));
     renderNotice();
     fireEvent.click(await screen.findByRole("button", { name: "Retry registration" }));
-    expect(await screen.findByText(/refused the registration \(STAGED_VERSION_MISMATCH\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/refused the registration \(ABANDONMENT_ATTESTATION_UNAVAILABLE\)/)).toBeInTheDocument();
     expect(screen.getByText("This version is not yet registered with the Authority")).toBeInTheDocument();
+  });
+
+  it("reports a blocked recovery without offering a retry (C-191)", async () => {
+    api.forms.authorityRegistration.mockResolvedValueOnce(status("Pending"));
+    api.forms.recoverAuthorityRegistration.mockResolvedValueOnce(status("RecoveryBlocked", { pendingVersionNumber: 2, outcome: "RecoveryBlocked", failureReason: "STAGED_VERSION_MISMATCH" }));
+    renderNotice();
+    fireEvent.click(await screen.findByRole("button", { name: "Retry registration" }));
+    expect(await screen.findByText("Registration of this version is blocked")).toBeInTheDocument();
+    expect(screen.getByText(/separately authorized repair/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry registration" })).not.toBeInTheDocument();
+  });
+
+  it("shows the blocked state on load", async () => {
+    api.forms.authorityRegistration.mockResolvedValueOnce(status("RecoveryBlocked", { pendingVersionNumber: 2 }));
+    renderNotice();
+    expect(await screen.findByText("Registration of this version is blocked")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry registration" })).not.toBeInTheDocument();
   });
 
   it("offers no retry for a version that can only be registered by publishing again", async () => {

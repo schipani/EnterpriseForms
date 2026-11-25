@@ -27,11 +27,24 @@ public sealed record PrepareFormVersionPublicationPayload(Guid FormDefinitionId,
 /// <c>Resolution</c> <c>Registered</c>: the business committed it - the Authority registers the manifest it staged at prepare time (never
 /// one rebuilt later from business rows, OD-3). <c>Abandoned</c>: the business never committed it - the pending state ends, nothing is
 /// registered. Either way field search on the form resumes from the Authority's latest registered version.
+/// <para>C-191: <c>Abandoned</c> needs <c>Attestation</c>, the business publication coordinator's signed statement that the version is
+/// absent from the business store (<c>FORM_PUBLICATION_ABANDONMENT_UNVERIFIED</c> otherwise; the publication stays pending). Design
+/// permission alone never abandons. <c>Registered</c> carries no attestation.</para>
 /// </summary>
-public sealed record ResolveFormVersionPublicationPayload(Guid FormDefinitionId, Guid FormVersionId, int FormVersionNumber, string LayoutDigestHex, string Resolution);
+public sealed record ResolveFormVersionPublicationPayload(Guid FormDefinitionId, Guid FormVersionId, int FormVersionNumber, string LayoutDigestHex, string Resolution, FormPublicationAbandonmentAttestation? Attestation = null);
 
-/// <summary>C-188 BF-1: the form's pending publication as shown to designers and security administrators (configuration view).</summary>
-public sealed record PendingFormVersionPublication(Guid FormVersionId, int FormVersionNumber, string LayoutDigestHex, DateTimeOffset PreparedOn);
+/// <summary>
+/// C-191: the business publication coordinator's attestation that a staged version was never committed, bound to the Authority's
+/// publication identifier, the staged version (id, number, digest) and its issue time, and naming the highest version number the business
+/// store holds. HMAC-SHA-256 with the dedicated coordinator attestation key over the message defined by the Authority's verifier.
+/// </summary>
+public sealed record FormPublicationAbandonmentAttestation(Guid FormVersionPublicationId, int BusinessLatestFormVersionNumber, long IssuedAtUnixSeconds, string AttestationMacHex);
+
+/// <summary>
+/// C-188 BF-1: the form's pending publication as shown to designers and security administrators (configuration view).
+/// C-191: <c>FormVersionPublicationId</c> is the Authority's identifier of the staged publication (an abandonment attestation is bound to it).
+/// </summary>
+public sealed record PendingFormVersionPublication(Guid FormVersionId, int FormVersionNumber, string LayoutDigestHex, DateTimeOffset PreparedOn, Guid? FormVersionPublicationId = null);
 
 /// <summary>
 /// AC-6: approve plaintext value search of one field for the given operators. Only <c>administer_security</c>; requires

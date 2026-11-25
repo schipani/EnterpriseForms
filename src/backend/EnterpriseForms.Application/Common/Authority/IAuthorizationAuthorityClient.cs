@@ -254,8 +254,11 @@ public sealed record AuthorityFieldSearchStatus(Guid FieldDefinitionId, string F
     string ApprovalState, string? InvalidationReason, IReadOnlyList<string> ApprovedOperators, IReadOnlyList<string> PermittedOperators,
     bool InCurrentVersion = true, int? LastPlacedVersionNumber = null, string? ApprovalScope = null);
 
-/// <summary>C-188 BF-1: the form's publication staged with the Authority and not yet resolved (business version id, number, layout digest).</summary>
-public sealed record AuthorityPendingFormVersionPublication(Guid FormVersionId, int FormVersionNumber, string LayoutDigestHex, DateTimeOffset PreparedOn);
+/// <summary>
+/// C-188 BF-1: the form's publication staged with the Authority and not yet resolved (business version id, number, layout digest).
+/// C-191: <c>FormVersionPublicationId</c> is the Authority's identifier of the staged publication (an abandonment attestation is bound to it).
+/// </summary>
+public sealed record AuthorityPendingFormVersionPublication(Guid FormVersionId, int FormVersionNumber, string LayoutDigestHex, DateTimeOffset PreparedOn, Guid? FormVersionPublicationId = null);
 
 public sealed record AuthorityFieldSearchConfiguration(bool CanApprove, bool ApprovalOperational, string ApprovalUnavailableReason, int? RegisteredFormVersionNumber, IReadOnlyList<AuthorityFieldSearchStatus> Fields,
     IReadOnlyList<FormAccessSubjectState>? FieldSearchers = null, bool RetainedFieldApprovalsEnabled = false, AuthorityPendingFormVersionPublication? PendingPublication = null);

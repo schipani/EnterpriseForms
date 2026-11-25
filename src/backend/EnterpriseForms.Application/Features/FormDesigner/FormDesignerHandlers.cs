@@ -24,7 +24,7 @@ namespace EnterpriseForms.Application.Features.FormDesigner;
 /// <param name="fieldSearchPolicy">C-188 BF-1: the Authority's configuration view of the form (pending publication, registered version), used
 /// by registration status and recovery; optional so hosts and tests without it keep working (those two operations then answer 503).</param>
 /// <param name="faults">Testing-only fault seam (C-188 BF-1 publication checkpoints); <see cref="NoWriteFaults"/> elsewhere.</param>
-public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock, FormRecords.Encryption.IFieldEncryptionService encryption, IFieldSearchPolicyAuthority? fieldSearchPolicy = null, IWriteFaultInjector? faults = null)
+public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock, FormRecords.Encryption.IFieldEncryptionService encryption, IFieldSearchPolicyAuthority? fieldSearchPolicy = null, IWriteFaultInjector? faults = null, FormPublicationAbandonmentAttestor? abandonmentAttestor = null)
 {
     [GeneratedRegex("^[a-z][a-z0-9_]{0,63}$")]
     private static partial Regex KeyPattern();

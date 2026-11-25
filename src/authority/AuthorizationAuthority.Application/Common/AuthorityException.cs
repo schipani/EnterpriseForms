@@ -106,6 +106,12 @@ public static class AuthorityErrorCodes
     public const string FormPublicationNotPending = "FORM_PUBLICATION_NOT_PENDING";
 
     /// <summary>
+    /// C-191: an <c>Abandoned</c> resolution without a valid publication coordinator attestation that the version was never committed
+    /// (absent, unverifiable, stale, bound to another publication, or not establishing non-commitment). The publication stays pending.
+    /// </summary>
+    public const string FormPublicationAbandonmentUnverified = "FORM_PUBLICATION_ABANDONMENT_UNVERIFIED";
+
+    /// <summary>
     /// AC-2 (Phase C6): a share editor's content write targets a record whose accepted, signed header status is not Draft
     /// (Submitted or Archived). Decided from the signed header bound to the accepted head, never from a business projection.
     /// </summary>

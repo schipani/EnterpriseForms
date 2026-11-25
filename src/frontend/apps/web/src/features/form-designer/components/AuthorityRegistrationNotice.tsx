@@ -17,6 +17,8 @@ const outcomeText: Record<string, string> = {
  * C-188 BF-1: shown to designers when the form's current published version is not registered with the Authorization Authority.
  * While a registration is pending, field search on the form is unavailable (the Authority fails closed); "Retry registration"
  * completes it without publishing again. Nothing is shown when the version is registered or the form is unpublished.
+ * C-191: "RecoveryBlocked" (the published version no longer matches what the Authority staged) offers no retry: only an exceptional,
+ * separately authorized repair can end it, so the notice says so and tells the designer whom to contact.
  */
 export function AuthorityRegistrationNotice({ formDefinitionId }: { formDefinitionId: string }) {
   const api = useApi();
@@ -36,6 +38,16 @@ export function AuthorityRegistrationNotice({ formDefinitionId }: { formDefiniti
     return (
       <StatusMessage tone="success" title="Registration complete" actions={<Button size="sm" variant="ghost" onClick={() => recover.reset()}>Dismiss</Button>}>
         {outcomeText[result.outcome] ?? "Field search on this form is available again."}
+      </StatusMessage>
+    );
+  }
+
+  if (state === "RecoveryBlocked") {
+    return (
+      <StatusMessage tone="danger" title="Registration of this version is blocked">
+        The published version no longer matches the version the Authority recorded before it was published, so it cannot be registered
+        or withdrawn. Field search on this form stays unavailable and the form cannot be published again until a separately authorized
+        repair. Records and the form itself are unaffected. Contact your security administrator.
       </StatusMessage>
     );
   }

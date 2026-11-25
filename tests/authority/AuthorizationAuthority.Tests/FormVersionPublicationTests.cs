@@ -15,7 +15,9 @@ namespace AuthorizationAuthority.Tests;
 /// approval of a field it brings back - until it is resolved; only a resolution matching the staged version ends that state; a
 /// registration from the staged manifest applies D-H3/D-H4 exactly as a one-step registration did; abandonment registers nothing;
 /// approvals, one-step registrations and any other prepare of the form are refused meanwhile (C-191: a pending publication is never
-/// superseded); and resolution re-validates against current facts. The real-stack proof (journal, both engines, open pages, snapshots, business recovery, concurrency) is the Stage B class
+/// superseded); and resolution re-validates against current facts. C-191 (final): an abandonment needs the business publication
+/// coordinator's attestation (<see cref="FormPublicationAbandonmentVerifier"/>); design permission alone, a forged, stale, replayed or
+/// misbound attestation, or one whose own statement shows the version committed, leaves the publication pending. The real-stack proof (journal, both engines, open pages, snapshots, business recovery, concurrency) is the Stage B class
 /// FormVersionPublicationBarrierTests.
 /// </summary>
 public sealed class FormVersionPublicationTests
@@ -31,7 +33,15 @@ public sealed class FormVersionPublicationTests
     private static readonly FieldSearchApprovalGate Enabled = FieldSearchApprovalGate.Create(FieldSearchApprovalGate.SyntheticMode, "Testing", "TestIdentityProvider")
         .WithRetainedFieldApprovals(FieldSearchApprovalGate.RetainedFieldApprovalsEnabledValue);
 
+    /// <summary>C-191: the coordinator attestation key of these tests (the business attestor signs with the same key).</summary>
+    private static readonly byte[] AttestationKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+
+    private static readonly FormPublicationAbandonmentVerifier Verifier = FormPublicationAbandonmentVerifier.Create(Convert.ToBase64String(AttestationKey), []);
+
     private readonly InMemoryAuthorityStore store = new();
+
+    /// <summary>The verifier the planner uses (C-191 tests replace it to show an unconfigured deployment).</summary>
+    private FormPublicationAbandonmentVerifier verifier = Verifier;
 
     public FormVersionPublicationTests()
     {
@@ -74,7 +84,7 @@ public sealed class FormVersionPublicationTests
         {
             var graph = new DesiredStateGraph(store.Edges.Where(e => e.RemovedBySecurityCommandId is null).ToList());
             var request = new SecurityCommandRequest(Org, kind, new ResourceRef(ResourceKind.FormDefinition, Form), 3, JsonSerializer.SerializeToElement(payload, CanonicalJson.Options));
-            plan = await CommandPlanner.PlanAsync(scope, Org, Actor(user), request, graph, Ct, Enabled);
+            plan = await CommandPlanner.PlanAsync(scope, Org, Actor(user), request, graph, Ct, Enabled, DateTimeOffset.UtcNow, verifier);
         }
 
         var command = Guid.CreateVersion7();
@@ -122,8 +132,22 @@ public sealed class FormVersionPublicationTests
         return businessVersion;
     }
 
+    /// <summary>Resolves as the designer; an abandonment carries a valid coordinator attestation for the pending publication (business at number - 1).</summary>
     private Task<CommandPlan> ResolveAsync(Guid businessVersion, int number, string resolution, string? digest = null) =>
-        RunAsync(Designer, SecurityCommandKind.ResolveFormVersionPublication, new ResolveFormVersionPublicationPayload(Form, businessVersion, number, digest ?? Digest(number), resolution));
+        RunAsync(Designer, SecurityCommandKind.ResolveFormVersionPublication, new ResolveFormVersionPublicationPayload(Form, businessVersion, number, digest ?? Digest(number), resolution,
+            resolution == FormVersionPublicationResolutions.Abandoned ? Attest(Pending?.FormVersionPublicationId ?? Guid.CreateVersion7(), businessVersion, number, digest ?? Digest(number), number - 1) : null));
+
+    /// <summary>C-191: an abandonment of the pending publication with exactly this attestation (null: none).</summary>
+    private Task<CommandPlan> AbandonAsync(Guid user, Guid businessVersion, int number, FormPublicationAbandonmentAttestation? attestation) =>
+        RunAsync(user, SecurityCommandKind.ResolveFormVersionPublication, new ResolveFormVersionPublicationPayload(Form, businessVersion, number, Digest(number), FormVersionPublicationResolutions.Abandoned, attestation));
+
+    /// <summary>C-191: what the business publication coordinator sends (signed with <paramref name="key"/>, the coordinator key by default).</summary>
+    private static FormPublicationAbandonmentAttestation Attest(Guid publication, Guid businessVersion, int number, string digest, int businessLatest, DateTimeOffset? issuedAt = null, byte[]? key = null)
+    {
+        var issued = (issuedAt ?? DateTimeOffset.UtcNow).ToUnixTimeSeconds();
+        var mac = System.Security.Cryptography.HMACSHA256.HashData(key ?? AttestationKey, FormPublicationAbandonmentVerifier.Message(Org, Form, publication, businessVersion, number, digest, businessLatest, issued));
+        return new FormPublicationAbandonmentAttestation(publication, businessLatest, issued, Convert.ToHexStringLower(mac));
+    }
 
     private async Task<FieldSearchApproval> ApproveAsync(Guid field, string? scope = null)
     {
@@ -214,7 +238,7 @@ public sealed class FormVersionPublicationTests
         await RejectedAsync(() => ResolveAsync(v2, 2, "Published"), AuthorityErrorCodes.InvalidCommand);
         var stranger = Guid.CreateVersion7(); // a member with no design permission and no administrator role (same rule as registration)
         store.Bindings.Add(new IdentityBinding { IdentityBindingId = Guid.CreateVersion7(), OrganizationId = Org, AuthorityUserId = stranger, IdentityIssuerUri = "https://idp", IdentitySubjectIdentifier = stranger.ToString("N"), IdentityBindingEnabled = true });
-        await RejectedAsync(() => RunAsync(stranger, SecurityCommandKind.ResolveFormVersionPublication, new ResolveFormVersionPublicationPayload(Form, v2, 2, Digest(2), FormVersionPublicationResolutions.Abandoned)), AuthorityErrorCodes.Forbidden);
+        await RejectedAsync(() => AbandonAsync(stranger, v2, 2, Attest(Pending!.FormVersionPublicationId, v2, 2, Digest(2), 1)), AuthorityErrorCodes.Forbidden); // a valid attestation confers no permission
         await RejectedAsync(() => RunAsync(stranger, SecurityCommandKind.PrepareFormVersionPublication, new PrepareFormVersionPublicationPayload(Form, Guid.CreateVersion7(), 3, Digest(3), [FirstEntry])), AuthorityErrorCodes.Forbidden);
         Assert.NotNull(Pending);
 
@@ -320,6 +344,110 @@ public sealed class FormVersionPublicationTests
         await ResolveAsync(v4, 4, FormVersionPublicationResolutions.Registered);
         Assert.Equal(FieldSearchApprovalStates.Invalidated, retained.ApprovalStateName);
         Assert.Empty(await IneffectiveAsync());
+    }
+
+    /// <summary>
+    /// C-191 (final): design permission alone never abandons. With v2 (Phone removed) staged, an abandonment without the coordinator's
+    /// attestation - by the designer or by an organization administrator - and one signed with any other key (e.g. a caller holding only
+    /// the business workload credential) or malformed is refused with FORM_PUBLICATION_ABANDONMENT_UNVERIFIED; the publication stays
+    /// pending and the barrier stays.
+    /// </summary>
+    [Fact]
+    public async Task AnAbandonmentNeedsThePublicationCoordinatorsAttestationNotDesignPermission()
+    {
+        await RegisterOneStepAsync(1, FirstEntry, PhoneEntry);
+        var phone = await ApproveAsync(Phone);
+        var v2 = await PrepareAsync(2, FirstEntry);
+        var publication = Pending!.FormVersionPublicationId;
+
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, null), AuthorityErrorCodes.FormPublicationAbandonmentUnverified);
+        await RejectedAsync(() => AbandonAsync(Administrator, v2, 2, null), AuthorityErrorCodes.FormPublicationAbandonmentUnverified);
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, Attest(publication, v2, 2, Digest(2), 1, key: System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))), AuthorityErrorCodes.FormPublicationAbandonmentUnverified); // another key
+        var valid = Attest(publication, v2, 2, Digest(2), 1);
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, valid with { AttestationMacHex = "zz" + valid.AttestationMacHex[2..] }), AuthorityErrorCodes.FormPublicationAbandonmentUnverified); // not hexadecimal
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, valid with { AttestationMacHex = valid.AttestationMacHex[..62] }), AuthorityErrorCodes.FormPublicationAbandonmentUnverified); // truncated
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, valid with { BusinessLatestFormVersionNumber = 0 }), AuthorityErrorCodes.FormPublicationAbandonmentUnverified); // altered after signing
+
+        Assert.Equal((v2, FormVersionPublicationStates.Pending), (Pending!.BusinessFormVersionId, Pending.PublicationStateName));
+        Assert.Equal([phone.FieldSearchApprovalId], await IneffectiveAsync()); // still closed
+        Assert.Single(store.PublishedVersions);
+
+        await AbandonAsync(Designer, v2, 2, valid); // the coordinator's attestation: v2 was never committed
+        Assert.Equal(FormVersionPublicationStates.Abandoned, store.Publications.Single().PublicationStateName);
+        Assert.Empty(await IneffectiveAsync());
+    }
+
+    /// <summary>
+    /// C-191 (final): a committed version cannot be abandoned. v2 (Phone removed) is committed and its resolution lost. A correctly signed
+    /// attestation whose own statement shows a business version numbered at or above v2 does not establish non-commitment; an attestation
+    /// for another publication, for another version, or outside its issue window is refused; so is every abandonment while no coordinator
+    /// key is configured. The publication stays pending until it is registered, and then D-H3 invalidates Phone.
+    /// </summary>
+    [Fact]
+    public async Task ACommittedVersionCannotBeAbandonedSoItsRemovalAlwaysTakesEffect()
+    {
+        await RegisterOneStepAsync(1, FirstEntry, PhoneEntry);
+        var phone = await ApproveAsync(Phone);
+        var v2 = await PrepareAsync(2, FirstEntry); // committed in the business; resolution lost
+        var publication = Pending!.FormVersionPublicationId;
+        var unverified = AuthorityErrorCodes.FormPublicationAbandonmentUnverified;
+
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, Attest(publication, v2, 2, Digest(2), 2)), unverified); // the business holds v2
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, Attest(publication, v2, 2, Digest(2), 7)), unverified); // and later versions
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, Attest(publication, v2, 2, Digest(2), -1)), unverified);
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, Attest(Guid.CreateVersion7(), v2, 2, Digest(2), 1)), unverified); // another publication
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, Attest(publication, Guid.CreateVersion7(), 2, Digest(2), 1)), unverified); // signed for another version
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, Attest(publication, v2, 2, Digest(7), 1)), unverified); // signed for another layout
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, Attest(publication, v2, 2, Digest(2), 1, DateTimeOffset.UtcNow.AddMinutes(-6))), unverified); // stale
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, Attest(publication, v2, 2, Digest(2), 1, DateTimeOffset.UtcNow.AddMinutes(6))), unverified); // not yet issued
+        verifier = FormPublicationAbandonmentVerifier.Unconfigured;
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, Attest(publication, v2, 2, Digest(2), 1)), unverified); // no key configured: never
+        verifier = Verifier;
+        await RejectedAsync(() => RunAsync(Designer, SecurityCommandKind.ResolveFormVersionPublication, new ResolveFormVersionPublicationPayload(Form, v2, 2, Digest(2), FormVersionPublicationResolutions.Registered, Attest(publication, v2, 2, Digest(2), 1))), AuthorityErrorCodes.InvalidCommand); // a registration carries none
+
+        Assert.Equal((v2, FormVersionPublicationStates.Pending), (Pending!.BusinessFormVersionId, Pending.PublicationStateName));
+        Assert.Equal([phone.FieldSearchApprovalId], await IneffectiveAsync());
+
+        await ResolveAsync(v2, 2, FormVersionPublicationResolutions.Registered); // recovery finds v2 committed
+        Assert.Equal((FieldSearchApprovalStates.Invalidated, FieldSearchInvalidationReasons.FormVersionChanged), (phone.ApprovalStateName, phone.InvalidationReasonCode)); // D-H3
+        Assert.Empty(await IneffectiveAsync());
+    }
+
+    /// <summary>
+    /// C-191 (final): an attestation is bound to the Authority's publication, so it cannot be replayed onto a later prepare of the same
+    /// business version: v2 abandoned with a valid attestation, the same v2 staged again, the old attestation refused, a fresh one accepted.
+    /// </summary>
+    [Fact]
+    public async Task AnAbandonmentAttestationCannotBeReplayedOntoALaterPublication()
+    {
+        await RegisterOneStepAsync(1, FirstEntry, PhoneEntry);
+        var v2 = Guid.CreateVersion7();
+        await RunAsync(Designer, SecurityCommandKind.PrepareFormVersionPublication, new PrepareFormVersionPublicationPayload(Form, v2, 2, Digest(2), [FirstEntry], "Intake"));
+        var first = Attest(Pending!.FormVersionPublicationId, v2, 2, Digest(2), 1);
+        await AbandonAsync(Designer, v2, 2, first);
+
+        await RunAsync(Designer, SecurityCommandKind.PrepareFormVersionPublication, new PrepareFormVersionPublicationPayload(Form, v2, 2, Digest(2), [FirstEntry], "Intake"));
+        await RejectedAsync(() => AbandonAsync(Designer, v2, 2, first), AuthorityErrorCodes.FormPublicationAbandonmentUnverified);
+        Assert.NotNull(Pending);
+        await AbandonAsync(Designer, v2, 2, Attest(Pending!.FormVersionPublicationId, v2, 2, Digest(2), 1));
+        Assert.Null(Pending);
+    }
+
+    /// <summary>C-191: the attested message is pinned (the business attestor's test pins the same vector), and the key is validated at startup.</summary>
+    [Fact]
+    public void TheAttestedMessageIsPinnedAndTheKeyIsValidatedAtStartup()
+    {
+        var message = FormPublicationAbandonmentVerifier.Message(Guid.Parse("00000000-0000-0000-0000-000000000001"), Guid.Parse("00000000-0000-0000-0000-000000000002"),
+            Guid.Parse("00000000-0000-0000-0000-000000000003"), Guid.Parse("00000000-0000-0000-0000-000000000004"), 2, string.Concat(Enumerable.Repeat("AB", 32)), 1, 1795000000);
+        var key = Enumerable.Range(1, 32).Select(i => (byte)i).ToArray();
+        Assert.Equal("3d15f20a6da18c84883ad6410b245b538aed47b2bffb796254d9e8e4732d3157", Convert.ToHexStringLower(System.Security.Cryptography.HMACSHA256.HashData(key, message)));
+
+        Assert.False(FormPublicationAbandonmentVerifier.Create(null, []).IsConfigured);
+        Assert.False(FormPublicationAbandonmentVerifier.Create(" ", []).IsConfigured);
+        Assert.True(FormPublicationAbandonmentVerifier.Create(Convert.ToBase64String(key), ["d29ya2xvYWQ="]).IsConfigured);
+        Assert.Throws<InvalidOperationException>(() => FormPublicationAbandonmentVerifier.Create("not base64!", []));
+        Assert.Throws<InvalidOperationException>(() => FormPublicationAbandonmentVerifier.Create(Convert.ToBase64String(new byte[31]), []));
+        Assert.Throws<InvalidOperationException>(() => FormPublicationAbandonmentVerifier.Create(Convert.ToBase64String(key), [null, Convert.ToBase64String(key)])); // equal to another credential
     }
 
     /// <summary>Registration from the staged manifest re-checks current facts: an encryption requirement recorded meanwhile refuses it, and the form stays pending.</summary>

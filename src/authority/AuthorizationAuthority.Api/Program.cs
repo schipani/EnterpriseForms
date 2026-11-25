@@ -114,6 +114,12 @@ public sealed class Program
             builder.Configuration["Identity:UserAssertion:ProviderKind"])
             // C-188 (D-H18): retained-field approvals are off unless FieldSearch:RetainedFieldApprovals=Enabled; an unknown value refuses startup.
             .WithRetainedFieldApprovals(builder.Configuration[AuthorizationAuthority.Application.Features.SecurityCommands.FieldSearchApprovalGate.RetainedFieldApprovalsKey]));
+        // C-191: an Abandoned resolution of a pending form publication needs the business publication coordinator's attestation, signed with
+        // this dedicated key (distinct from every other credential; absent => no abandonment is ever accepted and the publication stays pending).
+        builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.SecurityCommands.FormPublicationAbandonmentVerifier.Create(
+            builder.Configuration[AuthorizationAuthority.Application.Features.SecurityCommands.FormPublicationAbandonmentVerifier.ConfigurationKey],
+            AuthorizationAuthority.Application.Features.SecurityCommands.FormPublicationAbandonmentVerifier.OtherCredentialSections
+                .Select(name => builder.Configuration[$"Identity:{name}:SharedKeyBase64"])));
         // DR-C7-3: dual-controlled operator approvals for first/recovery Security Administrators. Unavailable unless configured;
         // Create refuses the development-only synthetic approver keys outside Development/Testing (startup failure).
         builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.OperatorPlane.OperatorApprovalVerifier.Create(

@@ -87,8 +87,11 @@ public static partial class CommandPlanner
     /// time - never one rebuilt later from business rows (OD-3) - after re-validating it against its current facts (an encryption
     /// requirement or a later registered version recorded meanwhile refuses it and the form stays pending). <c>Abandoned</c>: the business
     /// never committed it; nothing is registered. Either way the form's approvals are judged again from the latest registered version.
+    /// <para>C-191: <c>Abandoned</c> is accepted only with the business publication coordinator's attestation that the version was never
+    /// committed (<see cref="FormPublicationAbandonmentVerifier"/>); design permission alone leaves the publication pending
+    /// (<c>FORM_PUBLICATION_ABANDONMENT_UNVERIFIED</c>). The staged manifest is never changed by either resolution.</para>
     /// </summary>
-    private static async Task<CommandPlan> ResolveFormVersionPublicationAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, FieldSearchApprovalGate gate, CancellationToken cancellationToken)
+    private static async Task<CommandPlan> ResolveFormVersionPublicationAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, FieldSearchApprovalGate gate, FormPublicationAbandonmentVerifier abandonment, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var payload = CanonicalJson.Deserialize<ResolveFormVersionPublicationPayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.FormDefinition, payload.FormDefinitionId);
@@ -112,6 +115,11 @@ public static partial class CommandPlanner
         var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
         if (payload.Resolution == FormVersionPublicationResolutions.Registered)
         {
+            if (payload.Attestation is not null)
+            {
+                throw AuthorityException.Invalid("a registration carries no abandonment attestation");
+            }
+
             var fields = FieldSearchRules.ReadManifest(pending.FieldManifestJson);
             await ValidatePublicationAsync(scope, organizationId, actor, graph, payload.FormDefinitionId, pending.FormVersionNumber, Convert.ToHexStringLower(pending.LayoutDigest), fields, pending.FormTitleSnapshot, cancellationToken).ConfigureAwait(false);
             await PlanRegistrationAsync(scope, organizationId, payload.FormDefinitionId, pending.FormVersionNumber, pending.LayoutDigest, fields, pending.FormTitleSnapshot, gate, plan, cancellationToken).ConfigureAwait(false);
@@ -119,6 +127,8 @@ public static partial class CommandPlanner
         }
         else
         {
+            // C-191: only the publication coordinator's attestation establishes that the business never committed this version.
+            abandonment.RequireNonCommitment(organizationId, pending, payload.Attestation, now);
             pending.PublicationStateName = FormVersionPublicationStates.Abandoned;
             await AdvanceSearchPolicyAsync(scope, organizationId, plan, cancellationToken).ConfigureAwait(false);
         }

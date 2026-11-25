@@ -108,7 +108,8 @@ public static partial class CommandPlanner
         DesiredStateGraph graph,
         CancellationToken cancellationToken,
         FieldSearchApprovalGate? approvalGate = null,
-        DateTimeOffset? now = null)
+        DateTimeOffset? now = null,
+        FormPublicationAbandonmentVerifier? abandonmentVerifier = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         var at = now ?? DateTimeOffset.UtcNow;
@@ -130,7 +131,7 @@ public static partial class CommandPlanner
             SecurityCommandKind.ReclassifyField => await ReclassifyFieldAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RegisterPublishedFormVersion => await RegisterPublishedFormVersionAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.PrepareFormVersionPublication => await PrepareFormVersionPublicationAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.ResolveFormVersionPublication => await ResolveFormVersionPublicationAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.ResolveFormVersionPublication => await ResolveFormVersionPublicationAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, abandonmentVerifier ?? FormPublicationAbandonmentVerifier.Unconfigured, at, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.ApproveFieldSearch => await ApproveFieldSearchAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.WithdrawFieldSearch => await WithdrawFieldSearchAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateFieldSearchers => await UpdateFieldSearchersAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),

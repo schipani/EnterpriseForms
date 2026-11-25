@@ -30,6 +30,13 @@ namespace EnterpriseForms.Application.Features.FormDesigner;
 /// abandoned). Every attempt is authorized (design permission here and in the Authority), audited, and uses a fresh idempotency key: the
 /// Authority keeps a refused command under its key, so a retry under the same key would only replay the refusal.
 /// </para>
+/// <para>
+/// C-191: an abandonment carries the publication coordinator's signed attestation (<see cref="FormPublicationAbandonmentAttestor"/>) that
+/// the staged version is absent here and every stored version is numbered below it; without the attestation key, or when the store does
+/// not establish that, nothing is sent and the publication stays pending. A committed version whose stored layout no longer has the staged
+/// digest is reported as <c>RecoveryBlocked</c>: the barrier stays, nothing is resolved, regenerated or discarded, and only an exceptional,
+/// separately authorized repair procedure (not implemented) can end it.
+/// </para>
 /// </summary>
 public sealed partial class FormDesignerHandlers
 {
@@ -125,16 +132,26 @@ public sealed partial class FormDesignerHandlers
     /// <returns><c>Committed</c>: the Authority recorded the resolution (the form is no longer pending); <c>Effective</c>: and it is
     /// effective (invariant A11: only then is a registration reported as registered); <c>Failure</c>: the reason otherwise.</returns>
     private async Task<(bool Committed, bool Effective, string? Failure)> ResolvePublicationAsync(RequestContext context, Guid formDefinitionId, Guid formVersionId, int versionNumber, string digestHex,
-        string resolution, int fieldCount, string source, CancellationToken cancellationToken)
+        string resolution, int fieldCount, string source, CancellationToken cancellationToken, object? attestation = null)
     {
-        var payload = JsonSerializer.SerializeToElement(new
-        {
-            form_definition_id = formDefinitionId,
-            form_version_id = formVersionId,
-            form_version_number = versionNumber,
-            layout_digest_hex = digestHex,
-            resolution,
-        });
+        var payload = attestation is null
+            ? JsonSerializer.SerializeToElement(new
+            {
+                form_definition_id = formDefinitionId,
+                form_version_id = formVersionId,
+                form_version_number = versionNumber,
+                layout_digest_hex = digestHex,
+                resolution,
+            })
+            : JsonSerializer.SerializeToElement(new
+            {
+                form_definition_id = formDefinitionId,
+                form_version_id = formVersionId,
+                form_version_number = versionNumber,
+                layout_digest_hex = digestHex,
+                resolution,
+                attestation, // C-191: only an Abandoned resolution carries the coordinator's attestation
+            });
         string? failure;
         var committed = false;
         try
@@ -203,15 +220,16 @@ public sealed partial class FormDesignerHandlers
         ArgumentNullException.ThrowIfNull(context);
         await RequireDesignAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
         int? current;
+        List<FormVersion> versions;
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
             _ = await scope.FindFormDefinitionAsync(context.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false) ?? throw new BusinessException("NOT_FOUND", 404, "form definition not found");
-            var versions = await scope.GetFormVersionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false);
+            versions = await scope.GetFormVersionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false);
             current = versions.Count == 0 ? null : versions.Max(v => v.VersionNumber);
         }
 
         var view = await ReadAuthorityRegistrationAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
-        return Describe(formDefinitionId, current, view.Registered, view.Pending);
+        return Describe(formDefinitionId, current, view.Registered, view.Pending, IsRecoveryBlocked(versions, view.Pending));
     }
 
     /// <summary>
@@ -220,6 +238,9 @@ public sealed partial class FormDesignerHandlers
     /// registered from the Authority's staged manifest, provided its stored layout still has the staged digest) and one that is not found
     /// never will be (it is withdrawn). Without a pending publication nothing is sent: a current version the Authority never recorded (one
     /// published before this safeguard) is reported as not recoverable - the designer publishes again (OD-3).
+    /// <para>C-191: the withdrawal carries the coordinator's attestation and is sent only when the store establishes non-commitment (the
+    /// staged version absent and every stored version numbered below it) and the attestation key is configured; otherwise the publication
+    /// stays pending (<c>Refused</c>). A staged version found here with another layout digest is <c>RecoveryBlocked</c>: nothing is sent.</para>
     /// </summary>
     public async Task<FormAuthorityRegistrationResponse> RecoverAuthorityRegistrationAsync(RequestContext context, Guid formDefinitionId, CancellationToken cancellationToken)
     {
@@ -238,14 +259,34 @@ public sealed partial class FormDesignerHandlers
             var staged = versions.FirstOrDefault(v => v.FormVersionId == pending.FormVersionId);
             if (staged is null)
             {
-                var (committed, _, reason) = await ResolvePublicationAsync(context, formDefinitionId, pending.FormVersionId, pending.FormVersionNumber, pending.LayoutDigestHex, AbandonedResolution, 0, "Recovery", cancellationToken).ConfigureAwait(false);
-                (outcome, failure) = committed ? ("Abandoned", null) : ("Refused", reason);
+                // C-191: under the lock, an absent staged version was never committed - provided no stored version is numbered at or above it
+                // (otherwise non-commitment is not established and nothing is sent). The Authority accepts the withdrawal only with this
+                // coordinator attestation; without the key nothing is sent. Either refusal leaves the publication pending.
+                var latest = current ?? 0;
+                if (abandonmentAttestor is not { IsConfigured: true } || pending.FormVersionPublicationId is not { } publicationId || publicationId == Guid.Empty)
+                {
+                    (outcome, failure) = ("Refused", "ABANDONMENT_ATTESTATION_UNAVAILABLE");
+                    await ResolvePublicationAuditOnlyAsync(context, formDefinitionId, pending.FormVersionId, pending.FormVersionNumber, failure, recoveryBlocked: false, cancellationToken).ConfigureAwait(false);
+                }
+                else if (latest >= pending.FormVersionNumber)
+                {
+                    (outcome, failure) = ("Refused", "NON_COMMITMENT_NOT_ESTABLISHED");
+                    await ResolvePublicationAuditOnlyAsync(context, formDefinitionId, pending.FormVersionId, pending.FormVersionNumber, failure, recoveryBlocked: false, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    var attestation = abandonmentAttestor.Attest(context.OrganizationId, formDefinitionId, publicationId, pending.FormVersionId, pending.FormVersionNumber, pending.LayoutDigestHex, latest, clock.GetUtcNow());
+                    var (committed, _, reason) = await ResolvePublicationAsync(context, formDefinitionId, pending.FormVersionId, pending.FormVersionNumber, pending.LayoutDigestHex, AbandonedResolution, 0, "Recovery", cancellationToken, attestation).ConfigureAwait(false);
+                    (outcome, failure) = committed ? ("Abandoned", null) : ("Refused", reason);
+                }
             }
-            else if (staged.VersionNumber != pending.FormVersionNumber || !string.Equals(StoredLayoutDigestHex(staged.LayoutJson), pending.LayoutDigestHex, StringComparison.Ordinal))
+            else if (IsStagedVersionMismatch(staged, pending))
             {
-                // The stored version no longer matches what the Authority staged: never register it (fail closed; the form stays unsearchable).
-                (outcome, failure) = ("Refused", "STAGED_VERSION_MISMATCH");
-                await ResolvePublicationAuditOnlyAsync(context, formDefinitionId, staged, failure, cancellationToken).ConfigureAwait(false);
+                // C-191: the committed version no longer matches what the Authority staged. Never register it, never abandon it (it is
+                // committed), never regenerate the staged manifest: the barrier stays and recovery is blocked until an exceptional,
+                // separately authorized repair procedure (not implemented). The form stays unsearchable and cannot be published again.
+                (outcome, failure) = ("RecoveryBlocked", "STAGED_VERSION_MISMATCH");
+                await ResolvePublicationAuditOnlyAsync(context, formDefinitionId, staged.FormVersionId, staged.VersionNumber, failure, recoveryBlocked: true, cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -270,20 +311,30 @@ public sealed partial class FormDesignerHandlers
 
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false); // nothing written here; ends the transaction and releases the lock
         var after = view.Pending is null ? view : await ReadAuthorityRegistrationAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
-        return Describe(formDefinitionId, current, after.Registered, after.Pending) with { Outcome = outcome, FailureReason = failure };
+        return Describe(formDefinitionId, current, after.Registered, after.Pending, IsRecoveryBlocked(versions, after.Pending)) with { Outcome = outcome, FailureReason = failure };
     }
 
-    private async Task ResolvePublicationAuditOnlyAsync(RequestContext context, Guid formDefinitionId, FormVersion staged, string failure, CancellationToken cancellationToken)
+    private async Task ResolvePublicationAuditOnlyAsync(RequestContext context, Guid formDefinitionId, Guid formVersionId, int versionNumber, string failure, bool recoveryBlocked, CancellationToken cancellationToken)
     {
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
-        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormVersionAuthorityRegistrationFailed, "published version could not be registered with the Authority",
-            formDefinitionId: formDefinitionId, targetEntityType: "form_version", targetEntityId: staged.FormVersionId, metadata: new { versionNumber = staged.VersionNumber, fields = 0, registrationSource = "Recovery", reason = failure }, outcome: "Failed");
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormVersionAuthorityRegistrationFailed, recoveryBlocked
+                ? "published version cannot be registered with the Authority: its stored layout no longer matches the staged version (recovery blocked)"
+                : "a version staged with the Authority could not be resolved",
+            formDefinitionId: formDefinitionId, targetEntityType: "form_version", targetEntityId: formVersionId, metadata: new { versionNumber, fields = 0, registrationSource = "Recovery", reason = failure, recoveryBlocked }, outcome: "Failed");
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private static FormAuthorityRegistrationResponse Describe(Guid formDefinitionId, int? current, int? registered, AuthorityPendingFormVersionPublication? pending)
+    /// <summary>C-191: a staged version committed here whose stored number or layout digest differs from what the Authority staged.</summary>
+    private static bool IsStagedVersionMismatch(FormVersion staged, AuthorityPendingFormVersionPublication pending) =>
+        staged.VersionNumber != pending.FormVersionNumber || !string.Equals(StoredLayoutDigestHex(staged.LayoutJson), pending.LayoutDigestHex, StringComparison.Ordinal);
+
+    /// <summary>C-191: the pending publication is committed here but no longer matches what the Authority staged (recovery is blocked).</summary>
+    private static bool IsRecoveryBlocked(IEnumerable<FormVersion> versions, AuthorityPendingFormVersionPublication? pending) =>
+        pending is not null && versions.FirstOrDefault(v => v.FormVersionId == pending.FormVersionId) is { } staged && IsStagedVersionMismatch(staged, pending);
+
+    private static FormAuthorityRegistrationResponse Describe(Guid formDefinitionId, int? current, int? registered, AuthorityPendingFormVersionPublication? pending, bool recoveryBlocked = false)
     {
-        var state = current is null ? "NotPublished" : pending is not null ? "Pending" : registered == current ? "Registered" : "NotRegistered";
+        var state = current is null ? "NotPublished" : pending is not null ? (recoveryBlocked ? "RecoveryBlocked" : "Pending") : registered == current ? "Registered" : "NotRegistered";
         return new FormAuthorityRegistrationResponse(formDefinitionId, current, registered, pending?.FormVersionNumber, state);
     }
 

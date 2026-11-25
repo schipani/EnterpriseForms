@@ -19,6 +19,9 @@ namespace EnterpriseForms.StageBTests.Tests;
 /// open a window; the database refuses to revive, rewrite or duplicate a pending publication, and the runtime cannot delete one. C-191: a
 /// committed but unresolved publication is never superseded - no later version, other version of the same number or repeat is staged,
 /// by the business or directly at the Authority, and the database admits no superseded state - so it is resolved before anything else.
+/// C-191 (final): an abandonment needs the business publication coordinator's attestation - design permission alone, another key or the
+/// coordinator's own statement that the version is committed never lifts the barrier - and a committed version whose stored layout no
+/// longer has the staged digest is RecoveryBlocked (nothing resolved, regenerated or published over it).
 /// Lost registrations and lost commits are produced with the Testing-only publication fault checkpoints. Synthetic data only.
 /// </summary>
 [Collection(StageBStackCollectionDefinition.Name)]
@@ -382,6 +385,7 @@ public sealed class FormVersionPublicationBarrierTests(StageBFixture fixture)
         var recovered = Describe(await RecoverAsync(w));
         Assert.Equal(("Abandoned", "Registered", 1, 1), (recovered.Outcome, recovered.State, recovered.Current, recovered.Registered));
         Assert.Equal(["1|Registered", "2|Abandoned"], Publications(w));
+        Assert.Contains("attestation_mac_hex", Scalar($"SELECT command_payload_json::text FROM security_commands WHERE organization_id = '{w.S.OrganizationId:D}' AND command_kind_name = 'ResolveFormVersionPublication' AND command_state_name <> 'Rejected';"), StringComparison.Ordinal); // C-191: accepted only with the coordinator's attestation
         Assert.Equal("Active||CurrentVersion", Tail(Approvals(w, w.Phone).Single()));
         Assert.Equal([r1], Matches(await SearchAsync(w, w.Phone, "equals", "555-0401")));
         Assert.NotEmpty(BusinessAudit(w, "FORM_VERSION_AUTHORITY_PUBLICATION_ABANDONED"));
@@ -478,6 +482,116 @@ public sealed class FormVersionPublicationBarrierTests(StageBFixture fixture)
         AssertNotAllowed(await SearchAsync(w, w.Phone, "equals", "555-0801"));
         AssertNotAllowed((await IndexedAsync(w, clerk, w.Phone, "555-08")).Result);
         Assert.DoesNotContain((await CapabilitiesAsync(w)).GetProperty("fields").EnumerateArray(), f => f.GetProperty("fieldDefinitionId").GetGuid() == w.Phone);
+    }
+
+    // ---------------------------------------------------------------- C-191 (final): abandonment needs the coordinator's attestation
+
+    /// <summary>The synthetic coordinator attestation key of env.example (Development/Testing only); the business API signs with it.</summary>
+    private const string CoordinatorKeyBase64 = "Zm9ybS1wdWJsaWNhdGlvbi1jb29yZGluYXRvci1hdHRlc3RhdGlvbi1kZXYtb25seQ==";
+
+    /// <summary>The synthetic business workload credential key (TestIdentity): a holder of only this key must not be able to attest.</summary>
+    private const string WorkloadKeyBase64 = "d29ya2xvYWQtZGV2LW9ubHktc2hhcmVkLWtleS0wMDAwMDAwMDAwMA==";
+
+    /// <summary>An attestation exactly as the business coordinator builds it (message pinned by both unit tests), signed with <paramref name="keyBase64"/>.</summary>
+    private static object Attestation(Ws w, Guid publication, Guid version, int number, string digest, int businessLatest, string keyBase64)
+    {
+        var issued = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var message = string.Join('\n', "enterpriseforms/form-publication-abandonment/v1", "organization_id=" + w.S.OrganizationId.ToString("D"), "form_definition_id=" + w.FormId.ToString("D"),
+            "form_version_publication_id=" + publication.ToString("D"), "form_version_id=" + version.ToString("D"), "form_version_number=" + number.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "layout_digest_hex=" + digest, "business_latest_form_version_number=" + businessLatest.ToString(System.Globalization.CultureInfo.InvariantCulture), "issued_at_unix_seconds=" + issued.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var mac = HMACSHA256.HashData(Convert.FromBase64String(keyBase64), System.Text.Encoding.UTF8.GetBytes(message));
+        return new { form_version_publication_id = publication, business_latest_form_version_number = businessLatest, issued_at_unix_seconds = issued, attestation_mac_hex = Convert.ToHexStringLower(mac) };
+    }
+
+    /// <summary>The form's pending publication at the Authority: (business version id, Authority publication id, layout digest hex).</summary>
+    private (Guid Version, Guid Publication, string Digest) PendingPublication(Ws w)
+    {
+        var row = Scalar($"SELECT business_form_version_id || '|' || form_version_publication_id || '|' || encode(layout_digest, 'hex') FROM form_version_publications WHERE organization_id = '{w.S.OrganizationId:D}' AND form_definition_id = '{w.FormId:D}' AND publication_state_name = 'Pending';").Split('|');
+        return (Guid.Parse(row[0]), Guid.Parse(row[1]), row[2]);
+    }
+
+    /// <summary>
+    /// V2 removes Phone; the business commits it and its resolution is lost. Directly at the Authority, the designer and an organization
+    /// administrator (design permission) cannot abandon V2 without the coordinator's attestation; an attestation signed with the business
+    /// workload credential key is refused; and an attestation signed with the coordinator key whose own statement shows V2 in the business
+    /// store is refused too. Every refusal is recorded, nothing changes, both engines stay closed and recovery then registers V2 (D-H3).
+    /// </summary>
+    [Fact]
+    public async Task ADirectAbandonmentNeverLiftsTheBarrierOfACommittedRemoval()
+    {
+        var w = await WorkspaceAsync("bf1-abandon-direct");
+        Assert.Equal(1, await PublishAsync(w, (w.First, "First name"), (w.Phone, "Phone")));
+        Assert.True((await ApproveAsync(w, w.Phone)).IsSuccess);
+        var r1 = await CreateAsync(w, new() { ["first_name"] = "Kai", ["phone_number"] = "555-0901" });
+        Assert.Equal([r1], Matches(await SearchAsync(w, w.Phone, "equals", "555-0901")));
+        var clerk = await SessionAsync(w, w.S.Clerk);
+
+        Assert.Equal("TESTING_FAULT_INJECTED", (await PublishWithFaultAsync(w, LostRegistration, (w.First, "First name"), (w.Email, "Email"))).ErrorCode);
+        Assert.Equal((2, 1), (await CurrentVersionAsync(w), LatestRegistered(w)));
+        var (v2, publication, digest) = PendingPublication(w);
+        object Abandon(object? attestation) => new { form_definition_id = w.FormId, form_version_id = v2, form_version_number = 2, layout_digest_hex = digest, resolution = "Abandoned", attestation };
+
+        const string unverified = "FORM_PUBLICATION_ABANDONMENT_UNVERIFIED";
+        Assert.Equal(unverified, (await SubmitAsync(w, w.S.Designer, "ResolveFormVersionPublication", Abandon(null))).ErrorCode);
+        Assert.Equal(unverified, (await SubmitAsync(w, w.S.Administrator, "ResolveFormVersionPublication", Abandon(null))).ErrorCode);
+        Assert.Equal(unverified, (await SubmitAsync(w, w.S.Designer, "ResolveFormVersionPublication", Abandon(Attestation(w, publication, v2, 2, digest, 1, WorkloadKeyBase64)))).ErrorCode); // another key
+        Assert.Equal(unverified, (await SubmitAsync(w, w.S.Designer, "ResolveFormVersionPublication", Abandon(Attestation(w, publication, v2, 2, digest, 2, CoordinatorKeyBase64)))).ErrorCode); // V2 is in the business store
+        Assert.Equal(unverified, (await SubmitAsync(w, w.S.Designer, "ResolveFormVersionPublication", Abandon(Attestation(w, Guid.CreateVersion7(), v2, 2, digest, 1, CoordinatorKeyBase64)))).ErrorCode); // another publication
+        Assert.Equal("5", Scalar($"SELECT count(*) FROM security_commands WHERE organization_id = '{w.S.OrganizationId:D}' AND command_kind_name = 'ResolveFormVersionPublication' AND rejection_reason_code = '{unverified}';"));
+
+        Assert.Equal(["1|Registered", "2|Pending"], Publications(w));
+        AssertPending(await SearchAsync(w, w.Phone, "equals", "555-0901"));
+        AssertNotAllowed((await IndexedAsync(w, clerk, w.Phone, "555-09")).Result);
+        Assert.Equal("Active||CurrentVersion", Tail(Approvals(w, w.Phone).Single()));
+
+        var recovered = Describe(await RecoverAsync(w)); // the coordinator finds V2 committed: Registered, never Abandoned
+        Assert.Equal(("Registered", "Registered", 2, 2), (recovered.Outcome, recovered.State, recovered.Current, recovered.Registered));
+        Assert.Equal(["1|Registered", "2|Registered"], Publications(w));
+        Assert.Equal("Invalidated|FORM_VERSION_CHANGED|CurrentVersion", Tail(Approvals(w, w.Phone).Single()));
+        AssertNotAllowed(await SearchAsync(w, w.Phone, "equals", "555-0901"));
+    }
+
+    /// <summary>
+    /// V2 removes Phone (committed, resolution lost); a hostile BusinessDb administrator then rewrites V2's stored layout. Recovery reports
+    /// RecoveryBlocked (STAGED_VERSION_MISMATCH) - also on a plain status read - and resolves nothing: the publication stays pending at the
+    /// Authority with its staged manifest unchanged, both engines stay closed, a new publish is refused and publishes nothing, and a retry
+    /// changes nothing. Only an exceptional, separately authorized repair procedure (not implemented) can end this state.
+    /// </summary>
+    [Fact]
+    public async Task ACommittedVersionWhoseStoredLayoutNoLongerMatchesIsRecoveryBlocked()
+    {
+        var w = await WorkspaceAsync("bf1-blocked");
+        Assert.Equal(1, await PublishAsync(w, (w.First, "First name"), (w.Phone, "Phone")));
+        Assert.True((await ApproveAsync(w, w.Phone)).IsSuccess);
+        var r1 = await CreateAsync(w, new() { ["first_name"] = "Rui", ["phone_number"] = "555-1001" });
+        Assert.Equal([r1], Matches(await SearchAsync(w, w.Phone, "equals", "555-1001")));
+
+        Assert.Equal("TESTING_FAULT_INJECTED", (await PublishWithFaultAsync(w, LostRegistration, (w.First, "First name"), (w.Email, "Email"))).ErrorCode);
+        var (v2, _, digest) = PendingPublication(w);
+        var manifest = Scalar($"SELECT md5(field_manifest_json::text) FROM form_version_publications WHERE organization_id = '{w.S.OrganizationId:D}' AND form_definition_id = '{w.FormId:D}' AND publication_state_name = 'Pending';");
+        fixture.Stack.AttackerSql($"UPDATE form_versions SET layout_json = replace(layout_json::text, 'Email', 'Injected')::jsonb WHERE form_version_id = '{v2:D}';");
+
+        var blocked = await RecoverAsync(w);
+        Assert.Equal(("RecoveryBlocked", "RecoveryBlocked", 2, 1, 2), Describe(blocked));
+        Assert.Equal("STAGED_VERSION_MISMATCH", blocked.GetProperty("failureReason").GetString());
+        Assert.Equal("RecoveryBlocked", Describe(await RegistrationAsync(w)).State);
+        Assert.Contains("\"recoveryBlocked\":true", BusinessAudit(w, "FORM_VERSION_AUTHORITY_REGISTRATION_FAILED"), StringComparison.Ordinal);
+
+        // Nothing resolved or restaged: the Authority still holds V2 pending with the manifest it staged.
+        Assert.Equal(["1|Registered", "2|Pending"], Publications(w));
+        Assert.Equal((v2, digest), (PendingPublication(w).Version, PendingPublication(w).Digest));
+        Assert.Equal(manifest, Scalar($"SELECT md5(field_manifest_json::text) FROM form_version_publications WHERE organization_id = '{w.S.OrganizationId:D}' AND form_definition_id = '{w.FormId:D}' AND publication_state_name = 'Pending';"));
+        Assert.Equal("0", Scalar($"SELECT count(*) FROM security_commands WHERE organization_id = '{w.S.OrganizationId:D}' AND command_kind_name = 'ResolveFormVersionPublication' AND command_payload_json::text LIKE '%{v2:D}%';")); // nothing sent for V2 (V1's own registration is the only resolution)
+        AssertPending(await SearchAsync(w, w.Phone, "equals", "555-1001"));
+        Assert.Equal("Active||CurrentVersion", Tail(Approvals(w, w.Phone).Single()));
+
+        // Another publication cannot bypass the mismatch, and retrying changes nothing.
+        var draftRevision = await w.S.SaveDraftAsync(w.FormId, LayoutOf(w, (w.First, "First name")));
+        var refused = await fixture.Api.PostAsync($"/api/v1/form-definitions/{w.FormId:D}/publish", w.S.Token(w.S.Designer), new { expectedDraftRevision = draftRevision, expectedCurrentVersionNumber = 2, changeReason = "bf1 publish over a blocked version" });
+        Assert.Equal((HttpStatusCode.Conflict, "FORM_PUBLICATION_PENDING"), (refused.Status, refused.ErrorCode));
+        Assert.Equal(2, await CurrentVersionAsync(w));
+        Assert.Equal("RecoveryBlocked", Describe(await RecoverAsync(w)).Outcome);
+        Assert.Equal(["1|Registered", "2|Pending"], Publications(w));
     }
 
     // ---------------------------------------------------------------- the field-return case (C-188 retained approval)

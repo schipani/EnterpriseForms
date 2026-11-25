@@ -8480,6 +8480,13 @@
           "prepared_on": {
             "type": "string",
             "format": "date-time"
+          },
+          "form_version_publication_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },

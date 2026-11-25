@@ -102,7 +102,7 @@ public sealed class FieldSearchCapabilityService(IAuthorityStore store, Permissi
 
                 configuration = new FieldSearchConfiguration(mayAdminister, gate.ApprovalsOperational, gate.UnavailableReason, latest?.FormVersionNumber,
                     statuses.OrderBy(s => s.InCurrentVersion ? 0 : 1).ThenBy(s => s.FieldLabel, StringComparer.Ordinal).ToList(), searchers, gate.RetainedFieldApprovalsEnabled,
-                    pending is null ? null : new PendingFormVersionPublication(pending.BusinessFormVersionId, pending.FormVersionNumber, Convert.ToHexStringLower(pending.LayoutDigest), pending.PreparedOn));
+                    pending is null ? null : new PendingFormVersionPublication(pending.BusinessFormVersionId, pending.FormVersionNumber, Convert.ToHexStringLower(pending.LayoutDigest), pending.PreparedOn, pending.FormVersionPublicationId));
             }
         }
 

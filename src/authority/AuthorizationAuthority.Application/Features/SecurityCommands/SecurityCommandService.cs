@@ -9,7 +9,7 @@ using AuthorizationAuthority.Domain.Features.SecurityCommands;
 namespace AuthorizationAuthority.Application.Features.SecurityCommands;
 
 /// <summary>Authoritative security-commit point (CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md §2 "Command sequence").</summary>
-public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock, FieldSearchApprovalGate approvalGate, AuthorizationAuthority.Application.Features.SearchIndex.SearchIndexWriter? searchIndex = null, IOperationTimingObserver? timing = null)
+public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock, FieldSearchApprovalGate approvalGate, AuthorizationAuthority.Application.Features.SearchIndex.SearchIndexWriter? searchIndex = null, IOperationTimingObserver? timing = null, FormPublicationAbandonmentVerifier? abandonmentVerifier = null)
 {
     public async Task<OperationStatus> SubmitAsync(VerifiedActor actor, SecurityCommandRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken)
     {
@@ -80,7 +80,7 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             var graph = new DesiredStateGraph(edges);
             graphMs = timer.ElapsedMilliseconds - graphStarted;
             var planStarted = timer.ElapsedMilliseconds;
-            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate, command.CommandCreatedOn).ConfigureAwait(false);
+            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate, command.CommandCreatedOn, abandonmentVerifier).ConfigureAwait(false);
             command.CommandPayloadJson = plan.NormalizedPayloadJson;
             if (plan.CommandReasonOverride is { } reasonOverride)
             {
