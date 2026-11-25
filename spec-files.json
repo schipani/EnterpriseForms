@@ -539,8 +539,8 @@
     },
     {
       "path": "docs/governance/AUTONOMOUS_DEVELOPMENT_POLICY.md",
-      "sha256": "b4c84fc00eef2811cae998a08b4687f1b60d1351d1941d57fe1c919ba375e966",
-      "bytes": 4373
+      "sha256": "83eb1e6a1c5c9bdb4c364cb25e168e0d1cb3814148f9cbbcd3276b3e4bd1e4bc",
+      "bytes": 4889
     },
     {
       "path": "docs/governance/PB12_RELEASE_EVIDENCE_SCHEMA.json",
@@ -553,14 +553,19 @@
       "bytes": 6300
     },
     {
+      "path": "docs/governance/PROPOSED_DEVELOPMENT_AI_REVIEW_AMENDMENT.md",
+      "sha256": "dc0c38b4ab7e1edf713d42c0d3f6d9a44b5959c38415b9fcf9515fb2ffadbe79",
+      "bytes": 5401
+    },
+    {
       "path": "docs/governance/REVIEW_AND_AUTHORIZATION_WORKFLOW.md",
       "sha256": "bbd3f7c7e22dd1b244d13d7a67b416b65937a4b621b8f4ff7af0274510e73cb1",
       "bytes": 3944
     },
     {
       "path": "docs/governance/WORK_PACKAGE_REGISTER.md",
-      "sha256": "59816b0bea82b508d9a70abb7ebddecc5492905abd3e57966335c2831ea01aef",
-      "bytes": 15063
+      "sha256": "bbb7c64b11d9a4b80507cb1100d2f1519787f169da005964fb8127512849d160",
+      "bytes": 17425
     },
     {
       "path": "docs/identity/PB08_IDENTITY_ASSURANCE_STANDARD.md",

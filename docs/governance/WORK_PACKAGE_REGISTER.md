@@ -70,3 +70,19 @@ Live ruleset 25341169 is active with no bypass actors and the four approved requ
 - On the corrected checkout, npm ci, lint, typecheck, build and all 626 tests over 72 files passed. The independent comparison against Zod 3.25.76 matched 2,400 layout cases, 2,400 JSON parses, 671 rule cases and four actual Designer edit-to-serializer cases. The corrected branch audit reported no Zod finding. This is additional layout compatibility evidence for §11 #17. The authoritative register and its acceptance statuses are in PR #77.
 - Rehearsal tree 36a3139428b39fc423871c62bd842b0021fd7817 combines the original #79 head and the corrected #80 head. In an isolated scratch checkout, a clean install and dependency-tree check passed and npm audit reported zero vulnerabilities. The combined lockfile stayed byte-for-byte unchanged during verification. The original Vite optional fsevents entry is preserved. This is a rehearsal. After #79 is merged, regenerate and verify the lockfile on the actual integration base.
 - The reproduced compatibility defect is corrected. The four required checks and CodeQL passed for the corrected head against fbf18bc734f9b6d9563a94a66721af49a7177003. The hosted synthetic merge tree matched the signed head tree. Final base reconciliation after #79 still requires its own CI and human reviews. No alert or milestone acceptance is recorded. [Required checks](https://github.com/schipani/EnterpriseForms/actions/runs/45612255480) · [CodeQL](https://github.com/schipani/EnterpriseForms/actions/runs/45612252119)
+
+## Mandate V2 checkpoint — 2026-11-25
+
+**Current milestone:** C10 M1 development on an isolated provisional base. The owner authorized M1–M3 and integrated closeout preparation in Development/Test. The normative scope is C-194 and WP-0 §9. M2 and M3 depend on the Authority behavior and wire contracts. The subsequent integration base must match the actual approved main and be reverified.
+
+**Provisional base:** signed 6cc574d25a180f2b031b1e113b19b0231893a634 on coord/c10-provisional-base, built from fbf18bc7 and then the original #77, #78, #79 and corrected #80 heads. Strict specifications passed with 312 files. Advance this base only by a recorded reconciliation. It does not establish acceptance or integration on main.
+
+| Role | Active work and exact base |
+| --- | --- |
+| Codex coordinator | Provisional integration, #77 traceability corrections, review findings, signed check and PR checkpoints. |
+| Claude Code implementation | C:/t/c10-m1 on feat/c10-m1-authority at 6cc574d2 for WP1 Authority schema and WP12 comments. C:/t/c10-stepup on feat/c10-m1-step-up at the same base for the existing human command guards in WP7 and their minimal adapters. C:/t/coord-bh1-review on review/bh1-corrective at 21be48f0 for #78 corrective review. Each branch has one implementation writer. |
+| Independent Codex reviewer | Separate read-only session reviewing actual diffs for #77–#82 and material candidate changes. An AI PASS is technical evidence pending the existing policy or the proposed amendment. |
+
+**Review outcomes in progress:** The first review matched all 82 requirements against their source. It found WP-0 traceability discrepancies on #77 and test reliability and selector issues on #78. A #77 correction and a parallel #78 corrective pass are active. The reviewer independently reproduced #80 schema parity on the exact signed corrected head. Record final dispositions on the reconciled heads.
+
+**Owner decision:** [Proposed Development/Test review amendment and exact settings](PROPOSED_DEVELOPMENT_AI_REVIEW_AMENDMENT.md). Existing merge gates continue meanwhile. Remaining C10 work includes graph commitment, access-time expiry, lineage and transitions, document binding, journal and adapters before dependent business APIs and UI. G27 is open. C-195 remains in draft [PR #82](https://github.com/schipani/EnterpriseForms/pull/82).

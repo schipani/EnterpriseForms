@@ -12,6 +12,10 @@ The EnterpriseForms Standing Autonomous Development Mandate of 2026-11-25 delega
 
 Apply every gate that governs the action. An item on the roadmap establishes planning context. A successful command establishes only its observed result. Each package needs its own authorization and prerequisite record. Agent technical verification supports human review and owner acceptance. [Release evidence and governance](PB12_SECURITY_EVIDENCE_RELEASE_STANDARD.md)
 
+## Roles
+
+The coordinator selects packages, maintains provisional bases and owns publishing and integration. Claude Code is the primary implementation writer. A separate read-only review agent inspects the actual Git diff on an exact head and base and records PASS, FAIL or BLOCKED. The coordinator requests a fresh review after a material change. The separate agent's findings inform the existing review process while the [proposed amendment](PROPOSED_DEVELOPMENT_AI_REVIEW_AMENDMENT.md) awaits an owner decision.
+
 ## Coordination loop
 
 1. Resume from the [work-package register](WORK_PACKAGE_REGISTER.md). Verify the recorded checkpoint against local and remote refs, actual worktree state, active writer and latest owner decisions. Check external operation results before retrying.
