@@ -4,6 +4,10 @@ Branch `ui/dashboard-security-monitoring`, based on `ui/consistency-unified` (5e
 recorded 2026-10-30 (C-91, §6).** Not merged: a signed pull request into `main` and its required hosted checks are
 still outstanding. This is a development feature, not production Level 2 evidence.
 
+**Update (2026-11-25):** merged into `main` as `8a2c57f` (PR #40, 2026-11-02, the signed replacement for PR #37). The
+merge is code integration of the owner-accepted development feature (C-91); SD-1…SD-6 below are unchanged, and no
+production Level 2 claim is made.
+
 ## 1. What was delivered
 
 | # | Deliverable | Where |
@@ -128,7 +132,7 @@ What the acceptance covers and does not cover:
 | Item | Status after C-91 |
 |---|---|
 | Visual and functional acceptance of §1 deliverables | Accepted by the owner (development) |
-| Merge into `main` | Not done. Needs a signed pull request and the required hosted checks (`ci` runs on every pull request; `stage-b-integration` on pull requests into `main`). No pull request is open yet; hosted CI has not run on this branch. |
+| Merge into `main` | Not done. Needs a signed pull request and the required hosted checks (`ci` runs on every pull request; `stage-b-integration` on pull requests into `main`). No pull request is open yet; hosted CI has not run on this branch. **Update 2026-11-25: done, PR #40 `8a2c57f` (2026-11-02).** |
 | SD-1 Authority journal read / disposition command (AC-10) | **Open** — proposal only |
 | SD-2 Organization-owner security summary permission | **Open** — proposal only |
 | SD-3 Auditor role contract | **Open** — proposal only |

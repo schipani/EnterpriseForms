@@ -1,6 +1,7 @@
 # Phase C8 — Administration and Governance: status
 
-- **Branch:** `phase-c8/administration-governance`, from `main` `b1e1b30a78ebe36b8055ec52343390419dff9ba9` (Phase C7 squash merge, PR #29). Not merged; no PR.
+- **Current state (added 2026-11-25; the entries below are kept as written, each with its own date):** merged into `main` as code integration — M1 `94bb848` (PR #33, C-89), AC-9 `ebd645f` (PR #34), M2 with the Platform Console, onboarding and owner recovery `935f241` (PR #42), M3 `4a03671` (PR #49), M4-1 S1/M1 through the sync PR #57 `a9b32de`, M4-2 `3c645ac` (PR #60), M4-3 `ce4789c` (PR #61), M4-4 `6142f91` (PR #62), M4-5 integration `198aeae` (PR #69, §46). A merge is not milestone acceptance: owner Development/Testing acceptance is recorded only where a decision says so (for example M4-4, C-173); no decision recording owner acceptance of M3 or of M4-5 as a milestone was found. Independent review, hosted Stage B on the integrated code and every item of §45.5 remain open. RB-13: the datastore-replacement class was given its own Stage B shard and stack in PR #68 (`5358371`, test-only, merged before §46 was written); that 11-shard layout has not yet run on hosted runners, so RB-13 stays open pending hosted validation.
+- **Branch (original M1 entry, 2026-10-29):** `phase-c8/administration-governance`, from `main` `b1e1b30a78ebe36b8055ec52343390419dff9ba9` (Phase C7 squash merge, PR #29). Not merged; no PR.
 - **Architecture and milestone plan:** `docs/architecture/PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md`.
 - **Decisions:** C-77 (M0 plan), C-78 (owner approval of D8-1…D8-10 with conditions; M1 authorized), C-79 (M1 implementation).
 - **State (2026-10-29):**
