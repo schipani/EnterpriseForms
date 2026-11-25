@@ -126,10 +126,17 @@ public sealed class OrganizationProtectionPolicyConfiguration : IEntityTypeConfi
     {
         builder.MapSnakeCase("organization_protection_policies");
         builder.HasKey(e => e.OrganizationProtectionPolicyId);
+        builder.Property(e => e.MaximumDelegationDepth).HasDefaultValue(3);
         builder.Property(e => e.MinimumFieldClassification).HasMaxLength(20);
         builder.HasIndex(e => e.OrganizationId).IsUnique().HasDatabaseName("uq_protection_policy_org");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_protection_policy_org");
-        builder.ToTable(t => t.HasCheckConstraint("ck_protection_policy_classification", "minimum_field_classification IN ('Public','Internal','Confidential','Restricted')"));
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_protection_policy_classification", "minimum_field_classification IN ('Public','Internal','Confidential','Restricted')");
+
+            // C10 M1-WP1: delegation depth must be within platform maximum (1-3).
+            t.HasCheckConstraint("ck_protection_policy_max_depth", "maximum_delegation_depth BETWEEN 1 AND 3");
+        });
     }
 }
 
@@ -141,11 +148,12 @@ public sealed class AuthorityResourceConfiguration : IEntityTypeConfiguration<Au
         builder.HasKey(e => e.AuthorityResourceId);
         builder.Property(e => e.ResourceTypeName).HasMaxLength(40);
         builder.Property(e => e.ResourceLifecycleState).HasMaxLength(20);
-        builder.HasIndex(e => new { e.OrganizationId, e.ResourceTypeName, e.ResourceEntityId }).IsUnique().HasDatabaseName("uq_authority_resource");
+        builder.HasAlternateKey(e => new { e.OrganizationId, e.ResourceTypeName, e.ResourceEntityId }).HasName("uq_authority_resource");
         // Phase C7 AC-5: form-scoped catalogue enumeration without scanning the organization's registry.
         builder.HasIndex(e => new { e.OrganizationId, e.ResourceTypeName, e.ParentResourceEntityId, e.ResourceLifecycleState }).HasDatabaseName("ix_authority_resources_form_scope");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_resource_org");
-        builder.ToTable(t => t.HasCheckConstraint("ck_resource_lifecycle_state", "resource_lifecycle_state IN ('Registered','Active','Revoked','Quarantined')"));
+        // C10 M1-WP1: add Expired and Invalidated terminal states for record_share resources.
+        builder.ToTable(t => t.HasCheckConstraint("ck_resource_lifecycle_state", "resource_lifecycle_state IN ('Registered','Active','Revoked','Quarantined') OR (resource_type_name = 'record_share' AND resource_lifecycle_state IN ('Expired','Invalidated'))"));
     }
 }
 
@@ -155,6 +163,7 @@ public sealed class SecurityCommandConfiguration : IEntityTypeConfiguration<Secu
     {
         builder.MapSnakeCase("security_commands");
         builder.HasKey(e => e.SecurityCommandId);
+        builder.HasAlternateKey(e => new { e.OrganizationId, e.SecurityCommandId }).HasName("ak_security_command_organization_command");
         builder.Property(e => e.CommandKindName).HasMaxLength(60);
         builder.Property(e => e.CommandIdempotencyKey).HasMaxLength(128);
         builder.Property(e => e.CommandStateName).HasMaxLength(40);

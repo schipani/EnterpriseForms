@@ -9,6 +9,7 @@ using AuthorizationAuthority.Domain.Features.SearchAccess;
 using AuthorizationAuthority.Domain.Features.SearchIndex;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
+using AuthorizationAuthority.Domain.Features.Sharing;
 using Microsoft.EntityFrameworkCore;
 
 namespace AuthorizationAuthority.Infrastructure.Persistence;
@@ -147,6 +148,12 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
     public DbSet<SearchAccessVerificationState> SearchAccessVerificationStates => Set<SearchAccessVerificationState>();
 
     public DbSet<SearchAccessShadowSample> SearchAccessShadowSamples => Set<SearchAccessShadowSample>();
+
+    // C10 M1-WP1: share-specific metadata stored alongside the generic AuthorityResource.
+    public DbSet<ShareResourceMetadata> ShareResourceMetadatas => Set<ShareResourceMetadata>();
+
+    /// <summary>C10 M1-WP8: document item version binding within a share.</summary>
+    public DbSet<ShareDocumentBinding> ShareDocumentBindings => Set<ShareDocumentBinding>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

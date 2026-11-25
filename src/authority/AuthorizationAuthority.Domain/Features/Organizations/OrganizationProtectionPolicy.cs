@@ -26,6 +26,12 @@ public sealed class OrganizationProtectionPolicy
     /// <summary>Advances whenever field search policy (organization flag or any approval) changes.</summary>
     public long SearchPolicyRevision { get; set; }
 
+    /// <summary>
+    /// C10 M1-WP1: maximum delegation depth for shares in this organization. Platform maximum is 3; organizations may
+    /// configure 1 or 2 but never more. Depth 1 = owner-granted. A Manager at depth 3 is refused. Default 3.
+    /// </summary>
+    public int MaximumDelegationDepth { get; set; } = 3;
+
     public Guid UpdatedBySecurityCommandId { get; set; }
 
     public DateTimeOffset PolicyUpdatedOn { get; set; }
