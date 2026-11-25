@@ -327,7 +327,7 @@ the C8 status); the six Dependabot alerts; independent third-party assessment an
 
 Authorized by the owner on 2026-11-24 (owner decisions D-H1…D-H18; H1–H6 in Development/Test only). Implemented on the
 branch `c188/retained-field-search` from `9903844` (the PR #75 squash merge), pushed and opened as PR #76 with owner
-authorization; BF-1 remediated on the same branch (§11.6), and the final BF-1 check corrected (§11.8, C-191). **Not merged, not deployed; not owner-accepted and not independently
+authorization; BF-1 remediated on the same branch (§11.6), the final BF-1 check corrected (§11.8, C-191), and its final resolution implemented (§11.9: fail-closed abandonment, recovery-blocked state). **Not merged, not deployed; not owner-accepted and not independently
 reviewed.** CLAUDE.md §11 #2 searchability stays
 **UNMET** in the requirement register until the owner accepts the evidence below.
 
@@ -458,11 +458,11 @@ layout exactly as publishing does; the contract test reproduces the jsonb case a
   `FORM_VERSION_AUTHORITY_REGISTERED` event for the same version. Not run on any persistent environment (not authorized).
 - **Availability:** search on a form with a pending publication is unavailable until a designer retries the registration (since C-191
   a new publication is refused until then, also after a failed commit); there is no automatic background retry (it would need a non-human registration identity - a governance change not made).
-- **A staged version whose stored layout no longer has the staged digest** (tampering, or a defect) is never registered. Since C-191 a
-  new publication cannot supersede it either, so the form stays unsearchable and unpublishable until it is resolved outside the product
-  flow (investigation, then an explicit resolution); there is no in-product path. Owner decision pending (§11.8).
-- **Abandonment** is decided by the business from its own store under the lock; a designer with direct Authority access could withdraw
-  a committed version's staging, recreating the C7 window for that form (audited; it grants no search that the approval did not).
+- **A staged version whose stored layout no longer has the staged digest** (tampering, or a defect) is never registered, abandoned or
+  superseded: the form reports `RecoveryBlocked` and stays unsearchable and unpublishable. Owner decision (C-191 final, §11.9): preserve
+  the barrier and report it; an exceptional, separately authorized repair procedure is required and is **not implemented**.
+- **Abandonment** needs the business publication coordinator's attestation since the C-191 final resolution (§11.9); design permission
+  alone no longer withdraws a staged version. The attestation key is a new deployment secret of both the business API and the Authority.
 - **Race coverage:** in the Stage B race the four publications all registered while the concurrent re-approvals were refused
   (pending or transient); the pending branch is proven deterministically with the Testing-only fault checkpoints, not by the race.
 - **Concurrent C7 limitation recorded in §11.4** ("Registration during a concurrent security command") is superseded by this section.
@@ -500,4 +500,46 @@ manifest is declared by the business (OD-3), so independent enforcement of aband
 an owner decision (not implemented): business-side evidence the Authority can verify, or a conservative abandonment that also applies
 the staged manifest's invalidations.
 
+**Superseded in part by §11.9:** the Abandoned analysis above describes `cffc57f`; the owner then required a fail-closed abandonment
+contract and an explicit recovery-blocked state.
+
 **Verification (local, 2026-11-24; nothing on a persistent environment):** Authority unit FormVersionPublicationTests 11/11 (3 new; the supersede test replaced; the three fail with the refusal removed); full Authority unit project 2,138 (1,927 passed, 211 authorized skips); contract FormVersionLifecycleContractTests 17/17 (1 new); Stage B FormVersionPublicationBarrierTests 6/6 on a freshly recreated stack (run 20261124-165940-9c181d41; 1 new); focused Stage B regressions on the same stack: RetainedFieldSearchTests 5/5 (race adapted: a pending publication is recovered before the next publish; in this run all three rounds registered, so that branch was not exercised), FieldSearchApprovalTests 5/5, FieldSearchExecutionTests 14/14, FormVersion* 14/14, DesignerTests 3/3; Playwright form-publication-registration 4/4; Release build without OpenAPI drift; full .NET CI-equivalent set 3,349/3,349 with 223 authorized skips (unchanged); characterization tests against unchanged 34a5dae reproduced the three superseding cases (3/3, not committed).
+
+### 11.9 C-191 final resolution — fail-closed abandonment and recovery-blocked state (owner-authorized 2026-11-24)
+
+The owner approved the C-191 supersession fix at `cffc57f` and authorized a final correction on PR #76.
+
+**Abandonment contract (fail closed).** An `Abandoned` resolution is accepted only with the business publication coordinator's
+attestation that the staged version was never committed:
+
+- The Authority (`FormPublicationAbandonmentVerifier`) refuses `FORM_PUBLICATION_ABANDONMENT_UNVERIFIED` when the attestation is absent,
+  signed with any other key, malformed, bound to another publication, outside a 5-minute issue window, or when its own statement shows
+  a business version numbered at or above the staged one. Without a configured key no abandonment is accepted. The refusal is recorded
+  like every refused field-search command; the publication stays pending and the barrier stays.
+- The attestation is HMAC-SHA-256 with a dedicated deployment key (`FormPublication:AbandonmentAttestationKeyBase64`) over a pinned,
+  domain-separated message: organization, form, the Authority's own publication id, business version id, number, layout digest, the
+  highest version number in the business store, issue time. Binding to the Authority's publication id prevents replay onto a later
+  prepare of the same business version. The key must differ from every workload, operator and user-assertion key; the business API and
+  the Authority refuse to start otherwise. The Authority's pending-publication view now carries its publication id.
+- The business (`FormPublicationAbandonmentAttestor`) signs only in recovery, holding the form's publication lock, after finding the
+  staged version absent from its store and every stored version numbered below it. Otherwise it sends nothing and reports `Refused`
+  (`ABANDONMENT_ATTESTATION_UNAVAILABLE` without the key, `NON_COMMITMENT_NOT_ESTABLISHED` when the store does not establish it).
+- Authorization stays Authority-owned: the attestation decides only non-commitment and confers no permission (design permission is
+  still checked); neither resolution changes the staged manifest; a registration carries no attestation.
+
+**Trust boundary (stated, not closed).** The key is held by the business API. A fully compromised business runtime can still produce an
+attestation, as it can already declare any manifest (OD-3). The mechanism removes the ability of any other holder of the business
+workload credential, or of a design-permission user, to lift the barrier by submitting `Abandoned` directly. Production key custody
+(Key Vault/Managed HSM, rotation) is not designed here; the local stacks use a synthetic Development/Testing value from `env.example`.
+
+**Recovery-blocked state.** A committed pending version whose stored layout no longer has the staged digest is reported as
+`RecoveryBlocked` (registration status and recovery outcome; `FailureReason` `STAGED_VERSION_MISMATCH`). Nothing is registered,
+abandoned, regenerated or discarded; nothing is sent to the Authority; the barrier stays; a new publication is refused
+(`409 FORM_PUBLICATION_PENDING`, nothing committed); a retry changes nothing; the failure is audited with `recoveryBlocked=true`; the
+designer notice explains the state and offers no retry. **An exceptional, separately authorized repair procedure is required to end
+it. It is not implemented** and needs its own design and owner authorization (scope, approvers, evidence, and how the Authority's
+staged manifest and the business layout are reconciled without trusting the tampered row).
+
+**Unchanged by design:** the designer's Retry registration requirement; no automatic retries; no other lifecycle change.
+
+**Verification (local, 2026-11-24; nothing on a persistent environment):** Authority unit FormVersionPublicationTests 15/15 (4 new; the three attestation tests fail with the Authority check removed); contract FormVersionLifecycleContractTests 20/20 (2 new, 2 extended); Vitest AuthorityRegistrationNotice 6/6 (2 new); Stage B on a freshly recreated security-test stack: FormVersionPublicationBarrierTests 8/8 (run 20261124-203350-29924db6, 2 new; the first run 20261124-195607-0259a19f failed 7/8 on a wrong assertion in the new recovery-blocked test - it counted V1's own registration - corrected and rerun), RetainedFieldSearchTests 5/5, FieldSearchApprovalTests 5/5, FieldSearchExecutionTests 14/14, DesignerTests 3/3, FormVersion* 15/16 with the same assertion failure (run 20261124-202849-11ff4eaf; the corrected class then passed 8/8); Playwright form-publication-registration 4/4 (run 20261124-203918-6b67bc96); Release build; full .NET CI-equivalent set 3,356/3,356 with 223 authorized skips.
