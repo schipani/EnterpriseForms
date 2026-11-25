@@ -42,8 +42,12 @@ public sealed partial class IndexedSearchService(
     ISecurityAlertSink alerts,
     TimeProvider clock,
     IIndexedSearchProbe? probe = null,
-    IIndexedSearchShadowSink? shadow = null)
+    IIndexedSearchShadowSink? shadow = null,
+    SecurityCommands.FieldSearchApprovalGate? approvalGate = null)
 {
+    /// <summary>C-188: retained-field approvals are honoured only when enabled (absent gate: disabled, fail closed).</summary>
+    private readonly bool retainedFieldApprovalsEnabled = approvalGate?.RetainedFieldApprovalsEnabled ?? false;
+
     public const string Engine = "Indexed";
 
     private static readonly string[] RecordStatuses = ["Draft", "Submitted", "Archived"];
@@ -109,7 +113,8 @@ public sealed partial class IndexedSearchService(
                 {
                     facts = await read.ReadStateAsync(query.FormDefinitionId, cancellationToken).ConfigureAwait(false);
                     await RequireConsistentStateAsync(organizationId, facts, state, cancellationToken).ConfigureAwait(false);
-                    approvalIds = AuthorizePredicates(conditions, facts, mayQuery, policy?.PlaintextSearchPermitted ?? false);
+                    var ineffective = await SecurityCommands.RetainedFieldApprovals.IneffectiveAsync(scope, organizationId, facts.Approvals, policy, retainedFieldApprovalsEnabled, cancellationToken).ConfigureAwait(false);
+                    approvalIds = AuthorizePredicates(conditions, facts, mayQuery, policy?.PlaintextSearchPermitted ?? false, ineffective);
 
                     var scopeFacts = await read.ReadScopeAsync(query.FormDefinitionId, discoverableIds, fields, cancellationToken).ConfigureAwait(false);
                     await GuardScopeAsync(organizationId, scopeFacts, cancellationToken).ConfigureAwait(false);
@@ -315,7 +320,8 @@ public sealed partial class IndexedSearchService(
                     Guid[] approvals;
                     try
                     {
-                        approvals = AuthorizePredicates(conditions, facts, mayQuery, policy?.PlaintextSearchPermitted ?? false);
+                        var ineffective = await SecurityCommands.RetainedFieldApprovals.IneffectiveAsync(scope, organizationId, facts.Approvals, policy, retainedFieldApprovalsEnabled, cancellationToken).ConfigureAwait(false);
+                        approvals = AuthorizePredicates(conditions, facts, mayQuery, policy?.PlaintextSearchPermitted ?? false, ineffective);
                     }
                     catch (AuthorityException ex) when (ex.ErrorCode is IndexedSearchErrorCodes.FieldNotAllowed or IndexedSearchErrorCodes.OperatorNotSupported or IndexedSearchErrorCodes.IndexNotReady)
                     {
@@ -670,10 +676,12 @@ public sealed partial class IndexedSearchService(
     /// as V1 (the caller's query_fields permission and the organization policy, the field's Active approval and value type, the
     /// approved operator set, the frozen option snapshot), then coverage Complete. Returns the approval id per condition.
     /// </summary>
-    private static Guid[] AuthorizePredicates(IReadOnlyList<PreparedIndexedCondition> conditions, SearchQueryStateFacts facts, bool mayQuery, bool plaintextPermitted)
+    private static Guid[] AuthorizePredicates(IReadOnlyList<PreparedIndexedCondition> conditions, SearchQueryStateFacts facts, bool mayQuery, bool plaintextPermitted, HashSet<Guid> ineffective)
     {
+        // C-188: an Active approval that is not effective now (a retained one failing its conditions, or - BF-1 - any approval of a form whose
+        // publication is pending registration) is treated exactly like no approval (same denial).
         var active = mayQuery && plaintextPermitted && facts.FormLifecycleState == ResourceLifecycleStates.Active
-            ? facts.Approvals.Where(a => a.ApprovalStateName == FieldSearchApprovalStates.Active).GroupBy(a => a.FieldDefinitionId).ToDictionary(g => g.Key, g => g.ToList())
+            ? facts.Approvals.Where(a => a.ApprovalStateName == FieldSearchApprovalStates.Active && !ineffective.Contains(a.FieldSearchApprovalId)).GroupBy(a => a.FieldDefinitionId).ToDictionary(g => g.Key, g => g.ToList())
             : [];
         // Pass 1, every condition (V1 order): field, value type, operator, option. Only then pass 2: coverage, so an authorization
         // refusal is never masked by a not-ready answer for an earlier condition.

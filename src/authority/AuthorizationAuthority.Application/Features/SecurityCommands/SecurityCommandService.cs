@@ -9,7 +9,7 @@ using AuthorizationAuthority.Domain.Features.SecurityCommands;
 namespace AuthorizationAuthority.Application.Features.SecurityCommands;
 
 /// <summary>Authoritative security-commit point (CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md §2 "Command sequence").</summary>
-public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock, FieldSearchApprovalGate approvalGate, AuthorizationAuthority.Application.Features.SearchIndex.SearchIndexWriter? searchIndex = null, IOperationTimingObserver? timing = null)
+public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock, FieldSearchApprovalGate approvalGate, AuthorizationAuthority.Application.Features.SearchIndex.SearchIndexWriter? searchIndex = null, IOperationTimingObserver? timing = null, FormPublicationAbandonmentVerifier? abandonmentVerifier = null)
 {
     public async Task<OperationStatus> SubmitAsync(VerifiedActor actor, SecurityCommandRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken)
     {
@@ -80,7 +80,7 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             var graph = new DesiredStateGraph(edges);
             graphMs = timer.ElapsedMilliseconds - graphStarted;
             var planStarted = timer.ElapsedMilliseconds;
-            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate, command.CommandCreatedOn).ConfigureAwait(false);
+            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate, command.CommandCreatedOn, abandonmentVerifier).ConfigureAwait(false);
             command.CommandPayloadJson = plan.NormalizedPayloadJson;
             if (plan.CommandReasonOverride is { } reasonOverride)
             {
@@ -114,7 +114,8 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             command.CommandStateName = SecurityCommandStates.Rejected;
             command.RejectionReasonCode = ex.ErrorCode;
             scope.AddCommand(command);
-            if (request.CommandKind is SecurityCommandKind.ApproveFieldSearch or SecurityCommandKind.WithdrawFieldSearch or SecurityCommandKind.UpdateFieldSearchers or SecurityCommandKind.RegisterPublishedFormVersion)
+            if (request.CommandKind is SecurityCommandKind.ApproveFieldSearch or SecurityCommandKind.WithdrawFieldSearch or SecurityCommandKind.UpdateFieldSearchers or SecurityCommandKind.RegisterPublishedFormVersion
+                or SecurityCommandKind.PrepareFormVersionPublication or SecurityCommandKind.ResolveFormVersionPublication)
             {
                 // OD-8: refused AC-6 decisions are also hash-chained, archived evidence on the audit stream (no values, no predicates).
                 AuditJournal.Append(scope, state, "FieldSearchCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), form_definition_id = request.Resource.ResourceId, actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, rejection_detail = ex.ErrorCode is AuthorityErrorCodes.FieldSearchNotEligible ? ex.Message : null, correlation_id = correlationId }, clock);
@@ -266,6 +267,26 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
         {
             approval.ChangedBySecurityCommandId = command.SecurityCommandId;
             approval.StateChangedOn = now;
+        }
+
+        foreach (var resolved in plan.ResolvedPublications)
+        {
+            resolved.ResolvedBySecurityCommandId = command.SecurityCommandId;
+            resolved.ResolvedOn = now;
+        }
+
+        if (plan.NewPublication is { } publication)
+        {
+            publication.PreparedBySecurityCommandId = command.SecurityCommandId;
+            publication.PreparedOn = now;
+            scope.AddFormVersionPublication(publication);
+        }
+
+        foreach (var binding in plan.NewFieldFormBindings)
+        {
+            binding.BoundBySecurityCommandId = command.SecurityCommandId;
+            binding.BoundOn = now;
+            scope.AddFieldFormBinding(binding);
         }
 
         if (plan.SearchPolicyToAdvance is { } searchPolicy)

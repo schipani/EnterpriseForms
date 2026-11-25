@@ -117,7 +117,9 @@ export function AdvancedFieldSearch({ formSelected, capabilities, loading, loadF
             <StatusMessage tone="info" title="Advanced field search is not available yet">
               {unavailableReason === "TRUSTED_SEARCH_NOT_ENABLED"
                 ? "Searching inside records is turned off until the Authorization Authority can verify that results are complete and that only approved fields are searched. Nothing is searched here. To find one record, use Search records above with its reference or ID."
-                : "Searching inside the records of this form is not available. To find one record, use Search records above with its reference or ID."}
+                : unavailableReason === "FORM_PUBLICATION_PENDING"
+                  ? "A new version of this form has been published but is not yet registered with the Authorization Authority, so none of its fields can be searched until it is. A designer of the form can retry the registration. To find one record, use Search records above with its reference or ID."
+                  : "Searching inside the records of this form is not available. To find one record, use Search records above with its reference or ID."}
             </StatusMessage>
           </div>
         ) : null}
@@ -203,7 +205,7 @@ function ConditionRow({ number, condition, field, fields, enabled, errors, remov
           label="Field"
           value={condition.fieldDefinitionId}
           placeholder={enabled ? (fields.length > 0 ? "Choose a field" : "No searchable fields") : "No searchable fields"}
-          options={fields.map((candidate) => ({ value: candidate.fieldDefinitionId, label: candidate.displayLabel }))}
+          options={fields.map((candidate) => ({ value: candidate.fieldDefinitionId, label: candidate.inCurrentVersion === false ? `${candidate.displayLabel} (no longer in the form)` : candidate.displayLabel }))}
           disabled={!enabled || fields.length === 0}
           error={errors.field}
           onValueChange={chosen(onFieldChange)}

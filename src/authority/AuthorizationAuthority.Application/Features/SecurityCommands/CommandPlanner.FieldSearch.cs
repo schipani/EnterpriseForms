@@ -11,42 +11,154 @@ namespace AuthorizationAuthority.Application.Features.SecurityCommands;
 public static partial class CommandPlanner
 {
     /// <summary>
-    /// OD-3: records a newly published form version (designer of the form or an organization administrator). Version
-    /// numbers only increase; a field the Authority knows to be encrypted cannot be declared Standard. Active approvals of
-    /// fields whose recorded entry changed, or that are no longer in the version, are invalidated in the same revision.
+    /// OD-3: records a newly published form version in one step (the C7 path, kept for compatibility; designer of the form or an
+    /// organization administrator). Version numbers only increase; a field the Authority knows to be encrypted cannot be declared
+    /// Standard. Active approvals of fields whose recorded entry changed, or that are no longer in the version, are invalidated in the
+    /// same revision.
+    /// <para>C-188 BF-1: refused while a publication of the form is pending (<c>FORM_PUBLICATION_PENDING</c>): only its resolution ends the
+    /// fail-closed state. The business publish path uses <see cref="PrepareFormVersionPublicationAsync"/> before it commits and
+    /// <see cref="ResolveFormVersionPublicationAsync"/> after, so a version it commits is never current without the Authority knowing.</para>
     /// </summary>
-    private static async Task<CommandPlan> RegisterPublishedFormVersionAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
+    private static async Task<CommandPlan> RegisterPublishedFormVersionAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, FieldSearchApprovalGate gate, CancellationToken cancellationToken)
     {
         var payload = CanonicalJson.Deserialize<RegisterPublishedFormVersionPayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.FormDefinition, payload.FormDefinitionId);
-        await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.FormDefinition, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false);
+        var digest = await ValidatePublicationAsync(scope, organizationId, actor, graph, payload.FormDefinitionId, payload.FormVersionNumber, payload.LayoutDigestHex, payload.Fields, payload.FormTitle, cancellationToken).ConfigureAwait(false);
+        await RequireNoPendingPublicationAsync(scope, organizationId, payload.FormDefinitionId, "one-step registration", cancellationToken).ConfigureAwait(false);
+        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
+        await PlanRegistrationAsync(scope, organizationId, payload.FormDefinitionId, payload.FormVersionNumber, digest, payload.Fields, payload.FormTitle, gate, plan, cancellationToken).ConfigureAwait(false);
+        return plan;
+    }
+
+    /// <summary>
+    /// C-188 BF-1: stages the version a business publish request is about to commit, <b>before</b> it commits, with the same validation as
+    /// a registration (design permission, entries, encryption cross-check, strictly increasing number, field-to-form binding), so a version
+    /// that could never be registered is refused while the business can still roll back. From this revision until the publication is
+    /// resolved, no approval of the form confers search (<see cref="RetainedFieldApprovals.IneffectiveAsync"/>) and new approvals are
+    /// refused: the Authority cannot know whether the business has made the new layout current, so field search on the form fails closed.
+    /// <para>C-191: refused while a publication of the form is pending (<c>FORM_PUBLICATION_PENDING</c>), including a repeated prepare of
+    /// the same version and another version with the same number. A pending publication is never superseded: it may already be committed
+    /// and current in the business, and a later prepare that replaced it could be registered (skipping its D-H3/D-H4 consequences) or
+    /// abandoned (lifting the barrier onto the previous registered manifest). Only <see cref="ResolveFormVersionPublicationAsync"/> naming
+    /// it exactly ends the pending state.</para>
+    /// </summary>
+    private static async Task<CommandPlan> PrepareFormVersionPublicationAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
+    {
+        var payload = CanonicalJson.Deserialize<PrepareFormVersionPublicationPayload>(request.CommandPayload);
+        RequireResource(request, ResourceKind.FormDefinition, payload.FormDefinitionId);
+        if (payload.FormVersionId == Guid.Empty)
+        {
+            throw AuthorityException.Invalid("form_version_id is required");
+        }
+
+        var digest = await ValidatePublicationAsync(scope, organizationId, actor, graph, payload.FormDefinitionId, payload.FormVersionNumber, payload.LayoutDigestHex, payload.Fields, payload.FormTitle, cancellationToken).ConfigureAwait(false);
+        // C-191: a pending publication of the form is resolved first, never superseded.
+        await RequireNoPendingPublicationAsync(scope, organizationId, payload.FormDefinitionId, "staging another version", cancellationToken).ConfigureAwait(false);
+        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
+
+        // D-H7 is checked now, so a version that can never be registered is refused before the business commits it; the bindings themselves
+        // are written only when the publication is registered.
+        var probe = new CommandPlan();
+        foreach (var field in payload.Fields)
+        {
+            await RequireFieldFormBindingAsync(scope, organizationId, field.FieldDefinitionId, payload.FormDefinitionId, probe, FieldFormBindingSources.VersionRegistration, cancellationToken).ConfigureAwait(false);
+        }
+
+        plan.NewPublication = new FormVersionPublication
+        {
+            FormVersionPublicationId = Guid.CreateVersion7(),
+            OrganizationId = organizationId,
+            FormDefinitionId = payload.FormDefinitionId,
+            FormVersionNumber = payload.FormVersionNumber,
+            BusinessFormVersionId = payload.FormVersionId,
+            LayoutDigest = digest,
+            FieldManifestJson = FieldSearchRules.WriteManifest(payload.Fields),
+            FormTitleSnapshot = string.IsNullOrWhiteSpace(payload.FormTitle) ? null : payload.FormTitle.Trim(),
+            PublicationStateName = FormVersionPublicationStates.Pending,
+        };
+
+        await AdvanceSearchPolicyAsync(scope, organizationId, plan, cancellationToken).ConfigureAwait(false);
+        return plan;
+    }
+
+    /// <summary>
+    /// C-188 BF-1: resolves the form's pending publication, which must be exactly the named one (business version id, number and layout
+    /// digest; otherwise <c>FORM_PUBLICATION_NOT_PENDING</c>). <c>Registered</c>: the Authority registers the manifest it staged at prepare
+    /// time - never one rebuilt later from business rows (OD-3) - after re-validating it against its current facts (an encryption
+    /// requirement or a later registered version recorded meanwhile refuses it and the form stays pending). <c>Abandoned</c>: the business
+    /// never committed it; nothing is registered. Either way the form's approvals are judged again from the latest registered version.
+    /// <para>C-191: <c>Abandoned</c> is accepted only with the business publication coordinator's attestation that the version was never
+    /// committed (<see cref="FormPublicationAbandonmentVerifier"/>); design permission alone leaves the publication pending
+    /// (<c>FORM_PUBLICATION_ABANDONMENT_UNVERIFIED</c>). The staged manifest is never changed by either resolution.</para>
+    /// </summary>
+    private static async Task<CommandPlan> ResolveFormVersionPublicationAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, FieldSearchApprovalGate gate, FormPublicationAbandonmentVerifier abandonment, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var payload = CanonicalJson.Deserialize<ResolveFormVersionPublicationPayload>(request.CommandPayload);
+        RequireResource(request, ResourceKind.FormDefinition, payload.FormDefinitionId);
         if (!graph.CanDesignForm(actor.AuthorityUserId, payload.FormDefinitionId) && !IsOrganizationAdministrator(graph, organizationId, actor.AuthorityUserId))
+        {
+            throw AuthorityException.Forbidden("resolving a form publication requires design permission on the form");
+        }
+
+        if (payload.Resolution is not (FormVersionPublicationResolutions.Registered or FormVersionPublicationResolutions.Abandoned))
+        {
+            throw AuthorityException.Invalid("resolution must be Registered or Abandoned");
+        }
+
+        var digest = ParseLayoutDigest(payload.LayoutDigestHex);
+        var pending = await scope.FindPendingFormVersionPublicationAsync(organizationId, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false);
+        if (pending is null || pending.BusinessFormVersionId != payload.FormVersionId || pending.FormVersionNumber != payload.FormVersionNumber || !pending.LayoutDigest.AsSpan().SequenceEqual(digest))
+        {
+            throw new AuthorityException(AuthorityErrorCodes.FormPublicationNotPending, 409, false, "this publication is not the form's pending publication");
+        }
+
+        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
+        if (payload.Resolution == FormVersionPublicationResolutions.Registered)
+        {
+            if (payload.Attestation is not null)
+            {
+                throw AuthorityException.Invalid("a registration carries no abandonment attestation");
+            }
+
+            var fields = FieldSearchRules.ReadManifest(pending.FieldManifestJson);
+            await ValidatePublicationAsync(scope, organizationId, actor, graph, payload.FormDefinitionId, pending.FormVersionNumber, Convert.ToHexStringLower(pending.LayoutDigest), fields, pending.FormTitleSnapshot, cancellationToken).ConfigureAwait(false);
+            await PlanRegistrationAsync(scope, organizationId, payload.FormDefinitionId, pending.FormVersionNumber, pending.LayoutDigest, fields, pending.FormTitleSnapshot, gate, plan, cancellationToken).ConfigureAwait(false);
+            pending.PublicationStateName = FormVersionPublicationStates.Registered;
+        }
+        else
+        {
+            // C-191: only the publication coordinator's attestation establishes that the business never committed this version.
+            abandonment.RequireNonCommitment(organizationId, pending, payload.Attestation, now);
+            pending.PublicationStateName = FormVersionPublicationStates.Abandoned;
+            await AdvanceSearchPolicyAsync(scope, organizationId, plan, cancellationToken).ConfigureAwait(false);
+        }
+
+        plan.ResolvedPublications.Add(pending);
+        return plan;
+    }
+
+    /// <summary>The checks shared by one-step registration, prepare and the registration of a staged publication. Returns the layout digest.</summary>
+    private static async Task<byte[]> ValidatePublicationAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, DesiredStateGraph graph, Guid formDefinitionId, int formVersionNumber, string? layoutDigestHex, IReadOnlyList<PublishedFieldEntry>? fields, string? formTitle, CancellationToken cancellationToken)
+    {
+        await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.FormDefinition, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        if (!graph.CanDesignForm(actor.AuthorityUserId, formDefinitionId) && !IsOrganizationAdministrator(graph, organizationId, actor.AuthorityUserId))
         {
             throw AuthorityException.Forbidden("registering a published form version requires design permission on the form");
         }
 
-        if (payload.FormVersionNumber < 1 || payload.LayoutDigestHex is not { Length: 64 } || payload.Fields is null || payload.Fields.Count > 1000
-            || payload.Fields.Select(f => f.FieldDefinitionId).Distinct().Count() != payload.Fields.Count)
+        if (formVersionNumber < 1 || layoutDigestHex is not { Length: 64 } || fields is null || fields.Count > 1000
+            || fields.Select(f => f.FieldDefinitionId).Distinct().Count() != fields.Count)
         {
             throw AuthorityException.Invalid("form_version_number >= 1, a 64-hex layout digest and unique field entries (at most 1000) are required");
         }
 
-        if (payload.FormTitle is { Length: > 300 })
+        if (formTitle is { Length: > 300 })
         {
             throw AuthorityException.Invalid("form_title is at most 300 characters");
         }
 
-        byte[] digest;
-        try
-        {
-            digest = Convert.FromHexString(payload.LayoutDigestHex);
-        }
-        catch (FormatException)
-        {
-            throw AuthorityException.Invalid("layout_digest_hex must be hexadecimal");
-        }
-
-        foreach (var field in payload.Fields)
+        var digest = ParseLayoutDigest(layoutDigestHex);
+        foreach (var field in fields)
         {
             FieldSearchRules.ValidateEntry(field);
             var facts = await FieldSearchRules.ReadProtectionFactsAsync(scope, organizationId, field.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
@@ -56,42 +168,114 @@ public static partial class CommandPlanner
             }
         }
 
-        var latest = await scope.FindLatestPublishedFormVersionAsync(organizationId, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false);
-        if (latest is not null && payload.FormVersionNumber <= latest.FormVersionNumber)
+        var latest = await scope.FindLatestPublishedFormVersionAsync(organizationId, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        if (latest is not null && formVersionNumber <= latest.FormVersionNumber)
         {
             throw new AuthorityException(AuthorityErrorCodes.FormVersionUntrusted, 409, false, "a version with this number or a later one is already registered");
         }
 
-        var manifest = FieldSearchRules.WriteManifest(payload.Fields);
-        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
+        return digest;
+    }
+
+    private static byte[] ParseLayoutDigest(string? layoutDigestHex)
+    {
+        if (layoutDigestHex is not { Length: 64 })
+        {
+            throw AuthorityException.Invalid("layout_digest_hex must be 64 hexadecimal characters");
+        }
+
+        try
+        {
+            return Convert.FromHexString(layoutDigestHex);
+        }
+        catch (FormatException)
+        {
+            throw AuthorityException.Invalid("layout_digest_hex must be hexadecimal");
+        }
+    }
+
+    /// <summary>C-188 BF-1: refuses <paramref name="what"/> while a publication of the form is pending (only its resolution ends that state).</summary>
+    private static async Task RequireNoPendingPublicationAsync(IAuthorityScope scope, Guid organizationId, Guid formDefinitionId, string what, CancellationToken cancellationToken)
+    {
+        if (await scope.FindPendingFormVersionPublicationAsync(organizationId, formDefinitionId, cancellationToken).ConfigureAwait(false) is not null)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.FormPublicationPending, 409, false, $"a publication of this form is pending registration; {what} is refused until it is resolved");
+        }
+    }
+
+    /// <summary>
+    /// Records the version and applies its consequences to the form's approvals in this revision.
+    /// <para>C-188: every field entry is bound to this form (a field bound to another form refuses the whole registration,
+    /// FIELD_BOUND_TO_ANOTHER_FORM). A RetainedField approval stays as it is while its field is still absent; when the field
+    /// returns it becomes a CurrentVersion approval only if retained approvals are enabled, the entry is unchanged and the field
+    /// is still eligible (D-H4) - otherwise it is invalidated. Withdrawn and Invalidated approvals are never touched.</para>
+    /// </summary>
+    private static async Task PlanRegistrationAsync(IAuthorityScope scope, Guid organizationId, Guid formDefinitionId, int formVersionNumber, byte[] digest, IReadOnlyList<PublishedFieldEntry> fields, string? formTitle, FieldSearchApprovalGate gate, CommandPlan plan, CancellationToken cancellationToken)
+    {
         plan.PublishedVersion = new PublishedFormVersion
         {
             PublishedFormVersionId = Guid.CreateVersion7(),
             OrganizationId = organizationId,
-            FormDefinitionId = payload.FormDefinitionId,
-            FormVersionNumber = payload.FormVersionNumber,
+            FormDefinitionId = formDefinitionId,
+            FormVersionNumber = formVersionNumber,
             LayoutDigest = digest,
-            FieldManifestJson = manifest,
-            FormTitleSnapshot = string.IsNullOrWhiteSpace(payload.FormTitle) ? null : payload.FormTitle.Trim(),
+            FieldManifestJson = FieldSearchRules.WriteManifest(fields),
+            FormTitleSnapshot = string.IsNullOrWhiteSpace(formTitle) ? null : formTitle.Trim(),
         };
 
-        var entries = payload.Fields.ToDictionary(f => f.FieldDefinitionId);
-        foreach (var approval in await ActiveApprovalsAsync(scope, organizationId, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false))
+        // C-188 (D-H7): every placed field belongs to this form and to no other.
+        foreach (var field in fields)
         {
-            if (!entries.TryGetValue(approval.FieldDefinitionId, out var entry) || !SameApprovedEntry(approval, entry))
+            await RequireFieldFormBindingAsync(scope, organizationId, field.FieldDefinitionId, formDefinitionId, plan, FieldFormBindingSources.VersionRegistration, cancellationToken).ConfigureAwait(false);
+        }
+
+        var entries = fields.ToDictionary(f => f.FieldDefinitionId);
+        OrganizationProtectionPolicy? policy = null;
+        foreach (var approval in await ActiveApprovalsAsync(scope, organizationId, formDefinitionId, cancellationToken).ConfigureAwait(false))
+        {
+            var present = entries.TryGetValue(approval.FieldDefinitionId, out var entry);
+            if (approval.ApprovalScopeName == FieldSearchApprovalScopes.RetainedField)
             {
-                Invalidate(plan, approval, FieldSearchInvalidationReasons.FormVersionChanged);
+                if (!present)
+                {
+                    continue; // still not in the form: the retained approval is unchanged
+                }
+
+                // D-H4: the field returns. Convert only when enabled, unchanged and still eligible; otherwise invalidate. Never revive.
+                if (!gate.RetainedFieldApprovalsEnabled || !SameApprovedEntry(approval, entry!))
+                {
+                    Invalidate(plan, approval, FieldSearchInvalidationReasons.FormVersionChanged);
+                    continue;
+                }
+
+                policy ??= await scope.FindProtectionPolicyAsync(organizationId, cancellationToken).ConfigureAwait(false);
+                var facts = await FieldSearchRules.ReadProtectionFactsAsync(scope, organizationId, approval.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
+                var eligibility = FieldSearchRules.Eligibility(entry!, policy, facts);
+                if (eligibility != FieldSearchEligibility.Eligible)
+                {
+                    Invalidate(plan, approval, RetainedFieldApprovals.InvalidationReasonFor(eligibility));
+                    continue;
+                }
+
+                approval.ApprovalScopeName = FieldSearchApprovalScopes.CurrentVersion;
+                approval.SourceFormVersionNumber = null;
+                approval.ApprovedFormVersionNumber = formVersionNumber;
+                approval.ApprovedLayoutDigest = digest;
+                plan.ChangedApprovals.Add(approval);
+            }
+            else if (!present || !SameApprovedEntry(approval, entry!))
+            {
+                Invalidate(plan, approval, FieldSearchInvalidationReasons.FormVersionChanged); // D-H3: removal still invalidates a current-version approval
             }
             else
             {
-                approval.ApprovedFormVersionNumber = payload.FormVersionNumber; // unchanged entry: the approval carries over to the new version
+                approval.ApprovedFormVersionNumber = formVersionNumber; // unchanged entry: the approval carries over to the new version
                 approval.ApprovedLayoutDigest = digest;
                 plan.ChangedApprovals.Add(approval);
             }
         }
 
         await AdvanceSearchPolicyAsync(scope, organizationId, plan, cancellationToken).ConfigureAwait(false);
-        return plan;
     }
 
     /// <summary>
@@ -113,11 +297,48 @@ public static partial class CommandPlanner
             throw AuthorityException.Invalid("approval_reference (1..200 characters) identifying the governance decision is required");
         }
 
+        var approvalScope = payload.ApprovalScope ?? FieldSearchApprovalScopes.CurrentVersion;
+        if (!FieldSearchApprovalScopes.IsKnown(approvalScope))
+        {
+            throw AuthorityException.Invalid("approval_scope must be CurrentVersion or RetainedField");
+        }
+
+        if (approvalScope == FieldSearchApprovalScopes.RetainedField && !gate.RetainedFieldApprovalsEnabled)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.RetainedFieldApprovalsDisabled, 422, false, "approvals of fields that are no longer in the form are disabled in this environment");
+        }
+
         await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.FormDefinition, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false);
+        // C-188 BF-1: while a publication of the form awaits registration the Authority does not know the form's current layout.
+        await RequireNoPendingPublicationAsync(scope, organizationId, payload.FormDefinitionId, "approving field search", cancellationToken).ConfigureAwait(false);
         var latest = await scope.FindLatestPublishedFormVersionAsync(organizationId, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false)
                      ?? throw new AuthorityException(AuthorityErrorCodes.FormVersionUntrusted, 422, false, "no published version of this form is registered with the Authority; publish the form again");
-        var entry = FieldSearchRules.ReadManifest(latest).FirstOrDefault(f => f.FieldDefinitionId == payload.FieldDefinitionId)
-                    ?? throw new AuthorityException(AuthorityErrorCodes.FormVersionUntrusted, 422, false, "the field is not part of the latest registered version of the form");
+        var inLatest = FieldSearchRules.ReadManifest(latest).FirstOrDefault(f => f.FieldDefinitionId == payload.FieldDefinitionId);
+        var source = latest;
+        PublishedFieldEntry entry;
+        if (approvalScope == FieldSearchApprovalScopes.CurrentVersion)
+        {
+            entry = inLatest ?? throw new AuthorityException(AuthorityErrorCodes.FormVersionUntrusted, 422, false, "the field is not part of the latest registered version of the form");
+        }
+        else
+        {
+            if (inLatest is not null)
+            {
+                throw new AuthorityException(AuthorityErrorCodes.FormVersionUntrusted, 422, false, "the field is part of the latest registered version; approve it for the current version");
+            }
+
+            // D-H14: bound to the most recent registered version that placed the field; a field only in unregistered versions is refused.
+            var placed = (await scope.GetPublishedFormVersionsAsync(organizationId, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false))
+                .Select(v => (Version: v, Entry: FieldSearchRules.ReadManifest(v).FirstOrDefault(f => f.FieldDefinitionId == payload.FieldDefinitionId)))
+                .FirstOrDefault(x => x.Entry is not null);
+            if (placed.Entry is null)
+            {
+                throw new AuthorityException(AuthorityErrorCodes.FormVersionUntrusted, 422, false, "the field was never part of a registered version of this form");
+            }
+
+            (source, entry) = (placed.Version, placed.Entry);
+        }
+
         var policy = await scope.FindProtectionPolicyAsync(organizationId, cancellationToken).ConfigureAwait(false);
         var facts = await FieldSearchRules.ReadProtectionFactsAsync(scope, organizationId, payload.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
         var eligibility = FieldSearchRules.Eligibility(entry, policy, facts);
@@ -133,6 +354,7 @@ public static partial class CommandPlanner
         }
 
         var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload with { ApprovalReference = payload.ApprovalReference.Trim(), StepUpEvidence = null }) };
+        await RequireFieldFormBindingAsync(scope, organizationId, payload.FieldDefinitionId, payload.FormDefinitionId, plan, FieldFormBindingSources.VersionRegistration, cancellationToken).ConfigureAwait(false);
         foreach (var previous in await ActiveApprovalsAsync(scope, organizationId, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false))
         {
             if (previous.FieldDefinitionId == payload.FieldDefinitionId)
@@ -149,8 +371,8 @@ public static partial class CommandPlanner
             OrganizationId = organizationId,
             FormDefinitionId = payload.FormDefinitionId,
             FieldDefinitionId = payload.FieldDefinitionId,
-            ApprovedFormVersionNumber = latest.FormVersionNumber,
-            ApprovedLayoutDigest = latest.LayoutDigest,
+            ApprovedFormVersionNumber = source.FormVersionNumber,
+            ApprovedLayoutDigest = source.LayoutDigest,
             ApprovedFieldDataType = entry.FieldDataType,
             ApprovedFieldClassification = entry.FieldClassification,
             ApprovedProtectionMode = entry.ProtectionMode,
@@ -159,6 +381,8 @@ public static partial class CommandPlanner
             ApprovedOptionSnapshotJson = FieldSearchRules.WriteOptions(entry.Options),
             ApprovalReferenceText = payload.ApprovalReference.Trim(),
             ApprovalStateName = FieldSearchApprovalStates.Active,
+            ApprovalScopeName = approvalScope,
+            SourceFormVersionNumber = approvalScope == FieldSearchApprovalScopes.RetainedField ? source.FormVersionNumber : null,
         });
         await AdvanceSearchPolicyAsync(scope, organizationId, plan, cancellationToken).ConfigureAwait(false);
         return plan;
@@ -269,6 +493,37 @@ public static partial class CommandPlanner
         if (plan.ChangedApprovals.Count > 0)
         {
             await AdvanceSearchPolicyAsync(scope, organizationId, plan, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// C-188 (D-H7, D-H13): the field must belong to <paramref name="formDefinitionId"/> - bound earlier in this command, bound in the
+    /// store, or (first naming) bound now. A field bound to another form refuses the command; the binding is never moved.
+    /// </summary>
+    private static async Task RequireFieldFormBindingAsync(IAuthorityScope scope, Guid organizationId, Guid fieldDefinitionId, Guid formDefinitionId, CommandPlan plan, string source, CancellationToken cancellationToken)
+    {
+        var bound = plan.NewFieldFormBindings.FirstOrDefault(b => b.FieldDefinitionId == fieldDefinitionId)?.FormDefinitionId
+                    ?? (await scope.FindFieldFormBindingAsync(organizationId, fieldDefinitionId, cancellationToken).ConfigureAwait(false))?.FormDefinitionId;
+        if (bound is { } existing && existing != formDefinitionId)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.FieldBoundToAnotherForm, 422, false, "the field belongs to another form");
+        }
+
+        if (bound is null)
+        {
+            plan.NewFieldFormBindings.Add(new FieldFormBinding { OrganizationId = organizationId, FieldDefinitionId = fieldDefinitionId, FormDefinitionId = formDefinitionId, BindingSourceName = source });
+        }
+    }
+
+    /// <summary>
+    /// C-188 (D-H13): a protection resource of the field (requirement, release, reclassification) that records a form must record this
+    /// one. A resource without a recorded form carries no evidence either way; the field-to-form binding then decides.
+    /// </summary>
+    private static void RequireSameFormResource(AuthorityResource? resource, Guid formDefinitionId)
+    {
+        if (resource?.ParentResourceEntityId is { } recorded && recorded != formDefinitionId)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.FieldBoundToAnotherForm, 422, false, "the field's protection record belongs to another form");
         }
     }
 

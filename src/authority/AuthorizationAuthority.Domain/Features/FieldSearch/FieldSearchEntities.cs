@@ -74,6 +74,110 @@ public sealed class FieldSearchApproval
     public DateTimeOffset ApprovedOn { get; set; }
 
     public DateTimeOffset? StateChangedOn { get; set; }
+
+    /// <summary>
+    /// C-188: <see cref="FieldSearchApprovalScopes.CurrentVersion"/> (the field is in the latest registered version) or
+    /// <see cref="FieldSearchApprovalScopes.RetainedField"/> (an explicit approval to search the latest retained values of a field
+    /// that is no longer in the form). A retained approval may become CurrentVersion only when the field returns unchanged and
+    /// still eligible; never the other way round.
+    /// </summary>
+    public string ApprovalScopeName { get; set; } = FieldSearchApprovalScopes.CurrentVersion;
+
+    /// <summary>C-188: for a RetainedField approval, the most recent registered version that placed the field (whose entry the approval binds); null otherwise.</summary>
+    public int? SourceFormVersionNumber { get; set; }
+}
+
+/// <summary>C-188 (D-H2): the scope of a field search approval.</summary>
+public static class FieldSearchApprovalScopes
+{
+    public const string CurrentVersion = "CurrentVersion";
+    public const string RetainedField = "RetainedField";
+
+    public static bool IsKnown(string? scope) => scope is CurrentVersion or RetainedField;
+}
+
+/// <summary>
+/// C-188 (D-H7, D-H13): the one form a field definition belongs to in this organization's Authority. Written the first time a
+/// version registration or a protection command names the field (or by the C-188 migration from existing records); afterwards
+/// any command naming the field for another form is refused (FIELD_BOUND_TO_ANOTHER_FORM). Never changed or deleted by the runtime.
+/// </summary>
+public sealed class FieldFormBinding
+{
+    public Guid OrganizationId { get; set; }
+
+    public Guid FieldDefinitionId { get; set; }
+
+    public Guid FormDefinitionId { get; set; }
+
+    /// <summary><see cref="FieldFormBindingSources"/>: Backfill (the C-188 migration), VersionRegistration or ProtectionCommand.</summary>
+    public string BindingSourceName { get; set; } = FieldFormBindingSources.VersionRegistration;
+
+    /// <summary>The security command that created the binding; null only for <see cref="FieldFormBindingSources.Backfill"/>.</summary>
+    public Guid? BoundBySecurityCommandId { get; set; }
+
+    public DateTimeOffset BoundOn { get; set; }
+}
+
+/// <summary>
+/// C-188 BF-1: a form version the business is publishing, recorded by <c>PrepareFormVersionPublication</c> <b>before</b> the business
+/// commits it, with the complete field manifest of that publish request. While a publication is <see cref="FormVersionPublicationStates.Pending"/>
+/// no field search approval of the form confers search (capabilities, both engines, open pages, catalogue snapshots) and no new approval is
+/// accepted: the Authority cannot know whether the business has made the new layout current, so it fails closed. Only
+/// <c>ResolveFormVersionPublication</c> ends it - Registered (the staged manifest becomes a registered version; never a later business copy,
+/// OD-3) or Abandoned (the business never committed it). A pending publication is never superseded (C-191): a later prepare of the form is
+/// refused until it is resolved (<c>FORM_PUBLICATION_PENDING</c>), and the database accepts no other state. Terminal rows never change
+/// (trigger <c>trg_form_version_publication_transition</c>).
+/// </summary>
+public sealed class FormVersionPublication
+{
+    public Guid FormVersionPublicationId { get; set; }
+
+    public Guid OrganizationId { get; set; }
+
+    public Guid FormDefinitionId { get; set; }
+
+    public int FormVersionNumber { get; set; }
+
+    /// <summary>The business FormVersionId the publish request created (the business commits it under this id or not at all).</summary>
+    public Guid BusinessFormVersionId { get; set; }
+
+    /// <summary>SHA-256 of the canonical layout JSON (32 bytes).</summary>
+    public byte[] LayoutDigest { get; set; } = [];
+
+    public string FieldManifestJson { get; set; } = "[]";
+
+    public string? FormTitleSnapshot { get; set; }
+
+    public string PublicationStateName { get; set; } = FormVersionPublicationStates.Pending;
+
+    public Guid PreparedBySecurityCommandId { get; set; }
+
+    public DateTimeOffset PreparedOn { get; set; }
+
+    public Guid? ResolvedBySecurityCommandId { get; set; }
+
+    public DateTimeOffset? ResolvedOn { get; set; }
+}
+
+public static class FormVersionPublicationStates
+{
+    public const string Pending = "Pending";
+    public const string Registered = "Registered";
+    public const string Abandoned = "Abandoned";
+}
+
+/// <summary>C-188 BF-1: how a pending publication is resolved.</summary>
+public static class FormVersionPublicationResolutions
+{
+    public const string Registered = "Registered";
+    public const string Abandoned = "Abandoned";
+}
+
+public static class FieldFormBindingSources
+{
+    public const string Backfill = "Backfill";
+    public const string VersionRegistration = "VersionRegistration";
+    public const string ProtectionCommand = "ProtectionCommand";
 }
 
 public static class FieldSearchApprovalStates

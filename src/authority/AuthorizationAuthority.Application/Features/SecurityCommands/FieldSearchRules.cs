@@ -22,6 +22,10 @@ public static class FieldSearchRules
         return JsonSerializer.Deserialize<List<PublishedFieldEntry>>(version.FieldManifestJson, Json) ?? [];
     }
 
+    /// <summary>C-188 BF-1: the entries of a stored manifest (a staged publication's), as written by <see cref="WriteManifest"/>.</summary>
+    public static IReadOnlyList<PublishedFieldEntry> ReadManifest(string fieldManifestJson) =>
+        JsonSerializer.Deserialize<List<PublishedFieldEntry>>(fieldManifestJson, Json) ?? [];
+
     /// <summary>Fields in id order; options keep the published order (what searchers are shown).</summary>
     public static string WriteManifest(IEnumerable<PublishedFieldEntry> fields) =>
         JsonSerializer.Serialize(fields.OrderBy(f => f.FieldDefinitionId).ToList(), Json);

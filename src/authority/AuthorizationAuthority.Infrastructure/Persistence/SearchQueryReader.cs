@@ -27,7 +27,7 @@ public sealed class SearchQueryReader(string? readerConnectionString, IndexedSea
             throw new InvalidOperationException("no search reader connection is configured");
         }
 
-        var contextOptions = new DbContextOptionsBuilder<AuthorityDbContext>().UseNpgsql(readerConnectionString).Options;
+        var contextOptions = new DbContextOptionsBuilder<AuthorityDbContext>().UseNpgsql(FieldSearchScopeConnection.WithScopeAwareness(readerConnectionString)).Options; // C-188 fence
         var context = new AuthorityDbContext(contextOptions);
         try
         {

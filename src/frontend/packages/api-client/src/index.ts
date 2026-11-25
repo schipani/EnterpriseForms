@@ -63,6 +63,7 @@ export type FormDefinitionDetailResponse = S["FormDefinitionDetailResponse"];
 export type FieldDefinitionResponse = S["FieldDefinitionResponse"];
 export type FieldOptionResponse = S["FieldOptionResponse"];
 export type FormVersionResponse = S["FormVersionResponse"];
+export type FormAuthorityRegistrationResponse = S["FormAuthorityRegistrationResponse"];
 export type FormDraftResponse = S["FormDraftResponse"];
 export type RelationshipDefinitionResponse = S["RelationshipDefinitionResponse"];
 export type CreateFormDefinitionV2Request = S["CreateFormDefinitionV2Request"];
@@ -367,6 +368,10 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       versions: (formDefinitionId: string, signal?: AbortSignal) => read<FormVersionResponse[]>("forms.versions", { formDefinitionId }, undefined, "interactive-read", signal),
       /** Phase C9 M2: what publishing the draft at this revision would change (read-only). */
       publishImpact: (formDefinitionId: string, expectedDraftRevision: number, signal?: AbortSignal) => read<PublishImpactResponse>("forms.publishImpact", { formDefinitionId }, { expectedDraftRevision }, "interactive-read", signal),
+      /** C-188 BF-1: whether the current published version is registered with the Authority (designers only). */
+      authorityRegistration: (formDefinitionId: string, signal?: AbortSignal) => read<FormAuthorityRegistrationResponse>("forms.authorityRegistration", { formDefinitionId }, undefined, "interactive-read", signal),
+      /** C-188 BF-1: completes or withdraws a pending registration without publishing again (idempotent, audited). */
+      recoverAuthorityRegistration: (formDefinitionId: string) => write<FormAuthorityRegistrationResponse>("POST", "forms.recoverAuthorityRegistration", { formDefinitionId }, {}, { resourceKey: `form:${formDefinitionId}` }),
       /** Phase C9 M2: semantic comparison; `from`/`to` are version ids or "draft". */
       compareVersions: (formDefinitionId: string, from: string, to: string, signal?: AbortSignal) => read<VersionComparisonResponse>("forms.compareVersions", { formDefinitionId }, { from, to }, "interactive-read", signal),
       createRelationship: (formDefinitionId: string, request: CreateRelationshipDefinitionRequest) => write<RelationshipDefinitionResponse>("POST", "forms.createRelationship", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),

@@ -4314,6 +4314,15 @@
               "string"
             ],
             "format": "int32"
+          },
+          "retained_approval_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
           }
         }
       },
@@ -4440,6 +4449,10 @@
           "correlation_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "publication_pending": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -4485,6 +4498,20 @@
             "items": {
               "$ref": "#/components/schemas/FormAccessSubject"
             }
+          },
+          "retained_field_approvals_enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "pending_publication": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PendingFormVersionPublication"
+              }
+            ]
           }
         }
       },
@@ -4558,6 +4585,25 @@
             "items": {
               "type": "string"
             }
+          },
+          "in_current_version": {
+            "type": "boolean",
+            "default": true
+          },
+          "last_placed_version_number": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approval_scope": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -8407,6 +8453,43 @@
           }
         }
       },
+      "PendingFormVersionPublication": {
+        "required": [
+          "form_version_id",
+          "form_version_number",
+          "layout_digest_hex",
+          "prepared_on"
+        ],
+        "type": "object",
+        "properties": {
+          "form_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_version_number": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "layout_digest_hex": {
+            "type": "string"
+          },
+          "prepared_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "form_version_publication_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
       "PermissionCheckBatchRequest": {
         "required": [
           "checks"
@@ -10514,6 +10597,10 @@
               "string"
             ],
             "format": "int32"
+          },
+          "in_current_version": {
+            "type": "boolean",
+            "default": true
           }
         }
       },
@@ -11663,7 +11750,9 @@
           "EnableIdentityBinding",
           "RequestOrganizationMembership",
           "CancelOrganizationMembershipRequest",
-          "ReplaceOrganizationMembershipRequest"
+          "ReplaceOrganizationMembershipRequest",
+          "PrepareFormVersionPublication",
+          "ResolveFormVersionPublication"
         ]
       },
       "SecurityCommandOutcome": {

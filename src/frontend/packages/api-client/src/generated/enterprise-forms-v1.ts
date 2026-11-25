@@ -733,8 +733,42 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Atomically publishes the draft as an immutable version and advances the current pointer (expected draft revision + current version number). */
+        /** Atomically publishes the draft as an immutable version and advances the current pointer (expected draft revision + current version number). C-188 BF-1: the Authority stages the version first (503 AUTHORITY_UNAVAILABLE or the Authority's refusal code when it cannot or will not; nothing is then published); authorityRegistrationPending true means the version is published but not yet registered, so field search on the form is unavailable until registration is recovered. */
         post: operations["PublishFormVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/authority-registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** C-188 BF-1: whether the form's current published version is registered with the Authorization Authority (Registered, Pending, NotRegistered, NotPublished). Requires the Authority design permission on the form (404 otherwise); 503 AUTHORITY_UNAVAILABLE. */
+        get: operations["GetFormAuthorityRegistration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/authority-registration/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** C-188 BF-1: completes a pending registration without publishing again - registers the version the Authority staged when this store committed it (its layout must still have the staged digest), or withdraws a staged version that was never committed. Idempotent; audited; requires the Authority design permission on the form (404 otherwise). Outcome AlreadyRegistered, Registered, Abandoned, NotRecoverable (publish again) or Refused (failureReason). */
+        post: operations["RecoverFormAuthorityRegistration"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2292,6 +2326,7 @@ export interface components {
             approvalReference: null | string;
             /** @default false */
             useDevelopmentStepUp: boolean;
+            approvalScope?: null | string;
         };
         AuditAccessEvidenceResponse: {
             /** Format: int64 */
@@ -2996,6 +3031,11 @@ export interface components {
             activeApprovalCount: number | string;
             /** Format: int32 */
             invalidatedApprovalCount: number | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            retainedApprovalCount: number | string;
         };
         FieldSearchAdministrationResponse: {
             plaintextSearchPermitted: boolean;
@@ -3027,6 +3067,8 @@ export interface components {
             minimumTextLength: null | number | string;
             /** Format: int32 */
             maximumTextLength: null | number | string;
+            /** @default true */
+            inCurrentVersion: boolean;
         };
         FieldSearchCondition: {
             /** Format: uuid */
@@ -3050,6 +3092,8 @@ export interface components {
             registeredFormVersionNumber: null | number | string;
             fields: components["schemas"]["FieldSearchStatusResponse"][];
             fieldSearchers?: null | components["schemas"]["FormAccessSubjectResponse"][];
+            /** @default false */
+            retainedFieldApprovalsEnabled: boolean;
         };
         FieldSearchNotSearchableField: {
             /** Format: uuid */
@@ -3111,6 +3155,11 @@ export interface components {
             invalidationReason: null | string;
             approvedOperators: string[];
             permittedOperators: string[];
+            /** @default true */
+            inCurrentVersion: boolean;
+            /** Format: int32 */
+            lastPlacedVersionNumber?: null | number | string;
+            approvalScope?: null | string;
         };
         FieldValueResponse: {
             /** Format: uuid */
@@ -3143,6 +3192,19 @@ export interface components {
             /** Format: uuid */
             subjectId: string;
             displayName: string;
+        };
+        FormAuthorityRegistrationResponse: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            /** Format: int32 */
+            currentVersionNumber: null | number | string;
+            /** Format: int32 */
+            registeredVersionNumber: null | number | string;
+            /** Format: int32 */
+            pendingVersionNumber: null | number | string;
+            registrationState: string;
+            outcome?: null | string;
+            failureReason?: null | string;
         };
         FormDefinitionDetailResponse: {
             summary: components["schemas"]["FormDefinitionSummaryResponse"];
@@ -3234,6 +3296,8 @@ export interface components {
             publishedByUserId: string;
             /** @default false */
             authorityRegistered: boolean;
+            /** @default false */
+            authorityRegistrationPending: boolean;
         };
         GroupDefinitionResponse: {
             /** Format: uuid */
@@ -6061,6 +6125,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FormVersionResponse"];
+                };
+            };
+        };
+    };
+    GetFormAuthorityRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormAuthorityRegistrationResponse"];
+                };
+            };
+        };
+    };
+    RecoverFormAuthorityRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormAuthorityRegistrationResponse"];
                 };
             };
         };

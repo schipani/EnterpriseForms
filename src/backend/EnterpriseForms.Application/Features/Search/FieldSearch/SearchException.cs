@@ -37,6 +37,10 @@ public sealed class SearchException(string errorCode, int httpStatusCode, string
         new(SearchErrorCodes.VerificationUnavailable, 503, "the records in scope could not all be verified; no result is returned", retryable, reason);
 
     /// <summary>M0 gate: well-formed requests are refused because trusted execution does not exist; never an empty 200.</summary>
+    /// <summary>C-188 BF-1: the form's latest publication awaits registration with the Authority; nothing on the form is searchable until it is resolved.</summary>
+    public static SearchException FormPublicationPending() =>
+        new(SearchErrorCodes.VerificationUnavailable, 503, "field search on this form is unavailable until its latest published version is registered with the Authority", retryable: false, SearchUnavailableReasons.FormPublicationPending);
+
     public static SearchException TrustedSearchNotEnabled() =>
         new(SearchErrorCodes.VerificationUnavailable, 503, "advanced field-value search is not available: trusted, independently verified execution has not been enabled", retryable: false, SearchUnavailableReasons.TrustedSearchNotEnabled);
 }

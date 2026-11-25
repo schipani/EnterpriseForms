@@ -278,8 +278,9 @@ public static partial class AuditEventCatalog
             [FieldKey]);
         Add(AuditActions.OptionListChanged, "Shared option list changed", "A shared option list was created or changed; fields keep their own copies until they sync.",
             [Count("revision", "List revision"), Count("changes", "Changes"), Count("added", "Options added"), Count("deactivated", "Options deactivated"), Count("items", "Options")]);
-        Add(AuditActions.FormVersionAuthorityRegistered, "Form version registered", "A published form version was registered with the Authorization Authority.", [Count("versionNumber", "Version"), Count("fields", "Fields")]);
-        Add(AuditActions.FormVersionAuthorityRegistrationFailed, "Form version registration failed", "A published form version could not be registered with the Authorization Authority.", [Count("versionNumber", "Version"), Count("fields", "Fields")], [Reason]);
+        Add(AuditActions.FormVersionAuthorityRegistered, "Form version registered", "A published form version was registered with the Authorization Authority.", [Count("versionNumber", "Version"), Count("fields", "Fields"), Code("registrationSource", "Registered by")]);
+        Add(AuditActions.FormVersionAuthorityRegistrationFailed, "Form version registration failed", "A published form version could not be registered with the Authorization Authority; field search on the form stays unavailable until it is.", [Count("versionNumber", "Version"), Count("fields", "Fields"), Code("registrationSource", "Registered by")], [Reason]);
+        Add(AuditActions.FormVersionAuthorityPublicationAbandoned, "Unpublished version withdrawn from the Authority", "A version staged with the Authorization Authority was never published, so it was withdrawn; nothing was registered.", [Count("versionNumber", "Version"), Code("registrationSource", "Withdrawn by")], [Reason]);
 
         // Field protection and governance
         Add(AuditActions.FieldProtectionStrengthened, "Field protection strengthened", "A field's classification or protection was strengthened (audited migration).",
@@ -322,7 +323,7 @@ public static partial class AuditEventCatalog
             [Code("previous.minimumFieldClassification", "Previous minimum classification"), Status("previous.plaintextInternalFieldsPermitted", "Previously: plaintext Internal fields"), Status("previous.plaintextDowngradePermitted", "Previously: encryption release"),
                 Status("previous.plaintextSearchPermitted", "Previously: plaintext search"), Code("minimumFieldClassification", "Minimum classification"), Status("plaintextInternalFieldsPermitted", "Plaintext Internal fields"),
                 Status("plaintextDowngradePermitted", "Encryption release"), Status("plaintextSearchPermitted", "Plaintext search"), Status("loosened", "Loosened"), Count("revision", "Policy revision"), AuthorityCommandId]);
-        Add(AuditActions.FieldSearchApproved, "Field search approved", "Plaintext value search was approved for a field.", [Code("operators", "Operators")], [FreeText("approvalReference", "Approval reference")]);
+        Add(AuditActions.FieldSearchApproved, "Field search approved", "Plaintext value search was approved for a field.", [Code("operators", "Operators"), Code("approvalScope", "Approval scope")], [FreeText("approvalReference", "Approval reference")]);
         Add(AuditActions.FieldSearchWithdrawn, "Field search withdrawn", "A plaintext value search approval was withdrawn for a field.", [], [Reason]);
         Add(AuditActions.FieldSearchersChanged, "Field search access changed", "Who may search the form's fields changed.",
             [Count("grantUsers", "Users granted"), Count("grantTeams", "Teams granted"), Count("revokeUsers", "Users revoked"), Count("revokeTeams", "Teams revoked")]);

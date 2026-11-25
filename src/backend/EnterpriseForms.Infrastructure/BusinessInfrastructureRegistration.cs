@@ -77,6 +77,10 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<VerifiedRecordReader>();
         services.AddSingleton<EnsureIdentityProjectionHandler>();
         services.AddSingleton<CreateFormDefinitionHandler>();
+        // C-191: the publication coordinator's abandonment attestation key (dedicated; distinct from the workload, user-assertion and reconciler
+        // keys; absent => recovery never withdraws a staged version and the publication stays pending).
+        services.AddSingleton(FormPublicationAbandonmentAttestor.Create(configuration[FormPublicationAbandonmentAttestor.ConfigurationKey],
+            [configuration["TrustAuthority:WorkloadSharedKeyBase64"], configuration["UserAuthentication:SharedKeyBase64"], configuration["TeamMembershipReconciler:SharedKeyBase64"]]));
         services.AddSingleton<FormDesignerHandlers>();
         services.AddSingleton<OptionListHandlers>();
         services.AddSingleton<FormAccessHandlers>();

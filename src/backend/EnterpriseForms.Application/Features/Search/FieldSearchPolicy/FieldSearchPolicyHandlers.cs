@@ -38,8 +38,9 @@ public sealed class FieldSearchPolicyHandlers(IBusinessStore store, IAuthorizati
 
         return new FieldSearchConfigurationResponse(formDefinitionId, capabilities.PlaintextSearchPermitted, capabilities.SearchPolicyRevision, configuration.CanApprove, configuration.ApprovalOperational,
             configuration.ApprovalUnavailableReason, configuration.RegisteredFormVersionNumber,
-            configuration.Fields.Select(f => new FieldSearchStatusResponse(f.FieldDefinitionId, f.FieldLabel, f.FieldDataType, f.FieldClassification, f.ProtectionMode, f.Eligibility, f.ApprovalState, f.InvalidationReason, f.ApprovedOperators, f.PermittedOperators)).ToList(),
-            searchers);
+            configuration.Fields.Select(f => new FieldSearchStatusResponse(f.FieldDefinitionId, f.FieldLabel, f.FieldDataType, f.FieldClassification, f.ProtectionMode, f.Eligibility, f.ApprovalState, f.InvalidationReason, f.ApprovedOperators, f.PermittedOperators,
+                f.InCurrentVersion, f.LastPlacedVersionNumber, f.ApprovalScope)).ToList(),
+            searchers, configuration.RetainedFieldApprovalsEnabled);
     }
 
     /// <summary>
@@ -61,7 +62,7 @@ public sealed class FieldSearchPolicyHandlers(IBusinessStore store, IAuthorizati
 
         return new FieldSearchAdministrationResponse(administration.PlaintextSearchPermitted, administration.ApprovalOperational, administration.ApprovalUnavailableReason,
             administration.Forms.Select(f => new FieldSearchAdministrationFormResponse(f.FormDefinitionId, f.FormTitle ?? "Untitled form (publish again to register its title)", f.FormTitle is not null,
-                f.RegisteredFormVersionNumber, f.RegisteredOn, f.FieldCount, f.EligibleFieldCount, f.ActiveApprovalCount, f.InvalidatedApprovalCount)).ToList());
+                f.RegisteredFormVersionNumber, f.RegisteredOn, f.FieldCount, f.EligibleFieldCount, f.ActiveApprovalCount, f.InvalidatedApprovalCount, f.RetainedApprovalCount)).ToList());
     }
 
     public async Task<FieldSearchConfigurationResponse> ApproveAsync(RequestContext context, Guid formDefinitionId, Guid fieldDefinitionId, ApproveFieldSearchRequest request, CancellationToken cancellationToken)
@@ -75,9 +76,10 @@ public sealed class FieldSearchPolicyHandlers(IBusinessStore store, IAuthorizati
             operators = request.Operators ?? [],
             approval_reference = request.ApprovalReference ?? string.Empty,
             step_up_evidence = request.UseDevelopmentStepUp ? SyntheticStepUpMarker : null,
+            approval_scope = string.IsNullOrWhiteSpace(request.ApprovalScope) ? null : request.ApprovalScope, // C-188: the Authority validates the scope
         });
         await SubmitAsync(context, SecurityCommandKind.ApproveFieldSearch, formDefinitionId, payload, "approve field search", $"field-search-approve:{fieldDefinitionId:N}:{Guid.CreateVersion7():N}", cancellationToken).ConfigureAwait(false);
-        await AuditAsync(context, AuditActions.FieldSearchApproved, "plaintext value search approved for a field", formDefinitionId, fieldDefinitionId, new { operators = request.Operators, approvalReference = request.ApprovalReference }, cancellationToken).ConfigureAwait(false);
+        await AuditAsync(context, AuditActions.FieldSearchApproved, "plaintext value search approved for a field", formDefinitionId, fieldDefinitionId, new { operators = request.Operators, approvalReference = request.ApprovalReference, approvalScope = string.IsNullOrWhiteSpace(request.ApprovalScope) ? "CurrentVersion" : request.ApprovalScope }, cancellationToken).ConfigureAwait(false);
         return await GetConfigurationAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
     }
 

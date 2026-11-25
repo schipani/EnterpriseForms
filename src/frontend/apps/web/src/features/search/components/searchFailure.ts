@@ -21,6 +21,9 @@ export function presentSearchFailure(error: unknown): SearchFailure {
       if (reason === "TRUSTED_SEARCH_NOT_ENABLED") {
         return { code: presented.code, title: "Advanced field search is not available yet", message: "Searching inside records stays off until results can be independently verified as complete. Nothing was searched, so this is not a list of matching records.", canRetry: false };
       }
+      if (reason === "FORM_PUBLICATION_PENDING") {
+        return { code: presented.code, title: "This form cannot be searched right now", message: "A new version of this form is not yet registered with the Authorization Authority, so nothing was searched — this is not a list of matching records. A designer of the form can retry the registration.", canRetry: false };
+      }
       if (reason === "SEARCH_CAPACITY_EXCEEDED") {
         return { code: presented.code, title: "Search is busy", message: "Too many verified searches are running right now, so this one was not started. Your conditions are kept — try again in a moment.", canRetry: true };
       }

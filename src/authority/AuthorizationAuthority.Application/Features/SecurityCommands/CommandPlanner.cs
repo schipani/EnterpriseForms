@@ -38,6 +38,15 @@ public sealed class CommandPlan
 
     public List<FieldSearchApproval> ChangedApprovals { get; } = [];
 
+    /// <summary>C-188 (D-H7): field-to-form bindings first established by this command (persisted in its transaction).</summary>
+    public List<FieldFormBinding> NewFieldFormBindings { get; } = [];
+
+    /// <summary>C-188 BF-1: the publication staged by PrepareFormVersionPublication (persisted in its transaction).</summary>
+    public FormVersionPublication? NewPublication { get; set; }
+
+    /// <summary>C-188 BF-1: Pending publications this command resolved (tracked; their resolution is stamped in its transaction).</summary>
+    public List<FormVersionPublication> ResolvedPublications { get; } = [];
+
     /// <summary>IX-1: set by the one caller that applies the search-index coverage changes for these approvals in the same transaction.</summary>
     internal bool SearchIndexChangesAppliedByCaller { get; set; }
 
@@ -99,7 +108,8 @@ public static partial class CommandPlanner
         DesiredStateGraph graph,
         CancellationToken cancellationToken,
         FieldSearchApprovalGate? approvalGate = null,
-        DateTimeOffset? now = null)
+        DateTimeOffset? now = null,
+        FormPublicationAbandonmentVerifier? abandonmentVerifier = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         var at = now ?? DateTimeOffset.UtcNow;
@@ -119,7 +129,9 @@ public static partial class CommandPlanner
             SecurityCommandKind.PublishFormSecurityRevision => await PublishFormSecurityRevisionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateMandatoryPolicy => await UpdateMandatoryPolicyAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.ReclassifyField => await ReclassifyFieldAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.RegisterPublishedFormVersion => await RegisterPublishedFormVersionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.RegisterPublishedFormVersion => await RegisterPublishedFormVersionAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.PrepareFormVersionPublication => await PrepareFormVersionPublicationAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.ResolveFormVersionPublication => await ResolveFormVersionPublicationAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, abandonmentVerifier ?? FormPublicationAbandonmentVerifier.Unconfigured, at, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.ApproveFieldSearch => await ApproveFieldSearchAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.WithdrawFieldSearch => await WithdrawFieldSearchAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateFieldSearchers => await UpdateFieldSearchersAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
@@ -445,6 +457,10 @@ public static partial class CommandPlanner
 
         var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload with { ApprovalReference = payload.ApprovalReference.Trim() }) };
         var existing = await scope.FindResourceAsync(organizationId, ResourceTypeNames.FieldReclassification, payload.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
+        // C-188 (D-H13): the requirement, an earlier reclassification and the field binding all belong to this form.
+        RequireSameFormResource(requirement, payload.FormDefinitionId);
+        RequireSameFormResource(existing, payload.FormDefinitionId);
+        await RequireFieldFormBindingAsync(scope, organizationId, payload.FieldDefinitionId, payload.FormDefinitionId, plan, Domain.Features.FieldSearch.FieldFormBindingSources.ProtectionCommand, cancellationToken).ConfigureAwait(false);
         if (existing is null)
         {
             plan.RegisterResources.Add(NewResource(organizationId, ResourceTypeNames.FieldReclassification, payload.FieldDefinitionId, payload.FormDefinitionId));
@@ -503,6 +519,11 @@ public static partial class CommandPlanner
                 throw AuthorityException.Invalid("field_classification is required when publishing an encryption requirement");
             }
 
+            // C-188 (D-H13): the requirement, a release and the field binding all belong to this form.
+            RequireSameFormResource(requirement, payload.FormDefinitionId);
+            RequireSameFormResource(release, payload.FormDefinitionId);
+            await RequireFieldFormBindingAsync(scope, organizationId, payload.FieldDefinitionId, payload.FormDefinitionId, plan, Domain.Features.FieldSearch.FieldFormBindingSources.ProtectionCommand, cancellationToken).ConfigureAwait(false);
+
             if (requirement is null)
             {
                 plan.RegisterResources.Add(NewResource(organizationId, ResourceTypeNames.FieldProtectionRequirement, payload.FieldDefinitionId, payload.FormDefinitionId));
@@ -550,6 +571,11 @@ public static partial class CommandPlanner
         {
             throw AuthorityException.Invalid("the field is not application-encrypted according to the authority");
         }
+
+        // C-188 (D-H13): the requirement, an earlier release and the field binding all belong to this form.
+        RequireSameFormResource(requirement, payload.FormDefinitionId);
+        RequireSameFormResource(release, payload.FormDefinitionId);
+        await RequireFieldFormBindingAsync(scope, organizationId, payload.FieldDefinitionId, payload.FormDefinitionId, plan, Domain.Features.FieldSearch.FieldFormBindingSources.ProtectionCommand, cancellationToken).ConfigureAwait(false);
 
         // The classification the authority recorded when encryption was last published; unknown counts as sensitive (fail closed).
         var publication = await scope.FindCommandAsync(requirement.RegisteredBySecurityCommandId, cancellationToken).ConfigureAwait(false);

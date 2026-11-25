@@ -141,7 +141,17 @@ public static class FormDesignerEndpoints
                 return TypedResults.Created($"{ApiVersions.V1Prefix}/form-definitions/{formDefinitionId:D}/versions", response);
             })
             .WithName("PublishFormVersion")
-            .WithSummary("Atomically publishes the draft as an immutable version and advances the current pointer (expected draft revision + current version number).");
+            .WithSummary("Atomically publishes the draft as an immutable version and advances the current pointer (expected draft revision + current version number). C-188 BF-1: the Authority stages the version first (503 AUTHORITY_UNAVAILABLE or the Authority's refusal code when it cannot or will not; nothing is then published); authorityRegistrationPending true means the version is published but not yet registered, so field search on the form is unavailable until registration is recovered.");
+
+        group.MapGet("/{formDefinitionId:guid}/authority-registration", static async Task<Ok<FormAuthorityRegistrationResponse>> (Guid formDefinitionId, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.GetAuthorityRegistrationAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, cancellationToken).ConfigureAwait(false)))
+            .WithName("GetFormAuthorityRegistration")
+            .WithSummary("C-188 BF-1: whether the form's current published version is registered with the Authorization Authority (Registered, Pending, NotRegistered, NotPublished). Requires the Authority design permission on the form (404 otherwise); 503 AUTHORITY_UNAVAILABLE.");
+
+        group.MapPost("/{formDefinitionId:guid}/authority-registration/recover", static async Task<Ok<FormAuthorityRegistrationResponse>> (Guid formDefinitionId, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.RecoverAuthorityRegistrationAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, cancellationToken).ConfigureAwait(false)))
+            .WithName("RecoverFormAuthorityRegistration")
+            .WithSummary("C-188 BF-1: completes a pending registration without publishing again - registers the version the Authority staged when this store committed it (its layout must still have the staged digest), or withdraws a staged version that was never committed. Idempotent; audited; requires the Authority design permission on the form (404 otherwise). Outcome AlreadyRegistered, Registered, Abandoned, NotRecoverable (publish again) or Refused (failureReason).");
 
         group.MapPost("/{formDefinitionId:guid}/restore-draft", static async Task<Ok<FormDraftResponse>> (Guid formDefinitionId, RestoreVersionRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await handlers.RestoreToDraftAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, request, cancellationToken).ConfigureAwait(false)))

@@ -38,17 +38,24 @@ public sealed class FieldSearchCapabilityService(IAuthorityStore store, Permissi
         var policy = await scope.FindProtectionPolicyAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false);
         var fields = new List<SearchableFieldCapability>();
         FieldSearchConfiguration? configuration = null;
+        FormVersionPublication? pending = null;
         // administer_security is an organization permission: it shows configuration only for a form registered and active
         // in the caller's own organization. Anything else gets the same empty answer as an unknown form.
         var form = await scope.FindResourceAsync(request.OrganizationId, ResourceTypeNames.FormDefinition, request.FormDefinitionId, cancellationToken).ConfigureAwait(false);
         if (form is { ResourceLifecycleState: ResourceLifecycleStates.Active } && (mayQuery || mayDesign || mayAdminister))
         {
             var approvals = (await scope.GetFieldSearchApprovalsAsync(request.OrganizationId, request.FormDefinitionId, cancellationToken).ConfigureAwait(false)).ToList();
+            // C-188 BF-1: a publication awaiting registration makes every approval of the form ineffective (IneffectiveAsync); say so.
+            pending = await scope.FindPendingFormVersionPublicationAsync(request.OrganizationId, request.FormDefinitionId, cancellationToken).ConfigureAwait(false);
             var active = approvals.Where(a => a.ApprovalStateName == FieldSearchApprovalStates.Active).ToList();
             if (mayQuery && policy is { PlaintextSearchPermitted: true })
             {
-                fields.AddRange(active.OrderBy(a => a.ApprovedFieldLabelSnapshot, StringComparer.Ordinal).ThenBy(a => a.FieldDefinitionId)
-                    .Select(a => new SearchableFieldCapability(a.FieldDefinitionId, a.ApprovedFieldLabelSnapshot, a.ApprovedFieldDataType, FieldSearchRules.ReadOperators(a), FieldSearchRules.ReadOptions(a), a.ApprovedFormVersionNumber)));
+                // C-188: a retained-field approval confers search only while it is effective (enabled, field still absent, bound, eligible);
+                // BF-1: no approval confers search while a publication of the form is pending.
+                var ineffective = await SecurityCommands.RetainedFieldApprovals.IneffectiveAsync(scope, request.OrganizationId, active, policy, gate.RetainedFieldApprovalsEnabled, cancellationToken).ConfigureAwait(false);
+                fields.AddRange(active.Where(a => !ineffective.Contains(a.FieldSearchApprovalId)).OrderBy(a => a.ApprovedFieldLabelSnapshot, StringComparer.Ordinal).ThenBy(a => a.FieldDefinitionId)
+                    .Select(a => new SearchableFieldCapability(a.FieldDefinitionId, a.ApprovedFieldLabelSnapshot, a.ApprovedFieldDataType, FieldSearchRules.ReadOperators(a), FieldSearchRules.ReadOptions(a), a.ApprovedFormVersionNumber,
+                        a.ApprovalScopeName == FieldSearchApprovalScopes.CurrentVersion)));
             }
 
             if (mayDesign || mayAdminister)
@@ -61,7 +68,27 @@ public sealed class FieldSearchCapabilityService(IAuthorityStore store, Permissi
                     var current = approvals.Where(a => a.FieldDefinitionId == entry.FieldDefinitionId).OrderByDescending(a => a.ApprovedOn).FirstOrDefault();
                     statuses.Add(new FieldSearchStatus(entry.FieldDefinitionId, entry.FieldLabel, entry.FieldDataType, entry.FieldClassification, facts.RequirementActive ? "ApplicationEncrypted" : entry.ProtectionMode,
                         FieldSearchRules.Eligibility(entry, policy, facts), current?.ApprovalStateName ?? "None", current?.InvalidationReasonCode,
-                        current is { ApprovalStateName: FieldSearchApprovalStates.Active } ? FieldSearchRules.ReadOperators(current) : [], FieldSearchRules.PermittedOperators(entry.FieldDataType)));
+                        current is { ApprovalStateName: FieldSearchApprovalStates.Active } ? FieldSearchRules.ReadOperators(current) : [], FieldSearchRules.PermittedOperators(entry.FieldDataType),
+                        InCurrentVersion: true, LastPlacedVersionNumber: latest!.FormVersionNumber, ApprovalScope: current?.ApprovalScopeName));
+                }
+
+                // C-188 (D-H9): fields of earlier registered versions that the latest one no longer places ("No longer in the form"),
+                // each described from the most recent version that placed it - only for designers of the form and security administrators.
+                if (latest is not null)
+                {
+                    var listed = statuses.Select(s => s.FieldDefinitionId).ToHashSet();
+                    foreach (var earlier in await scope.GetPublishedFormVersionsAsync(request.OrganizationId, request.FormDefinitionId, cancellationToken).ConfigureAwait(false))
+                    {
+                        foreach (var entry in FieldSearchRules.ReadManifest(earlier).Where(e => listed.Add(e.FieldDefinitionId)))
+                        {
+                            var facts = await FieldSearchRules.ReadProtectionFactsAsync(scope, request.OrganizationId, entry.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
+                            var current = approvals.Where(a => a.FieldDefinitionId == entry.FieldDefinitionId).OrderByDescending(a => a.ApprovedOn).FirstOrDefault();
+                            statuses.Add(new FieldSearchStatus(entry.FieldDefinitionId, entry.FieldLabel, entry.FieldDataType, entry.FieldClassification, facts.RequirementActive ? "ApplicationEncrypted" : entry.ProtectionMode,
+                                FieldSearchRules.Eligibility(entry, policy, facts), current?.ApprovalStateName ?? "None", current?.InvalidationReasonCode,
+                                current is { ApprovalStateName: FieldSearchApprovalStates.Active } ? FieldSearchRules.ReadOperators(current) : [], FieldSearchRules.PermittedOperators(entry.FieldDataType),
+                                InCurrentVersion: false, LastPlacedVersionNumber: earlier.FormVersionNumber, ApprovalScope: current?.ApprovalScopeName));
+                        }
+                    }
                 }
 
                 IReadOnlyList<FormAccessSubject>? searchers = null;
@@ -73,7 +100,9 @@ public sealed class FieldSearchCapabilityService(IAuthorityStore store, Permissi
                         .OrderBy(s => s.SubjectKind, StringComparer.Ordinal).ThenBy(s => s.SubjectId).ToList();
                 }
 
-                configuration = new FieldSearchConfiguration(mayAdminister, gate.ApprovalsOperational, gate.UnavailableReason, latest?.FormVersionNumber, statuses.OrderBy(s => s.FieldLabel, StringComparer.Ordinal).ToList(), searchers);
+                configuration = new FieldSearchConfiguration(mayAdminister, gate.ApprovalsOperational, gate.UnavailableReason, latest?.FormVersionNumber,
+                    statuses.OrderBy(s => s.InCurrentVersion ? 0 : 1).ThenBy(s => s.FieldLabel, StringComparer.Ordinal).ToList(), searchers, gate.RetainedFieldApprovalsEnabled,
+                    pending is null ? null : new PendingFormVersionPublication(pending.BusinessFormVersionId, pending.FormVersionNumber, Convert.ToHexStringLower(pending.LayoutDigest), pending.PreparedOn, pending.FormVersionPublicationId));
             }
         }
 
@@ -83,7 +112,7 @@ public sealed class FieldSearchCapabilityService(IAuthorityStore store, Permissi
             throw AuthorityException.NotReady("authorization state moved while reading field search capabilities");
         }
 
-        return new FieldSearchCapabilitiesResponse(request.FormDefinitionId, policy?.PlaintextSearchPermitted ?? false, policy?.SearchPolicyRevision ?? 0, revision, fields, configuration, correlationId);
+        return new FieldSearchCapabilitiesResponse(request.FormDefinitionId, policy?.PlaintextSearchPermitted ?? false, policy?.SearchPolicyRevision ?? 0, revision, fields, configuration, correlationId, pending is not null);
     }
 
     /// <summary>
@@ -128,7 +157,8 @@ public sealed class FieldSearchCapabilityService(IAuthorityStore store, Permissi
 
             var formApprovals = approvals.Where(a => a.FormDefinitionId == version.FormDefinitionId).ToList();
             forms.Add(new FieldSearchAdministrationForm(version.FormDefinitionId, version.FormTitleSnapshot, version.FormVersionNumber, version.RegisteredOn, entries.Count, eligible,
-                formApprovals.Count(a => a.ApprovalStateName == FieldSearchApprovalStates.Active), formApprovals.Count(a => a.ApprovalStateName == FieldSearchApprovalStates.Invalidated)));
+                formApprovals.Count(a => a.ApprovalStateName == FieldSearchApprovalStates.Active), formApprovals.Count(a => a.ApprovalStateName == FieldSearchApprovalStates.Invalidated),
+                formApprovals.Count(a => a.ApprovalStateName == FieldSearchApprovalStates.Active && a.ApprovalScopeName == FieldSearchApprovalScopes.RetainedField)));
         }
 
         var after = await scope.ReadOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false);

@@ -93,6 +93,24 @@ public static class AuthorityErrorCodes
     public const string RecoveryNotApplicable = "RECOVERY_NOT_APPLICABLE";
     public const string FormVersionUntrusted = "FORM_VERSION_UNTRUSTED";
 
+    /// <summary>C-188 (D-H7, D-H13): the field definition is bound to another form in this organization's Authority; nothing is registered, approved or published.</summary>
+    public const string FieldBoundToAnotherForm = "FIELD_BOUND_TO_ANOTHER_FORM";
+
+    /// <summary>C-188 (D-H18): approvals of retained (removed) fields are disabled by deployment configuration (FieldSearch:RetainedFieldApprovals).</summary>
+    public const string RetainedFieldApprovalsDisabled = "RETAINED_FIELD_APPROVALS_DISABLED";
+
+    /// <summary>C-188 BF-1: a publication of the form is pending registration (approvals and one-step registration are refused until it is resolved).</summary>
+    public const string FormPublicationPending = "FORM_PUBLICATION_PENDING";
+
+    /// <summary>C-188 BF-1: the resolution names a publication that is not the form's pending one (already resolved or never prepared).</summary>
+    public const string FormPublicationNotPending = "FORM_PUBLICATION_NOT_PENDING";
+
+    /// <summary>
+    /// C-191: an <c>Abandoned</c> resolution without a valid publication coordinator attestation that the version was never committed
+    /// (absent, unverifiable, stale, bound to another publication, or not establishing non-commitment). The publication stays pending.
+    /// </summary>
+    public const string FormPublicationAbandonmentUnverified = "FORM_PUBLICATION_ABANDONMENT_UNVERIFIED";
+
     /// <summary>
     /// AC-2 (Phase C6): a share editor's content write targets a record whose accepted, signed header status is not Draft
     /// (Submitted or Archived). Decided from the signed header bound to the accepted head, never from a business projection.

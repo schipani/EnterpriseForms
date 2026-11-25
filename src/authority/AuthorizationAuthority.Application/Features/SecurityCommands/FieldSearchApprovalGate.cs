@@ -22,14 +22,44 @@ public sealed class FieldSearchApprovalGate
     public const string SyntheticStepUpEvidence = "synthetic-development-step-up";
     public const string UnavailableReasonCode = "PB08_STEP_UP_NOT_AVAILABLE";
 
-    private FieldSearchApprovalGate(bool operational)
+    /// <summary>C-188 (D-H18): deployment setting for retained-field approvals; Disabled when absent. Anything but Enabled/Disabled refuses startup.</summary>
+    public const string RetainedFieldApprovalsKey = "FieldSearch:RetainedFieldApprovals";
+    public const string RetainedFieldApprovalsEnabledValue = "Enabled";
+    public const string RetainedFieldApprovalsDisabledValue = "Disabled";
+
+    private FieldSearchApprovalGate(bool operational, bool retainedFieldApprovalsEnabled = false)
     {
         ApprovalsOperational = operational;
+        RetainedFieldApprovalsEnabled = retainedFieldApprovalsEnabled;
     }
 
     public static FieldSearchApprovalGate Unavailable { get; } = new(false);
 
     public bool ApprovalsOperational { get; }
+
+    /// <summary>
+    /// C-188 (D-H18): whether retained-field approvals are accepted and honoured. Off by default. While off, new retained approvals
+    /// are refused, existing Active ones are not effective (no capability, no predicate authorization, open indexed pages invalidated,
+    /// V1 snapshots issued before this process started invalidated for forms that hold one), a retained field that returns is
+    /// invalidated instead of converted, and withdrawal, strengthening and policy invalidation keep working.
+    /// </summary>
+    public bool RetainedFieldApprovalsEnabled { get; }
+
+    /// <summary>The same gate with the retained-field setting resolved (startup); an unknown value is a configuration failure.</summary>
+    public FieldSearchApprovalGate WithRetainedFieldApprovals(string? configuredValue)
+    {
+        if (string.IsNullOrWhiteSpace(configuredValue) || string.Equals(configuredValue, RetainedFieldApprovalsDisabledValue, StringComparison.Ordinal))
+        {
+            return new FieldSearchApprovalGate(ApprovalsOperational, false);
+        }
+
+        if (!string.Equals(configuredValue, RetainedFieldApprovalsEnabledValue, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"{RetainedFieldApprovalsKey} must be {RetainedFieldApprovalsDisabledValue} or {RetainedFieldApprovalsEnabledValue}. Refusing to start.");
+        }
+
+        return new FieldSearchApprovalGate(ApprovalsOperational, true);
+    }
 
     public string UnavailableReason => ApprovalsOperational ? string.Empty : UnavailableReasonCode;
 

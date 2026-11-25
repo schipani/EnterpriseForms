@@ -33,6 +33,9 @@ public sealed class FormVersionLifecycleContractTests
     private static readonly Guid Phone = Guid.CreateVersion7();
     private static readonly Guid Email = Guid.CreateVersion7();
 
+    /// <summary>The audit outcomes the database accepts (ck_audit_events_outcome).</summary>
+    private static readonly string[] AllowedOutcomes = ["Success", "Denied", "Failed"];
+
     private static string Element(Guid fieldId, string label, bool required = false) =>
         JsonSerializer.Serialize(new { kind = "field", fieldDefinitionId = fieldId, control = "text", label, required, layout = new { columnSpan = 4, startOnNewRow = false }, validation = new { } });
 
@@ -196,6 +199,275 @@ public sealed class FormVersionLifecycleContractTests
         }
     }
 
+    /// <summary>
+    /// A registration the Authority refuses (here: its gate closed by a concurrent command) leaves the version published and reported as
+    /// not registered, with a FORM_VERSION_AUTHORITY_REGISTRATION_FAILED audit event whose outcome the database accepts
+    /// (ck_audit_events_outcome: Success, Denied or Failed). Found during C-188 verification: the handler wrote "Failure", the insert
+    /// failed and the publish answered 503 STORE_UNAVAILABLE without its audit evidence.
+    /// </summary>
+    [Fact]
+    public async Task ARefusedAuthorityRegistrationIsReportedAndAuditedWithAnAllowedOutcome()
+    {
+        var store = new Store { RegistrationFailure = "AUTHORITY_NOT_READY" };
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        var v1 = await PublishAsync(store, handlers, "v1 while the Authority is busy");
+
+        Assert.Equal(1, v1.VersionNumber);
+        Assert.False(v1.AuthorityRegistered);
+        Assert.True(v1.AuthorityRegistrationPending); // C-188 BF-1: staged, so the Authority keeps field search on the form closed
+        Assert.NotNull(store.Pending);
+        var failed = Assert.Single(store.AuditEvents, e => e.EventAction == AuditActions.FormVersionAuthorityRegistrationFailed);
+        Assert.Equal("Failed", failed.EventOutcome);
+        Assert.Equal("AUTHORITY_NOT_READY", JsonDocument.Parse(failed.EventMetadataJson).RootElement.GetProperty("reason").GetString());
+        Assert.All(store.AuditEvents, e => Assert.Contains(e.EventOutcome, AllowedOutcomes));
+    }
+
+    /// <summary>
+    /// C-188 BF-1: the Authority stages the version (under the form's publication lock) before the business adds and commits it, and the
+    /// publication is resolved only after the commit; each attempt uses a fresh idempotency key.
+    /// </summary>
+    [Fact]
+    public async Task ThePublicationIsStagedBeforeTheCommitAndResolvedAfterIt()
+    {
+        var store = new Store();
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        store.Steps.Clear();
+        var v1 = await PublishAsync(store, handlers, "v1");
+
+        Assert.Equal(["lock", "prepare", "add-version", "commit", "resolve:Registered", "commit"], store.Steps); // the last commit is the registration audit
+        Assert.True(v1.AuthorityRegistered);
+        Assert.False(v1.AuthorityRegistrationPending);
+        Assert.Null(store.Pending);
+        Assert.Equal(1, store.AuthorityRegistered);
+        var resolution = Assert.Single(store.Resolutions);
+        Assert.Equal(v1.FormVersionId, resolution.GetProperty("form_version_id").GetGuid());
+        Assert.Equal(store.Registrations.Single().GetProperty("layout_digest_hex").GetString(), resolution.GetProperty("layout_digest_hex").GetString());
+        Assert.Equal(store.IdempotencyKeys.Count, store.IdempotencyKeys.Distinct().Count());
+        var registered = Assert.Single(store.AuditEvents, e => e.EventAction == AuditActions.FormVersionAuthorityRegistered);
+        Assert.Equal("Publish", JsonDocument.Parse(registered.EventMetadataJson).RootElement.GetProperty("registrationSource").GetString());
+    }
+
+    /// <summary>C-188 BF-1: when the Authority refuses to stage the version, nothing is published, committed or registered.</summary>
+    [Fact]
+    public async Task ARefusedPrepareFailsThePublishAndPublishesNothing()
+    {
+        var store = new Store { PrepareFailure = "FORM_VERSION_UNTRUSTED" };
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        var commits = store.Commits;
+
+        var error = await Assert.ThrowsAsync<BusinessException>(() => PublishAsync(store, handlers, "v1"));
+        Assert.Equal(("FORM_VERSION_UNTRUSTED", 422), (error.ErrorCode, error.HttpStatusCode));
+        Assert.Empty(store.Versions);
+        Assert.Equal(commits, store.Commits);
+        Assert.Null(store.Definition.CurrentFormVersionId);
+        Assert.Empty(store.Resolutions);
+        Assert.DoesNotContain(store.AuditEvents, e => e.EventAction == AuditActions.FormVersionPublished);
+    }
+
+    /// <summary>C-188 BF-1: a busy Authority (a concurrent security command) is retried with fresh keys; if it stays busy nothing is published.</summary>
+    [Fact]
+    public async Task ABusyAuthorityIsRetriedWithFreshKeysAndNeverLeadsToAnUnstagedPublication()
+    {
+        var store = new Store { PrepareBusyAttempts = 2 };
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        var v1 = await PublishAsync(store, handlers, "v1 after two busy refusals");
+        Assert.True(v1.AuthorityRegistered);
+        var prepares = store.IdempotencyKeys.Where(k => k.StartsWith("form-version-prepare:", StringComparison.Ordinal)).ToList();
+        Assert.Equal(3, prepares.Count);
+        Assert.Equal(3, prepares.Distinct().Count()); // a refused key would only replay its refusal
+
+        var busy = new Store { PrepareBusyAttempts = 10 };
+        var busyHandlers = busy.Handlers(designAllowed: true);
+        await SaveAsync(busy, busyHandlers, V1Layout);
+        var error = await Assert.ThrowsAsync<BusinessException>(() => PublishAsync(busy, busyHandlers, "v1 while the Authority stays busy"));
+        Assert.Equal(("AUTHORITY_UNAVAILABLE", 503), (error.ErrorCode, error.HttpStatusCode));
+        Assert.Empty(busy.Versions);
+        Assert.Null(busy.Pending);
+    }
+
+    /// <summary>
+    /// C-188 BF-1 recovery without a new publication: a staged version this store committed is registered (from the Authority's staged
+    /// manifest; same id, number and digest), then the form reports Registered; a second recovery changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task RecoveryRegistersACommittedStagedVersionAndIsIdempotent()
+    {
+        var store = new Store { RegistrationFailure = "AUTHORITY_NOT_READY", NormalizeStoredLayouts = true }; // the stored text differs from the published text, as with jsonb
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        var v1 = await PublishAsync(store, handlers, "v1");
+        Assert.NotEqual(store.Registrations.Single().GetProperty("layout_digest_hex").GetString(), Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(store.Versions.Single().LayoutJson))));
+        Assert.Equal("Pending", (await handlers.GetAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None)).RegistrationState);
+
+        store.RegistrationFailure = null;
+        store.Steps.Clear();
+        var recovered = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("Registered", "Registered", 1, 1, (int?)null), (recovered.Outcome, recovered.RegistrationState, recovered.CurrentVersionNumber, recovered.RegisteredVersionNumber, recovered.PendingVersionNumber));
+        Assert.Equal("lock", store.Steps[0]); // decided under the publication lock
+        Assert.Equal(v1.FormVersionId, Assert.Single(store.Resolutions).GetProperty("form_version_id").GetGuid());
+        Assert.Contains(store.AuditEvents, e => e.EventAction == AuditActions.FormVersionAuthorityRegistered && JsonDocument.Parse(e.EventMetadataJson).RootElement.GetProperty("registrationSource").GetString() == "Recovery");
+
+        var again = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("AlreadyRegistered", "Registered"), (again.Outcome, again.RegistrationState));
+        Assert.Single(store.Resolutions); // nothing sent
+    }
+
+    /// <summary>C-188 BF-1: a staged version this store never committed is withdrawn (abandoned); the current registered version applies again.</summary>
+    [Fact]
+    public async Task RecoveryWithdrawsAStagedVersionThatWasNeverCommitted()
+    {
+        var store = new Store();
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        await PublishAsync(store, handlers, "v1");
+        var neverCommitted = Guid.CreateVersion7();
+        var publication = Guid.CreateVersion7();
+        store.Pending = new AuthorityPendingFormVersionPublication(neverCommitted, 2, new string('a', 64), DateTimeOffset.UtcNow, publication); // e.g. the commit failed after the prepare
+
+        var recovered = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("Abandoned", "Registered", 1), (recovered.Outcome, recovered.RegistrationState, recovered.RegisteredVersionNumber));
+        var resolution = store.Resolutions.Last();
+        Assert.Equal(("Abandoned", neverCommitted), (resolution.GetProperty("resolution").GetString(), resolution.GetProperty("form_version_id").GetGuid()));
+        var attestation = resolution.GetProperty("attestation"); // C-191: the coordinator's attestation, verified by the stub as the Authority does
+        Assert.Equal((publication, 1), (attestation.GetProperty("form_version_publication_id").GetGuid(), attestation.GetProperty("business_latest_form_version_number").GetInt32()));
+        Assert.Contains(store.AuditEvents, e => e.EventAction == AuditActions.FormVersionAuthorityPublicationAbandoned);
+        Assert.Single(store.Versions);
+    }
+
+    /// <summary>
+    /// C-188 BF-1 / C-191: recovery never registers a committed version whose stored layout no longer has the staged digest, never abandons
+    /// it and never restages it: the form reports RecoveryBlocked (also on a plain status read), the barrier stays, nothing is sent and a
+    /// new publish is refused without committing anything. A current version the Authority never staged is reported as not recoverable
+    /// (publish again; OD-3) - nothing is sent.
+    /// </summary>
+    [Fact]
+    public async Task RecoveryRefusesAMismatchedStoredVersionAndNeverRegistersAnUnstagedOne()
+    {
+        var store = new Store { RegistrationFailure = "AUTHORITY_NOT_READY" };
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        var v1 = await PublishAsync(store, handlers, "v1");
+        store.RegistrationFailure = null;
+        store.Pending = store.Pending! with { LayoutDigestHex = new string('b', 64) }; // the stored layout no longer matches what was staged
+        var blocked = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("RecoveryBlocked", "STAGED_VERSION_MISMATCH", "RecoveryBlocked", 1), (blocked.Outcome, blocked.FailureReason, blocked.RegistrationState, blocked.PendingVersionNumber));
+        Assert.Equal("RecoveryBlocked", (await handlers.GetAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None)).RegistrationState);
+        Assert.Empty(store.Resolutions); // neither registered nor abandoned
+        Assert.NotNull(store.Pending);
+        var failed = store.AuditEvents.Last(e => e.EventAction == AuditActions.FormVersionAuthorityRegistrationFailed);
+        Assert.True(JsonDocument.Parse(failed.EventMetadataJson).RootElement.GetProperty("recoveryBlocked").GetBoolean());
+
+        await SaveAsync(store, handlers, V2Layout); // another publication cannot bypass the mismatch
+        var commits = store.Commits;
+        var error = await Assert.ThrowsAsync<BusinessException>(() => PublishAsync(store, handlers, "v2 over a blocked v1"));
+        Assert.Equal(("FORM_PUBLICATION_PENDING", 409), (error.ErrorCode, error.HttpStatusCode));
+        Assert.Equal(commits, store.Commits);
+        Assert.Single(store.Versions);
+        Assert.Equal("RecoveryBlocked", (await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None)).Outcome); // retrying changes nothing
+        Assert.Empty(store.Resolutions);
+
+        store.Pending = null; // a version published before the safeguard: the Authority never staged it
+        var legacy = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("NotRecoverable", "NotRegistered"), (legacy.Outcome, legacy.RegistrationState));
+        Assert.Empty(store.Resolutions);
+        Assert.Equal(v1.FormVersionId, store.Definition.CurrentFormVersionId);
+    }
+
+    /// <summary>
+    /// C-191: while the previous version's resolution is pending (v1 committed, resolution lost) a new publish is refused by the Authority
+    /// with FORM_PUBLICATION_PENDING; the business answers 409, commits nothing and leaves v1 pending. After recovery the publish succeeds.
+    /// </summary>
+    [Fact]
+    public async Task APublishWhileThePreviousVersionIsPendingIsRefusedAndPublishesNothingUntilRecovery()
+    {
+        var store = new Store { RegistrationFailure = "AUTHORITY_NOT_READY" };
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        var v1 = await PublishAsync(store, handlers, "v1, resolution lost");
+        Assert.True(v1.AuthorityRegistrationPending);
+        store.RegistrationFailure = null;
+        await SaveAsync(store, handlers, V2Layout);
+        var commits = store.Commits;
+
+        var error = await Assert.ThrowsAsync<BusinessException>(() => PublishAsync(store, handlers, "v2 before recovery"));
+        Assert.Equal(("FORM_PUBLICATION_PENDING", 409), (error.ErrorCode, error.HttpStatusCode));
+        Assert.Equal(commits, store.Commits);
+        Assert.Equal(v1.FormVersionId, Assert.Single(store.Versions).FormVersionId);
+        Assert.Equal(v1.FormVersionId, store.Definition.CurrentFormVersionId);
+        Assert.Equal((v1.FormVersionId, 1), (store.Pending!.FormVersionId, store.Pending.FormVersionNumber));
+        Assert.Empty(store.Resolutions);
+
+        var recovered = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("Registered", "Registered"), (recovered.Outcome, recovered.RegistrationState));
+        var v2 = await PublishAsync(store, handlers, "v2 after recovery");
+        Assert.Equal((2, true), (v2.VersionNumber, v2.AuthorityRegistered));
+        Assert.Equal(2, store.AuthorityRegistered);
+    }
+
+    /// <summary>
+    /// C-191: without the coordinator attestation key the business never withdraws a staged version: recovery of a never-committed v2
+    /// reports Refused (ABANDONMENT_ATTESTATION_UNAVAILABLE), sends nothing, audits the failure and the publication stays pending.
+    /// </summary>
+    [Fact]
+    public async Task RecoveryWithoutTheAttestationKeyLeavesANeverCommittedVersionPending()
+    {
+        var store = new Store { Attestor = FormPublicationAbandonmentAttestor.Unconfigured };
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        await PublishAsync(store, handlers, "v1");
+        store.Resolutions.Clear(); // v1's own registration
+        store.Pending = new AuthorityPendingFormVersionPublication(Guid.CreateVersion7(), 2, new string('a', 64), DateTimeOffset.UtcNow, Guid.CreateVersion7());
+
+        var refused = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("Refused", "ABANDONMENT_ATTESTATION_UNAVAILABLE", "Pending"), (refused.Outcome, refused.FailureReason, refused.RegistrationState));
+        Assert.Empty(store.Resolutions);
+        Assert.NotNull(store.Pending);
+        Assert.Contains(store.AuditEvents, e => e.EventAction == AuditActions.FormVersionAuthorityRegistrationFailed && JsonDocument.Parse(e.EventMetadataJson).RootElement.GetProperty("reason").GetString() == "ABANDONMENT_ATTESTATION_UNAVAILABLE");
+    }
+
+    /// <summary>
+    /// C-191: recovery attests non-commitment only when the store establishes it. A staged version absent here while a stored version is
+    /// numbered at or above it (the staged number can no longer be a version this store never committed) is not withdrawn: Refused
+    /// (NON_COMMITMENT_NOT_ESTABLISHED), nothing sent, still pending.
+    /// </summary>
+    [Fact]
+    public async Task RecoveryDoesNotWithdrawWhenTheStoreDoesNotEstablishNonCommitment()
+    {
+        var store = new Store();
+        var handlers = store.Handlers(designAllowed: true);
+        await SaveAsync(store, handlers, V1Layout);
+        await PublishAsync(store, handlers, "v1");
+        store.Resolutions.Clear(); // v1's own registration
+        store.Pending = new AuthorityPendingFormVersionPublication(Guid.CreateVersion7(), 1, new string('a', 64), DateTimeOffset.UtcNow, Guid.CreateVersion7()); // number 1 exists here under another id
+
+        var refused = await handlers.RecoverAuthorityRegistrationAsync(Context, store.Definition.FormDefinitionId, CancellationToken.None);
+        Assert.Equal(("Refused", "NON_COMMITMENT_NOT_ESTABLISHED", "Pending"), (refused.Outcome, refused.FailureReason, refused.RegistrationState));
+        Assert.Empty(store.Resolutions);
+        Assert.NotNull(store.Pending);
+    }
+
+    /// <summary>C-191: the attested message is pinned to the vector the Authority verifier's test pins, and the key is validated at startup.</summary>
+    [Fact]
+    public void TheAbandonmentAttestationMatchesTheAuthorityVectorAndTheKeyIsValidated()
+    {
+        var key = Enumerable.Range(1, 32).Select(i => (byte)i).ToArray();
+        var attestor = FormPublicationAbandonmentAttestor.Create(Convert.ToBase64String(key), []);
+        var attestation = JsonSerializer.SerializeToElement(attestor.Attest(Guid.Parse("00000000-0000-0000-0000-000000000001"), Guid.Parse("00000000-0000-0000-0000-000000000002"),
+            Guid.Parse("00000000-0000-0000-0000-000000000003"), Guid.Parse("00000000-0000-0000-0000-000000000004"), 2, string.Concat(Enumerable.Repeat("AB", 32)), 1, DateTimeOffset.FromUnixTimeSeconds(1795000000)));
+        Assert.Equal("3d15f20a6da18c84883ad6410b245b538aed47b2bffb796254d9e8e4732d3157", attestation.GetProperty("attestation_mac_hex").GetString());
+        Assert.Equal((1795000000L, 1), (attestation.GetProperty("issued_at_unix_seconds").GetInt64(), attestation.GetProperty("business_latest_form_version_number").GetInt32()));
+
+        Assert.False(FormPublicationAbandonmentAttestor.Create(null, []).IsConfigured);
+        Assert.Throws<InvalidOperationException>(() => FormPublicationAbandonmentAttestor.Create("not base64!", []));
+        Assert.Throws<InvalidOperationException>(() => FormPublicationAbandonmentAttestor.Create(Convert.ToBase64String(new byte[31]), []));
+        Assert.Throws<InvalidOperationException>(() => FormPublicationAbandonmentAttestor.Create(Convert.ToBase64String(key), [Convert.ToBase64String(key)])); // equal to the workload key, e.g.
+        Assert.Throws<InvalidOperationException>(() => FormPublicationAbandonmentAttestor.Unconfigured.Attest(Org, Guid.Empty, Guid.Empty, Guid.Empty, 1, new string('a', 64), 0, DateTimeOffset.UtcNow));
+    }
+
     // ---------------------------------------------------------------- in-memory store
 
     private sealed class Store
@@ -241,7 +513,13 @@ public sealed class FormVersionLifecycleContractTests
             {
                 nameof(IAuthorizationAuthorityClient.CheckPermissionAsync) => Task.FromResult(new PermissionDecision(designAllowed, null, 9, 9, null, Guid.Empty)),
                 nameof(IAuthorizationAuthorityClient.DiscoverAuthorizedRecordsAsync) => Task.FromResult(new RecordDiscoveryPage([], 9, null)),
-                nameof(IAuthorizationAuthorityClient.SubmitSecurityCommandAsync) => Register((SecurityCommandRequest)args[1]!),
+                nameof(IAuthorizationAuthorityClient.SubmitSecurityCommandAsync) => Submit((SecurityCommandRequest)args[1]!, (string)args[2]!),
+                _ => throw new NotSupportedException(method.Name),
+            });
+            var fieldSearch = Stubs.Create<IFieldSearchPolicyAuthority>((method, _) => method.Name switch
+            {
+                nameof(IFieldSearchPolicyAuthority.GetFieldSearchCapabilitiesAsync) => Task.FromResult(new AuthorityFieldSearchCapabilities(Definition.FormDefinitionId, true, 1, 9, [],
+                    new AuthorityFieldSearchConfiguration(false, true, string.Empty, AuthorityRegistered, [], PendingPublication: Pending), Guid.Empty, Pending is not null)),
                 _ => throw new NotSupportedException(method.Name),
             });
             var store = Stubs.Create<IBusinessStore>((_, _) =>
@@ -249,13 +527,106 @@ public sealed class FormVersionLifecycleContractTests
                 ScopesOpened++;
                 return Task.FromResult(Scope());
             });
-            return new FormDesignerHandlers(store, authority, new AuthorityCommandAwaiter(authority, TimeProvider.System), TimeProvider.System, null!);
+            return new FormDesignerHandlers(store, authority, new AuthorityCommandAwaiter(authority, TimeProvider.System), TimeProvider.System, null!, fieldSearch, abandonmentAttestor: Attestor);
         }
 
-        private Task<SecurityCommandResult> Register(SecurityCommandRequest request)
+        /// <summary>C-191: the coordinator attestation key the Authority stub verifies abandonments with.</summary>
+        private static readonly byte[] AttestationKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+
+        /// <summary>C-191: the business attestor (signs with <see cref="AttestationKey"/>; tests may set it unconfigured).</summary>
+        public FormPublicationAbandonmentAttestor Attestor { get; set; } = FormPublicationAbandonmentAttestor.Create(Convert.ToBase64String(AttestationKey), []);
+
+        /// <summary>When set, the Authority refuses the resolution of a publication as registered with this error code (e.g. a gate closed by a concurrent command).</summary>
+        public string? RegistrationFailure { get; set; }
+
+        /// <summary>C-188 BF-1: when set, the Authority refuses to stage a version with this error code (non-retryable, 422).</summary>
+        public string? PrepareFailure { get; set; }
+
+        /// <summary>C-188 BF-1: the number of prepare attempts refused with AUTHORITY_NOT_READY (503, retryable) before one is accepted.</summary>
+        public int PrepareBusyAttempts { get; set; }
+
+        /// <summary>C-188 BF-1: the Authority's view - its pending publication and latest registered version number (kept as the commands run).</summary>
+        public AuthorityPendingFormVersionPublication? Pending { get; set; }
+
+        public int? AuthorityRegistered { get; set; }
+
+        /// <summary>C-188 BF-1: resolutions sent (payloads) and every idempotency key used, in order.</summary>
+        public List<JsonElement> Resolutions { get; } = [];
+
+        public List<string> IdempotencyKeys { get; } = [];
+
+        /// <summary>C-188 BF-1: the order of publication-relevant operations (lock, prepare, add-version, commit, resolve).</summary>
+        public List<string> Steps { get; } = [];
+
+        private Task<SecurityCommandResult> Submit(SecurityCommandRequest request, string idempotencyKey)
         {
-            Assert.Equal(SecurityCommandKind.RegisterPublishedFormVersion, request.CommandKind);
-            Registrations.Add(request.CommandPayload.Clone());
+            IdempotencyKeys.Add(idempotencyKey);
+            var payload = request.CommandPayload;
+            switch (request.CommandKind)
+            {
+                case SecurityCommandKind.PrepareFormVersionPublication:
+                    Steps.Add("prepare");
+                    if (PrepareBusyAttempts > 0)
+                    {
+                        PrepareBusyAttempts--;
+                        throw new AuthorityClientException("AUTHORITY_NOT_READY", 503, true);
+                    }
+
+                    if (PrepareFailure is { } refused)
+                    {
+                        throw new AuthorityClientException(refused, 422, false);
+                    }
+
+                    if (Pending is not null)
+                    {
+                        throw new AuthorityClientException("FORM_PUBLICATION_PENDING", 409, false); // C-191: the Authority never supersedes a pending publication
+                    }
+
+                    Registrations.Add(payload.Clone()); // the staged manifest the Authority will register
+                    Pending = new AuthorityPendingFormVersionPublication(payload.GetProperty("form_version_id").GetGuid(), payload.GetProperty("form_version_number").GetInt32(), payload.GetProperty("layout_digest_hex").GetString()!, DateTimeOffset.UtcNow, Guid.CreateVersion7());
+                    break;
+                case SecurityCommandKind.ResolveFormVersionPublication:
+                    Steps.Add("resolve:" + payload.GetProperty("resolution").GetString());
+                    if (RegistrationFailure is { } code && payload.GetProperty("resolution").GetString() == "Registered")
+                    {
+                        throw new AuthorityClientException(code, 503, true);
+                    }
+
+                    Assert.NotNull(Pending);
+                    Assert.Equal((Pending!.FormVersionId, Pending.FormVersionNumber, Pending.LayoutDigestHex),
+                        (payload.GetProperty("form_version_id").GetGuid(), payload.GetProperty("form_version_number").GetInt32(), payload.GetProperty("layout_digest_hex").GetString()));
+                    if (payload.GetProperty("resolution").GetString() == "Abandoned")
+                    {
+                        // C-191: as the Authority does - only with a valid coordinator attestation that establishes non-commitment.
+                        var attestation = payload.TryGetProperty("attestation", out var a) ? a : default;
+                        var valid = attestation.ValueKind == JsonValueKind.Object
+                            && attestation.GetProperty("form_version_publication_id").GetGuid() == Pending.FormVersionPublicationId
+                            && attestation.GetProperty("business_latest_form_version_number").GetInt32() < Pending.FormVersionNumber
+                            && attestation.GetProperty("attestation_mac_hex").GetString() == Convert.ToHexStringLower(System.Security.Cryptography.HMACSHA256.HashData(AttestationKey,
+                                FormPublicationAbandonmentAttestor.Message(request.OrganizationId, Definition.FormDefinitionId, Pending.FormVersionPublicationId!.Value, Pending.FormVersionId, Pending.FormVersionNumber, Pending.LayoutDigestHex,
+                                    attestation.GetProperty("business_latest_form_version_number").GetInt32(), attestation.GetProperty("issued_at_unix_seconds").GetInt64())));
+                        if (!valid)
+                        {
+                            throw new AuthorityClientException("FORM_PUBLICATION_ABANDONMENT_UNVERIFIED", 403, false);
+                        }
+                    }
+                    else
+                    {
+                        Assert.False(payload.TryGetProperty("attestation", out _)); // a registration carries no attestation
+                    }
+
+                    Resolutions.Add(payload.Clone());
+                    if (payload.GetProperty("resolution").GetString() == "Registered")
+                    {
+                        AuthorityRegistered = Pending.FormVersionNumber;
+                    }
+
+                    Pending = null;
+                    break;
+                default:
+                    throw new NotSupportedException(request.CommandKind.ToString());
+            }
+
             return Task.FromResult(new SecurityCommandResult(Guid.CreateVersion7(), SecurityCommandStatus.Effective, 10, 10, "Open", null, Guid.Empty));
         }
 
@@ -274,9 +645,16 @@ public sealed class FormVersionLifecycleContractTests
             nameof(IBusinessScope.GetFormRecordsAsync) => Task.FromResult(new List<Domain.Features.FormRecords.FormRecord>()),
             nameof(IBusinessScope.AddAuditEvent) => Audit((AuditEvent)args[0]!),
             nameof(IBusinessScope.CommitAsync) => Commit(),
+            nameof(IBusinessScope.LockFormPublicationAsync) => Step("lock"),
             nameof(IAsyncDisposable.DisposeAsync) => ValueTask.CompletedTask,
             _ => throw new NotSupportedException(method.Name),
         });
+
+        private Task Step(string step)
+        {
+            Steps.Add(step);
+            return Task.CompletedTask;
+        }
 
         private object? SetDraft(FormDraft draft)
         {
@@ -284,8 +662,17 @@ public sealed class FormVersionLifecycleContractTests
             return null;
         }
 
+        /// <summary>C-188 BF-1: store layouts the way a jsonb column returns them (not byte for byte as published).</summary>
+        public bool NormalizeStoredLayouts { get; set; }
+
         private object? AddVersion(FormVersion version)
         {
+            Steps.Add("add-version");
+            if (NormalizeStoredLayouts)
+            {
+                version.LayoutJson = JsonNode.Parse(version.LayoutJson)!.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+            }
+
             Versions.Add(version);
             return null;
         }
@@ -298,6 +685,7 @@ public sealed class FormVersionLifecycleContractTests
 
         private Task Commit()
         {
+            Steps.Add("commit");
             Commits++;
             return Task.CompletedTask;
         }

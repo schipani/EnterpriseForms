@@ -332,6 +332,11 @@ approval binds to a field across versions, what the Authority registers for fiel
 completeness and revocation are proven) and its own security authorization. M3 tests the existing behaviour as it is,
 changes no test expectation and adds no search capability.
 
+**Update (C-189, 2026-11-24):** the owner approved Option B (explicit retained-field approval; decisions D-H1…D-H18)
+and authorized its implementation in Development/Test. It is implemented on the local branch
+`c188/retained-field-search`; the design as built is `docs/architecture/PHASE_C7_ADVANCED_FIELD_SEARCH.md` §6G and the
+evidence is `docs/PHASE_C9_STATUS.md` §11. The requirement stays UNMET until the owner accepts that evidence.
+
 ### 8.4 Not changed by M3
 
 D9-1…D9-9 including the compatibility exception (§4.5) and the D9-9 deferrals; G21; the PB-06 concurrency convention;

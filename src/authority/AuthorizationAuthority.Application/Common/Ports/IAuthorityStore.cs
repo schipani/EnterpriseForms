@@ -307,6 +307,19 @@ public interface IAuthorityScope : IAsyncDisposable
 
     void AddFieldSearchApproval(FieldSearchApproval approval);
 
+    /// <summary>C-188: every registered published version of a form, highest version number first (read-only).</summary>
+    Task<List<PublishedFormVersion>> GetPublishedFormVersionsAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken);
+
+    /// <summary>C-188 (D-H7): the form a field definition is bound to in this organization, or null (read-only).</summary>
+    Task<FieldFormBinding?> FindFieldFormBindingAsync(Guid organizationId, Guid fieldDefinitionId, CancellationToken cancellationToken);
+
+    void AddFieldFormBinding(FieldFormBinding binding);
+
+    /// <summary>C-188 BF-1: the form's Pending publication (tracked, so a resolution can resolve it), or null.</summary>
+    Task<FormVersionPublication?> FindPendingFormVersionPublicationAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken);
+
+    void AddFormVersionPublication(FormVersionPublication publication);
+
     /// <summary>Phase C7 M4: the entries of one snapshot for the given records only (read-only; uses the snapshot/record unique index).</summary>
     Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid searchCatalogueSnapshotId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
 

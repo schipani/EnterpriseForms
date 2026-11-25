@@ -21,6 +21,9 @@ public static class SearchUnavailableReasons
 {
     /// <summary>Phase C7 M0: trusted execution (Authority AC-5 catalogue and AC-6 field search policy) does not exist yet, so no field-value search runs.</summary>
     public const string TrustedSearchNotEnabled = "TRUSTED_SEARCH_NOT_ENABLED";
+
+    /// <summary>C-188 BF-1: the form's latest publication is not yet registered with the Authority, so no field of it is searchable (fails closed).</summary>
+    public const string FormPublicationPending = "FORM_PUBLICATION_PENDING";
 }
 
 /// <summary>Value types of a predicate; the value travels as invariant text and is parsed strictly by the server.</summary>

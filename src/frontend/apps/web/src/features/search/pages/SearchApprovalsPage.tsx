@@ -6,7 +6,7 @@ import { useState } from "react";
 import { OrganizationLayout } from "../../organizations";
 import { ErrorPanel } from "../../support";
 import { FieldSearchersCard } from "../components/FieldSearchersCard";
-import { FieldSearchSection, fieldSearchKey } from "../components/FieldSearchSection";
+import { FieldSearchSection, NO_LONGER_IN_THE_FORM, fieldSearchKey } from "../components/FieldSearchSection";
 
 export const searchApprovalsKey = ["organization", "search-approvals"];
 
@@ -66,6 +66,8 @@ export function SearchApprovalsPage() {
                 { key: "eligible", header: "Can be approved", render: (row) => `${row.eligibleFieldCount} of ${row.fieldCount}` },
                 { key: "approved", header: "Approved", render: (row) => (Number(row.activeApprovalCount) > 0 ? <Badge tone="success">{String(row.activeApprovalCount)}</Badge> : "0") },
                 { key: "invalidated", header: "No longer valid", render: (row) => (Number(row.invalidatedApprovalCount) > 0 ? <Badge tone="warning">{String(row.invalidatedApprovalCount)}</Badge> : "0") },
+                // C-188 (D-H8): active approvals of fields that are no longer in the form, for periodic review.
+                { key: "retained", header: "Removed fields searchable", render: (row) => (Number(row.retainedApprovalCount ?? 0) > 0 ? <Badge tone="info">{String(row.retainedApprovalCount)}</Badge> : "0") },
                 {
                   key: "actions",
                   header: "Actions",
@@ -105,7 +107,7 @@ function FormApprovals({ form, onClose }: { form: FieldSearchAdministrationFormR
       {configuration.isError ? <ErrorPanel error={configuration.error} onRetry={() => void configuration.refetch()} /> : null}
       {configuration.data
         ? configuration.data.fields.map((field) => (
-            <Card key={field.fieldDefinitionId} title={field.fieldLabel}>
+            <Card key={field.fieldDefinitionId} title={field.inCurrentVersion === false ? `${field.fieldLabel} (${NO_LONGER_IN_THE_FORM.toLowerCase()})` : field.fieldLabel}>
               <FieldSearchSection formDefinitionId={form.formDefinitionId} fieldDefinitionId={field.fieldDefinitionId} />
             </Card>
           ))
