@@ -38,6 +38,8 @@ Each selected group runs on its own runner and clean stack, with its own test re
 
 All seven groups remain defined, assigned and discoverable: forms-documents, authorization-security-onboarding, records-lifecycle, administration-membership, search-catalogue, search-execution, protection-reconciliation.
 
+*Update (BH-1, C-193):* the manifest now defines twelve groups — the seven above, the four of PR #68 (projection-integrity-restore, search-benchmark-indexed, search-benchmark-churn, search-benchmark-ingestion) and search-index-builder (SearchIndexBuilderStackTests, moved from search-catalogue). Groups whose tests wait for Authority search-index sweep passes declare `stackEnvironment` `IX1_SEARCH_SWEEP_INTERVAL_SECONDS=10`; the security-test overlay default is otherwise 300 s. `tests/integration/EnterpriseForms.StageBTests/stage-b-groups.json` remains the single source of truth. This release-only policy is unchanged.
+
 ## 4. What changed
 
 | Item | Before | After |

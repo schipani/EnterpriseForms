@@ -108,7 +108,11 @@ services:
       SearchIndex__Access__FullVerificationIntervalSeconds: ${IX5_FULL_VERIFICATION_SECONDS:-300}
       SearchIndex__Access__SpiceDbSweepIntervalSeconds: ${IX5_SWEEP_INTERVAL_SECONDS:-600}
       SearchIndex__Access__ShadowCanaryOrganizationIds__0: ${IX5C_CANARY_ORGANIZATION:-00000000-0000-0000-0000-000000000000}
-      SearchIndex__CheapSweepIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
+      # BH-1 (C-193): the overlay default is 300 s so that the S-A/S-B sweep of every organization accumulated on a long-lived stack
+      # does not load unrelated tests (an idle stack with 45 indexed organizations spent about 76 % CPU at 10 s; C9 status §12.4).
+      # Stage B groups whose tests wait for sweep passes declare IX1_SEARCH_SWEEP_INTERVAL_SECONDS=10 in stage-b-groups.json
+      # (stackEnvironment); CI and scripts/dev/stage-b.ps1 / test.ps1 apply it. Production defaults (900 s / 300 s) are unchanged.
+      SearchIndex__CheapSweepIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-300}
       # C-136 (R-33/R-36): entries per S-B transaction (organization lock released between transactions); the measurement recreates
       # the authority with other values.
       SearchIndex__SealCheckTransactionSize: ${IX4_SEAL_TRANSACTION_SIZE:-50}
@@ -122,7 +126,7 @@ services:
       # R-02 statement-preparation investigation: an optional Npgsql connection-string suffix for the runtime connection (empty by default),
       # e.g. ";Max Auto Prepare=50;Auto Prepare Min Usages=2". Test stack only; no production configuration is changed.
       ConnectionStrings__AuthorityDb: Host=authority-db;Database=${AUTHORITY_DB_NAME};Username=${AUTHORITY_RUNTIME_USER};Password=${AUTHORITY_RUNTIME_PASSWORD}${AUTHORITY_DB_CONNECTION_EXTRA:-}
-      SearchIndex__DeadlineEvaluationIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
+      SearchIndex__DeadlineEvaluationIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-300}
       SearchIndex__Seal__Provider: VaultTransit
       SearchIndex__Seal__SigningKeyName: search-entry-seal-v1
       SearchIndex__Seal__SigningKeyVersion: "1"

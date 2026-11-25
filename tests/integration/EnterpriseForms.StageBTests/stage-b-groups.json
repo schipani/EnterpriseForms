@@ -1,5 +1,5 @@
 {
-  "_comment": "Single source of truth for Stage B integration sharding. Every test class under Tests/ must appear in exactly one group (scripts/ci/stage_b_groups.py enforces it in CI and in scripts/dev/stage-b.ps1). Groups are balanced by summed test time measured in run 41709208259 (about 3735 s sequential): forms-documents ~180 s, authorization-security-onboarding ~395 s, records-lifecycle ~455 s, administration-membership ~570 s, search-catalogue ~620 s, protection-reconciliation ~715 s, search-execution ~820 s (one 719 s benchmark that cannot be split further). Re-split after Stage B run 44878220074 (findings F-6 and RB-13): the search-execution shard had grown to ten classes, including four long measurement classes recorded locally at about 21 min (IndexedSearchLocalBenchmarkTests), 14 min (SearchAvailabilityUnderPermissionChurnTests), 13 min (SealSweepLockMeasurementTests) and 16 min (RecordRegistrationThroughputMeasurementTests), and exceeded its 45 min job; each measurement now has a shard of its own (the last two share one). ProjectionIntegrityRollbackTests replaces or restores the whole SpiceDB datastore, which correctly quarantines every organization on the stack (RB-13), so it runs on a stack of its own. No test is removed or skipped.",
+  "_comment": "Single source of truth for Stage B integration sharding. Every test class under Tests/ must appear in exactly one group (scripts/ci/stage_b_groups.py enforces it in CI and in scripts/dev/stage-b.ps1). Groups are balanced by summed test time measured in run 41709208259 (about 3735 s sequential): forms-documents ~180 s, authorization-security-onboarding ~395 s, records-lifecycle ~455 s, administration-membership ~570 s, search-catalogue ~620 s, protection-reconciliation ~715 s, search-execution ~820 s (one 719 s benchmark that cannot be split further). Re-split after Stage B run 44878220074 (findings F-6 and RB-13): the search-execution shard had grown to ten classes, including four long measurement classes recorded locally at about 21 min (IndexedSearchLocalBenchmarkTests), 14 min (SearchAvailabilityUnderPermissionChurnTests), 13 min (SealSweepLockMeasurementTests) and 16 min (RecordRegistrationThroughputMeasurementTests), and exceeded its 45 min job; each measurement now has a shard of its own (the last two share one). ProjectionIntegrityRollbackTests replaces or restores the whole SpiceDB datastore, which correctly quarantines every organization on the stack (RB-13), so it runs on a stack of its own. No test is removed or skipped. BH-1 (C-193): the security-test overlay runs the Authority's search-index sweeps every 300 s (was 10 s), so that the sweep of every organization accumulated on a stack no longer loads unrelated tests. Groups whose tests wait for sweep passes declare stackEnvironment IX1_SEARCH_SWEEP_INTERVAL_SECONDS=10 (search-execution, search-benchmark-ingestion, search-index-builder); CI and scripts/dev/stage-b.ps1 and test.ps1 apply it (the shortest interval wins when several groups share one local stack). SearchIndexBuilderStackTests moved from search-catalogue to its own group so that the verified-search benchmark in search-catalogue runs without sweep load. No test is removed, skipped or weakened.",
   "namespace": "EnterpriseForms.StageBTests.Tests",
   "minimumTotalTests": 270,
   "groups": [
@@ -26,11 +26,12 @@
     {
       "name": "search-catalogue",
       "title": "Field Search Catalogue and Approvals",
-      "classes": ["SearchCatalogueTests", "FieldSearchApprovalTests", "RetainedFieldSearchTests", "FormVersionPublicationBarrierTests", "SearchIndexBuilderStackTests", "SearchAccessItemIdentityTests", "SearchAccessProjectionStackTests", "SearchAccessValueProjectionStackTests", "IndexedCommitReadStageMeasurementTests"]
+      "classes": ["SearchCatalogueTests", "FieldSearchApprovalTests", "RetainedFieldSearchTests", "FormVersionPublicationBarrierTests", "SearchAccessItemIdentityTests", "SearchAccessProjectionStackTests", "SearchAccessValueProjectionStackTests", "IndexedCommitReadStageMeasurementTests"]
     },
     {
       "name": "search-execution",
       "title": "Field Search Execution",
+      "stackEnvironment": { "IX1_SEARCH_SWEEP_INTERVAL_SECONDS": "10" },
       "classes": ["FieldSearchExecutionTests", "SearchIndexFoundationTests", "IndexedSearchQueryStackTests", "IndexedFieldSearchEngineStackTests", "IndexedSearchTimeoutDiagnosticsTests", "IndexedSearchShareOnlyItemChannelTests"]
     },
     {
@@ -56,7 +57,14 @@
     {
       "name": "search-benchmark-ingestion",
       "title": "Seal Sweep and Record Registration Measurements",
+      "stackEnvironment": { "IX1_SEARCH_SWEEP_INTERVAL_SECONDS": "10" },
       "classes": ["SealSweepLockMeasurementTests", "RecordRegistrationThroughputMeasurementTests"]
+    },
+    {
+      "name": "search-index-builder",
+      "title": "Search Index Builder, Rebuild and Deep Sweep",
+      "stackEnvironment": { "IX1_SEARCH_SWEEP_INTERVAL_SECONDS": "10" },
+      "classes": ["SearchIndexBuilderStackTests"]
     }
   ]
 }

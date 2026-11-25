@@ -117,7 +117,7 @@ public sealed partial class SearchIndexFoundationTests
             pairs_measured = measured.Count,
             started_on = started,
             ended_on = ended,
-            sweep_interval_seconds = Environment.GetEnvironmentVariable("IX1_SEARCH_SWEEP_INTERVAL_SECONDS") ?? "10 (security-test default)",
+            sweep_interval_seconds = Environment.GetEnvironmentVariable("IX1_SEARCH_SWEEP_INTERVAL_SECONDS") ?? "unset: security-test overlay default (300 s since BH-1, C-193)",
             tier2_mode = Environment.GetEnvironmentVariable("IX5_ACCESS_MODE") ?? "Dark (security-test default)",
             indexed_ms = Series(indexedSorted),
             plain_ms = Series(plainSorted),

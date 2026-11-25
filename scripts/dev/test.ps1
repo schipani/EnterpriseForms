@@ -67,6 +67,22 @@ function StackUpAll {
   if ($failed.Count -gt 0) { Write-Host "one-shot service failed: $failed" -ForegroundColor Red; $global:LASTEXITCODE = 1 }
 }
 
+# BH-1 (C-193): apply the disposable stack environment the selected Stage B tests need (stage-b-groups.json stackEnvironment,
+# resolved by scripts/ci/stage_b_groups.py stack-env; when several groups share this stack the shortest sweep interval wins). An
+# empty value removes the variable, so the security-test overlay default applies; a value set by hand in this shell is replaced,
+# with a notice. Affects the enterpriseforms-sectest compose project only; never the dev stack or production configuration.
+function ApplyStackEnvironment([string[]]$Selection) {
+  $lines = @(python (Join-Path $root 'scripts/ci/stage_b_groups.py') stack-env @Selection)
+  if ($LASTEXITCODE -ne 0) { throw 'cannot resolve the Stage B stack environment of the selected tests' }
+  foreach ($line in $lines) {
+    $key, $value = $line -split '=', 2
+    $current = [Environment]::GetEnvironmentVariable($key)
+    if ($current -and $current -ne $value) { Write-Host "Replacing $key=$current from this shell with '$value' (empty = overlay default) for the selected tests." -ForegroundColor Yellow }
+    [Environment]::SetEnvironmentVariable($key, $(if ($value) { $value } else { $null }))
+    Write-Host "Stack environment: $key=$(if ($value) { $value } else { '(overlay default)' })"
+  }
+}
+
 try {
   if ($Level -eq 1) {
     Step '.NET build + unit/architecture/contract tests' {
@@ -77,6 +93,11 @@ try {
   }
 
   if ($Level -eq 2) {
+    if ($Class) { ApplyStackEnvironment @('--class-pattern', $Class) } elseif (-not ($Spec -or $Browser)) { ApplyStackEnvironment @('--groups', 'all') } else { ApplyStackEnvironment @('--defaults') }
+    if ($NoRebuild) {
+      # BH-1: the stack is reused as-is except the authority, which compose recreates only if its configuration differs.
+      Step 'Stack environment (authority only, no rebuild)' { Stack @('up', '-d', '--no-deps', '--wait', 'authority') }
+    }
     if (-not $NoRebuild) {
       # Incremental: BuildKit reuses unchanged layers and compose recreates only containers whose image changed.
       Step 'Stack up (incremental build, stays running)' { StackUpAll }
@@ -136,6 +157,7 @@ try {
     if ($stageBAuthorized) {
       # The Stage B stack must start from empty volumes: a stack reused after the tamper tests can quarantine (ARCHIVE_BODY_MISMATCH).
       Step 'Stage B: clean stack' { Stack @('down', '-v', '--remove-orphans') }
+      ApplyStackEnvironment @('--groups', 'all')
       Step 'Stage B: start full stack' { StackUpAll }
       Step 'Stage B: integration tests' {
         InDir $root { dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release --results-directory artifacts/stage-b/test-results --report-xunit-trx -- --minimum-expected-tests 10 }

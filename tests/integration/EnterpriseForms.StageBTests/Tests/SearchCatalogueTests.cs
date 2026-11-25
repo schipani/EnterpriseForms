@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using EnterpriseForms.SecurityTests.Harness;
 using EnterpriseForms.StageBTests.Harness;
@@ -463,7 +464,7 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
             levels.Add(new { concurrency, rounds, attempts = (rounds + 1) * concurrency, verifications = server.Count, typedRetryableRefusals = failures, timeLimitRefusals, serverMilliseconds = server.Count > 0 ? Percentiles(server) : null, clientMilliseconds = client.Count > 0 ? Percentiles(client) : null });
         }
 
-        var json = JsonSerializer.Serialize(new { measuredOn = DateTimeOffset.UtcNow, records = 200, valueProfile = "Accused form: 8 fields incl. encrypted names (name lengths 8..47), plaintext date/boolean/option/datetime/guid", backgroundWorkload = "address edits on another form every 250 ms", note = "engineering measurement; small samples; p99 of small n is near the maximum; not a capacity claim", levels }, Indented);
+        var json = JsonSerializer.Serialize(new { measuredOn = DateTimeOffset.UtcNow, environment = DescribeBenchmarkEnvironment(), records = 200, valueProfile = "Accused form: 8 fields incl. encrypted names (name lengths 8..47), plaintext date/boolean/option/datetime/guid", backgroundWorkload = "address edits on another form every 250 ms", note = "engineering measurement; small samples; p99 of small n is near the maximum; not a capacity claim", levels }, Indented);
         TestContext.Current.TestOutputHelper?.WriteLine(json);
         Console.WriteLine("C7-AC5-BENCHMARK-200 " + JsonSerializer.Serialize(levels));
         var root = new DirectoryInfo(AppContext.BaseDirectory);
@@ -491,6 +492,7 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
     public async Task BenchmarkTheVerifiedScopeAt50And150And480Records()
     {
         var report = new List<object>();
+        var environment = DescribeBenchmarkEnvironment();
         foreach (var (size, runs) in new[] { (50, 15), (150, 12), (480, 8) })
         {
             var s = new StageBScenario(fixture, $"c7-bench-{size}");
@@ -544,6 +546,7 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
             {
                 records = size,
                 runs,
+                stackOrganizationsAfterMeasurement = StackOrganizationCount(),
                 serverMilliseconds = Percentiles(server),
                 clientMilliseconds = Percentiles(client),
                 catalogueEntries = last.GetProperty("catalogueEntryCount").GetInt32(),
@@ -552,10 +555,10 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
                 verificationBatches = last.GetProperty("verificationBatches").GetInt32(),
                 verifiedBytes = last.GetProperty("verifiedBytes").GetInt64(),
             });
-            await WriteReportAsync(report);
+            await WriteReportAsync(report, environment);
         }
 
-        await WriteReportAsync(report);
+        await WriteReportAsync(report, environment);
 
         // Leave the shared stack as found: let the archive processor deliver the benchmark's journal backlog before other tests run.
         var drained = Stopwatch.StartNew();
@@ -565,9 +568,62 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
         }
     }
 
-    private static async Task WriteReportAsync(List<object> report)
+    /// <summary>
+    /// BH-1 (C9 status §12.4): states where and under which background load a benchmark ran, instead of a fixed label. The
+    /// label was once hard-coded as "GitHub-hosted", so a laptop measurement was compared with a hosted one as if both were
+    /// hosted. Reporting only: no measurement, limit or assertion depends on these values.
+    /// </summary>
+    private object DescribeBenchmarkEnvironment()
     {
-        var json = JsonSerializer.Serialize(new { measuredOn = DateTimeOffset.UtcNow, environment = "GitHub-hosted isolated Docker stack (compose.security-test)", note = "provisional engineering measurement; small sample sizes; p99 of n<=15 runs is the maximum", scenarios = report }, Indented);
+        var hosted = string.Equals(Environment.GetEnvironmentVariable("GITHUB_ACTIONS"), "true", StringComparison.OrdinalIgnoreCase);
+        return new
+        {
+            host = hosted ? "GitHub-hosted runner" : "local machine (not a GitHub-hosted runner)",
+            stack = "isolated Docker stack (compose.security-test)",
+            runnerOperatingSystem = Environment.GetEnvironmentVariable("RUNNER_OS"),
+            runnerImage = Environment.GetEnvironmentVariable("ImageOS"),
+            runnerImageVersion = Environment.GetEnvironmentVariable("ImageVersion"),
+            workflowRunId = Environment.GetEnvironmentVariable("GITHUB_RUN_ID"),
+            sourceCommit = Environment.GetEnvironmentVariable("GITHUB_SHA"),
+            stageBGroup = Environment.GetEnvironmentVariable("GROUP"),
+            operatingSystem = RuntimeInformation.OSDescription,
+            processorCount = Environment.ProcessorCount,
+            searchIndexCheapSweepIntervalSeconds = AuthorityConfiguredValue("SearchIndex__CheapSweepIntervalSeconds"),
+            stackOrganizationsAtStart = StackOrganizationCount(),
+        };
+    }
+
+    /// <summary>The value the running Authority container was configured with (the image has no shell, so the container's
+    /// environment is read); null when it cannot be read, never a guessed default.</summary>
+    private string? AuthorityConfiguredValue(string key)
+    {
+        var container = fixture.Stack.Compose("ps -q authority", 60, throwOnError: false).Trim();
+        if (container.Length == 0)
+        {
+            return null;
+        }
+
+        var environment = ComposeStack.Run("docker", "inspect --format \"{{range .Config.Env}}{{println .}}{{end}}\" " + container, 60, throwOnError: false);
+        return environment.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault(line => line.StartsWith(key + "=", StringComparison.Ordinal))?[(key.Length + 1)..];
+    }
+
+    /// <summary>Organizations on the stack (the Authority's periodic background work grows with them); null if unreadable.</summary>
+    private int? StackOrganizationCount()
+    {
+        try
+        {
+            return int.Parse(fixture.Stack.AuthorityObserverSql("SELECT count(*) FROM organization_authorization_states;").Trim(), CultureInfo.InvariantCulture);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or TimeoutException or FormatException)
+        {
+            return null;
+        }
+    }
+
+    private static async Task WriteReportAsync(List<object> report, object environment)
+    {
+        var json = JsonSerializer.Serialize(new { measuredOn = DateTimeOffset.UtcNow, environment, note = "provisional engineering measurement; small sample sizes; p99 of n<=15 runs is the maximum", scenarios = report }, Indented);
         TestContext.Current.TestOutputHelper?.WriteLine(json);
         Console.WriteLine("C7-M1-BENCHMARK " + JsonSerializer.Serialize(report));
         var root = new DirectoryInfo(AppContext.BaseDirectory);
