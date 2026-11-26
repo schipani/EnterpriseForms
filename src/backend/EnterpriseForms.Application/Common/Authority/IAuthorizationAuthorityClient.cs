@@ -445,3 +445,28 @@ public interface ITestStackIdentityAuthority
 {
     Task<AuthorityStackIdentity> GetTestStackIdentityAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>C10 M2: the Authority's committed state of one share (internal <c>GetShareDetails</c>), read behind the open gate.</summary>
+public sealed record AuthorityShareDetails(
+    Guid RecordShareId,
+    Guid FormRecordId,
+    string LifecycleState,
+    string? RecipientKind,
+    Guid? RecipientId,
+    string? RecipientRole,
+    IReadOnlyList<Guid> FieldItemIds,
+    DateTimeOffset? ShareExpiresOn,
+    DateTimeOffset? EffectiveExpiresOn,
+    long ShareRevision,
+    Guid? ParentRecordShareId,
+    int DelegationDepth,
+    bool LegacyLineageUnresolved,
+    string? InvalidationReasonCode,
+    Guid? GrantorUserId,
+    long AuthorizationRevision);
+
+/// <summary>C10 M2 (WP-0 Section 3.5): the authoritative share-details read; the Authority decides who may read it.</summary>
+public interface IShareDetailsAuthority
+{
+    Task<AuthorityShareDetails> GetShareDetailsAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken);
+}

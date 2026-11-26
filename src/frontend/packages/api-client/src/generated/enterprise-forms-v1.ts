@@ -1342,7 +1342,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** One share's committed state from the authority (owner, or a Manager on its committed lineage; others 404). The ETag carries the authoritative share revision for PATCH If-Match. */
+        get: operations["GetRecordShare"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4489,6 +4490,38 @@ export interface components {
             expiresOn: null | string;
             identityProviderKind: string;
         };
+        ShareDetailsResponse: {
+            /** Format: uuid */
+            recordShareId: string;
+            /** Format: uuid */
+            formRecordId: string;
+            shareStatus: string;
+            /** Format: uuid */
+            recipientUserId: null | string;
+            /** Format: uuid */
+            recipientTeamId: null | string;
+            recipientDisplayName: null | string;
+            recipientRole: null | string;
+            fieldValueItemIds: string[];
+            fieldKeys: string[];
+            /** Format: date-time */
+            shareExpiresOn: null | string;
+            /** Format: date-time */
+            effectiveExpiresOn: null | string;
+            /** Format: int64 */
+            shareRevision: number | string;
+            /** Format: uuid */
+            parentRecordShareId: null | string;
+            /** Format: int32 */
+            delegationDepth: number | string;
+            legacyLineageUnresolved: boolean;
+            invalidationReasonCode: null | string;
+            /** Format: uuid */
+            grantorUserId: null | string;
+            grantorDisplayName: null | string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+        };
         SharedFieldAccessResponse: {
             fieldKey: string;
             editable: boolean;
@@ -7118,6 +7151,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShareResponse"];
+                };
+            };
+        };
+    };
+    GetRecordShare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+                recordShareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareDetailsResponse"];
                 };
             };
         };

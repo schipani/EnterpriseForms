@@ -3581,6 +3581,45 @@
       }
     },
     "/api/v1/form-records/{formRecordId}/shares/{recordShareId}": {
+      "get": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "One share's committed state from the authority (owner, or a Manager on its committed lineage; others 404). The ETag carries the authoritative share revision for PATCH If-Match.",
+        "operationId": "GetRecordShare",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "recordShareId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareDetailsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "patch": {
         "tags": [
           "Sharing"
@@ -15191,6 +15230,149 @@
           },
           "identityProviderKind": {
             "type": "string"
+          }
+        }
+      },
+      "ShareDetailsResponse": {
+        "required": [
+          "recordShareId",
+          "formRecordId",
+          "shareStatus",
+          "recipientUserId",
+          "recipientTeamId",
+          "recipientDisplayName",
+          "recipientRole",
+          "fieldValueItemIds",
+          "fieldKeys",
+          "shareExpiresOn",
+          "effectiveExpiresOn",
+          "shareRevision",
+          "parentRecordShareId",
+          "delegationDepth",
+          "legacyLineageUnresolved",
+          "invalidationReasonCode",
+          "grantorUserId",
+          "grantorDisplayName",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "recordShareId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "shareStatus": {
+            "type": "string"
+          },
+          "recipientUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recipientTeamId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recipientDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "recipientRole": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fieldValueItemIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "fieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "shareExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "effectiveExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "shareRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "parentRecordShareId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "delegationDepth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "legacyLineageUnresolved": {
+            "type": "boolean"
+          },
+          "invalidationReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "grantorUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "grantorDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           }
         }
       },

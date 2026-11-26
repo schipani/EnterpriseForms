@@ -68,6 +68,17 @@ public sealed record ShareResponse(Guid RecordShareId, Guid FormRecordId, string
 public sealed record UpdateShareRequest(string RecipientRole, IReadOnlyList<string> FieldKeys, DateTimeOffset? ShareExpiresOn = null, bool? NoExpiry = null,
     Guid? ParentRecordShareId = null, bool? UseDevelopmentStepUp = null);
 
+/// <summary>
+/// C10 M2 (WP-0 Section 3.5): one share as the Authority committed it. <c>ShareRevision</c> is the authoritative share revision and
+/// is also served as the <c>ETag</c> for <c>PATCH</c>; <c>AuthorizationRevision</c> is the organization revision of the read. Field
+/// items are authoritative; <c>FieldKeys</c> is a display hint from the local projection and may omit items it cannot name.
+/// Recipient, role and items are empty once the share is no longer Active.
+/// </summary>
+public sealed record ShareDetailsResponse(Guid RecordShareId, Guid FormRecordId, string ShareStatus, Guid? RecipientUserId, Guid? RecipientTeamId, string? RecipientDisplayName,
+    string? RecipientRole, IReadOnlyList<Guid> FieldValueItemIds, IReadOnlyList<string> FieldKeys, DateTimeOffset? ShareExpiresOn, DateTimeOffset? EffectiveExpiresOn,
+    long ShareRevision, Guid? ParentRecordShareId, int DelegationDepth, bool LegacyLineageUnresolved, string? InvalidationReasonCode, Guid? GrantorUserId,
+    string? GrantorDisplayName, long AuthorizationRevision);
+
 /// <summary>C10 M2: the share after an Effective update; <c>ShareRevision</c> is also the new <c>ETag</c>.</summary>
 public sealed record UpdateShareResponse(Guid RecordShareId, Guid FormRecordId, string RecipientRole, IReadOnlyList<Guid> FieldValueItemIds, long ShareRevision, string ShareStatus,
     CommandOutcome Command);

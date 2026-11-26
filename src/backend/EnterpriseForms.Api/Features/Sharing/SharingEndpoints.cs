@@ -1,6 +1,7 @@
 using EnterpriseForms.Api.Composition;
 using EnterpriseForms.Api.Features.FormDefinitions;
 using EnterpriseForms.Application.Features.Sharing.CreateShare;
+using EnterpriseForms.Application.Features.Sharing.GetShare;
 using EnterpriseForms.Application.Features.Sharing.ListShares;
 using EnterpriseForms.Application.Features.Sharing.RevokeShare;
 using EnterpriseForms.Application.Features.Sharing.UpdateShare;
@@ -33,6 +34,18 @@ public static class SharingEndpoints
             })
             .WithName("ListRecordShares")
             .WithSummary("Shares of a record for its access managers (local projection; the authority decides every recipient's access).");
+
+        // C10 M2 (WP-0 §3.5, D10-3): the authoritative share details; the ETag is the Authority's committed share revision.
+        group.MapGet("/{recordShareId:guid}", static async Task<Ok<ShareDetailsResponse>> (Guid formRecordId, Guid recordShareId, HttpContext http, GetShareHandler handler, CancellationToken cancellationToken) =>
+            {
+                var context = BusinessAuthentication.RequireContext(http);
+                var response = await handler.HandleAsync(context, formRecordId, recordShareId, cancellationToken).ConfigureAwait(false);
+                http.Response.Headers.ETag = ShareRevisionPrecondition.Format(recordShareId, response.ShareRevision);
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(response);
+            })
+            .WithName("GetRecordShare")
+            .WithSummary("One share's committed state from the authority (owner, or a Manager on its committed lineage; others 404). The ETag carries the authoritative share revision for PATCH If-Match.");
 
         // C10 M2 (WP-0 §3.2, PB-06): replace a share's scope. If-Match carries the share ETag "{recordShareId}:{shareRevision}"
         // (428 when missing, 412 when malformed or stale); an organization-revision conflict is 409 and is not retried.
