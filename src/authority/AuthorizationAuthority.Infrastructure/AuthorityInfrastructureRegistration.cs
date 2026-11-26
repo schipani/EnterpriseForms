@@ -107,6 +107,7 @@ public static class AuthorityInfrastructureRegistration
         services.AddSingleton<ProjectionIntegrityMonitor>();
         services.AddSingleton<PermissionCheckService>();
         services.AddSingleton<FormAccessService>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.Sharing.ShareDetailsService>();
         services.AddSingleton<ContentService>();
         services.AddSingleton<ProjectionProcessor>();
         services.AddSingleton<ArchiveProcessor>();

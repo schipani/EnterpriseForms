@@ -180,6 +180,56 @@
         }
       }
     },
+    "/internal/v1/records/{organizationId}/{formRecordId}/shares/{recordShareId}": {
+      "get": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "Authoritative committed state and share revision of one share (owner, or a Manager on its committed lineage); fails closed while the organization gate is closed.",
+        "operationId": "GetShareDetails",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "recordShareId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/security-commands": {
       "post": {
         "tags": [
@@ -12917,6 +12967,127 @@
           "correlation_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "ShareDetails": {
+        "required": [
+          "record_share_id",
+          "form_record_id",
+          "lifecycle_state",
+          "recipient_kind",
+          "recipient_id",
+          "recipient_role",
+          "field_item_ids",
+          "share_expires_on",
+          "effective_expires_on",
+          "share_revision",
+          "parent_record_share_id",
+          "delegation_depth",
+          "legacy_lineage_unresolved",
+          "invalidation_reason_code",
+          "grantor_user_id",
+          "authorization_revision"
+        ],
+        "type": "object",
+        "properties": {
+          "record_share_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lifecycle_state": {
+            "type": "string"
+          },
+          "recipient_kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "recipient_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recipient_role": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "field_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "share_expires_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "effective_expires_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "share_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "parent_record_share_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "delegation_depth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "legacy_lineage_unresolved": {
+            "type": "boolean"
+          },
+          "invalidation_reason_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "grantor_user_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           }
         }
       },

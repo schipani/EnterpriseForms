@@ -232,6 +232,7 @@ public sealed class Program
 
         app.MapAuthorizationEndpoints();
         app.MapFormAccessEndpoints();
+        app.MapShareDetailsEndpoints();
         app.MapSecurityCommandEndpoints();
         app.MapSecurityCommandOutcomeEndpoints();
         AuthorizationAuthority.Api.Features.Audit.AuditAccessEndpoints.MapAuditAccessEndpoints(app);
