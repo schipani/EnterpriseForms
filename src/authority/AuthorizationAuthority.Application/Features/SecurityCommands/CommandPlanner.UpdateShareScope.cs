@@ -137,29 +137,55 @@ public static partial class CommandPlanner
         var currentFields = graph.EdgesWithSubject(ResourceTypeNames.RecordShare, payload.RecordShareId)
             .Where(e => e.ResourceTypeName == ResourceTypeNames.FieldItem && e.RelationshipName == "shared_via").ToList();
         var recipient = roleEdges[0];
-        if ((role != recipient.RelationshipName || expiresOn != metadata.ShareExpiresOn ||
-             !fields.SetEquals(currentFields.Select(e => e.ResourceEntityId))) &&
-            await HasDependentShareAsync(scope, organizationId, payload.RecordShareId, cancellationToken).ConfigureAwait(false))
+
+        // C10 M1-WP5 (WP-0 Section 3.4): a change that narrows the share invalidates, in this same command, every Active descendant
+        // whose scope is no longer within its parent's new scope (and everything below it). Widening invalidates nothing; an earlier
+        // expiry needs no invalidation because a descendant's effective expiry is the lineage minimum (enforced at access time).
+        List<(Domain.Features.Organizations.AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata)> narrowed = [];
+        if (role != recipient.RelationshipName || !fields.SetEquals(currentFields.Select(e => e.ResourceEntityId)))
         {
-            throw new AuthorityException(AuthorityErrorCodes.ShareHasActiveDescendants, 422, false, "dependent shares require an atomic cascade");
+            var descendants = await ReadRevokedShareDescendantsAsync(scope, organizationId, payload.FormRecordId, payload.RecordShareId, cancellationToken).ConfigureAwait(false);
+            narrowed = NarrowedDescendants(graph, payload.RecordShareId, role, fields, descendants);
         }
 
         var nextRevision = metadata.ShareRevision + 1;
         var plan = new CommandPlan
         {
-            NormalizedPayloadJson = CanonicalJson.Serialize(new
-            {
-                payload.RecordShareId,
-                payload.FormRecordId,
-                payload.RecipientRole,
-                payload.FieldItemIds,
-                metadata.ParentRecordShareId,
-                payload.ExpectedShareRevision,
-                ShareRevision = nextRevision,
-                ShareExpiresOn = expiresOn,
-            }),
+            NormalizedPayloadJson = narrowed.Count == 0
+                ? CanonicalJson.Serialize(new
+                {
+                    payload.RecordShareId,
+                    payload.FormRecordId,
+                    payload.RecipientRole,
+                    payload.FieldItemIds,
+                    metadata.ParentRecordShareId,
+                    payload.ExpectedShareRevision,
+                    ShareRevision = nextRevision,
+                    ShareExpiresOn = expiresOn,
+                })
+                : CanonicalJson.Serialize(new
+                {
+                    payload.RecordShareId,
+                    payload.FormRecordId,
+                    payload.RecipientRole,
+                    payload.FieldItemIds,
+                    metadata.ParentRecordShareId,
+                    payload.ExpectedShareRevision,
+                    ShareRevision = nextRevision,
+                    ShareExpiresOn = expiresOn,
+                    InvalidatedDescendantShareIds = narrowed.Select(d => d.Metadata.RecordShareId).Order().ToArray(),
+                    InvalidationReasonCode = Domain.Features.Sharing.ShareInvalidationReasons.UpstreamNarrowed,
+                }),
             ShareMetadataUpdate = (metadata, nextRevision, expiresOn),
         };
+
+        if (narrowed.Count > 0)
+        {
+            plan.RemoveEdges.AddRange(narrowed.SelectMany(d => graph.EdgesWithSubject(ResourceTypeNames.RecordShare, d.Metadata.RecordShareId)
+                .Concat(graph.EdgesOf(ResourceTypeNames.RecordShare, d.Metadata.RecordShareId))).Distinct());
+            plan.InvalidatedDescendantShares.AddRange(narrowed.Select(d => (d.Resource, d.Metadata, Domain.Features.Sharing.ShareInvalidationReasons.UpstreamNarrowed)));
+            plan.InvalidationSourceShareId = payload.RecordShareId;
+        }
 
         var removedFields = currentFields.Where(e => !fields.Contains(e.ResourceEntityId)).ToList();
         plan.RemoveEdges.AddRange(removedFields);
@@ -182,18 +208,35 @@ public static partial class CommandPlanner
         return plan;
     }
 
-    private static async Task<bool> HasDependentShareAsync(IAuthorityScope scope, Guid organizationId, Guid shareId, CancellationToken cancellationToken)
+    /// <summary>
+    /// The Active descendants (from <see cref="ReadRevokedShareDescendantsAsync"/>, parents before children) that the updated share's
+    /// new role and items no longer cover: a parent that is not a Manager cannot delegate; a share's items must be within its parent's;
+    /// a descendant below an invalidated share is invalidated with it. Descendants that remain covered keep their own scope.
+    /// </summary>
+    private static List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata)> NarrowedDescendants(
+        DesiredStateGraph graph, Guid updatedShareId, string updatedRole, IReadOnlySet<Guid> updatedFields,
+        List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata)> descendants)
     {
-        foreach (var child in await scope.FindShareMetadataByParentAsync(organizationId, shareId, cancellationToken).ConfigureAwait(false))
+        var scopes = new Dictionary<Guid, (string Role, IReadOnlySet<Guid> Fields)> { [updatedShareId] = (updatedRole, updatedFields) };
+        var invalid = new HashSet<Guid>();
+        var narrowed = new List<(AuthorityResource, Domain.Features.Sharing.ShareResourceMetadata)>();
+        foreach (var (resource, metadata) in descendants)
         {
-            var resource = await scope.FindResourceAsync(organizationId, ResourceTypeNames.RecordShare, child.RecordShareId, cancellationToken).ConfigureAwait(false);
-            if (resource is null || resource.ResourceLifecycleState == ResourceLifecycleStates.Active ||
-                (await scope.FindShareMetadataByParentAsync(organizationId, child.RecordShareId, cancellationToken).ConfigureAwait(false)).Count > 0)
+            var id = metadata.RecordShareId;
+            var roles = graph.EdgesOf(ResourceTypeNames.RecordShare, id).Where(e => e.RelationshipName is "reader" or "contributor" or "manager").Select(e => e.RelationshipName).Distinct().ToList();
+            var covered = metadata.ParentRecordShareId is { } parent && !invalid.Contains(parent) && scopes.TryGetValue(parent, out var parentScope) &&
+                          parentScope.Role == "manager" && roles.Count == 1 && graph.FieldItemsOfShare(id).All(parentScope.Fields.Contains);
+            if (covered)
             {
-                return true;
+                scopes[id] = (roles[0], graph.FieldItemsOfShare(id));
+            }
+            else
+            {
+                invalid.Add(id);
+                narrowed.Add((resource, metadata));
             }
         }
 
-        return false;
+        return narrowed;
     }
 }

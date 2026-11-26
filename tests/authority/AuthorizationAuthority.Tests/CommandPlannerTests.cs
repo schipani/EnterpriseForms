@@ -499,7 +499,7 @@ public sealed class CommandPlannerTests
     }
 
     [Fact]
-    public async Task ScopeUpdateKeepsItsParentAndRefusesAChangeWithDependentShares()
+    public async Task ScopeUpdateKeepsItsParentAndNarrowingInvalidatesUncoveredDependents()
     {
         var fixture = new SharePlanFixture();
         var parent = fixture.AddGrant(Item);
@@ -512,10 +512,15 @@ public sealed class CommandPlannerTests
             fixture.UpdateAsync(child, [fixture.OtherItem], parent: independentParent.RecordShareId, asOwner: false));
         Assert.Equal(AuthorityErrorCodes.Forbidden, reparent.ErrorCode);
 
-        var descendant = await Assert.ThrowsAsync<AuthorityException>(() => fixture.UpdateAsync(parent, [fixture.OtherItem]));
-        Assert.Equal(AuthorityErrorCodes.ShareHasActiveDescendants, descendant.ErrorCode);
+        // C10 M1-WP5: narrowing the parent away from the child's item invalidates the child in the same command.
+        var narrowed = await fixture.UpdateAsync(parent, [fixture.OtherItem]);
+        var invalidated = Assert.Single(narrowed.InvalidatedDescendantShares);
+        Assert.Equal(child.RecordShareId, invalidated.Metadata.RecordShareId);
+        Assert.Equal(ShareInvalidationReasons.UpstreamNarrowed, invalidated.Reason);
+        Assert.Equal(parent.RecordShareId, narrowed.InvalidationSourceShareId);
+        Assert.Contains(narrowed.RemoveEdges, e => e.ResourceEntityId == child.RecordShareId || e.SubjectEntityId == child.RecordShareId);
+        Assert.Contains(ShareInvalidationReasons.UpstreamNarrowed, narrowed.NormalizedPayloadJson, StringComparison.Ordinal);
         Assert.Equal(1, child.ShareRevision);
-        Assert.Equal(1, parent.ShareRevision);
     }
 
     [Fact]
