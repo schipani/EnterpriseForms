@@ -206,6 +206,45 @@ public sealed class HumanCommandStepUpTests
         Assert.Equal(5, Assert.Single(store.Organizations).AuthorizationRevision);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task IdempotentReplayKeepsTheExistingCommandWithOrWithoutAnExplicitMarker(bool useMarker)
+    {
+        var binding = store.Bindings.Single(b => b.AuthorityUserId == Owner);
+        var service = new SecurityCommandService(store, new NoOpFaultInjector(), TimeProvider.System, FieldSearchSynthetic,
+            humanCommandGate: Synthetic);
+        var share = Guid.NewGuid();
+        var payload = useMarker
+            ? JsonSerializer.SerializeToElement(new
+            {
+                record_share_id = share,
+                form_record_id = Record,
+                step_up_evidence = HumanCommandStepUpGate.SyntheticStepUpEvidence,
+            })
+            : JsonSerializer.SerializeToElement(new { record_share_id = share, form_record_id = Record });
+        var request = new SecurityCommandRequest(Org, SecurityCommandKind.RevokeShare, new ResourceRef(ResourceKind.FormRecord, Record), 0, payload);
+        var stored = new SecurityCommand
+        {
+            OrganizationId = Org,
+            SecurityCommandId = Guid.NewGuid(),
+            ActorIdentityBindingId = binding.IdentityBindingId,
+            CommandKindName = nameof(SecurityCommandKind.RevokeShare),
+            CommandStateName = SecurityCommandStates.Effective,
+            CommandIdempotencyKey = "replay-step-up",
+            CommittedAuthorizationRevision = 5,
+            CommandRequestDigest = CanonicalJson.Digest(CanonicalJson.SerializeBytes(request)),
+        };
+        store.Commands.Add(stored);
+
+        var status = await service.SubmitAsync(new VerifiedActor("https://idp", Owner.ToString("N"), "test"),
+            request with { ExpectedAuthorizationRevision = 5 }, stored.CommandIdempotencyKey, Guid.NewGuid(), Ct);
+
+        Assert.Equal(stored.SecurityCommandId, status.CommandId);
+        Assert.Single(store.Commands);
+        Assert.Empty(store.Outbox);
+    }
+
     // ---- RevokeShare step-up tests ----
 
     [Fact]

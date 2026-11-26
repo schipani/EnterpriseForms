@@ -8,4 +8,7 @@
     <ProjectReference Include="../EnterpriseForms.Contracts/EnterpriseForms.Contracts.csproj" />
     <ProjectReference Include="../../shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="EnterpriseForms.Api.ContractTests" />
+  </ItemGroup>
 </Project>

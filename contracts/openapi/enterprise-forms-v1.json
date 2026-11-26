@@ -7667,6 +7667,20 @@
               "null",
               "boolean"
             ]
+          },
+          "parentRecordShareId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "shareExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
