@@ -38,6 +38,13 @@ public sealed class Program
             return evidenceIndexExitCode;
         }
 
+        // C10 M1-WP10: read-only legacy lineage dry-run report (Development/Testing; one verified REPEATABLE READ, READ ONLY
+        // transaction on its own connection; no write path). It accepts no other command or host argument alongside it.
+        if (LegacyLineageDryRunCommand.TryRun(args, out var lineageExitCode))
+        {
+            return lineageExitCode;
+        }
+
         // E3-M2b-1F: Release B only, an explicit operator action; ordinary --migrate never applies the floor, and the two are
         // never combined in one invocation (the command refuses --migrate alongside it).
         if (ContentAcceptanceFloorCommand.TryRun(args, out var floorExitCode))
