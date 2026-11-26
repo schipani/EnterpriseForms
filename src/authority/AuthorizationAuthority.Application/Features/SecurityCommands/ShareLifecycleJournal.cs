@@ -77,13 +77,14 @@ internal static class ShareLifecycleJournal
             return;
         }
 
-        if (plan.InvalidationSourceShareId is not { } source)
-        {
-            throw new InvalidOperationException("an invalidation plan must name the share whose change caused it");
-        }
-
         foreach (var (resource, metadata, reason) in plan.InvalidatedDescendantShares.OrderBy(d => d.Metadata.RecordShareId))
         {
+            // The share whose change caused the invalidation; for a lost grantor path (no upstream share changed), the share's own parent.
+            if ((plan.InvalidationSourceShareId ?? metadata.ParentRecordShareId) is not { } source)
+            {
+                throw new InvalidOperationException("an invalidated share must name the upstream share it depended on");
+            }
+
             if (resource.OrganizationId != locked.OrganizationId || metadata.OrganizationId != locked.OrganizationId ||
                 resource.ResourceEntityId != metadata.RecordShareId || resource.ParentResourceEntityId is not { } record)
             {

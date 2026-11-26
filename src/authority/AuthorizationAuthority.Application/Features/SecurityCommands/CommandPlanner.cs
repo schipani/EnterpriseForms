@@ -289,9 +289,72 @@ public static partial class CommandPlanner
             }
 
             plan.RemoveEdges.Add(existing);
+            await InvalidateLostGrantorPathsAsync(scope, organizationId, graph, payload, plan, cancellationToken).ConfigureAwait(false);
         }
 
         return plan;
+    }
+
+    /// <summary>
+    /// C10 M1-WP5 (WP-0 Section 3.4, "removes the delegator's path"): when the removed member held a Manager share only through this
+    /// team, every Active share the member delegated under it (and its subtree) is invalidated in the same command
+    /// (<see cref="Domain.Features.Sharing.ShareInvalidationReasons.GrantorPathLost"/>). A path that survives (a direct Manager edge or
+    /// another team) keeps them.
+    /// </summary>
+    private static async Task InvalidateLostGrantorPathsAsync(IAuthorityScope scope, Guid organizationId, DesiredStateGraph graph, TeamMemberPayload payload, CommandPlan plan, CancellationToken cancellationToken)
+    {
+        var member = payload.MemberUserId;
+        var binding = await scope.FindIdentityBindingByUserAsync(organizationId, member, cancellationToken).ConfigureAwait(false);
+        if (binding is null)
+        {
+            return;
+        }
+
+        var lost = new List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata)>();
+        var seen = new HashSet<Guid>();
+        foreach (var held in graph.EdgesWithSubject(ResourceTypeNames.Team, payload.TeamId)
+                     .Where(e => e.ResourceTypeName == ResourceTypeNames.RecordShare && e.RelationshipName == "manager" && e.SubjectRelationName == "participant"))
+        {
+            var parent = held.ResourceEntityId;
+            var stillHeld = graph.EdgesOf(ResourceTypeNames.RecordShare, parent, "manager").Any(e =>
+                (e.SubjectTypeName == ResourceTypeNames.User && e.SubjectEntityId == member && e.SubjectRelationName.Length == 0) ||
+                (e.SubjectTypeName == ResourceTypeNames.Team && e.SubjectEntityId != payload.TeamId && e.SubjectRelationName == "participant" && graph.IsTeamMember(member, e.SubjectEntityId)));
+            if (stillHeld)
+            {
+                continue;
+            }
+
+            foreach (var child in await scope.FindShareMetadataByParentAsync(organizationId, parent, cancellationToken).ConfigureAwait(false))
+            {
+                var resource = await scope.FindResourceAsync(organizationId, ResourceTypeNames.RecordShare, child.RecordShareId, cancellationToken).ConfigureAwait(false);
+                if (resource is null || resource.ResourceLifecycleState != ResourceLifecycleStates.Active || resource.ParentResourceEntityId is not { } record ||
+                    (await scope.FindCommandAsync(resource.RegisteredBySecurityCommandId, cancellationToken).ConfigureAwait(false))?.ActorIdentityBindingId != binding.IdentityBindingId ||
+                    !seen.Add(child.RecordShareId))
+                {
+                    continue; // another grantor's delegation, or not Active: unaffected by this member's removal
+                }
+
+                lost.Add((resource, child));
+                foreach (var below in await ReadRevokedShareDescendantsAsync(scope, organizationId, record, child.RecordShareId, cancellationToken).ConfigureAwait(false))
+                {
+                    if (seen.Add(below.Metadata.RecordShareId))
+                    {
+                        lost.Add(below);
+                    }
+                }
+            }
+        }
+
+        if (lost.Count == 0)
+        {
+            return;
+        }
+
+        plan.RemoveEdges.AddRange(lost.SelectMany(d => graph.EdgesWithSubject(ResourceTypeNames.RecordShare, d.Metadata.RecordShareId)
+            .Concat(graph.EdgesOf(ResourceTypeNames.RecordShare, d.Metadata.RecordShareId))).Distinct());
+        plan.InvalidatedDescendantShares.AddRange(lost.Select(d => (d.Resource, d.Metadata, Domain.Features.Sharing.ShareInvalidationReasons.GrantorPathLost)));
+        // The normalized payload stays {team_id, member_user_id}: membership reconciliation reads it strictly. The invalidations are
+        // journalled as the removed edges of this command and as one ShareInvalidated audit entry per share.
     }
 
     private static async Task<CommandPlan> RegisterFormDefinitionAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
