@@ -2,7 +2,7 @@
  * Generated contract types for the business API plus a typed client whose only transport is the app-shell request
  * coordinator (packages/work-queue, ADR-PB-006/007). No raw fetch lives here.
  */
-import type { IRequestCoordinator, OperationLane } from "@enterpriseforms/work-queue";
+import type { ApiOperation, IRequestCoordinator, OperationLane } from "@enterpriseforms/work-queue";
 import type { components } from "./generated/enterprise-forms-v1";
 
 export type { components as EnterpriseFormsV1Components, paths as EnterpriseFormsV1Paths } from "./generated/enterprise-forms-v1";
@@ -285,12 +285,13 @@ function idempotencyKey(): string {
 export function createApiClient(coordinator: IRequestCoordinator) {
   const read = <T>(endpointKey: string, pathParams?: Record<string, string>, query?: Record<string, string | number | boolean | undefined>, lane: OperationLane = "interactive-read", signal?: AbortSignal) =>
     coordinator.execute<T>({ lane, method: "GET", endpointKey, ...(pathParams ? { pathParams } : {}), ...(query ? { query } : {}) }, signal);
-  const write = <T>(method: "POST" | "PUT" | "PATCH" | "DELETE", endpointKey: string, pathParams: Record<string, string> | undefined, payload: unknown, options: { idempotent?: boolean; idempotencyKey?: string; resourceKey?: string; expectedRevision?: string; lane?: OperationLane; responseKind?: "json" | "none" } = {}) =>
+  const write = <T>(method: "POST" | "PUT" | "PATCH" | "DELETE", endpointKey: string, pathParams: Record<string, string> | undefined, payload: unknown, options: { idempotent?: boolean; idempotencyKey?: string; resourceKey?: string; expectedRevision?: string; lane?: OperationLane; responseKind?: "json" | "none"; query?: ApiOperation["query"] } = {}) =>
     coordinator.execute<T>({
       lane: options.lane ?? "interactive-write",
       method,
       endpointKey,
       ...(pathParams ? { pathParams } : {}),
+      ...(options.query ? { query: options.query } : {}),
       ...(payload !== undefined ? { payload } : {}),
       ...(options.idempotent ? { idempotencyKey: options.idempotencyKey ?? idempotencyKey() } : {}),
       ...(options.resourceKey ? { resourceKey: options.resourceKey } : {}),
@@ -412,7 +413,12 @@ export function createApiClient(coordinator: IRequestCoordinator) {
     shares: {
       list: (formRecordId: string, signal?: AbortSignal) => read<RecordShareListResponse>("shares.list", { formRecordId }, undefined, "interactive-read", signal),
       create: (formRecordId: string, request: CreateShareRequest) => write<ShareResponse>("POST", "shares.create", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}` }),
-      revoke: (formRecordId: string, recordShareId: string) => write<CommandStatusResponse>("POST", "shares.revoke", { formRecordId, recordShareId }, {}, { idempotent: true, resourceKey: `record:${formRecordId}` }),
+      revoke: (formRecordId: string, recordShareId: string, useDevelopmentStepUp = false) =>
+        write<CommandStatusResponse>("POST", "shares.revoke", { formRecordId, recordShareId }, {}, {
+          idempotent: true,
+          resourceKey: `record:${formRecordId}`,
+          ...(useDevelopmentStepUp ? { query: { useDevelopmentStepUp: true } } : {}),
+        }),
     },
     uploads: {
       begin: (request: BeginUploadRequest) => write<UploadSessionResponse>("POST", "uploads.begin", undefined, request, { idempotent: true, lane: "file-transfer" }),
