@@ -5,9 +5,17 @@ using EnterpriseForms.Contracts.Features;
 
 namespace EnterpriseForms.Application.Features.FormRecords.TransferOwnership;
 
-/// <summary>Ownership transfer is an authority command; the local owner projection is updated only after it is Effective and never consulted for authorization.</summary>
+/// <summary>
+/// Ownership transfer is an authority command; the local owner projection is updated only after it is Effective and never consulted
+/// for authorization. C10 M1-WP11 (WP-0 Section 3.7): the Effective command is also projected once as <c>RECORD_OWNERSHIP_TRANSFERRED</c>,
+/// keyed by its security command id (target <c>security_command</c>), so an idempotent replay never records it twice and a pending
+/// command is never shown as a completed transfer. This is a projection of the Authority's command, not a new event writer.
+/// </summary>
 public sealed class TransferOwnershipHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock)
 {
+    /// <summary>The audit target type of a projection keyed by its Authority security command.</summary>
+    public const string SecurityCommandTarget = "security_command";
+
     public async Task<CommandStatusResponse> HandleAsync(RequestContext context, Guid formRecordId, TransferOwnershipRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -38,6 +46,13 @@ public sealed class TransferOwnershipHandler(IBusinessStore store, IAuthorizatio
                 record.OwnerTeamId = request.NewOwnerTeamId;
                 record.ModifiedOn = clock.GetUtcNow();
                 record.ModifiedByUserId = context.LocalUserId;
+                if ((await scope.GetTargetAuditEventsAsync(context.OrganizationId, SecurityCommandTarget, command.CommandId, 1, cancellationToken).ConfigureAwait(false)).Count == 0)
+                {
+                    Audit.AuditRecorder.Record(scope, context, clock, Audit.AuditCategories.Access, Domain.Features.Audit.AuditActions.RecordOwnershipTransferred,
+                        "record ownership transferred by the authority", formRecordId, targetEntityType: SecurityCommandTarget, targetEntityId: command.CommandId,
+                        metadata: new { commandId = command.CommandId, reason = request.TransferReason });
+                }
+
                 await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             }
         }
