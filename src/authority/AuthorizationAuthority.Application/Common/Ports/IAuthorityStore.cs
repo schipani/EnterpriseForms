@@ -129,6 +129,13 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>C10 M1-WP2: the active <c>team#member</c> edges of the given teams.</summary>
     Task<List<AuthorityRelationshipEdge>> GetActiveTeamMemberEdgesAsync(Guid organizationId, IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// C10 M1-WP9 (WP-0 Section 3.5): every edge, active or removed, that ever gave the record an owner or a share: the record's
+    /// <c>owner</c> and <c>shared_via</c> edges, and the role and item edges of every share that was ever <c>shared_via</c> the record.
+    /// </summary>
+    Task<List<AuthorityRelationshipEdge>> GetRecordSecurityEdgeHistoryAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("record security edge history is not available from this store");
+
     Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken);
 
     void AddProtectionPolicy(OrganizationProtectionPolicy policy);

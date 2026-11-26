@@ -327,6 +327,16 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
                 ((e.ResourceTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.ResourceEntityId)) ||
                  (e.SubjectTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.SubjectEntityId)))).ToList());
 
+        public Task<List<AuthorityRelationshipEdge>> GetRecordSecurityEdgeHistoryAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken)
+        {
+            var recordEdges = s.Edges.Where(e => e.OrganizationId == organizationId && e.ResourceTypeName == ResourceTypeNames.FormRecord && e.ResourceEntityId == formRecordId &&
+                e.RelationshipName is "owner" or "shared_via").ToList();
+            var shareIds = recordEdges.Where(e => e.RelationshipName == "shared_via" && e.SubjectTypeName == ResourceTypeNames.RecordShare).Select(e => e.SubjectEntityId).ToHashSet();
+            return Task.FromResult(recordEdges.Concat(s.Edges.Where(e => e.OrganizationId == organizationId &&
+                ((e.ResourceTypeName == ResourceTypeNames.RecordShare && shareIds.Contains(e.ResourceEntityId)) ||
+                 (e.SubjectTypeName == ResourceTypeNames.RecordShare && shareIds.Contains(e.SubjectEntityId) && e.ResourceTypeName != ResourceTypeNames.FormRecord)))).ToList());
+        }
+
         public Task<List<AuthorityRelationshipEdge>> GetActiveTeamMemberEdgesAsync(Guid organizationId, IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken) =>
             Task.FromResult(s.Edges.Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null && e.ResourceTypeName == ResourceTypeNames.Team &&
                 e.RelationshipName == "member" && teamIds.Contains(e.ResourceEntityId)).ToList());

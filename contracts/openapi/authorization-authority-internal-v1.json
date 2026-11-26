@@ -230,6 +230,47 @@
         }
       }
     },
+    "/internal/v1/records/{organizationId}/{formRecordId}/security-history": {
+      "get": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "Record-scoped sharing and ownership history from committed Authority edges, each command with its own state (owner or ManageAccess; others 404).",
+        "operationId": "GetRecordSecurityHistory",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordSecurityHistory"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/security-commands": {
       "post": {
         "tags": [
@@ -10560,6 +10601,144 @@
           "correlation_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "RecordSecurityChange": {
+        "required": [
+          "change_kind",
+          "record_share_id",
+          "share_end_state",
+          "invalidation_reason_code",
+          "subject_kind",
+          "subject_id"
+        ],
+        "type": "object",
+        "properties": {
+          "change_kind": {
+            "type": "string"
+          },
+          "record_share_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "share_end_state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "invalidation_reason_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subject_kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subject_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "RecordSecurityHistory": {
+        "required": [
+          "form_record_id",
+          "items",
+          "truncated",
+          "authorization_revision"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordSecurityHistoryItem"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "RecordSecurityHistoryItem": {
+        "required": [
+          "security_command_id",
+          "command_kind",
+          "command_state",
+          "occurred_on",
+          "effective_on",
+          "committed_authorization_revision",
+          "actor_user_id",
+          "changes"
+        ],
+        "type": "object",
+        "properties": {
+          "security_command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "command_kind": {
+            "type": "string"
+          },
+          "command_state": {
+            "type": "string"
+          },
+          "occurred_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effective_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "committed_authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "actor_user_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordSecurityChange"
+            }
           }
         }
       },

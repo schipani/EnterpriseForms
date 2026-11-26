@@ -477,6 +477,26 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
                              (e.SubjectTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.SubjectEntityId))))
                 .ToListAsync(cancellationToken);
 
+        public async Task<List<AuthorityRelationshipEdge>> GetRecordSecurityEdgeHistoryAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken)
+        {
+            var recordEdges = await context.RelationshipEdges.AsNoTracking()
+                .Where(e => e.OrganizationId == organizationId && e.ResourceTypeName == ResourceTypeNames.FormRecord && e.ResourceEntityId == formRecordId &&
+                            (e.RelationshipName == "owner" || e.RelationshipName == "shared_via"))
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            var shareIds = recordEdges.Where(e => e.RelationshipName == "shared_via" && e.SubjectTypeName == ResourceTypeNames.RecordShare).Select(e => e.SubjectEntityId).Distinct().ToList();
+            if (shareIds.Count == 0)
+            {
+                return recordEdges;
+            }
+
+            var shareEdges = await context.RelationshipEdges.AsNoTracking()
+                .Where(e => e.OrganizationId == organizationId &&
+                            ((e.ResourceTypeName == ResourceTypeNames.RecordShare && shareIds.Contains(e.ResourceEntityId)) ||
+                             (e.SubjectTypeName == ResourceTypeNames.RecordShare && shareIds.Contains(e.SubjectEntityId) && e.ResourceTypeName != ResourceTypeNames.FormRecord)))
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            return [.. recordEdges, .. shareEdges];
+        }
+
         public Task<List<AuthorityRelationshipEdge>> GetActiveTeamMemberEdgesAsync(Guid organizationId, IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken) =>
             context.RelationshipEdges.AsNoTracking()
                 .Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId == null && e.ResourceTypeName == ResourceTypeNames.Team &&

@@ -19,6 +19,14 @@ public static class ShareDetailsEndpoints
             .WithName("GetShareDetails")
             .WithSummary("Authoritative committed state and share revision of one share (owner, or a Manager on its committed lineage); fails closed while the organization gate is closed.");
 
+        group.MapGet("/{organizationId:guid}/{formRecordId:guid}/security-history", static async Task<Ok<RecordSecurityHistory>> (Guid organizationId, Guid formRecordId, HttpContext context, RecordSecurityHistoryService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
+            {
+                var actor = InternalAuthentication.RequireActor(context, validator);
+                return TypedResults.Ok(await service.GetAsync(actor, organizationId, formRecordId, cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetRecordSecurityHistory")
+            .WithSummary("Record-scoped sharing and ownership history from committed Authority edges, each command with its own state (owner or ManageAccess; others 404).");
+
         return endpoints;
     }
 }
