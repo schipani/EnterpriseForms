@@ -388,6 +388,19 @@ public sealed class CommandPlannerTests
         Assert.Equal(AuthorityErrorCodes.Forbidden, anotherActor.ErrorCode);
     }
 
+    [Fact]
+    public async Task UnrelatedActorCannotDistinguishAnExistingParentFromAnUnknownId()
+    {
+        var fixture = new SharePlanFixture();
+        var parent = fixture.AddGrant(Item);
+        var unrelated = Guid.NewGuid();
+        var denied = await Assert.ThrowsAsync<AuthorityException>(() => fixture.PlanAsync(parent.RecordShareId, user: unrelated));
+        var unknown = await Assert.ThrowsAsync<AuthorityException>(() => fixture.PlanAsync(Guid.NewGuid(), user: unrelated));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, denied.ErrorCode);
+        Assert.Equal(denied.ErrorCode, unknown.ErrorCode);
+        Assert.Equal(denied.Message, unknown.Message);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

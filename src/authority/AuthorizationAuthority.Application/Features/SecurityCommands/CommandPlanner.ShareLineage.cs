@@ -26,6 +26,12 @@ public static partial class CommandPlanner
         }
 
         var sharesOnRecord = graph.ShareIdsOfRecord(payload.FormRecordId).ToHashSet();
+        if (!sharesOnRecord.Contains(parentId) ||
+            !await HoldsActiveManagerShareAsync(scope, graph, organizationId, authorityUserId, parentId, cancellationToken).ConfigureAwait(false))
+        {
+            throw AuthorityException.Forbidden("actor does not hold Manager on the specified parent share");
+        }
+
         var chain = new Dictionary<Guid, ShareLineageNode>();
         var cursor = (Guid?)parentId;
         while (cursor is { } shareId && chain.Count < MaximumShareDelegationDepth &&
@@ -46,11 +52,6 @@ public static partial class CommandPlanner
         if (parent.Status != ShareLineageStatus.Active)
         {
             throw AuthorityException.Invalid("parent share must have active, resolved lineage in the same record");
-        }
-
-        if (!await HoldsActiveManagerShareAsync(scope, graph, organizationId, authorityUserId, parentId, cancellationToken).ConfigureAwait(false))
-        {
-            throw AuthorityException.Forbidden("actor does not hold Manager on the specified parent share");
         }
 
         var policy = await scope.FindProtectionPolicyAsync(organizationId, cancellationToken).ConfigureAwait(false);
