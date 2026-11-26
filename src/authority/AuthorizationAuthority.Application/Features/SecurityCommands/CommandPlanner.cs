@@ -104,7 +104,19 @@ public sealed class CommandPlan
 
     /// <summary>C10 M1-WP9: the accepted scope change of an UpdateShareScope command (journal evidence: counts and flags only).</summary>
     internal ShareScopeChangeEvidence? ShareScopeChange { get; set; }
+
+    /// <summary>C10 M1-WP6/WP9: the share an ExpireShare command converged (journal evidence of the <c>ShareExpired</c> event).</summary>
+    internal ShareExpiryEvidence? ShareExpiry { get; set; }
 }
+
+/// <summary>C10 M1-WP6: what an ExpireShare command converged and under whose decision (WP-0 Section 4 "Journal attribution").</summary>
+internal sealed record ShareExpiryEvidence(
+    Guid RecordShareId,
+    Guid FormRecordId,
+    DateTimeOffset ShareExpiresOn,
+    DateTimeOffset EvaluatedOn,
+    long ShareRevision,
+    Guid ExpirySourceSecurityCommandId);
 
 /// <summary>
 /// C10 M1-WP9: what an accepted UpdateShareScope changed, without the scope itself: no field item ids, no expiry value, no step-up

@@ -170,6 +170,12 @@ public sealed class Program
         builder.Services.AddHostedService<ProjectionIntegrityMonitorLoop>();
         // SEC-BL-01 WP-3/WP-4: baseline and alert-only scheduled journal verifier; Development/Testing only, off unless configured.
         builder.Services.AddJournalVerification(builder.Configuration, builder.Environment);
+        if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"))
+        {
+            // C10 M1-WP6: expiry convergence is enabled only in Development/Testing in M1 (access-time enforcement does not depend on it).
+            builder.Services.AddSingleton<ShareExpiryLoop>();
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<ShareExpiryLoop>());
+        }
 
         var app = builder.Build();
         if (measureSeal)

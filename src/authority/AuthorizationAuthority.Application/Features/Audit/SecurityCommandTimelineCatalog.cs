@@ -123,6 +123,8 @@ public static partial class SecurityCommandTimelineCatalog
         "RecoverSecurityAdministrator",
         "InitializeOrganization",
         "RecoverOrganizationOwners",
+        // C10 M1-WP6: the Authority-internal convergence command; its allowlisted ShareExpired audit entry records it.
+        "ExpireShare",
     };
 
     /// <summary>Allowlisted audit-stream kinds and their envelopes (contract §5.2; PD-09 option B for EnvelopeCapabilityRefused).</summary>
@@ -160,6 +162,11 @@ public static partial class SecurityCommandTimelineCatalog
             Count("field_items_removed"), Flag("expiry_changed"), Flag("has_expiry"), Code("command_state_at_commit"), Id("correlation_id")),
         ["ShareInvalidated"] = Rule(Id("security_command_id"), Code("command_kind"), Id("form_record_id"), Id("record_share_id"), Id("upstream_record_share_id"),
             Code("invalidation_reason"), Count("authorization_revision"), Code("command_state_at_commit"), Id("correlation_id")),
+
+        // C10 M1-WP6: "Expired (scheduled at grant)", attributed to the expiry-setting command; the expiry instant itself is withheld.
+        ["ShareExpired"] = Rule(Id("security_command_id"), Code("command_kind"), Id("form_record_id"), Id("record_share_id"), Time("evaluated_on"), Count("share_revision"),
+            Id("expiry_source_security_command_id"), Code("workload_name"), Ids("invalidated_descendant_share_ids"), Count("authorization_revision"),
+            Code("command_state_at_commit"), Id("correlation_id")),
     };
 
     /// <summary>Audit-stream rejection entries: the journal evidence of their rejected command row, never items of their own.</summary>

@@ -178,8 +178,11 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
         return status with { CorrelationId = correlationId };
     }
 
-    /// <summary>Applies the plan inside the locked organization transaction: desired state, immutable command, outbox and journal — one commit.</summary>
-    internal static void ApplyPlan(IAuthorityScope scope, OrganizationAuthorizationState state, SecurityCommand command, CommandPlan plan, BoundActor actor, SecurityCommandRequest request, CancellationToken cancellationToken)
+    /// <summary>
+    /// Applies the plan inside the locked organization transaction: desired state, immutable command, outbox and journal — one commit.
+    /// Authority-internal commands without a contract request (C10 M1-WP6 ExpireShare) call this directly; only the resource is journalled.
+    /// </summary>
+    internal static void ApplyPlan(IAuthorityScope scope, OrganizationAuthorizationState state, SecurityCommand command, CommandPlan plan, BoundActor actor, ResourceRef commandResource, CancellationToken cancellationToken)
     {
         _ = cancellationToken;
         if ((plan.NewApprovals.Count > 0 || plan.ChangedApprovals.Count > 0) && !plan.SearchIndexChangesAppliedByCaller)
@@ -366,8 +369,8 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             actor.AuthorityUserId,
             actor.Actor.IssuerUri,
             actor.Actor.SubjectIdentifier,
-            request.Resource.ResourceKind.ToString(),
-            request.Resource.ResourceId,
+            commandResource.ResourceKind.ToString(),
+            commandResource.ResourceId,
             command.ExpectedAuthorizationRevision,
             revision,
             Convert.ToHexStringLower(command.CommandRequestDigest),
@@ -381,6 +384,13 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
 
         // C10 M1-WP9: named record-scoped share evidence on the audit stream, in this same transaction (the body above is unchanged).
         ShareLifecycleJournal.Append(scope, state, command, plan, revision);
+    }
+
+    /// <summary>As above, for a contract request: the journalled resource is the request's.</summary>
+    internal static void ApplyPlan(IAuthorityScope scope, OrganizationAuthorizationState state, SecurityCommand command, CommandPlan plan, BoundActor actor, SecurityCommandRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ApplyPlan(scope, state, command, plan, actor, request.Resource, cancellationToken);
     }
 
     /// <summary>C8 M2 (AC-7): proposals, membership state, revoked sessions and membership requests, in the command's transaction.</summary>
@@ -477,6 +487,12 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
         if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length is < 8 or > 128)
         {
             throw AuthorityException.Invalid("Idempotency-Key must be 8..128 characters");
+        }
+
+        // C10 M1-WP6: the deterministic keys of the internal ExpireShare command are reserved, so no caller can occupy one first.
+        if (idempotencyKey.StartsWith(ShareExpiryConvergenceService.IdempotencyKeyPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            throw AuthorityException.Invalid("Idempotency-Key uses a reserved prefix");
         }
     }
 

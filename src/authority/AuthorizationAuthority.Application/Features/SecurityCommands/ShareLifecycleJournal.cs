@@ -23,6 +23,8 @@ internal static class ShareLifecycleJournal
 
     public const string ShareInvalidated = "ShareInvalidated";
 
+    public const string ShareExpired = "ShareExpired";
+
     /// <summary>Appends the scope-change entry, then one entry per invalidated dependent share (by share id), to the audit stream.</summary>
     public static void Append(IAuthorityScope scope, OrganizationAuthorizationState locked, SecurityCommand command, CommandPlan plan, long committedRevision)
     {
@@ -44,6 +46,27 @@ internal static class ShareLifecycleJournal
                 field_items_removed = change.FieldItemsRemoved,
                 expiry_changed = change.ExpiryChanged,
                 has_expiry = change.HasExpiry,
+                command_state_at_commit = SecurityCommandStates.CommittedAwaitingProjection,
+                correlation_id = command.CorrelationIdentifier,
+            }, TimeProvider.System);
+        }
+
+        if (plan.ShareExpiry is { } expiry)
+        {
+            // WP-0 Section 4 "Journal attribution and evidence": attributed to the human command that set the expiry.
+            AuditJournal.Append(scope, locked, ShareExpired, new
+            {
+                security_command_id = command.SecurityCommandId,
+                command_kind = command.CommandKindName,
+                form_record_id = expiry.FormRecordId,
+                record_share_id = expiry.RecordShareId,
+                share_expires_on = expiry.ShareExpiresOn,
+                evaluated_on = expiry.EvaluatedOn,
+                share_revision = expiry.ShareRevision,
+                expiry_source_security_command_id = expiry.ExpirySourceSecurityCommandId,
+                workload_name = CommandPlanner.ShareExpiryWorkloadName,
+                invalidated_descendant_share_ids = plan.InvalidatedDescendantShares.Select(d => d.Metadata.RecordShareId).Order().ToArray(),
+                authorization_revision = committedRevision,
                 command_state_at_commit = SecurityCommandStates.CommittedAwaitingProjection,
                 correlation_id = command.CorrelationIdentifier,
             }, TimeProvider.System);

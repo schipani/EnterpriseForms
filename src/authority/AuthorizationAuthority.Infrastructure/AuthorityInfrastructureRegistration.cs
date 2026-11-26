@@ -99,6 +99,7 @@ public static class AuthorityInfrastructureRegistration
         services.TryAddSingleton(FieldSearchApprovalGate.Unavailable); // the API host registers the configured gate (OD-7)
         services.TryAddSingleton(FormPublicationAbandonmentVerifier.Unconfigured); // C-191: the API host registers the configured key; absent => no abandonment is accepted
         services.AddSingleton<SecurityCommandService>();
+        services.AddSingleton<ShareExpiryConvergenceService>(); // C10 M1-WP6: internal ExpireShare (no endpoint)
         // C8 M4 S1: projection-integrity protocol (pin, decide, verify), startup marker transition and periodic check.
         services.AddSingleton<ProjectionMarkerTransitionState>();
         services.AddSingleton<ProjectionIntegrityMetrics>();
