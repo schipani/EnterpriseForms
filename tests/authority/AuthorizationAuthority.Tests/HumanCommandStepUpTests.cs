@@ -5,6 +5,7 @@ using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.Content;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
+using AuthorizationAuthority.Domain.Features.Sharing;
 using AuthorizationAuthority.Infrastructure.Faults;
 using Xunit;
 
@@ -204,6 +205,66 @@ public sealed class HumanCommandStepUpTests
         Assert.Equal("{}", command.CommandPayloadJson);
         Assert.Empty(store.Outbox);
         Assert.Equal(5, Assert.Single(store.Organizations).AuthorizationRevision);
+    }
+
+    [Theory]
+    [InlineData(4, 1, AuthorityErrorCodes.StaleAuthorizationRevision)]
+    [InlineData(5, 2, AuthorityErrorCodes.StaleShareRevision)]
+    public async Task ScopeUpdateRevisionsAreDistinctAndRejectionLeavesTheShareUnchanged(long organizationRevision, long shareRevision, string expectedError)
+    {
+        var metadata = SeedShareForScopeUpdate();
+        var payload = new UpdateShareScopePayload(metadata.RecordShareId, Record, RecipientRoles.Contributor, [FieldValue1],
+            shareRevision, HumanCommandStepUpGate.SyntheticStepUpEvidence);
+        var request = new SecurityCommandRequest(Org, SecurityCommandKind.UpdateShareScope, new ResourceRef(ResourceKind.FormRecord, Record),
+            organizationRevision, JsonSerializer.SerializeToElement(payload, CanonicalJson.Options));
+        var service = new SecurityCommandService(store, new NoOpFaultInjector(), TimeProvider.System, FieldSearchSynthetic, humanCommandGate: Synthetic);
+
+        var error = await Assert.ThrowsAsync<AuthorityException>(() => service.SubmitAsync(
+            new VerifiedActor("https://idp", Owner.ToString("N"), "test"), request, "update-share-test", Guid.NewGuid(), Ct));
+
+        Assert.Equal(expectedError, error.ErrorCode);
+        Assert.Equal(1, metadata.ShareRevision);
+        Assert.Empty(store.Outbox);
+        Assert.Equal("{}", Assert.Single(store.Commands).CommandPayloadJson);
+        Assert.Equal(5, Assert.Single(store.Organizations).AuthorizationRevision);
+    }
+
+    [Fact]
+    public async Task AppliedScopeUpdateBindsNewExpiryAndAnIdempotentReplayDoesNotAdvanceIt()
+    {
+        var metadata = SeedShareForScopeUpdate();
+        var expiry = DateTimeOffset.UtcNow.AddHours(2);
+        var payload = new UpdateShareScopePayload(metadata.RecordShareId, Record, RecipientRoles.Contributor, [FieldValue1],
+            1, HumanCommandStepUpGate.SyntheticStepUpEvidence, ShareExpiresOn: expiry);
+        var request = new SecurityCommandRequest(Org, SecurityCommandKind.UpdateShareScope, new ResourceRef(ResourceKind.FormRecord, Record), 5,
+            JsonSerializer.SerializeToElement(payload, CanonicalJson.Options));
+        var service = new SecurityCommandService(store, new NoOpFaultInjector(), TimeProvider.System, FieldSearchSynthetic, humanCommandGate: Synthetic);
+        var actor = new VerifiedActor("https://idp", Owner.ToString("N"), "test");
+
+        var status = await service.SubmitAsync(actor, request, "update-share-test", Guid.NewGuid(), Ct);
+        var replay = await service.SubmitAsync(actor, request with { ExpectedAuthorizationRevision = 6 }, "update-share-test", Guid.NewGuid(), Ct);
+
+        Assert.Equal(status.CommandId, replay.CommandId);
+        Assert.Equal(expiry, metadata.ShareExpiresOn);
+        Assert.Equal(status.CommandId, metadata.ExpirySourceSecurityCommandId);
+        Assert.Equal(2, metadata.ShareRevision);
+        Assert.Single(store.Outbox);
+        Assert.DoesNotContain(HumanCommandStepUpGate.SyntheticStepUpEvidence, Assert.Single(store.Commands).CommandPayloadJson, StringComparison.Ordinal);
+    }
+
+    private ShareResourceMetadata SeedShareForScopeUpdate()
+    {
+        var id = Guid.NewGuid();
+        store.Resources.Add(new AuthorityResource
+        {
+            OrganizationId = Org, ResourceTypeName = ResourceTypeNames.RecordShare, ResourceEntityId = id, ParentResourceEntityId = Record,
+        });
+        store.Edges.Add(Edge(ResourceTypeNames.FormRecord, Record, "shared_via", ResourceTypeNames.RecordShare, id));
+        store.Edges.Add(Edge(ResourceTypeNames.RecordShare, id, "reader", ResourceTypeNames.User, Recipient));
+        store.Edges.Add(Edge(ResourceTypeNames.FieldItem, FieldValue1, "shared_via", ResourceTypeNames.RecordShare, id));
+        var metadata = new ShareResourceMetadata { OrganizationId = Org, RecordShareId = id };
+        store.ShareMetadata.Add(metadata);
+        return metadata;
     }
 
     // ---- RevokeShare step-up tests ----

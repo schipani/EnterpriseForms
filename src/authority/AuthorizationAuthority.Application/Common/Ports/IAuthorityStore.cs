@@ -117,6 +117,9 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>C10 M1-WP1: adds share metadata for a new share (must be unique per organization/share).</summary>
     void AddShareMetadata(ShareResourceMetadata metadata);
 
+    /// <summary>C10 M1-WP5: finds all share metadata records where parent_record_share_id matches the given parent share id.</summary>
+    Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid organizationId, Guid parentRecordShareId, CancellationToken cancellationToken);
+
     Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken);
 
     void AddProtectionPolicy(OrganizationProtectionPolicy policy);

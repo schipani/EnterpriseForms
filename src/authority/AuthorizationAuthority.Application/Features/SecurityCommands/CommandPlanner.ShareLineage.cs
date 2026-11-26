@@ -32,22 +32,7 @@ public static partial class CommandPlanner
             throw AuthorityException.Forbidden("actor does not hold Manager on the specified parent share");
         }
 
-        var chain = new Dictionary<Guid, ShareLineageNode>();
-        var cursor = (Guid?)parentId;
-        while (cursor is { } shareId && chain.Count < MaximumShareDelegationDepth &&
-               sharesOnRecord.Contains(shareId) && !chain.ContainsKey(shareId))
-        {
-            var resource = await scope.FindResourceAsync(organizationId, ResourceTypeNames.RecordShare, shareId, cancellationToken).ConfigureAwait(false);
-            if (resource is null)
-            {
-                break;
-            }
-
-            var metadata = await scope.FindShareMetadataAsync(organizationId, shareId, cancellationToken).ConfigureAwait(false);
-            chain.Add(shareId, new ShareLineageNode(resource, metadata));
-            cursor = metadata?.ParentRecordShareId;
-        }
-
+        var chain = await ReadShareLineageAsync(scope, organizationId, sharesOnRecord, parentId, cancellationToken).ConfigureAwait(false);
         var parent = ShareLineageExpiry.Evaluate(chain, organizationId, payload.FormRecordId, parentId, at);
         if (parent.Status != ShareLineageStatus.Active)
         {
@@ -81,6 +66,28 @@ public static partial class CommandPlanner
         }
 
         return depth;
+    }
+
+    private static async Task<Dictionary<Guid, ShareLineageNode>> ReadShareLineageAsync(
+        IAuthorityScope scope, Guid organizationId, HashSet<Guid> sharesOnRecord, Guid recordShareId, CancellationToken cancellationToken)
+    {
+        var chain = new Dictionary<Guid, ShareLineageNode>();
+        var cursor = (Guid?)recordShareId;
+        while (cursor is { } shareId && chain.Count < MaximumShareDelegationDepth &&
+               sharesOnRecord.Contains(shareId) && !chain.ContainsKey(shareId))
+        {
+            var resource = await scope.FindResourceAsync(organizationId, ResourceTypeNames.RecordShare, shareId, cancellationToken).ConfigureAwait(false);
+            if (resource is null)
+            {
+                break;
+            }
+
+            var metadata = await scope.FindShareMetadataAsync(organizationId, shareId, cancellationToken).ConfigureAwait(false);
+            chain.Add(shareId, new ShareLineageNode(resource, metadata));
+            cursor = metadata?.ParentRecordShareId;
+        }
+
+        return chain;
     }
 
     private static async Task<bool> HoldsActiveManagerShareAsync(

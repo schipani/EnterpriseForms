@@ -458,6 +458,10 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public void AddShareMetadata(ShareResourceMetadata metadata) => context.ShareResourceMetadatas.Add(metadata);
 
+        // C10 M1-WP5: query descendants using the parent-lineage index for cascade invalidation.
+        public Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid organizationId, Guid parentRecordShareId, CancellationToken cancellationToken) =>
+            context.ShareResourceMetadatas.Where(s => s.OrganizationId == organizationId && s.ParentRecordShareId == parentRecordShareId).ToListAsync(cancellationToken);
+
         public Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken) =>
             context.ProtectionPolicies.FirstOrDefaultAsync(p => p.OrganizationId == organizationId, cancellationToken);
 
