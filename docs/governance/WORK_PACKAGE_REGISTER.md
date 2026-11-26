@@ -137,3 +137,7 @@ Same mandate and limits as above; still no independent review, merge, push, prot
 | M1-WP8 documents | Not started beyond the WP1 schema. | Full package. |
 
 **Next executable work:** WP8 document items; remaining M2/M3 endpoints and pages; independent review of every row; PR consolidation once the owner decides (final report of 2026-11-26).
+
+## Direct development checkpoint 3 — 2026-11-26
+
+D6 complete on the candidate at 8c712cb3: security_commands.target_form_record_id (immutable by trigger, backfilled from committed payloads, Development/Test only) and ix_journal_security_command; the record history now lists every committed expiry change including superseded ones, each marked journal-backed only when its authorization-journal entry exists. Verified on a disposable PostgreSQL 18 (backfill, trigger, indexes, Down). WP8 reassessed (owner-approved split WP8-A / WP8-B); WP8-A is blocked on one design point: the Authority does not persist an attachment's version number, so shared_through_version_number cannot yet be set from Authority evidence at grant time (see the session report). No WP8 code committed.
