@@ -96,6 +96,8 @@ public sealed class CommandPlan
     public Domain.Features.Sharing.ShareResourceMetadata? ShareMetadata { get; set; }
 
     internal (Domain.Features.Sharing.ShareResourceMetadata Metadata, long Revision, DateTimeOffset? ExpiresOn)? ShareMetadataUpdate { get; set; }
+    /// <summary>C10 M1-WP5: descendant shares invalidated by this command (revoke, expiry, narrowing, path loss), with reason.</summary>
+    internal List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata, string Reason)> InvalidatedDescendantShares { get; } = [];
 }
 
 /// <summary>
@@ -933,10 +935,24 @@ public static partial class CommandPlanner
             }
         }
 
-        // Strip step-up evidence from the journaled payload.
-        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload with { StepUpEvidence = null }) };
-        plan.RemoveEdges.AddRange(graph.EdgesWithSubject(ResourceTypeNames.RecordShare, payload.RecordShareId));
-        plan.RemoveEdges.AddRange(graph.EdgesOf(ResourceTypeNames.RecordShare, payload.RecordShareId));
+        var descendants = await ReadRevokedShareDescendantsAsync(scope, organizationId, payload.FormRecordId,
+            payload.RecordShareId, cancellationToken).ConfigureAwait(false);
+        var reason = Domain.Features.Sharing.ShareInvalidationReasons.UpstreamRevoked;
+        var plan = new CommandPlan
+        {
+            NormalizedPayloadJson = CanonicalJson.Serialize(new
+            {
+                payload.RecordShareId,
+                payload.FormRecordId,
+                InvalidatedDescendantShareIds = descendants.Select(child => child.Metadata.RecordShareId).Order().ToArray(),
+                InvalidationReasonCode = descendants.Count == 0 ? null : reason,
+            }),
+        };
+
+        var affectedShares = descendants.Select(child => child.Metadata.RecordShareId).Append(payload.RecordShareId);
+        plan.RemoveEdges.AddRange(affectedShares.SelectMany(id => graph.EdgesWithSubject(ResourceTypeNames.RecordShare, id)
+            .Concat(graph.EdgesOf(ResourceTypeNames.RecordShare, id))).Distinct());
+        plan.InvalidatedDescendantShares.AddRange(descendants.Select(child => (child.Resource, child.Metadata, reason)));
         share.ResourceLifecycleState = ResourceLifecycleStates.Revoked;
         plan.RevokeResources.Add(share);
         return plan;
