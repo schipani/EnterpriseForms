@@ -98,7 +98,30 @@ public sealed class CommandPlan
     internal (Domain.Features.Sharing.ShareResourceMetadata Metadata, long Revision, DateTimeOffset? ExpiresOn)? ShareMetadataUpdate { get; set; }
     /// <summary>C10 M1-WP5: descendant shares invalidated by this command (revoke, expiry, narrowing, path loss), with reason.</summary>
     internal List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata, string Reason)> InvalidatedDescendantShares { get; } = [];
+
+    /// <summary>C10 M1-WP9: the share whose revocation, expiry or narrowing invalidated <see cref="InvalidatedDescendantShares"/>.</summary>
+    internal Guid? InvalidationSourceShareId { get; set; }
+
+    /// <summary>C10 M1-WP9: the accepted scope change of an UpdateShareScope command (journal evidence: counts and flags only).</summary>
+    internal ShareScopeChangeEvidence? ShareScopeChange { get; set; }
 }
+
+/// <summary>
+/// C10 M1-WP9: what an accepted UpdateShareScope changed, without the scope itself: no field item ids, no expiry value, no step-up
+/// evidence and no reason.
+/// </summary>
+internal sealed record ShareScopeChangeEvidence(
+    Guid RecordShareId,
+    Guid FormRecordId,
+    long PreviousShareRevision,
+    long ShareRevision,
+    string RecipientRole,
+    bool RoleChanged,
+    int FieldItemCount,
+    int FieldItemsAdded,
+    int FieldItemsRemoved,
+    bool ExpiryChanged,
+    bool HasExpiry);
 
 /// <summary>
 /// Kind-specific validation of security commands against the authoritative desired state. Each kind enforces
@@ -953,6 +976,7 @@ public static partial class CommandPlanner
         plan.RemoveEdges.AddRange(affectedShares.SelectMany(id => graph.EdgesWithSubject(ResourceTypeNames.RecordShare, id)
             .Concat(graph.EdgesOf(ResourceTypeNames.RecordShare, id))).Distinct());
         plan.InvalidatedDescendantShares.AddRange(descendants.Select(child => (child.Resource, child.Metadata, reason)));
+        plan.InvalidationSourceShareId = payload.RecordShareId;
         share.ResourceLifecycleState = ResourceLifecycleStates.Revoked;
         plan.RevokeResources.Add(share);
         return plan;

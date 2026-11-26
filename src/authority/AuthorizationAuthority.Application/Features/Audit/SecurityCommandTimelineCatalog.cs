@@ -152,6 +152,14 @@ public static partial class SecurityCommandTimelineCatalog
         ["PlatformMembershipRequestViewed"] = Rule(Id("platform_operator_id"), Id("membership_request_id"), Codes("disclosed"), Id("correlation_id")),
         ["PlatformOwnerRecoveryCaseViewed"] = Rule(Id("organization_owner_recovery_case_id"), Id("platform_operator_id"), Codes("disclosed"), Id("correlation_id")),
         ["PlatformOwnerRecoveryMembersViewed"] = Rule(Id("platform_operator_id"), Codes("disclosed"), Count("returned_count"), Id("correlation_id")),
+
+        // C10 M1-WP9: share lifecycle evidence. Counts and flags of the scope change, never the scope, expiry value or reason; the
+        // state recorded is the command's state when it committed, so a reader never sees it as Effective from this entry alone.
+        ["ShareScopeUpdated"] = Rule(Id("security_command_id"), Code("command_kind"), Id("form_record_id"), Id("record_share_id"), Count("previous_share_revision"),
+            Count("share_revision"), Count("authorization_revision"), Code("recipient_role"), Flag("role_changed"), Count("field_item_count"), Count("field_items_added"),
+            Count("field_items_removed"), Flag("expiry_changed"), Flag("has_expiry"), Code("command_state_at_commit"), Id("correlation_id")),
+        ["ShareInvalidated"] = Rule(Id("security_command_id"), Code("command_kind"), Id("form_record_id"), Id("record_share_id"), Id("upstream_record_share_id"),
+            Code("invalidation_reason"), Count("authorization_revision"), Code("command_state_at_commit"), Id("correlation_id")),
     };
 
     /// <summary>Audit-stream rejection entries: the journal evidence of their rejected command row, never items of their own.</summary>

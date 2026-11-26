@@ -161,7 +161,9 @@ public static partial class CommandPlanner
             ShareMetadataUpdate = (metadata, nextRevision, expiresOn),
         };
 
-        plan.RemoveEdges.AddRange(currentFields.Where(e => !fields.Contains(e.ResourceEntityId)));
+        var removedFields = currentFields.Where(e => !fields.Contains(e.ResourceEntityId)).ToList();
+        plan.RemoveEdges.AddRange(removedFields);
+        var fieldCount = fields.Count;
         fields.ExceptWith(currentFields.Select(e => e.ResourceEntityId));
         foreach (var itemId in fields)
         {
@@ -174,6 +176,9 @@ public static partial class CommandPlanner
             plan.AddEdges.Add((ResourceTypeNames.RecordShare, payload.RecordShareId, role, recipient.SubjectTypeName, recipient.SubjectEntityId, recipient.SubjectRelationName));
         }
 
+        // C10 M1-WP9: journal evidence of the accepted change, in counts and flags (ShareLifecycleJournal).
+        plan.ShareScopeChange = new ShareScopeChangeEvidence(payload.RecordShareId, payload.FormRecordId, metadata.ShareRevision, nextRevision, role,
+            recipient.RelationshipName != role, fieldCount, fields.Count, removedFields.Count, expiresOn != metadata.ShareExpiresOn, expiresOn is not null);
         return plan;
     }
 

@@ -378,6 +378,9 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             command.CommandReasonText,
             command.CorrelationIdentifier);
         scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Authorization, revision, "SecurityCommandCommitted", body, command.SecurityCommandId, null, TimeProvider.System));
+
+        // C10 M1-WP9: named record-scoped share evidence on the audit stream, in this same transaction (the body above is unchanged).
+        ShareLifecycleJournal.Append(scope, state, command, plan, revision);
     }
 
     /// <summary>C8 M2 (AC-7): proposals, membership state, revoked sessions and membership requests, in the command's transaction.</summary>
