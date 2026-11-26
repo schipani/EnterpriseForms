@@ -25,10 +25,19 @@ public static partial class CommandPlanner
 
         var owner = graph.IsRecordOwner(actor.AuthorityUserId, payload.FormRecordId);
         var sharesOnRecord = graph.ShareIdsOfRecord(payload.FormRecordId).ToHashSet();
-        if (!owner && (payload.ParentRecordShareId is not { } namedParent || !sharesOnRecord.Contains(namedParent) ||
-            !await HoldsActiveManagerShareAsync(scope, graph, organizationId, actor.AuthorityUserId, namedParent, cancellationToken).ConfigureAwait(false)))
+        if (!owner)
         {
-            throw AuthorityException.Forbidden("actor cannot update this share");
+            if (payload.ParentRecordShareId is not { } namedParent || !sharesOnRecord.Contains(namedParent) ||
+                !await HoldsActiveManagerShareAsync(scope, graph, organizationId, actor.AuthorityUserId, namedParent, cancellationToken).ConfigureAwait(false))
+            {
+                throw AuthorityException.Forbidden("actor cannot update this share");
+            }
+
+            var parentLineage = await ReadShareLineageAsync(scope, organizationId, sharesOnRecord, namedParent, cancellationToken).ConfigureAwait(false);
+            if (ShareLineageExpiry.Evaluate(parentLineage, organizationId, payload.FormRecordId, namedParent, at).Status != ShareLineageStatus.Active)
+            {
+                throw AuthorityException.Forbidden("actor cannot update this share");
+            }
         }
 
         var chain = await ReadShareLineageAsync(scope, organizationId, sharesOnRecord, payload.RecordShareId, cancellationToken).ConfigureAwait(false);
