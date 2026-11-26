@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AuthorizationAuthority.Application.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
@@ -48,6 +49,37 @@ public sealed class ExpireShareAdmissionTests
         var result = ExpireShareAdmission.Evaluate(org, resource, metadata, 1L, sourceCommand, BaseTime, true, latestJournal, hasDelegatedAssertion: false);
 
         Assert.Equal(ExpireShareAdmission.Disposition.Eligible, result.Disposition);
+    }
+
+    [Fact]
+    public void EffectiveScopeUpdateCanBeTheExpirySource()
+    {
+        var source = CreateSourceCommand(ExpiryTime);
+        source.CommandKindName = "UpdateShareScope";
+        source.CommandPayloadJson = JsonSerializer.Serialize(new
+        {
+            record_share_id = ShareId, form_record_id = RecordId, share_expires_on = ExpiryTime,
+            field_item_ids = new[] { Guid.NewGuid() }, recipient_role = "Reader",
+            expected_share_revision = 3, share_revision = 4,
+        });
+        var metadata = CreateShareMetadata(ExpiryTime);
+        metadata.ShareRevision = 4;
+        var result = ExpireShareAdmission.Evaluate(CreateOrganization(), CreateShareResource(), metadata, 4,
+            source, BaseTime, true, BaseTime, hasDelegatedAssertion: false);
+        Assert.Equal(ExpireShareAdmission.Disposition.Eligible, result.Disposition);
+        Assert.Equal($"share-expiry:{ShareId:D}:4", result.IdempotencyKey);
+    }
+
+    [Fact]
+    public void RefusesARepeatedBindingInTheSourceObject()
+    {
+        var source = CreateSourceCommand(ExpiryTime);
+        source.CommandPayloadJson = source.CommandPayloadJson.Replace("\"form_record_id\":",
+            $"\"record_share_id\":\"{ShareId:D}\",\"form_record_id\":", StringComparison.Ordinal);
+        var result = ExpireShareAdmission.Evaluate(CreateOrganization(), CreateShareResource(), CreateShareMetadata(ExpiryTime), 1,
+            source, BaseTime, true, BaseTime, hasDelegatedAssertion: false);
+        Assert.Equal("PAYLOAD_MALFORMED", result.ReasonCode);
+        Assert.Null(result.DerivedActorIdentityBindingId);
     }
 
     [Fact]
@@ -154,6 +186,7 @@ public sealed class ExpireShareAdmissionTests
         var resource = CreateShareResource();
         var metadata = CreateShareMetadata(ExpiryTime);
         metadata.OrganizationId = Guid.CreateVersion7();
+        resource.OrganizationId = metadata.OrganizationId;
         var sourceCommand = CreateSourceCommand(ExpiryTime);
         var latestJournal = BaseTime.AddMinutes(-5);
 
@@ -446,7 +479,18 @@ public sealed class ExpireShareAdmissionTests
     {
         var sid = shareId ?? ShareId;
         var rid = recordId ?? RecordId;
-        var payload = $$"""{"record_share_id":"{{sid:D}}","form_record_id":"{{rid:D}}","share_expires_on":{{(expiresOn.HasValue ? $"\"{expiresOn.Value:O}\"" : "null")}}}""";
+        var payload = JsonSerializer.Serialize(new
+        {
+            record_share_id = sid,
+            form_record_id = rid,
+            recipient_user_id = ActorId,
+            recipient_team_id = (Guid?)null,
+            recipient_role = "Reader",
+            field_item_ids = new[] { Guid.NewGuid() },
+            parent_record_share_id = (Guid?)null,
+            delegation_depth = 1,
+            share_expires_on = expiresOn,
+        });
 
         return new SecurityCommand
         {

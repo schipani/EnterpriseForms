@@ -1,5 +1,4 @@
 using System.Text.Json;
-using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sharing;
@@ -167,9 +166,9 @@ internal static class ExpireShareAdmission
         try
         {
             using var jsonDoc = JsonDocument.Parse(expirySourceCommand.CommandPayloadJson);
-            payload = CanonicalJson.Deserialize<SharePayload>(jsonDoc.RootElement);
+            payload = ReadSourceBindings(jsonDoc.RootElement);
         }
-        catch (Exception ex) when (ex is JsonException or AuthorityException)
+        catch (JsonException)
         {
             return Ineligible("PAYLOAD_MALFORMED");
         }
@@ -206,9 +205,25 @@ internal static class ExpireShareAdmission
         return new AdmissionResult(Disposition.Ineligible, reasonCode, null, null);
     }
 
-    /// <summary>Minimal payload contract for validation; only fields needed for admission check.</summary>
-    private sealed record SharePayload(
-        Guid RecordShareId,
-        Guid FormRecordId,
-        DateTimeOffset? ShareExpiresOn);
+    private static SharePayload ReadSourceBindings(JsonElement payload)
+    {
+        const string shareKey = "record_share_id";
+        const string recordKey = "form_record_id";
+        const string expiryKey = "share_expires_on";
+        if (payload.ValueKind != JsonValueKind.Object ||
+            payload.EnumerateObject().Count(p => p.NameEquals(shareKey) || p.NameEquals(recordKey) || p.NameEquals(expiryKey)) != 3 ||
+            !payload.TryGetProperty(shareKey, out var share) || share.ValueKind != JsonValueKind.String ||
+            !share.TryGetGuid(out var shareId) ||
+            !payload.TryGetProperty(recordKey, out var record) || record.ValueKind != JsonValueKind.String ||
+            !record.TryGetGuid(out var recordId) ||
+            !payload.TryGetProperty(expiryKey, out var expiry) || expiry.ValueKind != JsonValueKind.String ||
+            !expiry.TryGetDateTimeOffset(out var expiresOn))
+        {
+            throw new JsonException("Expiry source binding is missing, duplicated or malformed");
+        }
+
+        return new SharePayload(shareId, recordId, expiresOn);
+    }
+
+    private readonly record struct SharePayload(Guid RecordShareId, Guid FormRecordId, DateTimeOffset ShareExpiresOn);
 }
