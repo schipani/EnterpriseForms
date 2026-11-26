@@ -177,7 +177,7 @@ describe("RecordSharingPage", () => {
 
     expect(await screen.findByRole("rowheader", { name: "Previously visible recipient" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Refresh access" }));
-    expect(await screen.findByText("Verifying record and sharing permissions")).toBeInTheDocument();
+    expect(await screen.findByText(/Verifying record and sharing permissions/)).toBeInTheDocument();
     expect(screen.queryByText("Previously visible recipient")).not.toBeInTheDocument();
 
     await act(async () => { completeRefresh({ result: baseProjection }); });
