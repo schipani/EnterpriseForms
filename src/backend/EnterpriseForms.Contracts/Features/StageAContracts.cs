@@ -83,10 +83,10 @@ public sealed record ShareDetailsResponse(Guid RecordShareId, Guid FormRecordId,
 /// C10 M2 (WP-0 Section 3.5): one change in the record's sharing or ownership history. <c>CommandState</c> is the Authority command's
 /// own state; only <c>Effective</c> means the change is in force. Names are display hints from the local directory.
 /// </summary>
-public sealed record RecordSecurityChangeResponse(string ChangeKind, Guid? RecordShareId, string? ShareEndState, string? InvalidationReasonCode, string? SubjectKind, Guid? SubjectId, string? SubjectDisplayName);
+public sealed record RecordSecurityChangeResponse(string ChangeKind, Guid? RecordShareId, string? ShareEndState, string? InvalidationReasonCode, string? SubjectKind, Guid? SubjectId, string? SubjectDisplayName, DateTimeOffset? ShareExpiresOn);
 
 public sealed record RecordSecurityHistoryItemResponse(Guid SecurityCommandId, string CommandKind, string CommandState, DateTimeOffset OccurredOn, DateTimeOffset? EffectiveOn,
-    long? CommittedAuthorizationRevision, Guid? ActorUserId, string? ActorDisplayName, IReadOnlyList<RecordSecurityChangeResponse> Changes);
+    long? CommittedAuthorizationRevision, Guid? ActorUserId, string? ActorDisplayName, IReadOnlyList<RecordSecurityChangeResponse> Changes, bool JournalBacked);
 
 public sealed record RecordSecurityHistoryResponse(Guid FormRecordId, IReadOnlyList<RecordSecurityHistoryItemResponse> Items, bool Truncated, long AuthorizationRevision);
 

@@ -35,6 +35,12 @@ public sealed class SecurityCommand
     public DateTimeOffset CommandModifiedOn { get; set; }
 
     public DateTimeOffset? CommandEffectiveOn { get; set; }
+
+    /// <summary>
+    /// C10 D6: the form record the command targets (its request resource), set when the row is created and never changed; null for
+    /// commands that target no record. Indexes the record-scoped sharing and ownership history.
+    /// </summary>
+    public Guid? TargetFormRecordId { get; set; }
 }
 
 public static class SecurityCommandStates

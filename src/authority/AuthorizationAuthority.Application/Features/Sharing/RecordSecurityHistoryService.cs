@@ -12,8 +12,9 @@ namespace AuthorizationAuthority.Application.Features.Sharing;
 /// C10 M1-WP9 (WP-0 Section 3.5, D10-11): the record's sharing and ownership history from the Authority's own committed state. Every
 /// owner, role and item edge records the command that created it and the command that removed it, so the commands that changed the
 /// record's owners or shares — and what each changed — are derived without trusting the business database or scanning the journal.
-/// Each item carries its command's actual state (A11). Limitation: an expiry-only update changes no edge, so only a share's latest
-/// expiry-setting command is listed (from its committed metadata); an earlier expiry-only change superseded by it is not. Readers: the record's current owner (or an owning-team member) and a holder of
+/// Each item carries its command's actual state (A11). C10 D6: commands are also found through their indexed target record, so every
+/// committed expiry-only update is listed with the expiry it committed, including ones a later update superseded; an item is
+/// journal-backed only when its authorization-journal entry exists. Readers: the record's current owner (or an owning-team member) and a holder of
 /// an Active Manager share on the record with Active lineage (ManageAccess); everyone else gets the answer for an unknown record.
 /// The read uses committed desired state, which is never behind the projection, so a revoked manager is refused at once.
 /// </summary>
@@ -55,25 +56,27 @@ public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProv
             }
         }
 
-        // An expiry-only update changes no edge: the share's latest expiry-setting command is taken from its committed metadata. An
-        // earlier expiry-only update that a later one superseded is not listed (no command-to-record index exists yet).
-        var commandIds = edges.Select(e => e.CreatedBySecurityCommandId).Concat(edges.Where(e => e.RemovedBySecurityCommandId is not null).Select(e => e.RemovedBySecurityCommandId!.Value))
-            .Concat(metadata.Values.Where(m => m.ExpirySourceSecurityCommandId is not null).Select(m => m.ExpirySourceSecurityCommandId!.Value))
-            .Where(id => id != Guid.Empty).ToHashSet();
-        var commands = new List<SecurityCommand>();
-        foreach (var id in commandIds)
+        // C10 D6: every committed command that targeted the record (indexed, so superseded expiry-only updates are kept), plus the
+        // commands that changed the record's edges from elsewhere (team removal, member deactivation).
+        var targeted = await scope.GetRecordTargetedCommandsAsync(organizationId, formRecordId, RecordSecurityHistoryLimits.MaximumCommands + 1, cancellationToken).ConfigureAwait(false);
+        var commands = targeted.Where(c => c.OrganizationId == organizationId).ToDictionary(c => c.SecurityCommandId);
+        var edgeCommandIds = edges.Select(e => e.CreatedBySecurityCommandId).Concat(edges.Where(e => e.RemovedBySecurityCommandId is not null).Select(e => e.RemovedBySecurityCommandId!.Value))
+            .Where(id => id != Guid.Empty && !commands.ContainsKey(id)).ToHashSet();
+        foreach (var id in edgeCommandIds)
         {
-            if (await scope.FindCommandAsync(id, cancellationToken).ConfigureAwait(false) is { } command && command.OrganizationId == organizationId)
+            if (await scope.FindCommandAsync(id, cancellationToken).ConfigureAwait(false) is { } command && command.OrganizationId == organizationId && command.CommandStateName != SecurityCommandStates.Rejected)
             {
-                commands.Add(command);
+                commands[id] = command;
             }
         }
 
-        var newest = commands.OrderByDescending(c => c.CommandCreatedOn).ThenByDescending(c => c.SecurityCommandId).ToList();
+        var newest = commands.Values.OrderByDescending(c => c.CommandCreatedOn).ThenByDescending(c => c.SecurityCommandId).ToList();
         var truncated = newest.Count > RecordSecurityHistoryLimits.MaximumCommands;
+        var page = newest.Take(RecordSecurityHistoryLimits.MaximumCommands).ToList();
+        var journalled = await scope.GetAuthorizationJournalCommandIdsAsync(organizationId, [.. page.Select(c => c.SecurityCommandId)], cancellationToken).ConfigureAwait(false);
         var users = new Dictionary<Guid, Guid?>();
         var items = new List<RecordSecurityHistoryItem>();
-        foreach (var command in newest.Take(RecordSecurityHistoryLimits.MaximumCommands))
+        foreach (var command in page)
         {
             if (!users.TryGetValue(command.ActorIdentityBindingId, out var user))
             {
@@ -82,16 +85,18 @@ public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProv
             }
 
             items.Add(new RecordSecurityHistoryItem(command.SecurityCommandId, command.CommandKindName, command.CommandStateName, command.CommandCreatedOn, command.CommandEffectiveOn,
-                command.CommittedAuthorizationRevision, user, ChangesOf(command.SecurityCommandId, edges, shares, metadata, formRecordId)));
+                command.CommittedAuthorizationRevision, user, ChangesOf(command, edges, shares, formRecordId, metadata), journalled.Contains(command.SecurityCommandId)));
         }
 
         return new RecordSecurityHistory(formRecordId, items, truncated, state.AuthorizationRevision);
     }
 
     /// <summary>What one command changed, from the edges it created and removed. Deterministic order: owner changes, then shares by id.</summary>
-    internal static IReadOnlyList<RecordSecurityChange> ChangesOf(Guid commandId, IReadOnlyList<AuthorityRelationshipEdge> edges,
-        IReadOnlyDictionary<Guid, AuthorityResource> shares, IReadOnlyDictionary<Guid, Domain.Features.Sharing.ShareResourceMetadata> metadata, Guid formRecordId)
+    internal static IReadOnlyList<RecordSecurityChange> ChangesOf(SecurityCommand command, IReadOnlyList<AuthorityRelationshipEdge> edges,
+        IReadOnlyDictionary<Guid, AuthorityResource> shares, Guid formRecordId, IReadOnlyDictionary<Guid, Domain.Features.Sharing.ShareResourceMetadata> metadata)
     {
+        var commandId = command.SecurityCommandId;
+        var (payloadShare, payloadExpiry) = CommittedShareScope(command);
         var changes = new List<RecordSecurityChange>();
         foreach (var owner in edges.Where(e => e.ResourceTypeName == ResourceTypeNames.FormRecord && e.ResourceEntityId == formRecordId && e.RelationshipName == "owner")
                      .OrderBy(e => e.SubjectEntityId))
@@ -116,9 +121,9 @@ public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProv
             var removed = own.Any(e => e.RemovedBySecurityCommandId == commandId);
             if (!created && !removed)
             {
-                if (metadata.GetValueOrDefault(shareId)?.ExpirySourceSecurityCommandId == commandId && share.RegisteredBySecurityCommandId != commandId)
+                if (payloadShare == shareId && command.CommandKindName == nameof(SecurityCommandKind.UpdateShareScope))
                 {
-                    changes.Add(new RecordSecurityChange("ShareScopeChanged", shareId, null, null, null, null)); // the latest expiry change
+                    changes.Add(new RecordSecurityChange("ShareScopeChanged", shareId, null, null, null, null, payloadExpiry)); // an expiry-only update
                 }
 
                 continue;
@@ -128,7 +133,7 @@ public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProv
             var stillHeld = own.Any(e => e.ResourceTypeName == ResourceTypeNames.RecordShare && Roles.Contains(e.RelationshipName) && e.RemovedBySecurityCommandId is null);
             if (share.RegisteredBySecurityCommandId == commandId)
             {
-                changes.Add(new RecordSecurityChange("ShareCreated", shareId, null, null, null, null));
+                changes.Add(new RecordSecurityChange("ShareCreated", shareId, null, null, null, null, payloadShare == shareId ? payloadExpiry : null));
             }
             else if (roleRemoved && !stillHeld && share.ResourceLifecycleState != ResourceLifecycleStates.Active)
             {
@@ -137,11 +142,33 @@ public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProv
             }
             else
             {
-                changes.Add(new RecordSecurityChange("ShareScopeChanged", shareId, null, null, null, null));
+                changes.Add(new RecordSecurityChange("ShareScopeChanged", shareId, null, null, null, null, payloadShare == shareId ? payloadExpiry : null));
             }
         }
 
         return changes;
+    }
+
+    /// <summary>The share and expiry a committed CreateShare or UpdateShareScope recorded in its normalized payload (step-up already stripped).</summary>
+    private static (Guid? Share, DateTimeOffset? Expiry) CommittedShareScope(SecurityCommand command)
+    {
+        if (command.CommandKindName is not (nameof(SecurityCommandKind.CreateShare) or nameof(SecurityCommandKind.UpdateShareScope)))
+        {
+            return (null, null);
+        }
+
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(command.CommandPayloadJson);
+            var root = document.RootElement;
+            Guid? share = root.TryGetProperty("record_share_id", out var id) && id.TryGetGuid(out var parsed) ? parsed : null;
+            DateTimeOffset? expiry = root.TryGetProperty("share_expires_on", out var e) && e.ValueKind == System.Text.Json.JsonValueKind.String && e.TryGetDateTimeOffset(out var at) ? at : null;
+            return (share, expiry);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return (null, null);
+        }
     }
 
     private static AuthorityException Unavailable() => AuthorityException.NotRegistered("record history is not available to this actor");

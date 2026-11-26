@@ -11,6 +11,7 @@ public sealed record RecordSecurityHistory(Guid FormRecordId, IReadOnlyList<Reco
 
 /// <param name="CommandState">Pending, CommittedAwaitingProjection, Effective, Rejected or FailedReconciliation.</param>
 /// <param name="ActorUserId">The Authority user the command is recorded under (for ExpireShare: the person whose command set the expiry).</param>
+/// <param name="JournalBacked">True when the command's entry exists on the organization's authorization journal stream.</param>
 public sealed record RecordSecurityHistoryItem(
     Guid SecurityCommandId,
     string CommandKind,
@@ -19,13 +20,15 @@ public sealed record RecordSecurityHistoryItem(
     DateTimeOffset? EffectiveOn,
     long? CommittedAuthorizationRevision,
     Guid? ActorUserId,
-    IReadOnlyList<RecordSecurityChange> Changes);
+    IReadOnlyList<RecordSecurityChange> Changes,
+    bool JournalBacked = false);
 
 /// <param name="ChangeKind">ShareCreated, ShareScopeChanged, ShareEnded, OwnerAdded or OwnerRemoved.</param>
 /// <param name="ShareEndState">For ShareEnded: Revoked, Expired or Invalidated.</param>
 /// <param name="InvalidationReasonCode">For an Invalidated share: why (for example UpstreamRevoked, UpstreamNarrowed, GrantorPathLost).</param>
 /// <param name="SubjectKind">For owner changes: "User" or "Team".</param>
-public sealed record RecordSecurityChange(string ChangeKind, Guid? RecordShareId, string? ShareEndState, string? InvalidationReasonCode, string? SubjectKind, Guid? SubjectId);
+/// <param name="ShareExpiresOn">For ShareCreated and ShareScopeChanged: the expiry the command committed (null: none).</param>
+public sealed record RecordSecurityChange(string ChangeKind, Guid? RecordShareId, string? ShareEndState, string? InvalidationReasonCode, string? SubjectKind, Guid? SubjectId, DateTimeOffset? ShareExpiresOn = null);
 
 public static class RecordSecurityHistoryLimits
 {

@@ -136,6 +136,14 @@ public interface IAuthorityScope : IAsyncDisposable
     Task<List<AuthorityRelationshipEdge>> GetRecordSecurityEdgeHistoryAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken) =>
         throw new NotSupportedException("record security edge history is not available from this store");
 
+    /// <summary>C10 D6: the committed (not Rejected) commands that targeted the record, newest first, at most <paramref name="limit"/>.</summary>
+    Task<List<SecurityCommand>> GetRecordTargetedCommandsAsync(Guid organizationId, Guid formRecordId, int limit, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("record-targeted commands are not available from this store");
+
+    /// <summary>C10 D6: which of the given commands have an entry on the organization's authorization journal stream.</summary>
+    Task<HashSet<Guid>> GetAuthorizationJournalCommandIdsAsync(Guid organizationId, IReadOnlyCollection<Guid> securityCommandIds, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("journal command lookup is not available from this store");
+
     Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken);
 
     void AddProtectionPolicy(OrganizationProtectionPolicy policy);

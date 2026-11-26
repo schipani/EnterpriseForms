@@ -13076,7 +13076,8 @@
           "invalidationReasonCode",
           "subjectKind",
           "subjectId",
-          "subjectDisplayName"
+          "subjectDisplayName",
+          "shareExpiresOn"
         ],
         "type": "object",
         "properties": {
@@ -13120,6 +13121,13 @@
               "null",
               "string"
             ]
+          },
+          "shareExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -13133,7 +13141,8 @@
           "committedAuthorizationRevision",
           "actorUserId",
           "actorDisplayName",
-          "changes"
+          "changes",
+          "journalBacked"
         ],
         "type": "object",
         "properties": {
@@ -13185,6 +13194,9 @@
             "items": {
               "$ref": "#/components/schemas/RecordSecurityChangeResponse"
             }
+          },
+          "journalBacked": {
+            "type": "boolean"
           }
         }
       },

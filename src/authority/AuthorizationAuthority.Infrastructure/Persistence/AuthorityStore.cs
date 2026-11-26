@@ -477,6 +477,19 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
                              (e.SubjectTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.SubjectEntityId))))
                 .ToListAsync(cancellationToken);
 
+        public Task<List<SecurityCommand>> GetRecordTargetedCommandsAsync(Guid organizationId, Guid formRecordId, int limit, CancellationToken cancellationToken) =>
+            context.SecurityCommands.AsNoTracking()
+                .Where(c => c.OrganizationId == organizationId && c.TargetFormRecordId == formRecordId && c.CommandStateName != SecurityCommandStates.Rejected)
+                .OrderByDescending(c => c.CommandCreatedOn).ThenByDescending(c => c.SecurityCommandId)
+                .Take(limit)
+                .ToListAsync(cancellationToken);
+
+        public async Task<HashSet<Guid>> GetAuthorizationJournalCommandIdsAsync(Guid organizationId, IReadOnlyCollection<Guid> securityCommandIds, CancellationToken cancellationToken) =>
+            (await context.JournalEntries.AsNoTracking()
+                .Where(e => e.OrganizationId == organizationId && e.JournalStreamName == JournalStreamNames.Authorization && e.SecurityCommandId != null && securityCommandIds.Contains(e.SecurityCommandId.Value))
+                .Select(e => e.SecurityCommandId!.Value)
+                .ToListAsync(cancellationToken).ConfigureAwait(false)).ToHashSet();
+
         public async Task<List<AuthorityRelationshipEdge>> GetRecordSecurityEdgeHistoryAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken)
         {
             var recordEdges = await context.RelationshipEdges.AsNoTracking()

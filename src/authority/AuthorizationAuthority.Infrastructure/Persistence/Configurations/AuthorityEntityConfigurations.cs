@@ -174,6 +174,8 @@ public sealed class SecurityCommandConfiguration : IEntityTypeConfiguration<Secu
         builder.HasIndex(e => new { e.OrganizationId, e.CommittedAuthorizationRevision }).HasDatabaseName("ix_security_commands_org_revision");
         // C8 M4-3 (AC-8.2, C-165 R-4): the security-command timeline keyset (organization, time, id), read under the audit-access bounds.
         builder.HasIndex(e => new { e.OrganizationId, e.CommandCreatedOn, e.SecurityCommandId }).HasDatabaseName("ix_security_commands_org_created");
+        // C10 D6: record-scoped sharing and ownership history (every committed command that targeted the record).
+        builder.HasIndex(e => new { e.OrganizationId, e.TargetFormRecordId, e.CommandCreatedOn }).HasDatabaseName("ix_security_commands_target_record");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_security_command_org");
         builder.HasOne<IdentityBinding>().WithMany().HasForeignKey(e => e.ActorIdentityBindingId).HasConstraintName("fk_security_command_actor");
         builder.ToTable(t => t.HasCheckConstraint("ck_security_command_state", "command_state_name IN ('Pending','CommittedAwaitingProjection','Effective','Rejected','FailedReconciliation')"));
@@ -232,6 +234,8 @@ public sealed class SecurityJournalEntryConfiguration : IEntityTypeConfiguration
         builder.Property(e => e.LastArchiveErrorCode).HasMaxLength(100);
         builder.HasIndex(e => new { e.OrganizationId, e.JournalStreamName, e.JournalStreamRevision }).IsUnique().HasDatabaseName("uq_journal_stream_revision");
         builder.HasIndex(e => new { e.OrganizationId, e.ArchiveDeliveryState }).HasDatabaseName("ix_journal_pending_archive");
+        // C10 D6: the journal entries of given commands (history items are journal-backed only when their entry exists).
+        builder.HasIndex(e => new { e.OrganizationId, e.SecurityCommandId }).HasDatabaseName("ix_journal_security_command");
         // C8 M4-3 (AC-8.2, C-165 R-4): timeline audit-stream entries and bounded rejection-evidence lookups by (organization, time).
         builder.HasIndex(e => new { e.OrganizationId, e.JournalCreatedOn, e.JournalStreamName, e.JournalStreamRevision }).HasDatabaseName("ix_journal_org_created");
         // Phase C7 M1: a record's checkpoint entry is found by its operation in one indexed lookup (verification was O(content revisions) per record).

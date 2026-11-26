@@ -4010,6 +4010,8 @@ export interface components {
             /** Format: uuid */
             subjectId: null | string;
             subjectDisplayName: null | string;
+            /** Format: date-time */
+            shareExpiresOn: null | string;
         };
         RecordSecurityHistoryItemResponse: {
             /** Format: uuid */
@@ -4026,6 +4028,7 @@ export interface components {
             actorUserId: null | string;
             actorDisplayName: null | string;
             changes: components["schemas"]["RecordSecurityChangeResponse"][];
+            journalBacked: boolean;
         };
         RecordSecurityHistoryResponse: {
             /** Format: uuid */

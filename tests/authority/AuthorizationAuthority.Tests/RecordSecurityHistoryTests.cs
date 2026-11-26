@@ -156,6 +156,35 @@ public sealed class RecordSecurityHistoryTests
     }
 
     [Fact]
+    public async Task EverySupersededExpiryOnlyUpdateIsListedWithTheExpiryItCommitted()
+    {
+        var share = Guid.NewGuid();
+        var step = HumanCommandStepUpGate.SyntheticStepUpEvidence;
+        var first = clock.GetUtcNow().AddDays(10);
+        var second = clock.GetUtcNow().AddDays(20);
+        await SubmitAsync(owner, SecurityCommandKind.CreateShare, new CreateSharePayload(share, record, reader, null, RecipientRoles.Reader, [this.first], step));
+        var update1 = await SubmitAsync(owner, SecurityCommandKind.UpdateShareScope, new UpdateShareScopePayload(share, record, RecipientRoles.Reader, [this.first], 1, step, null, first));
+        var update2 = await SubmitAsync(owner, SecurityCommandKind.UpdateShareScope, new UpdateShareScopePayload(share, record, RecipientRoles.Reader, [this.first], 2, step, null, second));
+
+        var history = await ReadAsync(owner);
+
+        var expiries = history.Items.Where(i => i.SecurityCommandId == update1 || i.SecurityCommandId == update2)
+            .ToDictionary(i => i.SecurityCommandId, i => Assert.Single(i.Changes).ShareExpiresOn);
+        Assert.Equal(first, expiries[update1]);
+        Assert.Equal(second, expiries[update2]); // the superseded first update is kept with its own committed value
+        Assert.All(history.Items, i => Assert.True(i.JournalBacked));
+    }
+
+    [Fact]
+    public async Task ACommandWithoutAJournalEntryIsNotJournalBacked()
+    {
+        var command = await SubmitAsync(owner, SecurityCommandKind.CreateShare, new CreateSharePayload(Guid.NewGuid(), record, reader, null, RecipientRoles.Reader, [first], HumanCommandStepUpGate.SyntheticStepUpEvidence));
+        store.Journal.RemoveAll(j => j.SecurityCommandId == command && j.JournalStreamName == AuthorizationAuthority.Domain.Features.Journal.JournalStreamNames.Authorization);
+
+        Assert.False(Assert.Single((await ReadAsync(owner)).Items).JournalBacked);
+    }
+
+    [Fact]
     public async Task ARecordWithoutSharesHasAnEmptyHistory()
     {
         var history = await ReadAsync(owner);

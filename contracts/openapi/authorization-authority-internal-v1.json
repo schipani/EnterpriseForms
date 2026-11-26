@@ -10649,6 +10649,13 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "share_expires_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -10739,6 +10746,10 @@
             "items": {
               "$ref": "#/components/schemas/RecordSecurityChange"
             }
+          },
+          "journal_backed": {
+            "type": "boolean",
+            "default": false
           }
         }
       },

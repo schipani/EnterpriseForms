@@ -1387,6 +1387,9 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "ArchiveDeliveryState")
                         .HasDatabaseName("ix_journal_pending_archive");
 
+                    b.HasIndex("OrganizationId", "SecurityCommandId")
+                        .HasDatabaseName("ix_journal_security_command");
+
                     b.HasIndex("OrganizationId", "JournalStreamName", "ContentChangeOperationId")
                         .HasDatabaseName("ix_journal_content_operation");
 
@@ -5019,6 +5022,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("rejection_reason_code");
 
+                    b.Property<Guid?>("TargetFormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_form_record_id");
+
                     b.HasKey("SecurityCommandId");
 
                     b.HasAlternateKey("OrganizationId", "SecurityCommandId")
@@ -5035,6 +5042,9 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganizationId", "CommandCreatedOn", "SecurityCommandId")
                         .HasDatabaseName("ix_security_commands_org_created");
+
+                    b.HasIndex("OrganizationId", "TargetFormRecordId", "CommandCreatedOn")
+                        .HasDatabaseName("ix_security_commands_target_record");
 
                     b.ToTable("security_commands", "authority", t =>
                         {

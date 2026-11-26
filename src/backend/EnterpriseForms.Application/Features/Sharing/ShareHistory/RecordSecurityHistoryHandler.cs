@@ -42,7 +42,7 @@ public sealed class RecordSecurityHistoryHandler(IBusinessStore store, IShareDet
         {
             var changes = item.Changes.Where(c => !ownershipOnly || c.ChangeKind is "OwnerAdded" or "OwnerRemoved")
                 .Select(c => new RecordSecurityChangeResponse(c.ChangeKind, c.RecordShareId, c.ShareEndState, c.InvalidationReasonCode, c.SubjectKind, c.SubjectId,
-                    c.SubjectKind == "User" && c.SubjectId is { } subject ? users.GetValueOrDefault(subject) : null))
+                    c.SubjectKind == "User" && c.SubjectId is { } subject ? users.GetValueOrDefault(subject) : null, c.ShareExpiresOn))
                 .ToList();
             if (changes.Count == 0)
             {
@@ -50,7 +50,7 @@ public sealed class RecordSecurityHistoryHandler(IBusinessStore store, IShareDet
             }
 
             items.Add(new RecordSecurityHistoryItemResponse(item.SecurityCommandId, item.CommandKind, item.CommandState, item.OccurredOn, item.EffectiveOn, item.CommittedAuthorizationRevision,
-                item.ActorUserId, item.ActorUserId is { } actor ? users.GetValueOrDefault(actor) : null, changes));
+                item.ActorUserId, item.ActorUserId is { } actor ? users.GetValueOrDefault(actor) : null, changes, item.JournalBacked));
         }
 
         return new RecordSecurityHistoryResponse(formRecordId, items, history.Truncated, history.AuthorizationRevision);

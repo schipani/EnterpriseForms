@@ -66,6 +66,7 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             CommandCreatedOn = clock.GetUtcNow(),
             CommandModifiedOn = clock.GetUtcNow(),
             CommandStateName = SecurityCommandStates.Rejected,
+            TargetFormRecordId = request.Resource.ResourceKind == ResourceKind.FormRecord ? request.Resource.ResourceId : null,
         };
 
         try

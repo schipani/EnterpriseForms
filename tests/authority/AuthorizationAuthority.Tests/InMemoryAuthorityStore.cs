@@ -327,6 +327,14 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
                 ((e.ResourceTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.ResourceEntityId)) ||
                  (e.SubjectTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.SubjectEntityId)))).ToList());
 
+        public Task<List<SecurityCommand>> GetRecordTargetedCommandsAsync(Guid organizationId, Guid formRecordId, int limit, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Commands.Where(c => c.OrganizationId == organizationId && c.TargetFormRecordId == formRecordId && c.CommandStateName != SecurityCommandStates.Rejected)
+                .OrderByDescending(c => c.CommandCreatedOn).ThenByDescending(c => c.SecurityCommandId).Take(limit).ToList());
+
+        public Task<HashSet<Guid>> GetAuthorizationJournalCommandIdsAsync(Guid organizationId, IReadOnlyCollection<Guid> securityCommandIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Journal.Where(e => e.OrganizationId == organizationId && e.JournalStreamName == JournalStreamNames.Authorization && e.SecurityCommandId is { } id && securityCommandIds.Contains(id))
+                .Select(e => e.SecurityCommandId!.Value).ToHashSet());
+
         public Task<List<AuthorityRelationshipEdge>> GetRecordSecurityEdgeHistoryAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken)
         {
             var recordEdges = s.Edges.Where(e => e.OrganizationId == organizationId && e.ResourceTypeName == ResourceTypeNames.FormRecord && e.ResourceEntityId == formRecordId &&

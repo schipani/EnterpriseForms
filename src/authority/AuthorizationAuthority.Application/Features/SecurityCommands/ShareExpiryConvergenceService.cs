@@ -96,6 +96,7 @@ public sealed class ShareExpiryConvergenceService(IAuthorityStore store, TimePro
             ActorIdentityBindingId = binding.IdentityBindingId,
             CommandKindName = SecurityCommandKinds.ExpireShare,
             CommandIdempotencyKey = key,
+            TargetFormRecordId = record,
             CommandRequestDigest = CanonicalJson.Digest(System.Text.Encoding.UTF8.GetBytes(plan.NormalizedPayloadJson)),
             ExpectedAuthorizationRevision = state.AuthorizationRevision,
             CommandPayloadJson = plan.NormalizedPayloadJson,

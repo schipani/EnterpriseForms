@@ -44,7 +44,7 @@ function describe(item: RecordSecurityHistoryItemResponse): string[] {
       case "ShareCreated":
         return `Share ${change.recordShareId ?? ""} created`;
       case "ShareScopeChanged":
-        return `Share ${change.recordShareId ?? ""} changed`;
+        return `Share ${change.recordShareId ?? ""} changed${change.shareExpiresOn ? `, expires ${getActiveFormatter().instant(change.shareExpiresOn)}` : ""}`;
       case "ShareEnded":
         return change.shareEndState === "Invalidated"
           ? `Share ${change.recordShareId ?? ""} ended because ${REASONS[change.invalidationReasonCode ?? ""] ?? "its delegation was no longer valid"}`

@@ -474,9 +474,9 @@ public interface IShareDetailsAuthority
     Task<AuthorityRecordSecurityHistory> GetRecordSecurityHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, CancellationToken cancellationToken);
 }
 
-public sealed record AuthorityRecordSecurityChange(string ChangeKind, Guid? RecordShareId, string? ShareEndState, string? InvalidationReasonCode, string? SubjectKind, Guid? SubjectId);
+public sealed record AuthorityRecordSecurityChange(string ChangeKind, Guid? RecordShareId, string? ShareEndState, string? InvalidationReasonCode, string? SubjectKind, Guid? SubjectId, DateTimeOffset? ShareExpiresOn = null);
 
 public sealed record AuthorityRecordSecurityHistoryItem(Guid SecurityCommandId, string CommandKind, string CommandState, DateTimeOffset OccurredOn, DateTimeOffset? EffectiveOn,
-    long? CommittedAuthorizationRevision, Guid? ActorUserId, IReadOnlyList<AuthorityRecordSecurityChange> Changes);
+    long? CommittedAuthorizationRevision, Guid? ActorUserId, IReadOnlyList<AuthorityRecordSecurityChange> Changes, bool JournalBacked = false);
 
 public sealed record AuthorityRecordSecurityHistory(Guid FormRecordId, IReadOnlyList<AuthorityRecordSecurityHistoryItem> Items, bool Truncated, long AuthorizationRevision);
