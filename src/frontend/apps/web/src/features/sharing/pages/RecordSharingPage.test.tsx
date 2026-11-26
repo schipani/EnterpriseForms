@@ -1,5 +1,5 @@
 import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -163,6 +163,27 @@ describe("RecordSharingPage", () => {
     expect(await screen.findByText("You cannot manage sharing for this record")).toBeInTheDocument();
     expect(api.shares.list).not.toHaveBeenCalled();
     expect(api.audit.record).not.toHaveBeenCalled();
+  });
+
+  it("withholds previously verified rows during a new access check", async () => {
+    const authorized = { ...baseProjection, permissions: { ...baseProjection.permissions, canManageAccess: true, canTransferOwnership: true } };
+    let completeRefresh: (value: { result: typeof baseProjection }) => void = () => {};
+    api.records.projection.mockResolvedValueOnce({ result: authorized }).mockImplementationOnce(() =>
+      new Promise<{ result: typeof baseProjection }>((resolve) => { completeRefresh = resolve; }),
+    );
+    api.shares.list.mockResolvedValue({ result: { items: [shareRow("Previously visible recipient")], authorizationRevision: baseProjection.record.authorizationRevision } });
+    api.audit.record.mockResolvedValue({ result: { events: [] } });
+    renderPage();
+
+    expect(await screen.findByRole("rowheader", { name: "Previously visible recipient" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh access" }));
+    expect(await screen.findByText("Verifying record and sharing permissions")).toBeInTheDocument();
+    expect(screen.queryByText("Previously visible recipient")).not.toBeInTheDocument();
+
+    await act(async () => { completeRefresh({ result: baseProjection }); });
+    expect(await screen.findByText("You cannot manage sharing for this record")).toBeInTheDocument();
+    expect(screen.queryByText("Previously visible recipient")).not.toBeInTheDocument();
+    expect(api.shares.list).toHaveBeenCalledTimes(1);
   });
 
   it("withholds sharing details if the cached permission cannot be reverified offline", () => {

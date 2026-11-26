@@ -33,7 +33,7 @@ function VerifiedRecordSharingPage({ formRecordId, scope }: { formRecordId: stri
     return <StatusMessage tone="info" title="Waiting for a connection to verify sharing access" />;
   }
 
-  if (projection.isPending || (!projection.isFetchedAfterMount && !projection.isError)) {
+  if (projection.fetchStatus === "fetching" || projection.isPending || (!projection.isFetchedAfterMount && !projection.isError)) {
     return <LoadingBlock label="Verifying record and sharing permissions" />;
   }
 
@@ -71,7 +71,7 @@ function VerifiedRecordSharingPage({ formRecordId, scope }: { formRecordId: stri
         actions={
           <>
             {backLink}
-            <Button variant="secondary" busy={projection.isFetching} onClick={() => void projection.refetch()}>
+            <Button variant="secondary" onClick={() => void projection.refetch()}>
               Refresh access
             </Button>
           </>
