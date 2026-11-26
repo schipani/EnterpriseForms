@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AuthorizationAuthority.Application.Features.Lineage;
 using AuthorizationAuthority.Domain.Features.Lineage;
 using AuthorizationAuthority.Domain.Features.Organizations;
@@ -188,7 +189,7 @@ public sealed class LegacyLineageClassifierTests
             TeamMemberUserIds = new HashSet<Guid>()
         };
 
-        var grantsSnapshot = new RecordGrantsSnapshot { ObservedOn = ObservedOn, ActiveShares = [managerShare] };
+        var grantsSnapshot = new RecordGrantsSnapshot { ObservedOn = ObservedOn, ActiveShares = WithVerifiedAncestors(managerShare) };
         var pseudonymizer = new LineagePseudonymizer(Org, TestKeyMaterial);
 
         // Act
@@ -432,7 +433,7 @@ public sealed class LegacyLineageClassifierTests
             TeamMemberUserIds = new HashSet<Guid>()
         };
 
-        var grantsSnapshot = new RecordGrantsSnapshot { ObservedOn = ObservedOn, ActiveShares = [managerShare] };
+        var grantsSnapshot = new RecordGrantsSnapshot { ObservedOn = ObservedOn, ActiveShares = WithVerifiedAncestors(managerShare) };
         var pseudonymizer = new LineagePseudonymizer(Org, TestKeyMaterial);
 
         // Act
@@ -482,7 +483,7 @@ public sealed class LegacyLineageClassifierTests
             TeamMemberUserIds = new HashSet<Guid>()
         };
 
-        var grantsSnapshot = new RecordGrantsSnapshot { ObservedOn = ObservedOn, ActiveShares = [managerShare] };
+        var grantsSnapshot = new RecordGrantsSnapshot { ObservedOn = ObservedOn, ActiveShares = WithVerifiedAncestors(managerShare) };
         var pseudonymizer = new LineagePseudonymizer(Org, TestKeyMaterial);
 
         // Act
@@ -1181,6 +1182,108 @@ public sealed class LegacyLineageClassifierTests
     }
 
     #endregion
+
+    [Fact]
+    public void MatchingButUnverifiedHistoricalOwnerDoesNotEstablishARoot()
+    {
+        var id = Guid.NewGuid();
+        var result = LegacyLineageClassifier.ClassifyShare(CreateShareResource(id, Record), null,
+            CreateShareEdges(id, RecipientUser, RecipientKind.User, "reader"), new HashSet<Guid> { FieldItem1 }, [],
+            OwnerUser, new OwnerInfoAtRegistration { OwnerUserId = OwnerUser, IsVerifiable = false },
+            new RecordGrantsSnapshot { ObservedOn = ObservedOn }, new LineagePseudonymizer(Org, TestKeyMaterial));
+
+        Assert.Equal(LegacyShareClassificationOutcome.NoCoveringParent, result.Classification);
+        Assert.Null(result.ProposedDelegationDepth);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RefusesRemovedOrContradictoryRecipientEvidence(bool contradictory)
+    {
+        var id = Guid.NewGuid();
+        var edges = CreateShareEdges(id, RecipientUser, RecipientKind.User, "reader");
+        if (contradictory)
+        {
+            edges.AddRange(CreateShareEdges(id, ManagerUser, RecipientKind.User, "contributor"));
+        }
+        else
+        {
+            edges[0].RemovedBySecurityCommandId = Guid.NewGuid();
+        }
+
+        Assert.Throws<InvalidOperationException>(() => LegacyLineageClassifier.ClassifyShare(CreateShareResource(id, Record), null,
+            edges, new HashSet<Guid> { FieldItem1 }, [], OwnerUser,
+            new OwnerInfoAtRegistration { OwnerUserId = OwnerUser, IsVerifiable = true },
+            new RecordGrantsSnapshot { ObservedOn = ObservedOn }, new LineagePseudonymizer(Org, TestKeyMaterial)));
+    }
+
+    [Fact]
+    public void AGrantWithIndirectDependenceCannotBeAParentOrIndependentAid()
+    {
+        var id = Guid.NewGuid();
+        var root = SnapshotShare(id, 1, null);
+        var middle = SnapshotShare(Guid.NewGuid(), 2, id);
+        var leaf = SnapshotShare(Guid.NewGuid(), 3, middle.RecordShareId) with
+        {
+            DirectUserRecipientIds = new HashSet<Guid> { ManagerUser, RecipientUser },
+        };
+        var result = LegacyLineageClassifier.ClassifyShare(CreateShareResource(id, Record), null,
+            CreateShareEdges(id, RecipientUser, RecipientKind.User, "reader"), new HashSet<Guid> { FieldItem1 }, [],
+            ManagerUser, null, new RecordGrantsSnapshot { ObservedOn = ObservedOn, ActiveShares = [root, middle, leaf] },
+            new LineagePseudonymizer(Org, TestKeyMaterial), evaluateIndependentCoverage: true);
+
+        Assert.Empty(result.CandidateParentShareIds);
+        Assert.Equal(IndependentCoverageAnnotation.NotCovered, result.IndependentCoverage);
+    }
+
+    [Fact]
+    public void ReportIsScopedToOneRevisionAndUsesPseudonyms()
+    {
+        var id = Guid.NewGuid();
+        var entry = LegacyLineageClassifier.ClassifyShare(CreateShareResource(id, Record), null,
+            CreateShareEdges(id, RecipientUser, RecipientKind.User, "reader"), new HashSet<Guid> { FieldItem1 }, [],
+            OwnerUser, new OwnerInfoAtRegistration { OwnerUserId = OwnerUser, IsVerifiable = true },
+            new RecordGrantsSnapshot { ObservedOn = ObservedOn }, new LineagePseudonymizer(Org, TestKeyMaterial));
+        var report = new LegacyLineageReportBuilder().WithAuthorizationRevision(12).WithTimestamp(ObservedOn).AddEntry(entry).Build();
+        var json = JsonSerializer.Serialize(report);
+        Assert.Equal(12, report.AuthorizationRevisionRead);
+        Assert.DoesNotContain(OwnerUser.ToString("D"), json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(RecipientUser.ToString("D"), json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(FieldItem1.ToString("D"), json, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEqual(entry.RecipientPseudonymousReference, entry.GrantorPseudonymousReference);
+
+        var crossOrg = new LegacyLineageReportBuilder().WithAuthorizationRevision(12).AddEntry(entry)
+            .AddEntry(entry with { OrganizationId = Guid.NewGuid() });
+        Assert.Throws<InvalidOperationException>(() => crossOrg.Build());
+    }
+
+    private static List<ActiveShareInfo> WithVerifiedAncestors(ActiveShareInfo leaf)
+    {
+        var shares = new List<ActiveShareInfo>();
+        Guid? parent = null;
+        for (var depth = 1; depth < leaf.DelegationDepth; depth++)
+        {
+            var ancestor = SnapshotShare(Guid.NewGuid(), depth, parent);
+            parent = ancestor.RecordShareId;
+            shares.Add(ancestor);
+        }
+
+        shares.Add(leaf with { ParentRecordShareId = parent });
+        return shares;
+    }
+
+    private static ActiveShareInfo SnapshotShare(Guid id, int depth, Guid? parent) => new()
+    {
+        RecordShareId = id,
+        OrganizationId = Org,
+        RecordId = Record,
+        DelegationDepth = depth,
+        ParentRecordShareId = parent,
+        Role = "manager",
+        IsActive = true,
+        FieldItemIds = new HashSet<Guid> { FieldItem1 },
+    };
 
     #region Helper Methods
 

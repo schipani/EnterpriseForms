@@ -58,7 +58,7 @@ public sealed class LegacyLineageClassifier
         ArgumentNullException.ThrowIfNull(pseudonymizer);
 
         // Extract recipient info from edges
-        var (recipientId, recipientKind, shareRole) = ExtractRecipientInfo(shareEdges);
+        var (recipientId, recipientKind, shareRole) = ExtractRecipientInfo(shareEdges, share.ResourceEntityId, share.OrganizationId);
 
         // If we cannot determine the grantor at registration, we cannot reliably classify
         if (grantorAtRegistration is null)
@@ -222,41 +222,107 @@ public sealed class LegacyLineageClassifier
             pseudonymizer);
     }
 
-    /// <summary>
-    /// Extracts recipient info (ID, kind, role) from share edges.
-    /// </summary>
-    private static (Guid recipientId, RecipientKind kind, string role) ExtractRecipientInfo(IReadOnlyList<AuthorityRelationshipEdge> shareEdges)
+    private static (Guid recipientId, RecipientKind kind, string role) ExtractRecipientInfo(
+        IReadOnlyList<AuthorityRelationshipEdge> shareEdges, Guid targetShareId, Guid targetOrganizationId)
     {
-        // Look for reader, contributor, or manager edges where the subject is a user or team
-        foreach (var edge in shareEdges)
+        var roles = shareEdges.Where(edge =>
+                edge.ResourceTypeName == ResourceTypeNames.RecordShare &&
+                edge.ResourceEntityId == targetShareId &&
+                edge.OrganizationId == targetOrganizationId &&
+                edge.RemovedBySecurityCommandId is null &&
+                edge.RelationshipName is "reader" or "contributor" or "manager")
+            .Take(2).ToArray();
+        if (roles.Length != 1 || roles[0].SubjectEntityId == Guid.Empty)
         {
-            if (edge.ResourceTypeName == ResourceTypeNames.RecordShare &&
-                (edge.RelationshipName == "reader" || edge.RelationshipName == "contributor" || edge.RelationshipName == "manager"))
-            {
-                var kind = edge.SubjectTypeName == ResourceTypeNames.Team ? RecipientKind.Team : RecipientKind.User;
-                return (edge.SubjectEntityId, kind, edge.RelationshipName);
-            }
+            throw new InvalidOperationException("share has no unique current recipient");
         }
 
-        // Fallback for unexpected edge structure
-        return (Guid.Empty, RecipientKind.User, "unknown");
+        var recipient = roles[0];
+        return (recipient.SubjectTypeName, recipient.SubjectRelationName) switch
+        {
+            (ResourceTypeNames.User, "") => (recipient.SubjectEntityId, RecipientKind.User, recipient.RelationshipName),
+            (ResourceTypeNames.Team, "participant") => (recipient.SubjectEntityId, RecipientKind.Team, recipient.RelationshipName),
+            _ => throw new InvalidOperationException("share recipient subject is malformed"),
+        };
     }
 
     /// <summary>
     /// Determines if the grantor was the owner at registration time.
+    /// Requires IsVerifiable == true and unambiguous owner kind.
     /// </summary>
     private static bool WasGrantorOwnerAtRegistration(Guid grantorUserId, OwnerInfoAtRegistration ownerInfo)
     {
+        // Must have verifiable ownership evidence
+        if (!ownerInfo.IsVerifiable)
+        {
+            return false;
+        }
+
+        // Ownership kind must be unambiguous: exactly one of user or team owner, not both
+        var hasUserOwner = ownerInfo.OwnerUserId.HasValue;
+        var hasTeamOwner = ownerInfo.OwnerTeamId.HasValue;
+
+        if (hasUserOwner && hasTeamOwner)
+        {
+            // Ambiguous: both user and team ownership present
+            return false;
+        }
+
+        if (!hasUserOwner && !hasTeamOwner)
+        {
+            // No ownership evidence
+            return false;
+        }
+
         // Direct user owner
-        if (ownerInfo.OwnerUserId == grantorUserId)
+        if (hasUserOwner && ownerInfo.OwnerUserId == grantorUserId)
         {
             return true;
         }
 
-        // Team owner: check if grantor was a team member
-        if (ownerInfo.OwnerTeamId is not null && ownerInfo.TeamMemberUserIds.Contains(grantorUserId))
+        // Team owner: grantor must be in team member set
+        if (hasTeamOwner && ownerInfo.TeamMemberUserIds.Contains(grantorUserId))
         {
             return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasValidAncestorChain(
+        Guid shareId, Guid targetShareId, Guid organizationId, Guid recordId, RecordGrantsSnapshot snapshot)
+    {
+        var currentId = shareId;
+        int? requiredDepth = null;
+        for (var level = 0; level < MaxDelegationDepth; level++)
+        {
+            if (currentId == Guid.Empty || currentId == targetShareId)
+            {
+                return false;
+            }
+
+            var matches = snapshot.ActiveShares.Where(s =>
+                s.RecordShareId == currentId && s.OrganizationId == organizationId && s.RecordId == recordId).Take(2).ToArray();
+            if (matches.Length != 1 || !IsActiveAtSnapshot(matches[0], snapshot) ||
+                matches[0].DelegationDepth is not (>= 1 and <= MaxDelegationDepth) ||
+                (requiredDepth.HasValue && matches[0].DelegationDepth != requiredDepth))
+            {
+                return false;
+            }
+
+            var currentShare = matches[0];
+            if (currentShare.DelegationDepth == 1)
+            {
+                return currentShare.ParentRecordShareId is null;
+            }
+
+            if (currentShare.ParentRecordShareId is not { } parentId)
+            {
+                return false;
+            }
+
+            currentId = parentId;
+            requiredDepth = currentShare.DelegationDepth - 1;
         }
 
         return false;
@@ -328,9 +394,9 @@ public sealed class LegacyLineageClassifier
                 continue;
             }
 
-            // Exclude if this would create a cycle (parent depends on target)
-            // A proper cycle check requires full lineage; for now we exclude obvious self-reference
-            if (share.ParentRecordShareId == targetShareId)
+            // Validate bounded full chain from this candidate to explicit depth-1 root
+            // Ensures: same org/record, active, unique parent for depth>1, decreasing depth 1..3, no cycles, target not in lineage
+            if (!HasValidAncestorChain(share.RecordShareId, targetShareId, targetOrganizationId, targetRecordId, grantsSnapshot))
             {
                 continue;
             }
@@ -473,6 +539,13 @@ public sealed class LegacyLineageClassifier
             }
 
             if (!ExpiryCompatible(targetExpiry, share.EffectiveExpiresOn))
+            {
+                continue;
+            }
+
+            // Validate bounded full chain from this independent share to explicit depth-1 root
+            // Ensures: same org/record, active, unique parent for depth>1, decreasing depth 1..3, no cycles, target not in lineage
+            if (!HasValidAncestorChain(share.RecordShareId, target.ResourceEntityId, target.OrganizationId, target.ParentResourceEntityId ?? Guid.Empty, grantsSnapshot))
             {
                 continue;
             }

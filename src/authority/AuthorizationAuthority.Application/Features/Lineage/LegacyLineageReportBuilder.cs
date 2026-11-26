@@ -59,6 +59,10 @@ public sealed class LegacyLineageReportBuilder
             .GroupBy(e => e.OrganizationId)
             .Select(BuildSummary)
             .ToList();
+        if (summaries.Count > 1)
+        {
+            throw new InvalidOperationException("a report revision applies to one organization");
+        }
 
         return new LegacyLineageClassificationReport
         {
