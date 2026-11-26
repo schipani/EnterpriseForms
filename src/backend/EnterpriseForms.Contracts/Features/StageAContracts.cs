@@ -79,6 +79,17 @@ public sealed record ShareDetailsResponse(Guid RecordShareId, Guid FormRecordId,
     long ShareRevision, Guid? ParentRecordShareId, int DelegationDepth, bool LegacyLineageUnresolved, string? InvalidationReasonCode, Guid? GrantorUserId,
     string? GrantorDisplayName, long AuthorizationRevision);
 
+/// <summary>
+/// C10 M2 (WP-0 Section 3.5): one change in the record's sharing or ownership history. <c>CommandState</c> is the Authority command's
+/// own state; only <c>Effective</c> means the change is in force. Names are display hints from the local directory.
+/// </summary>
+public sealed record RecordSecurityChangeResponse(string ChangeKind, Guid? RecordShareId, string? ShareEndState, string? InvalidationReasonCode, string? SubjectKind, Guid? SubjectId, string? SubjectDisplayName);
+
+public sealed record RecordSecurityHistoryItemResponse(Guid SecurityCommandId, string CommandKind, string CommandState, DateTimeOffset OccurredOn, DateTimeOffset? EffectiveOn,
+    long? CommittedAuthorizationRevision, Guid? ActorUserId, string? ActorDisplayName, IReadOnlyList<RecordSecurityChangeResponse> Changes);
+
+public sealed record RecordSecurityHistoryResponse(Guid FormRecordId, IReadOnlyList<RecordSecurityHistoryItemResponse> Items, bool Truncated, long AuthorizationRevision);
+
 /// <summary>C10 M2: the share after an Effective update; <c>ShareRevision</c> is also the new <c>ETag</c>.</summary>
 public sealed record UpdateShareResponse(Guid RecordShareId, Guid FormRecordId, string RecipientRole, IReadOnlyList<Guid> FieldValueItemIds, long ShareRevision, string ShareStatus,
     CommandOutcome Command);

@@ -3580,6 +3580,38 @@
         }
       }
     },
+    "/api/v1/form-records/{formRecordId}/shares/history": {
+      "get": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "Sharing and ownership changes of a record from the authority's committed state, newest first, each with its command state (owner or access manager; others 404).",
+        "operationId": "GetRecordSharingHistory",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordSecurityHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-records/{formRecordId}/shares/{recordShareId}": {
       "get": {
         "tags": [
@@ -3712,6 +3744,38 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CommandStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/ownership-history": {
+      "get": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "Ownership changes of a record from the authority's committed state, newest first, each with its command state.",
+        "operationId": "GetRecordOwnershipHistory",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordSecurityHistoryResponse"
                 }
               }
             }
@@ -13001,6 +13065,158 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "RecordSecurityChangeResponse": {
+        "required": [
+          "changeKind",
+          "recordShareId",
+          "shareEndState",
+          "invalidationReasonCode",
+          "subjectKind",
+          "subjectId",
+          "subjectDisplayName"
+        ],
+        "type": "object",
+        "properties": {
+          "changeKind": {
+            "type": "string"
+          },
+          "recordShareId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "shareEndState": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "invalidationReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subjectKind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "subjectDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RecordSecurityHistoryItemResponse": {
+        "required": [
+          "securityCommandId",
+          "commandKind",
+          "commandState",
+          "occurredOn",
+          "effectiveOn",
+          "committedAuthorizationRevision",
+          "actorUserId",
+          "actorDisplayName",
+          "changes"
+        ],
+        "type": "object",
+        "properties": {
+          "securityCommandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "commandKind": {
+            "type": "string"
+          },
+          "commandState": {
+            "type": "string"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effectiveOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "committedAuthorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "actorUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "actorDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordSecurityChangeResponse"
+            }
+          }
+        }
+      },
+      "RecordSecurityHistoryResponse": {
+        "required": [
+          "formRecordId",
+          "items",
+          "truncated",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordSecurityHistoryItemResponse"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           }
         }
       },

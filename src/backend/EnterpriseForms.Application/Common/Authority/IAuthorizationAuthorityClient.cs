@@ -469,4 +469,14 @@ public sealed record AuthorityShareDetails(
 public interface IShareDetailsAuthority
 {
     Task<AuthorityShareDetails> GetShareDetailsAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken);
+
+    /// <summary>C10 M1-WP9: the record's sharing and ownership history from committed Authority edges (owner or ManageAccess).</summary>
+    Task<AuthorityRecordSecurityHistory> GetRecordSecurityHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, CancellationToken cancellationToken);
 }
+
+public sealed record AuthorityRecordSecurityChange(string ChangeKind, Guid? RecordShareId, string? ShareEndState, string? InvalidationReasonCode, string? SubjectKind, Guid? SubjectId);
+
+public sealed record AuthorityRecordSecurityHistoryItem(Guid SecurityCommandId, string CommandKind, string CommandState, DateTimeOffset OccurredOn, DateTimeOffset? EffectiveOn,
+    long? CommittedAuthorizationRevision, Guid? ActorUserId, IReadOnlyList<AuthorityRecordSecurityChange> Changes);
+
+public sealed record AuthorityRecordSecurityHistory(Guid FormRecordId, IReadOnlyList<AuthorityRecordSecurityHistoryItem> Items, bool Truncated, long AuthorizationRevision);

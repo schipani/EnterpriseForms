@@ -1335,6 +1335,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-records/{formRecordId}/shares/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sharing and ownership changes of a record from the authority's committed state, newest first, each with its command state (owner or access manager; others 404). */
+        get: operations["GetRecordSharingHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-records/{formRecordId}/shares/{recordShareId}": {
         parameters: {
             query?: never;
@@ -1364,6 +1381,23 @@ export interface paths {
         put?: never;
         /** Revokes a share via authority command; effective immediately at the authority barrier. G27: useDevelopmentStepUp (bool query, default false) for the synthetic test path only. */
         post: operations["RevokeRecordShare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/ownership-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ownership changes of a record from the authority's committed state, newest first, each with its command state. */
+        get: operations["GetRecordOwnershipHistory"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3965,6 +3999,41 @@ export interface components {
             eTag: string;
             changedFieldKeys: string[];
             clearedFieldKeys: string[];
+        };
+        RecordSecurityChangeResponse: {
+            changeKind: string;
+            /** Format: uuid */
+            recordShareId: null | string;
+            shareEndState: null | string;
+            invalidationReasonCode: null | string;
+            subjectKind: null | string;
+            /** Format: uuid */
+            subjectId: null | string;
+            subjectDisplayName: null | string;
+        };
+        RecordSecurityHistoryItemResponse: {
+            /** Format: uuid */
+            securityCommandId: string;
+            commandKind: string;
+            commandState: string;
+            /** Format: date-time */
+            occurredOn: string;
+            /** Format: date-time */
+            effectiveOn: null | string;
+            /** Format: int64 */
+            committedAuthorizationRevision: null | number | string;
+            /** Format: uuid */
+            actorUserId: null | string;
+            actorDisplayName: null | string;
+            changes: components["schemas"]["RecordSecurityChangeResponse"][];
+        };
+        RecordSecurityHistoryResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            items: components["schemas"]["RecordSecurityHistoryItemResponse"][];
+            truncated: boolean;
+            /** Format: int64 */
+            authorizationRevision: number | string;
         };
         RecordShareListResponse: {
             items: components["schemas"]["RecordShareSummaryResponse"][];
@@ -7155,6 +7224,28 @@ export interface operations {
             };
         };
     };
+    GetRecordSharingHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordSecurityHistoryResponse"];
+                };
+            };
+        };
+    };
     GetRecordShare: {
         parameters: {
             query?: never;
@@ -7226,6 +7317,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandStatusResponse"];
+                };
+            };
+        };
+    };
+    GetRecordOwnershipHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordSecurityHistoryResponse"];
                 };
             };
         };

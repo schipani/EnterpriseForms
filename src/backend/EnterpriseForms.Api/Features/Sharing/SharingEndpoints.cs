@@ -4,6 +4,7 @@ using EnterpriseForms.Application.Features.Sharing.CreateShare;
 using EnterpriseForms.Application.Features.Sharing.GetShare;
 using EnterpriseForms.Application.Features.Sharing.ListShares;
 using EnterpriseForms.Application.Features.Sharing.RevokeShare;
+using EnterpriseForms.Application.Features.Sharing.ShareHistory;
 using EnterpriseForms.Application.Features.Sharing.UpdateShare;
 using EnterpriseForms.Contracts.Features;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -34,6 +35,26 @@ public static class SharingEndpoints
             })
             .WithName("ListRecordShares")
             .WithSummary("Shares of a record for its access managers (local projection; the authority decides every recipient's access).");
+
+        // C10 M2 (WP-0 §3.5, D10-11): record-scoped sharing history from the Authority; pending changes keep their state.
+        group.MapGet("/history", static async Task<Ok<RecordSecurityHistoryResponse>> (Guid formRecordId, HttpContext http, RecordSecurityHistoryHandler handler, CancellationToken cancellationToken) =>
+            {
+                var context = BusinessAuthentication.RequireContext(http);
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(await handler.HandleAsync(context, formRecordId, ownershipOnly: false, cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetRecordSharingHistory")
+            .WithSummary("Sharing and ownership changes of a record from the authority's committed state, newest first, each with its command state (owner or access manager; others 404).");
+
+        var recordGroup = endpoints.MapGroup(ApiVersions.V1Prefix + "/form-records/{formRecordId:guid}").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
+        recordGroup.MapGet("/ownership-history", static async Task<Ok<RecordSecurityHistoryResponse>> (Guid formRecordId, HttpContext http, RecordSecurityHistoryHandler handler, CancellationToken cancellationToken) =>
+            {
+                var context = BusinessAuthentication.RequireContext(http);
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(await handler.HandleAsync(context, formRecordId, ownershipOnly: true, cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetRecordOwnershipHistory")
+            .WithSummary("Ownership changes of a record from the authority's committed state, newest first, each with its command state.");
 
         // C10 M2 (WP-0 §3.5, D10-3): the authoritative share details; the ETag is the Authority's committed share revision.
         group.MapGet("/{recordShareId:guid}", static async Task<Ok<ShareDetailsResponse>> (Guid formRecordId, Guid recordShareId, HttpContext http, GetShareHandler handler, CancellationToken cancellationToken) =>
