@@ -37,6 +37,7 @@ const newRecordRoute = createRoute({ getParentRoute: () => appRoute, path: "/for
 const recordRoute = createRoute({ getParentRoute: () => appRoute, path: "/records/$formRecordId", component: lazyRouteComponent(() => import("../features/form-records"), "RecordPage"), validateSearch: parseRecordTabSearch });
 const editRecordRoute = createRoute({ getParentRoute: () => appRoute, path: "/records/$formRecordId/edit", component: lazyRouteComponent(() => import("../features/form-records"), "EditRecordPage") });
 const recordVersionRoute = createRoute({ getParentRoute: () => appRoute, path: "/records/$formRecordId/versions/$contentRevision", component: lazyRouteComponent(() => import("../features/form-records"), "RecordVersionPage") });
+const recordSharingRoute = createRoute({ getParentRoute: () => appRoute, path: "/records/$formRecordId/sharing", component: lazyRouteComponent(() => import("../features/sharing"), "RecordSharingPage") });
 const newChildRoute = createRoute({ getParentRoute: () => appRoute, path: "/records/$formRecordId/related/$formRelationshipDefinitionId/new", component: lazyRouteComponent(() => import("../features/related-forms"), "NewChildRecordPage") });
 const uploadsRoute = createRoute({ getParentRoute: () => appRoute, path: "/uploads", component: lazyRouteComponent(() => import("../features/jobs"), "UploadCenterPage") });
 const activityRoute = createRoute({ getParentRoute: () => appRoute, path: "/activity", component: lazyRouteComponent(() => import("../features/audit"), "MyActivityPage") });
@@ -93,7 +94,7 @@ const noPermissionRoute = createRoute({ getParentRoute: () => appRoute, path: "/
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationRegionalRoute, organizationLanguageRoute, organizationTextSizeRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityHomeRoute, securityIncidentsRoute, securityIncidentRoute, auditExplorerRoute, securityCommandTimelineRoute, auditEventRoute, userProfileRoute, userRegionalRoute, userLanguageRoute, userTextSizeRoute, ...legacyRoutes, ...developmentRoutes, noPermissionRoute]),
+  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, recordSharingRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationRegionalRoute, organizationLanguageRoute, organizationTextSizeRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityHomeRoute, securityIncidentsRoute, securityIncidentRoute, auditExplorerRoute, securityCommandTimelineRoute, auditEventRoute, userProfileRoute, userRegionalRoute, userLanguageRoute, userTextSizeRoute, ...legacyRoutes, ...developmentRoutes, noPermissionRoute]),
 ]);
 
 export function createAppRouter(history?: RouterHistory) {

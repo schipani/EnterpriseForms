@@ -1,7 +1,8 @@
 import type { RecordProjectionResponse, RecordShareSummaryResponse } from "@enterpriseforms/api-client";
 import { useApi, usePresence } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, Checkbox, DataTable, DescriptionList, Dialog, legendClass, LoadingBlock, PresenceIndicator, Select, StatusMessage, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
+import { Badge, Button, buttonClass, Card, Checkbox, DataTable, type DataTableColumn, DescriptionList, Dialog, legendClass, LoadingBlock, PresenceIndicator, Select, StatusMessage, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { ActivityTimeline } from "../../audit";
 import { ErrorPanel } from "../../support";
@@ -26,19 +27,37 @@ const SHARED_EDIT_DESCRIPTION = "shared fields changed by a person with shared e
  * revoke. Every list row is a local projection of an authority command; it confers nothing. New fields, child records
  * and documents are never covered by an existing share.
  */
-export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: string; projection: RecordProjectionResponse }) {
+export function RecordAccessPanel({ formRecordId, projection, verifiedScope }: { formRecordId: string; projection: RecordProjectionResponse; verifiedScope?: readonly (string | number | null)[] }) {
   useFormatter();
   const api = useApi();
   const queryClient = useQueryClient();
   const canManage = projection.permissions.canManageAccess;
-  const shares = useQuery({ queryKey: ["shares", formRecordId], queryFn: () => api.shares.list(formRecordId).then((r) => r.result), enabled: canManage });
+  const readOnly = verifiedScope !== undefined;
+  // The existing list is record-wide. The standalone page needs the scoped Authority read for delegated managers.
+  const canListShares = canManage && (!readOnly || projection.permissions.canTransferOwnership);
+  const revision = projection.record.authorizationRevision;
+  const shares = useQuery({
+    queryKey: verifiedScope ? ["record-sharing", "shares", ...verifiedScope, formRecordId, revision] : ["shares", formRecordId],
+    queryFn: ({ signal }) => api.shares.list(formRecordId, signal).then((r) => r.result),
+    enabled: canListShares,
+    refetchOnMount: readOnly ? "always" : true,
+  });
   const [open, setOpen] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<RecordShareSummaryResponse | null>(null);
   const [revokedNotice, setRevokedNotice] = useState<string | null>(null);
   const writesEnabled = projection.permissions.contributorWritesEnabled;
   // Collaboration history (owners, who can read the record's activity): grants, revocations and shared edits only.
-  const history = useQuery({ queryKey: ["audit", "record", formRecordId], queryFn: () => api.audit.record(formRecordId).then((r) => r.result), enabled: canManage && projection.permissions.isCompleteProjection });
-  const collaboration = (history.data?.events ?? []).filter((event) => event.eventAction === "RECORD_ACCESS_GRANTED" || event.eventAction === "RECORD_ACCESS_REVOKED" || (event.eventAction === "RECORD_UPDATED" && event.eventDescription === SHARED_EDIT_DESCRIPTION));
+  const history = useQuery({
+    queryKey: verifiedScope ? ["record-sharing", "history", ...verifiedScope, formRecordId, revision] : ["audit", "record", formRecordId],
+    queryFn: ({ signal }) => api.audit.record(formRecordId, signal).then((r) => r.result),
+    enabled: canListShares && projection.permissions.isCompleteProjection,
+    refetchOnMount: readOnly ? "always" : true,
+  });
+  const sharesVerified = shares.isSuccess && shares.isFetchedAfterMount && shares.fetchStatus === "idle";
+  const shareRevisionChanged = readOnly && sharesVerified && String(shares.data.authorizationRevision) !== String(revision);
+  const shareData = !readOnly || (sharesVerified && !shareRevisionChanged) ? shares.data : undefined;
+  const historyData = !readOnly || (history.isSuccess && history.isFetchedAfterMount && history.fetchStatus === "idle") ? history.data : undefined;
+  const collaboration = (historyData?.events ?? []).filter((event) => event.eventAction === "RECORD_ACCESS_GRANTED" || event.eventAction === "RECORD_ACCESS_REVOKED" || (event.eventAction === "RECORD_UPDATED" && event.eventDescription === SHARED_EDIT_DESCRIPTION));
   const revoke = useMutation({
     mutationFn: (share: RecordShareSummaryResponse) => api.shares.revoke(formRecordId, share.recordShareId).then((r) => r.result),
     onSuccess: async (_result, share) => {
@@ -48,11 +67,19 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
       await queryClient.invalidateQueries({ queryKey: ["audit", "record", formRecordId] });
     },
   });
-  const activeShares = shares.data?.items.filter((share) => share.shareStatus === "Active") ?? [];
+  const activeShares = shareData?.items.filter((share) => share.shareStatus === "Active") ?? [];
   const sharedEditable = (projection.sharedFieldAccess ?? []).filter((item) => item.editable).length;
+  const shareActions: DataTableColumn<RecordShareSummaryResponse>[] = readOnly ? [] : [
+    { key: "actions", header: "Actions", isActions: true, render: (row) => (row.shareStatus === "Active" ? <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(row)}>Revoke</Button> : null) },
+  ];
 
   return (
     <div className="flex flex-col gap-4">
+      {canManage && !readOnly ? (
+        <div>
+          <Link to="/app/records/$formRecordId/sharing" params={{ formRecordId }} className={buttonClass("secondary", "sm")}>Open sharing manager</Link>
+        </div>
+      ) : null}
       <Card title="Your permissions on this record">
         <DescriptionList
           items={[
@@ -76,17 +103,19 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
         />
         <p className="text-sm text-muted">Permissions are decided by the independent authorization authority on every request; this list is informational.</p>
       </Card>
-      {canManage ? (
+      {canListShares ? (
         <Card
-          title={`Shares (${activeShares.length} active)`}
+          title={shareData ? `Shares (${activeShares.length} active)` : "Shares"}
           actions={
             <>
               <Button size="sm" variant="secondary" busy={shares.isFetching} onClick={() => void shares.refetch()}>
                 Refresh
               </Button>
-              <Button size="sm" onClick={() => setOpen(true)} disabled={projection.record.values.length === 0}>
-                Share fields
-              </Button>
+              {!readOnly ? (
+                <Button size="sm" onClick={() => setOpen(true)} disabled={projection.record.values.length === 0}>
+                  Share fields
+                </Button>
+              ) : null}
             </>
           }
         >
@@ -95,14 +124,15 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
               They lose discovery, reading and editing of the shared fields on their next request. Changes they already saved stay in the record history.
             </StatusMessage>
           ) : null}
-          {shares.isPending ? <LoadingBlock label="Loading shares" /> : null}
+          {!shareData && !shares.isError && !shareRevisionChanged ? <LoadingBlock label="Loading shares" /> : null}
+          {shareRevisionChanged ? <StatusMessage tone="info" title="Sharing access changed. Refresh access to see the latest shares." /> : null}
           {shares.isError ? <ErrorPanel error={shares.error} onRetry={() => void shares.refetch()} /> : null}
-          {shares.data ? (
+          {shareData ? (
             <DataTable
               caption="Shares of this record"
               rowKey={(row) => row.recordShareId}
-              rows={shares.data.items}
-              emptyMessage="No shares. Only the owner can see this record."
+              rows={shareData.items}
+              emptyMessage="No shares to display."
               columns={[
                 { key: "recipient", header: "Recipient", isRowHeader: true, render: (row) => row.recipientDisplayName ?? (row.recipientTeamId ? `Team ${row.recipientTeamId}` : (row.recipientUserId ?? "unknown")) },
                 { key: "role", header: "Role", render: (row) => row.recipientRole },
@@ -111,7 +141,7 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
                 { key: "status", header: "Status", render: (row) => <Badge tone={row.shareStatus === "Active" ? "success" : "neutral"}>{row.shareStatus}</Badge> },
                 { key: "by", header: "Shared by", render: (row) => row.sharedByDisplayName ?? row.sharedByUserId },
                 { key: "created", header: "Created", render: (row) => getActiveFormatter().instant(row.shareCreatedOn) },
-                { key: "actions", header: "Actions", isActions: true, render: (row) => (row.shareStatus === "Active" ? <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(row)}>Revoke</Button> : null) },
+                ...shareActions,
               ]}
             />
           ) : null}
@@ -120,7 +150,7 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
           </StatusMessage>
         </Card>
       ) : null}
-      {canManage && projection.permissions.isCompleteProjection ? (
+      {canListShares && projection.permissions.isCompleteProjection ? (
         <Card
           title="Sharing history"
           aria-label="Sharing history"
@@ -130,15 +160,15 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
             </Button>
           }
         >
-          {history.isPending ? <LoadingBlock label="Loading sharing history" /> : null}
+          {!historyData && !history.isError ? <LoadingBlock label="Loading sharing history" /> : null}
           {history.isError ? <ErrorPanel error={history.error} onRetry={() => void history.refetch()} /> : null}
-          {history.data ? (collaboration.length > 0 ? <ActivityTimeline events={collaboration} /> : <p className="text-sm text-muted">No shares, revocations or shared edits yet.</p>) : null}
+          {historyData ? (collaboration.length > 0 ? <ActivityTimeline events={collaboration} /> : <p className="text-sm text-muted">No shares, revocations or shared edits yet.</p>) : null}
           <p className="mt-2 text-sm text-muted">Shares granted and revoked, and changes made by people with shared edit access. Values are never shown here; the full audit history is under Activity and history.</p>
         </Card>
       ) : null}
-      {open ? <CreateShareDialog formRecordId={formRecordId} projection={projection} contributorWritesEnabled={writesEnabled} onClose={() => setOpen(false)} /> : null}
+      {!readOnly && open ? <CreateShareDialog formRecordId={formRecordId} projection={projection} contributorWritesEnabled={writesEnabled} onClose={() => setOpen(false)} /> : null}
       <Dialog
-        open={revokeTarget !== null}
+        open={!readOnly && revokeTarget !== null}
         onOpenChange={(next) => (next ? undefined : setRevokeTarget(null))}
         title="Revoke this share?"
         description="The authority removes the grant immediately; the recipient loses discovery, reading and editing of the shared fields on their next request. Changes they already saved stay in the record history."
