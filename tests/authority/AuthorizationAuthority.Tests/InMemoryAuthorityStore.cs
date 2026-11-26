@@ -10,6 +10,7 @@ using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
+using AuthorizationAuthority.Domain.Features.Sharing;
 
 namespace AuthorizationAuthority.Tests;
 
@@ -32,6 +33,7 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<OrganizationAuthorizationState> Organizations { get; } = [];
     public List<IdentityBinding> Bindings { get; } = [];
     public List<AuthorityResource> Resources { get; } = [];
+    public List<ShareResourceMetadata> ShareMetadata { get; } = [];
     public List<AuthorityRelationshipEdge> Edges { get; } = [];
     public List<ContentChangeOperation> Operations { get; } = [];
     public List<ContentCandidateLeaf> CandidateLeaves { get; } = [];
@@ -307,6 +309,11 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
             Task.FromResult(s.Resources.FirstOrDefault(r => r.OrganizationId == organizationId && r.ResourceTypeName == resourceTypeName && r.ResourceEntityId == resourceEntityId));
 
         public void AddResource(AuthorityResource resource) => s.Resources.Add(resource);
+
+        public Task<ShareResourceMetadata?> FindShareMetadataAsync(Guid organizationId, Guid recordShareId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.ShareMetadata.SingleOrDefault(m => m.OrganizationId == organizationId && m.RecordShareId == recordShareId));
+
+        public void AddShareMetadata(ShareResourceMetadata metadata) => s.ShareMetadata.Add(metadata);
 
         public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid organizationId, Guid parentResourceEntityId, IReadOnlyCollection<string> resourceTypeNames, CancellationToken cancellationToken) =>
             Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && r.ParentResourceEntityId == parentResourceEntityId && resourceTypeNames.Contains(r.ResourceTypeName) && r.ResourceLifecycleState == ResourceLifecycleStates.Active).ToList());

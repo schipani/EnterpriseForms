@@ -202,7 +202,10 @@ public sealed record UnlinkChildRecordPayload(Guid FormRecordId, Guid ParentForm
 
 public sealed record TransferOwnershipPayload(Guid FormRecordId, Guid? NewOwnerUserId, Guid? NewOwnerTeamId);
 
-public sealed record CreateSharePayload(Guid RecordShareId, Guid FormRecordId, Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole, IReadOnlyList<Guid> FieldItemIds);
+/// <summary>C10 M1-WP3: creates a share with optional lineage and expiry. Owner-granted shares have null parent and depth 1.
+/// Non-owner must name exactly one active same-tenant same-record Manager share they hold (via team or direct grant).
+/// ShareExpiresOn enforces 1 hour minimum to 365 days maximum and must not exceed parent's effective expiry.</summary>
+public sealed record CreateSharePayload(Guid RecordShareId, Guid FormRecordId, Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole, IReadOnlyList<Guid> FieldItemIds, Guid? ParentRecordShareId = null, DateTimeOffset? ShareExpiresOn = null);
 
 public sealed record RevokeSharePayload(Guid RecordShareId, Guid FormRecordId);
 

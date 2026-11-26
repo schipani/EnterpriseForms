@@ -1,5 +1,6 @@
 using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.Catalogue;
+using AuthorizationAuthority.Domain.Features.Sharing;
 using System.Text.Json;
 using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
@@ -73,7 +74,7 @@ public sealed class CommandPlannerTests
     }
 
     [Fact]
-    public async Task ManagerCannotDelegateBeyondOwnScopeOrCreateManagers()
+    public async Task ManagerCanDelegateManagementOnlyWithinTheNamedParentScope()
     {
         var scope = new FakeScope(Org);
         scope.Resources.Add(Resource(ResourceTypeNames.FormRecord, Record));
@@ -84,23 +85,25 @@ public sealed class CommandPlannerTests
         scope.Leaves[commitId] = [new RecordManifestLeaf { ManifestItemKindCode = 3, ManifestItemId = Item }, new RecordManifestLeaf { ManifestItemKindCode = 3, ManifestItemId = otherItem }];
         var managerUser = Guid.CreateVersion7();
         var managerShare = Guid.CreateVersion7();
+        scope.Resources.Add(Resource(ResourceTypeNames.RecordShare, managerShare, Record));
+        scope.ShareMetadatas.Add(managerShare, new ShareResourceMetadata { OrganizationId = Org, RecordShareId = managerShare });
         var graph = Graph(
             Edge(ResourceTypeNames.FormRecord, Record, "owner", ResourceTypeNames.User, OwnerUser),
             Edge(ResourceTypeNames.FormRecord, Record, "shared_via", ResourceTypeNames.RecordShare, managerShare),
             Edge(ResourceTypeNames.RecordShare, managerShare, "manager", ResourceTypeNames.User, managerUser),
             Edge(ResourceTypeNames.FieldItem, Item, "shared_via", ResourceTypeNames.RecordShare, managerShare));
 
-        var withinScope = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, new { record_share_id = Guid.CreateVersion7(), form_record_id = Record, recipient_user_id = AttackerUser, recipient_team_id = (Guid?)null, recipient_role = "Reader", field_item_ids = new[] { Item } });
+        var withinScope = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record,
+            new CreateSharePayload(Guid.CreateVersion7(), Record, AttackerUser, null, RecipientRoles.Manager, [Item], managerShare));
         var plan = await CommandPlanner.PlanAsync(scope, Org, Actor(managerUser), withinScope, graph, CancellationToken.None);
         Assert.Contains(plan.AddEdges, e => e.ResourceId == Item);
 
-        var beyondScope = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, new { record_share_id = Guid.CreateVersion7(), form_record_id = Record, recipient_user_id = AttackerUser, recipient_team_id = (Guid?)null, recipient_role = "Reader", field_item_ids = new[] { otherItem } });
+        Assert.Contains(plan.AddEdges, e => e.ResourceType == ResourceTypeNames.RecordShare && e.Relation == "manager" && e.SubjectId == AttackerUser);
+        Assert.Equal(2, plan.ShareMetadata!.DelegationDepth);
+        var beyondScope = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record,
+            new CreateSharePayload(Guid.CreateVersion7(), Record, AttackerUser, null, RecipientRoles.Manager, [otherItem], managerShare));
         var ex = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(managerUser), beyondScope, graph, CancellationToken.None));
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, ex.ErrorCode);
-
-        var amplify = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, new { record_share_id = Guid.CreateVersion7(), form_record_id = Record, recipient_user_id = AttackerUser, recipient_team_id = (Guid?)null, recipient_role = "Manager", field_item_ids = new[] { Item } });
-        var ex2 = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(managerUser), amplify, graph, CancellationToken.None));
-        Assert.Equal(AuthorityErrorCodes.InvalidCommand, ex2.ErrorCode);
     }
 
     [Fact]
@@ -341,6 +344,189 @@ public sealed class CommandPlannerTests
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, await Rejected(new { form_definition_id = Form, grant_user_ids = none, grant_team_ids = none, revoke_user_ids = new[] { existingUser }, revoke_team_ids = none }, Record)); // resource reference must match the payload
     }
 
+    [Fact]
+    public async Task OwnerCreatesARootShareAndCannotNameAParent()
+    {
+        var fixture = new SharePlanFixture();
+        var expiry = SharePlanFixture.At.AddHours(2);
+        var plan = await fixture.PlanAsync(null, user: OwnerUser, expiresOn: expiry);
+        var metadata = Assert.IsType<ShareResourceMetadata>(plan.ShareMetadata);
+        Assert.Null(metadata.ParentRecordShareId);
+        Assert.Equal(1, metadata.DelegationDepth);
+        Assert.Equal(expiry, metadata.ShareExpiresOn);
+        using var payload = JsonDocument.Parse(plan.NormalizedPayloadJson);
+        Assert.Equal(1, payload.RootElement.GetProperty("delegation_depth").GetInt32());
+        Assert.Equal(expiry, payload.RootElement.GetProperty("share_expires_on").GetDateTimeOffset());
+        var refusal = await Assert.ThrowsAsync<AuthorityException>(() => fixture.PlanAsync(Guid.NewGuid(), user: OwnerUser));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, refusal.ErrorCode);
+    }
+
+    [Fact]
+    public async Task ManagerCanUseNamedParentButCannotCombineTwoGrants()
+    {
+        var fixture = new SharePlanFixture();
+        var parent = fixture.AddGrant(Item);
+        fixture.AddGrant(fixture.OtherItem);
+        var plan = await fixture.PlanAsync(parent.RecordShareId);
+        var metadata = Assert.IsType<ShareResourceMetadata>(plan.ShareMetadata);
+        Assert.Equal(parent.RecordShareId, metadata.ParentRecordShareId);
+        Assert.Equal(2, metadata.DelegationDepth);
+
+        var refusal = await Assert.ThrowsAsync<AuthorityException>(() =>
+            fixture.PlanAsync(parent.RecordShareId, items: [Item, fixture.OtherItem]));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, refusal.ErrorCode);
+    }
+
+    [Fact]
+    public async Task ManagerMustNameAParentTheyHold()
+    {
+        var fixture = new SharePlanFixture();
+        var parent = fixture.AddGrant(Item);
+        var missing = await Assert.ThrowsAsync<AuthorityException>(() => fixture.PlanAsync(null));
+        var anotherActor = await Assert.ThrowsAsync<AuthorityException>(() => fixture.PlanAsync(parent.RecordShareId, user: Guid.NewGuid()));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, missing.ErrorCode);
+        Assert.Equal(AuthorityErrorCodes.Forbidden, anotherActor.ErrorCode);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CrossTenantAndCrossRecordParentsAreRefused(bool crossTenant)
+    {
+        var fixture = new SharePlanFixture();
+        var parent = fixture.AddGrant(Item, record: crossTenant ? Record : Guid.NewGuid());
+        if (crossTenant)
+        {
+            parent.OrganizationId = Guid.NewGuid();
+        }
+
+        var refusal = await Assert.ThrowsAsync<AuthorityException>(() => fixture.PlanAsync(parent.RecordShareId));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, refusal.ErrorCode);
+    }
+
+    [Fact]
+    public async Task UnresolvedLegacyParentIsRefused()
+    {
+        var fixture = new SharePlanFixture();
+        var parent = fixture.AddGrant(Item);
+        parent.LegacyLineageUnresolved = true;
+        var refusal = await Assert.ThrowsAsync<AuthorityException>(() => fixture.PlanAsync(parent.RecordShareId));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, refusal.ErrorCode);
+    }
+
+    [Fact]
+    public async Task OrganizationDepthAndDeepestManagerLimitsAreIndependent()
+    {
+        var fixture = new SharePlanFixture();
+        var root = fixture.AddGrant(Item);
+        fixture.Scope.Policy = new OrganizationProtectionPolicy { OrganizationId = Org, MaximumDelegationDepth = 1 };
+        var tenantLimit = await Assert.ThrowsAsync<AuthorityException>(() => fixture.PlanAsync(root.RecordShareId));
+        Assert.Equal(AuthorityErrorCodes.DelegationDepthExceeded, tenantLimit.ErrorCode);
+
+        fixture.Scope.Policy.MaximumDelegationDepth = 3;
+        var depthTwo = fixture.AddGrant(Item, parent: root.RecordShareId);
+        var deepestManager = await Assert.ThrowsAsync<AuthorityException>(() =>
+            fixture.PlanAsync(depthTwo.RecordShareId, role: RecipientRoles.Manager));
+        Assert.Equal(AuthorityErrorCodes.ManagerAtMaximumDepth, deepestManager.ErrorCode);
+        var deepestReader = await fixture.PlanAsync(depthTwo.RecordShareId);
+        Assert.Equal(3, deepestReader.ShareMetadata!.DelegationDepth);
+    }
+
+    [Fact]
+    public async Task ManagerTeamMustStillBeActive()
+    {
+        var fixture = new SharePlanFixture();
+        var team = Resource(ResourceTypeNames.Team, Guid.NewGuid());
+        fixture.Scope.Resources.Add(team);
+        var parent = fixture.AddGrant(Item, team: team.ResourceEntityId);
+        var plan = await fixture.PlanAsync(parent.RecordShareId);
+        Assert.Equal(2, plan.ShareMetadata!.DelegationDepth);
+
+        team.ResourceLifecycleState = ResourceLifecycleStates.Revoked;
+        var refusal = await Assert.ThrowsAsync<AuthorityException>(() => fixture.PlanAsync(parent.RecordShareId));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, refusal.ErrorCode);
+    }
+
+    [Fact]
+    public async Task ExpiryIsCappedByTheEarliestAncestorAndDeniesAtItsDeadline()
+    {
+        var fixture = new SharePlanFixture();
+        var deadline = SharePlanFixture.At.AddHours(2);
+        var root = fixture.AddGrant(Item, expiry: deadline);
+        var parent = fixture.AddGrant(Item, parent: root.RecordShareId, expiry: deadline.AddHours(8));
+        Assert.Equal(deadline, (await fixture.PlanAsync(parent.RecordShareId, expiresOn: deadline)).ShareMetadata!.ShareExpiresOn);
+        await Assert.ThrowsAsync<AuthorityException>(() => fixture.PlanAsync(parent.RecordShareId, expiresOn: deadline.AddHours(1)));
+        await Assert.ThrowsAsync<AuthorityException>(() => fixture.PlanAsync(parent.RecordShareId));
+
+        root.ShareExpiresOn = SharePlanFixture.At;
+        var expired = await Assert.ThrowsAsync<AuthorityException>(() => fixture.PlanAsync(parent.RecordShareId, expiresOn: deadline));
+        Assert.Contains("active", expired.Message, StringComparison.Ordinal);
+    }
+
+    private sealed class SharePlanFixture
+    {
+        public static readonly DateTimeOffset At = new(2026, 11, 25, 12, 0, 0, TimeSpan.Zero);
+        private readonly Guid manager = Guid.NewGuid();
+        private readonly Guid recipient = Guid.NewGuid();
+        private readonly List<AuthorityRelationshipEdge> edges =
+            [Edge(ResourceTypeNames.FormRecord, Record, "owner", ResourceTypeNames.User, OwnerUser)];
+
+        public SharePlanFixture()
+        {
+            var commitId = Guid.NewGuid();
+            Scope.Resources.Add(Resource(ResourceTypeNames.FormRecord, Record, Form));
+            Scope.Bindings.Add(new IdentityBinding { OrganizationId = Org, AuthorityUserId = recipient, IdentityBindingEnabled = true });
+            Scope.Heads[Record] = new RecordContentHead { CurrentRecordManifestCommitId = commitId };
+            Scope.Leaves[commitId] = [Leaf(Item), Leaf(OtherItem)];
+        }
+
+        public FakeScope Scope { get; } = new(Org);
+        public Guid OtherItem { get; } = Guid.NewGuid();
+
+        public ShareResourceMetadata AddGrant(Guid item, Guid? parent = null, Guid? team = null, Guid? record = null, DateTimeOffset? expiry = null)
+        {
+            var id = Guid.NewGuid();
+            Scope.Resources.Add(Resource(ResourceTypeNames.RecordShare, id, record ?? Record));
+            edges.Add(Edge(ResourceTypeNames.FormRecord, Record, "shared_via", ResourceTypeNames.RecordShare, id));
+            edges.Add(Edge(ResourceTypeNames.FieldItem, item, "shared_via", ResourceTypeNames.RecordShare, id));
+            if (team is { } teamId)
+            {
+                edges.Add(Edge(ResourceTypeNames.RecordShare, id, "manager", ResourceTypeNames.Team, teamId, "participant"));
+                edges.Add(Edge(ResourceTypeNames.Team, teamId, "member", ResourceTypeNames.User, manager));
+            }
+            else
+            {
+                edges.Add(Edge(ResourceTypeNames.RecordShare, id, "manager", ResourceTypeNames.User, manager));
+            }
+
+            var metadata = new ShareResourceMetadata
+            {
+                OrganizationId = Org,
+                RecordShareId = id,
+                ParentRecordShareId = parent,
+                DelegationDepth = parent is { } parentId ? Scope.ShareMetadatas[parentId].DelegationDepth + 1 : 1,
+                ShareExpiresOn = expiry,
+            };
+            Scope.ShareMetadatas.Add(id, metadata);
+            return metadata;
+        }
+
+        public Task<CommandPlan> PlanAsync(Guid? parent, Guid? user = null, IReadOnlyList<Guid>? items = null,
+            string role = RecipientRoles.Reader, DateTimeOffset? expiresOn = null)
+        {
+            var payload = new CreateSharePayload(Guid.NewGuid(), Record, recipient, null, role, items ?? [Item], parent, expiresOn);
+            var request = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, payload);
+            return CommandPlanner.PlanAsync(Scope, Org, Actor(user ?? manager), request, new DesiredStateGraph(edges),
+                TestContext.Current.CancellationToken, now: At);
+        }
+
+        private static RecordManifestLeaf Leaf(Guid item) => new()
+        {
+            ManifestItemId = item,
+            ManifestItemKindCode = (byte)EnterpriseForms.Integrity.Merkle.MerkleItemKind.FieldValue,
+        };
+    }
+
     private static SecurityCommandRequest Command(SecurityCommandKind kind, ResourceKind resourceKind, Guid resourceId, object payload) =>
         new(Org, kind, new ResourceRef(resourceKind, resourceId), 0, JsonSerializer.SerializeToElement(payload, CanonicalJson.Options));
 
@@ -361,6 +547,8 @@ public sealed class CommandPlannerTests
     };
 
     private static AuthorityResource Resource(string type, Guid id) => new() { OrganizationId = Org, ResourceTypeName = type, ResourceEntityId = id, ResourceLifecycleState = ResourceLifecycleStates.Active, RegisteredBySecurityCommandId = Guid.CreateVersion7() };
+
+    private static AuthorityResource Resource(string type, Guid id, Guid parentId) => new() { OrganizationId = Org, ResourceTypeName = type, ResourceEntityId = id, ParentResourceEntityId = parentId, ResourceLifecycleState = ResourceLifecycleStates.Active, RegisteredBySecurityCommandId = Guid.CreateVersion7() };
 
     /// <summary>In-memory scope: only the lookups the planner needs. Cross-organization lookups return nothing (tenant binding).</summary>
     private sealed class FakeScope(Guid organizationId) : IAuthorityScope
@@ -398,6 +586,8 @@ public sealed class CommandPlannerTests
         public Dictionary<Guid, RecordContentHead> Heads { get; } = [];
 
         public Dictionary<Guid, List<RecordManifestLeaf>> Leaves { get; } = [];
+
+        public Dictionary<Guid, ShareResourceMetadata> ShareMetadatas { get; } = [];
 
         public Task<AuthorityResource?> FindResourceAsync(Guid org, string type, Guid id, CancellationToken ct) => Task.FromResult(org == organizationId ? Resources.FirstOrDefault(r => r.ResourceTypeName == type && r.ResourceEntityId == id) : null);
 
@@ -448,6 +638,11 @@ public sealed class CommandPlannerTests
         public void AddMembershipRequest(OrganizationMembershipRequest request) => throw new NotSupportedException();
 
         public void AddResource(AuthorityResource resource) => throw new NotSupportedException();
+
+        public Task<ShareResourceMetadata?> FindShareMetadataAsync(Guid org, Guid recordShareId, CancellationToken ct) =>
+            Task.FromResult(org == organizationId && ShareMetadatas.TryGetValue(recordShareId, out var metadata) ? metadata : null);
+
+        public void AddShareMetadata(ShareResourceMetadata metadata) => ShareMetadatas[metadata.RecordShareId] = metadata;
 
         public OrganizationProtectionPolicy? Policy { get; set; }
 

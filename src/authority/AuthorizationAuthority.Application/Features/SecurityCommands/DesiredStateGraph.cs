@@ -96,17 +96,4 @@ public sealed class DesiredStateGraph(IReadOnlyList<AuthorityRelationshipEdge> a
         return items;
     }
 
-    public IReadOnlySet<Guid> DelegableFieldItems(Guid userId, Guid formRecordId)
-    {
-        var items = new HashSet<Guid>();
-        foreach (var shareId in ShareIdsOfRecord(formRecordId))
-        {
-            if (ShareRolesOf(userId, shareId).Contains("manager"))
-            {
-                items.UnionWith(FieldItemsOfShare(shareId));
-            }
-        }
-
-        return items;
-    }
 }

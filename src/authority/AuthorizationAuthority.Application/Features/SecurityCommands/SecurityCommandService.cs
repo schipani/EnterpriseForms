@@ -239,6 +239,17 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             resource.ResourceRegisteredOn = now;
         }
 
+        // C10 M1-WP3: share metadata persisted alongside the resource registration (depth, parent, revision).
+        if (plan.ShareMetadata is { } shareMetadata)
+        {
+            if (shareMetadata.ShareExpiresOn is not null)
+            {
+                shareMetadata.ExpirySourceSecurityCommandId = command.SecurityCommandId;
+            }
+
+            scope.AddShareMetadata(shareMetadata);
+        }
+
         if (plan.ProtectionPolicy is { } policy)
         {
             policy.UpdatedBySecurityCommandId = command.SecurityCommandId;

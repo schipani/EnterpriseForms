@@ -11,6 +11,7 @@ using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
+using AuthorizationAuthority.Domain.Features.Sharing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -449,6 +450,13 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid organizationId, Guid parentResourceEntityId, IReadOnlyCollection<string> resourceTypeNames, CancellationToken cancellationToken) =>
             context.Resources.AsNoTracking().Where(r => r.OrganizationId == organizationId && r.ParentResourceEntityId == parentResourceEntityId && resourceTypeNames.Contains(r.ResourceTypeName) && r.ResourceLifecycleState == ResourceLifecycleStates.Active).ToListAsync(cancellationToken);
+
+        // C10 M1-WP1: share-specific metadata stored alongside the generic AuthorityResource.
+
+        public Task<ShareResourceMetadata?> FindShareMetadataAsync(Guid organizationId, Guid recordShareId, CancellationToken cancellationToken) =>
+            context.ShareResourceMetadatas.FirstOrDefaultAsync(s => s.OrganizationId == organizationId && s.RecordShareId == recordShareId, cancellationToken);
+
+        public void AddShareMetadata(ShareResourceMetadata metadata) => context.ShareResourceMetadatas.Add(metadata);
 
         public Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken) =>
             context.ProtectionPolicies.FirstOrDefaultAsync(p => p.OrganizationId == organizationId, cancellationToken);
