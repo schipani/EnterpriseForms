@@ -162,7 +162,13 @@ public enum InsufficientEvidenceReason
     AmbiguousOwnership = 3,
 
     /// <summary>No historical ownership evidence is available (null OwnerInfoAtRegistration).</summary>
-    MissingOwnershipEvidence = 4
+    MissingOwnershipEvidence = 4,
+
+    /// <summary>
+    /// The grantor holds a Manager share that covers the share's scope but whose own lineage is unknown or unverifiable, so
+    /// neither a parent assignment nor the absence of a covering parent can be established.
+    /// </summary>
+    UnresolvedCandidateParent = 5
 }
 
 /// <summary>

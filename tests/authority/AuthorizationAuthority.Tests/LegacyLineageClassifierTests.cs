@@ -921,7 +921,7 @@ public sealed class LegacyLineageClassifierTests
     #region Unknown Depth Tests
 
     [Fact]
-    public void ClassifyShareUnknownDepthExcludedFromCandidates()
+    public void ClassifyShareUnknownDepthCandidateIsRefusedNotInvalidated()
     {
         // Arrange
         var shareId = Guid.CreateVersion7();
@@ -956,8 +956,10 @@ public sealed class LegacyLineageClassifierTests
             grantorAtRegistration: ManagerUser, ownerAtRegistration: ownerInfo,
             grantsSnapshot, pseudonymizer);
 
-        // Assert: unknown depth cannot be assumed valid
-        Assert.Equal(LegacyShareClassificationOutcome.NoCoveringParent, result.Classification);
+        // Assert: unknown depth cannot be assumed valid, nor can it prove that no covering parent exists
+        Assert.Equal(LegacyShareClassificationOutcome.InsufficientEvidence, result.Classification);
+        Assert.Equal(InsufficientEvidenceReason.UnresolvedCandidateParent, result.EvidenceValidationError?.Reason);
+        Assert.Null(result.ProposedParentShareId);
     }
 
     #endregion

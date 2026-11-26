@@ -113,7 +113,7 @@ public sealed class LegacyLineageClassifier
         }
 
         // For non-owner grants, find covering Manager shares held by the grantor
-        var coveringManagerShares = FindCoveringManagerShares(
+        var (coveringManagerShares, unresolvedCoveringCount) = FindCoveringManagerShares(
             grantorAtRegistration.Value,
             share.ResourceEntityId,
             share.OrganizationId,
@@ -123,6 +123,29 @@ public sealed class LegacyLineageClassifier
             shareRole,
             shareMetadata?.ShareExpiresOn,
             grantsSnapshot);
+
+        // Two or more resolved covering parents are certain, whatever the unresolved ones turn out to be.
+        if (coveringManagerShares.Count <= 1 && unresolvedCoveringCount > 0)
+        {
+            // A covering Manager share exists whose own lineage is unknown or unverifiable: neither "no covering parent"
+            // (an invalidation claim) nor "unambiguous parent" (an assignment) can be proven.
+            return CreateInsufficientEvidenceEntry(
+                share,
+                shareMetadata,
+                recipientId,
+                recipientKind,
+                shareRole,
+                grantorAtRegistration,
+                shareFieldItems.Count,
+                shareDocumentBindings.Count,
+                new LineageEvidenceValidationError
+                {
+                    RecordShareId = share.ResourceEntityId,
+                    OrganizationId = share.OrganizationId,
+                    Reason = InsufficientEvidenceReason.UnresolvedCandidateParent,
+                },
+                pseudonymizer);
+        }
 
         if (coveringManagerShares.Count == 0)
         {
@@ -280,15 +303,29 @@ public sealed class LegacyLineageClassifier
     }
 
     private static bool HasValidAncestorChain(
+        Guid shareId, Guid targetShareId, Guid organizationId, Guid recordId, RecordGrantsSnapshot snapshot) =>
+        EvaluateAncestorChain(shareId, targetShareId, organizationId, recordId, snapshot) == AncestorChainStatus.Valid;
+
+    /// <summary>
+    /// Walks a candidate's recorded lineage to an explicit depth-1 root. <see cref="AncestorChainStatus.DependsOnTarget"/> is
+    /// definitive (the candidate descends from the share being classified and can never be its parent);
+    /// <see cref="AncestorChainStatus.Unresolved"/> means the lineage is unknown, broken or inconsistent and proves nothing.
+    /// </summary>
+    private static AncestorChainStatus EvaluateAncestorChain(
         Guid shareId, Guid targetShareId, Guid organizationId, Guid recordId, RecordGrantsSnapshot snapshot)
     {
         var currentId = shareId;
         int? requiredDepth = null;
         for (var level = 0; level < MaxDelegationDepth; level++)
         {
-            if (currentId == Guid.Empty || currentId == targetShareId)
+            if (currentId == targetShareId)
             {
-                return false;
+                return AncestorChainStatus.DependsOnTarget;
+            }
+
+            if (currentId == Guid.Empty)
+            {
+                return AncestorChainStatus.Unresolved;
             }
 
             var matches = snapshot.ActiveShares.Where(s =>
@@ -297,33 +334,42 @@ public sealed class LegacyLineageClassifier
                 matches[0].DelegationDepth is not (>= 1 and <= MaxDelegationDepth) ||
                 (requiredDepth.HasValue && matches[0].DelegationDepth != requiredDepth))
             {
-                return false;
+                return AncestorChainStatus.Unresolved;
             }
 
             var currentShare = matches[0];
             if (currentShare.DelegationDepth == 1)
             {
-                return currentShare.ParentRecordShareId is null;
+                return currentShare.ParentRecordShareId is null ? AncestorChainStatus.Valid : AncestorChainStatus.Unresolved;
             }
 
             if (currentShare.ParentRecordShareId is not { } parentId)
             {
-                return false;
+                return AncestorChainStatus.Unresolved;
             }
 
             currentId = parentId;
             requiredDepth = currentShare.DelegationDepth - 1;
         }
 
-        return false;
+        return AncestorChainStatus.Unresolved;
+    }
+
+    private enum AncestorChainStatus
+    {
+        Valid,
+        DependsOnTarget,
+        Unresolved,
     }
 
     /// <summary>
     /// Finds all Active Manager shares held by the grantor that cover the target share's scope.
     /// Implements the single-parent cap: returns all candidates, caller must handle multiple.
-    /// Only accepts preverified candidate evidence; unknown/unverifiable depth is not defaulted to valid.
+    /// Only accepts preverified candidate evidence; unknown/unverifiable depth is not defaulted to valid. A covering share
+    /// whose lineage is unknown or broken is counted as unresolved (it neither qualifies nor can be ruled out); one that
+    /// descends from the target is excluded definitively.
     /// </summary>
-    private static List<CandidateParentShare> FindCoveringManagerShares(
+    private static (List<CandidateParentShare> Resolved, int UnresolvedCount) FindCoveringManagerShares(
         Guid grantorUserId,
         Guid targetShareId,
         Guid targetOrganizationId,
@@ -335,6 +381,7 @@ public sealed class LegacyLineageClassifier
         RecordGrantsSnapshot grantsSnapshot)
     {
         var candidates = new List<CandidateParentShare>();
+        var unresolved = 0;
 
         foreach (var share in grantsSnapshot.ActiveShares)
         {
@@ -378,25 +425,23 @@ public sealed class LegacyLineageClassifier
                 continue;
             }
 
-            // Unknown or unverifiable depth cannot be assumed valid; exclude from candidates
-            if (!share.DelegationDepth.HasValue)
-            {
-                continue;
-            }
-
             // Validate bounded full chain from this candidate to explicit depth-1 root
-            // Ensures: same org/record, active, unique parent for depth>1, decreasing depth 1..3, no cycles, target not in lineage
-            if (!HasValidAncestorChain(share.RecordShareId, targetShareId, targetOrganizationId, targetRecordId, grantsSnapshot))
+            // Ensures: same org/record, active, unique parent for depth>1, decreasing depth 1..3, no cycles, target not in lineage.
+            // Unknown or unverifiable depth cannot be assumed valid, nor can it rule the candidate out.
+            switch (share.DelegationDepth.HasValue
+                        ? EvaluateAncestorChain(share.RecordShareId, targetShareId, targetOrganizationId, targetRecordId, grantsSnapshot)
+                        : AncestorChainStatus.Unresolved)
             {
-                continue;
+                case AncestorChainStatus.Valid:
+                    candidates.Add(new CandidateParentShare(share.RecordShareId, share.DelegationDepth!.Value));
+                    break;
+                case AncestorChainStatus.Unresolved:
+                    unresolved++;
+                    break;
             }
-
-            candidates.Add(new CandidateParentShare(
-                share.RecordShareId,
-                share.DelegationDepth.Value));
         }
 
-        return candidates;
+        return (candidates, unresolved);
     }
 
     /// <summary>
