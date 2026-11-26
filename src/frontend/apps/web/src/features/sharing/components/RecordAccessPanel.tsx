@@ -7,6 +7,7 @@ import { useState } from "react";
 import { ActivityTimeline } from "../../audit";
 import { ErrorPanel } from "../../support";
 import { contributorViewOnlyReasons } from "./contributorPreview";
+import { EditShareDialog } from "./EditShareDialog";
 
 /** Role copy follows the Authority's contributor-write switch (Phase C5, D10): never promise an edit that cannot happen. */
 const rolesFor = (contributorWritesEnabled: boolean) => [
@@ -44,6 +45,7 @@ export function RecordAccessPanel({ formRecordId, projection, verifiedScope }: {
   });
   const [open, setOpen] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<RecordShareSummaryResponse | null>(null);
+  const [editTarget, setEditTarget] = useState<RecordShareSummaryResponse | null>(null);
   const [revokedNotice, setRevokedNotice] = useState<string | null>(null);
   const writesEnabled = projection.permissions.contributorWritesEnabled;
   // Collaboration history (owners, who can read the record's activity): grants, revocations and shared edits only.
@@ -70,7 +72,20 @@ export function RecordAccessPanel({ formRecordId, projection, verifiedScope }: {
   const activeShares = shareData?.items.filter((share) => share.shareStatus === "Active") ?? [];
   const sharedEditable = (projection.sharedFieldAccess ?? []).filter((item) => item.editable).length;
   const shareActions: DataTableColumn<RecordShareSummaryResponse>[] = readOnly ? [] : [
-    { key: "actions", header: "Actions", isActions: true, render: (row) => (row.shareStatus === "Active" ? <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(row)}>Revoke</Button> : null) },
+    {
+      key: "actions",
+      header: "Actions",
+      isActions: true,
+      render: (row) =>
+        row.shareStatus === "Active" ? (
+          <div className="flex gap-1">
+            <Button size="sm" variant="ghost" aria-label={`Edit share for ${row.recipientDisplayName ?? row.recipientUserId ?? row.recipientTeamId ?? "recipient"}`} onClick={() => setEditTarget(row)}>
+              Edit
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(row)}>Revoke</Button>
+          </div>
+        ) : null,
+    },
   ];
 
   return (
@@ -166,6 +181,7 @@ export function RecordAccessPanel({ formRecordId, projection, verifiedScope }: {
           <p className="mt-2 text-sm text-muted">Shares granted and revoked, and changes made by people with shared edit access. Values are never shown here; the full audit history is under Activity and history.</p>
         </Card>
       ) : null}
+      {!readOnly && editTarget ? <EditShareDialog formRecordId={formRecordId} share={editTarget} projection={projection} onClose={() => setEditTarget(null)} /> : null}
       {!readOnly && open ? <CreateShareDialog formRecordId={formRecordId} projection={projection} contributorWritesEnabled={writesEnabled} onClose={() => setOpen(false)} /> : null}
       <Dialog
         open={!readOnly && revokeTarget !== null}
