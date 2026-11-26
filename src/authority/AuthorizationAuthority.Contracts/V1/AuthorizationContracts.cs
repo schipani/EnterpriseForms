@@ -215,6 +215,15 @@ public sealed record CreateSharePayload(Guid RecordShareId, Guid FormRecordId, G
     DateTimeOffset? ShareExpiresOn = null);
 
 /// <summary>
+/// C10 M1-WP4: Updates the scope (fields, role, expiry) of an existing Active share with step-up and expected share
+/// revision. Owner may update root shares; a non-owner must name their current committed parent Manager share.
+/// Terminal/expired shares cannot be updated. StepUpEvidence is stripped from the journaled payload.
+/// </summary>
+public sealed record UpdateShareScopePayload(Guid RecordShareId, Guid FormRecordId, string RecipientRole,
+    IReadOnlyList<Guid> FieldItemIds, long ExpectedShareRevision, string? StepUpEvidence = null,
+    Guid? ParentRecordShareId = null, DateTimeOffset? ShareExpiresOn = null);
+
+/// <summary>
 /// G27: Revoking a share requires step-up assurance. <c>StepUpEvidence</c> is the development-only synthetic marker
 /// where the synthetic path is enabled; it is stripped from the journaled payload.
 /// </summary>

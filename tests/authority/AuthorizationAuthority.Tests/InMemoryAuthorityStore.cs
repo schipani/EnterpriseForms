@@ -315,6 +315,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
         public void AddShareMetadata(ShareResourceMetadata metadata) => s.ShareMetadata.Add(metadata);
 
+        public Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid organizationId, Guid parentRecordShareId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.ShareMetadata.Where(m => m.OrganizationId == organizationId && m.ParentRecordShareId == parentRecordShareId).ToList());
+
         public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid organizationId, Guid parentResourceEntityId, IReadOnlyCollection<string> resourceTypeNames, CancellationToken cancellationToken) =>
             Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && r.ParentResourceEntityId == parentResourceEntityId && resourceTypeNames.Contains(r.ResourceTypeName) && r.ResourceLifecycleState == ResourceLifecycleStates.Active).ToList());
 

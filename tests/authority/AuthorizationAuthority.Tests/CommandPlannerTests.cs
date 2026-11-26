@@ -135,7 +135,7 @@ public sealed class CommandPlannerTests
     }
 
     [Fact]
-    public async Task UnknownPayloadMembersAndUnimplementedKindsAreRejected()
+    public async Task UnknownPayloadMembersAndUnknownCommandKindsAreRejected()
     {
         var scope = new FakeScope(Org);
         scope.Resources.Add(Resource(ResourceTypeNames.Team, Form));
@@ -144,8 +144,8 @@ public sealed class CommandPlannerTests
         var ex = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), massAssignment, graph, CancellationToken.None));
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, ex.ErrorCode);
 
-        var unimplemented = Command(SecurityCommandKind.UpdateShareScope, ResourceKind.FormRecord, Org, new { });
-        var ex2 = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), unimplemented, graph, CancellationToken.None));
+        var unknown = Command((SecurityCommandKind)int.MaxValue, ResourceKind.FormRecord, Org, new { });
+        var ex2 = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), unknown, graph, CancellationToken.None));
         Assert.Equal(AuthorityErrorCodes.CommandKindNotImplemented, ex2.ErrorCode);
 
         // Owner message 7: GrantSystemRole is implemented, and an organization owner cannot use it (no self-elevation).
@@ -481,6 +481,43 @@ public sealed class CommandPlannerTests
         Assert.Contains("active", expired.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ScopeUpdatePlansOnlyTheTargetShareDiffAndKeepsTrackedMetadataUntouched()
+    {
+        var fixture = new SharePlanFixture();
+        var target = fixture.AddGrant(Item, expiry: SharePlanFixture.At.AddMinutes(30));
+        var independent = fixture.AddGrant(Item);
+        var plan = await fixture.UpdateAsync(target, [fixture.OtherItem], expiry: target.ShareExpiresOn);
+
+        Assert.Equal(1, target.ShareRevision);
+        Assert.Equal(2, plan.ShareMetadataUpdate!.Value.Revision);
+        Assert.Equal(target.ShareExpiresOn, plan.ShareMetadataUpdate.Value.ExpiresOn);
+        Assert.Contains(plan.RemoveEdges, edge => edge.ResourceEntityId == Item && edge.SubjectEntityId == target.RecordShareId);
+        Assert.DoesNotContain(plan.RemoveEdges, edge => edge.SubjectEntityId == independent.RecordShareId || edge.ResourceEntityId == independent.RecordShareId);
+        Assert.Contains(plan.AddEdges, edge => edge.ResourceId == fixture.OtherItem && edge.SubjectId == target.RecordShareId);
+        Assert.DoesNotContain(HumanCommandStepUpGate.SyntheticStepUpEvidence, plan.NormalizedPayloadJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ScopeUpdateKeepsItsParentAndRefusesAChangeWithDependentShares()
+    {
+        var fixture = new SharePlanFixture();
+        var parent = fixture.AddGrant(Item);
+        var independentParent = fixture.AddGrant(fixture.OtherItem);
+        var child = fixture.AddGrant(Item, parent: parent.RecordShareId);
+        var update = await fixture.UpdateAsync(child, [Item], parent: parent.RecordShareId, asOwner: false);
+        Assert.Equal(2, update.ShareMetadataUpdate!.Value.Revision);
+
+        var reparent = await Assert.ThrowsAsync<AuthorityException>(() =>
+            fixture.UpdateAsync(child, [fixture.OtherItem], parent: independentParent.RecordShareId, asOwner: false));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, reparent.ErrorCode);
+
+        var descendant = await Assert.ThrowsAsync<AuthorityException>(() => fixture.UpdateAsync(parent, [fixture.OtherItem]));
+        Assert.Equal(AuthorityErrorCodes.ShareHasActiveDescendants, descendant.ErrorCode);
+        Assert.Equal(1, child.ShareRevision);
+        Assert.Equal(1, parent.ShareRevision);
+    }
+
     private sealed class SharePlanFixture
     {
         public static readonly DateTimeOffset At = new(2026, 11, 25, 12, 0, 0, TimeSpan.Zero);
@@ -537,6 +574,16 @@ public sealed class CommandPlannerTests
             var request = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, payload);
             return CommandPlanner.PlanAsync(Scope, Org, Actor(user ?? manager), request, new DesiredStateGraph(edges),
                 TestContext.Current.CancellationToken, now: At, humanCommandGate: SyntheticHumanGate);
+        }
+
+        public Task<CommandPlan> UpdateAsync(ShareResourceMetadata target, IReadOnlyList<Guid> items,
+            Guid? parent = null, DateTimeOffset? expiry = null, bool asOwner = true)
+        {
+            var payload = new UpdateShareScopePayload(target.RecordShareId, Record, RecipientRoles.Reader, items,
+                target.ShareRevision, HumanCommandStepUpGate.SyntheticStepUpEvidence, parent, expiry);
+            var request = Command(SecurityCommandKind.UpdateShareScope, ResourceKind.FormRecord, Record, payload);
+            return CommandPlanner.PlanAsync(Scope, Org, Actor(asOwner ? OwnerUser : manager), request,
+                new DesiredStateGraph(edges), TestContext.Current.CancellationToken, now: At, humanCommandGate: SyntheticHumanGate);
         }
 
         private static RecordManifestLeaf Leaf(Guid item) => new()
@@ -662,6 +709,9 @@ public sealed class CommandPlannerTests
             Task.FromResult(org == organizationId && ShareMetadatas.TryGetValue(recordShareId, out var metadata) ? metadata : null);
 
         public void AddShareMetadata(ShareResourceMetadata metadata) => ShareMetadatas[metadata.RecordShareId] = metadata;
+
+        public Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid org, Guid parentRecordShareId, CancellationToken ct) =>
+            Task.FromResult(org == organizationId ? ShareMetadatas.Values.Where(m => m.ParentRecordShareId == parentRecordShareId).ToList() : []);
 
         public OrganizationProtectionPolicy? Policy { get; set; }
 

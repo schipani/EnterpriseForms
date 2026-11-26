@@ -321,6 +321,8 @@ public sealed class ArchiveProcessorTests
 
         public void AddShareMetadata(ShareResourceMetadata metadata) => throw new NotSupportedException();
 
+        public Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid org, Guid parentRecordShareId, CancellationToken ct) => throw new NotSupportedException();
+
         public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid org, Guid parent, IReadOnlyCollection<string> types, CancellationToken ct) => Task.FromResult(new List<AuthorityResource>());
 
         public Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid org, CancellationToken ct) => Task.FromResult<OrganizationProtectionPolicy?>(null);

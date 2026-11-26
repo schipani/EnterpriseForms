@@ -94,6 +94,8 @@ public sealed class CommandPlan
 
     /// <summary>C10 M1-WP3: share metadata persisted alongside the resource registration (depth, parent, revision).</summary>
     public Domain.Features.Sharing.ShareResourceMetadata? ShareMetadata { get; set; }
+
+    internal (Domain.Features.Sharing.ShareResourceMetadata Metadata, long Revision, DateTimeOffset? ExpiresOn)? ShareMetadataUpdate { get; set; }
 }
 
 /// <summary>
@@ -129,6 +131,7 @@ public static partial class CommandPlanner
             SecurityCommandKind.RegisterRecord => await RegisterRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.TransferOwnership => await TransferOwnershipAsync(scope, organizationId, actor, request, graph, humanGate, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.CreateShare => await CreateShareAsync(scope, organizationId, actor, request, graph, humanGate, at, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.UpdateShareScope => await UpdateShareScopeAsync(scope, organizationId, actor, request, graph, humanGate, at, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RevokeShare => await RevokeShareAsync(scope, organizationId, actor, request, graph, humanGate, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UnlinkChildRecord => await UnlinkChildRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.PublishFormSecurityRevision => await PublishFormSecurityRevisionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),

@@ -56,6 +56,7 @@ public static class SecurityCommandKinds
     public const string RegisterRecord = "RegisterRecord";
     public const string TransferOwnership = "TransferOwnership";
     public const string CreateShare = "CreateShare";
+    public const string UpdateShareScope = "UpdateShareScope";
     public const string RevokeShare = "RevokeShare";
     public const string UpdateFormUsers = "UpdateFormUsers";
     public const string PublishFormSecurityRevision = "PublishFormSecurityRevision";

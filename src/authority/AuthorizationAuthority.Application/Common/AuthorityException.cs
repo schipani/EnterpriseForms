@@ -221,6 +221,12 @@ public static class AuthorityErrorCodes
     /// <summary>C10 M1-WP3: a Manager share cannot be created at the maximum delegation depth (a Manager at depth 3 is refused).</summary>
     public const string ManagerAtMaximumDepth = "MANAGER_AT_MAXIMUM_DEPTH";
 
+    /// <summary>C10 M1-WP4: the expected share revision does not match the current committed share revision (412, not retryable).</summary>
+    public const string StaleShareRevision = "STALE_SHARE_REVISION";
+
+    /// <summary>C10 M1-WP4: the share has active descendants; cascade invalidation (WP5) is required before updating parent scope (422, not retryable).</summary>
+    public const string ShareHasActiveDescendants = "SHARE_HAS_ACTIVE_DESCENDANTS";
+
     // C8 M4-2 (AC-8.3): audit-access evidence.
 
     /// <summary>403: the caller does not hold view_audit (Security Auditor) in the organization.</summary>

@@ -58,7 +58,7 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             CommandRequestDigest = requestDigest,
             ExpectedAuthorizationRevision = request.ExpectedAuthorizationRevision,
             // G27: keep untrusted step-up evidence out of rejected commands, including refusals before planning.
-            CommandPayloadJson = request.CommandKind is SecurityCommandKind.CreateShare or SecurityCommandKind.RevokeShare or SecurityCommandKind.TransferOwnership
+            CommandPayloadJson = request.CommandKind is SecurityCommandKind.CreateShare or SecurityCommandKind.UpdateShareScope or SecurityCommandKind.RevokeShare or SecurityCommandKind.TransferOwnership
                 ? "{}"
                 : request.CommandPayload.GetRawText(),
             CommandReasonText = request.ChangeReason,
@@ -245,7 +245,6 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             resource.ResourceRegisteredOn = now;
         }
 
-        // C10 M1-WP3: share metadata persisted alongside the resource registration (depth, parent, revision).
         if (plan.ShareMetadata is { } shareMetadata)
         {
             if (shareMetadata.ShareExpiresOn is not null)
@@ -254,6 +253,19 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             }
 
             scope.AddShareMetadata(shareMetadata);
+        }
+
+        if (plan.ShareMetadataUpdate is { } update)
+        {
+            // The planner checked the share revision while the organization row was locked.
+            if (update.Metadata.ShareExpiresOn != update.ExpiresOn)
+            {
+                update.Metadata.ExpirySourceSecurityCommandId = update.ExpiresOn is null ? null : command.SecurityCommandId;
+            }
+
+            update.Metadata.ShareRevision = update.Revision;
+            update.Metadata.ShareExpiresOn = update.ExpiresOn;
+            update.Metadata.ShareMetadataModifiedOn = now;
         }
 
         if (plan.ProtectionPolicy is { } policy)
