@@ -3580,6 +3580,57 @@
         }
       }
     },
+    "/api/v1/form-records/{formRecordId}/shares/{recordShareId}": {
+      "patch": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "Replaces a share's role, field items and expiry via the authority's UpdateShareScope command. Requires If-Match with the share ETag and an Idempotency-Key; returns the new ETag. Exactly one of share_expires_on or no_expiry is required.",
+        "operationId": "UpdateRecordShare",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "recordShareId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateShareResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/revoke": {
       "post": {
         "tags": [
@@ -16066,6 +16117,96 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "UpdateShareRequest": {
+        "required": [
+          "recipientRole",
+          "fieldKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "recipientRole": {
+            "type": "string"
+          },
+          "fieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "shareExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "noExpiry": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "parentRecordShareId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "useDevelopmentStepUp": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "UpdateShareResponse": {
+        "required": [
+          "recordShareId",
+          "formRecordId",
+          "recipientRole",
+          "fieldValueItemIds",
+          "shareRevision",
+          "shareStatus",
+          "command"
+        ],
+        "type": "object",
+        "properties": {
+          "recordShareId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipientRole": {
+            "type": "string"
+          },
+          "fieldValueItemIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "shareRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "shareStatus": {
+            "type": "string"
+          },
+          "command": {
+            "$ref": "#/components/schemas/CommandOutcome"
           }
         }
       },

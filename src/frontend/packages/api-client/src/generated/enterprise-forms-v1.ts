@@ -1335,6 +1335,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-records/{formRecordId}/shares/{recordShareId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Replaces a share's role, field items and expiry via the authority's UpdateShareScope command. Requires If-Match with the share ETag and an Idempotency-Key; returns the new ETag. Exactly one of share_expires_on or no_expiry is required. */
+        patch: operations["UpdateRecordShare"];
+        trace?: never;
+    };
     "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/revoke": {
         parameters: {
             query?: never;
@@ -4694,6 +4711,28 @@ export interface components {
             clearAssignment: boolean;
             resolutionExplanation?: null | string;
         };
+        UpdateShareRequest: {
+            recipientRole: string;
+            fieldKeys: string[];
+            /** Format: date-time */
+            shareExpiresOn?: null | string;
+            noExpiry?: null | boolean;
+            /** Format: uuid */
+            parentRecordShareId?: null | string;
+            useDevelopmentStepUp?: null | boolean;
+        };
+        UpdateShareResponse: {
+            /** Format: uuid */
+            recordShareId: string;
+            /** Format: uuid */
+            formRecordId: string;
+            recipientRole: string;
+            fieldValueItemIds: string[];
+            /** Format: int64 */
+            shareRevision: number | string;
+            shareStatus: string;
+            command: components["schemas"]["CommandOutcome"];
+        };
         UpdateUiPreferenceRequest: {
             textScalePreferenceMode: string;
             /** Format: double */
@@ -7079,6 +7118,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShareResponse"];
+                };
+            };
+        };
+    };
+    UpdateRecordShare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+                recordShareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateShareRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateShareResponse"];
                 };
             };
         };

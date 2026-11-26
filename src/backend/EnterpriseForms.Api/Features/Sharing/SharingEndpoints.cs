@@ -3,6 +3,7 @@ using EnterpriseForms.Api.Features.FormDefinitions;
 using EnterpriseForms.Application.Features.Sharing.CreateShare;
 using EnterpriseForms.Application.Features.Sharing.ListShares;
 using EnterpriseForms.Application.Features.Sharing.RevokeShare;
+using EnterpriseForms.Application.Features.Sharing.UpdateShare;
 using EnterpriseForms.Contracts.Features;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -32,6 +33,19 @@ public static class SharingEndpoints
             })
             .WithName("ListRecordShares")
             .WithSummary("Shares of a record for its access managers (local projection; the authority decides every recipient's access).");
+
+        // C10 M2 (WP-0 §3.2, PB-06): replace a share's scope. If-Match carries the share ETag "{recordShareId}:{shareRevision}"
+        // (428 when missing, 412 when malformed or stale); an organization-revision conflict is 409 and is not retried.
+        group.MapPatch("/{recordShareId:guid}", static async Task<Ok<UpdateShareResponse>> (Guid formRecordId, Guid recordShareId, UpdateShareRequest request, HttpContext http, UpdateShareHandler handler, CancellationToken cancellationToken) =>
+            {
+                var context = BusinessAuthentication.RequireContext(http);
+                var expected = ShareRevisionPrecondition.Require(http.Request.Headers.IfMatch, recordShareId);
+                var response = await handler.HandleAsync(context, formRecordId, recordShareId, expected, request, FormDefinitionEndpoints.RequireIdempotencyKey(http), cancellationToken).ConfigureAwait(false);
+                http.Response.Headers.ETag = ShareRevisionPrecondition.Format(recordShareId, response.ShareRevision);
+                return TypedResults.Ok(response);
+            })
+            .WithName("UpdateRecordShare")
+            .WithSummary("Replaces a share's role, field items and expiry via the authority's UpdateShareScope command. Requires If-Match with the share ETag and an Idempotency-Key; returns the new ETag. Exactly one of share_expires_on or no_expiry is required.");
 
         // G27: useDevelopmentStepUp is a bool query parameter (default false) since this endpoint has no body.
         group.MapPost("/{recordShareId:guid}/revoke", static async Task<Ok<CommandStatusResponse>> (Guid formRecordId, Guid recordShareId, HttpContext http, RevokeShareHandler handler, CancellationToken cancellationToken, bool useDevelopmentStepUp = false) =>
