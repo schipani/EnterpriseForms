@@ -268,6 +268,13 @@ public interface IBusinessScope : IAsyncDisposable
 
     Task<List<RecordShareField>> GetShareFieldsOfRecordAsync(Guid tenantId, Guid formRecordId, CancellationToken cancellationToken);
 
+    /// <summary>C10 M2: the tracked field rows of one share projection (for an authority-committed scope update).</summary>
+    Task<List<RecordShareField>> GetShareFieldsOfShareAsync(Guid tenantId, Guid recordShareId, CancellationToken cancellationToken);
+
+    void AddShareFields(IEnumerable<RecordShareField> fields);
+
+    void RemoveShareFields(IEnumerable<RecordShareField> fields);
+
     // Teams projections
     void AddTeamProjection(Team team);
 

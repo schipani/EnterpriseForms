@@ -24,6 +24,7 @@ using EnterpriseForms.Application.Features.RelatedForms;
 using EnterpriseForms.Application.Features.Sharing.CreateShare;
 using EnterpriseForms.Application.Features.Sharing.ListShares;
 using EnterpriseForms.Application.Features.Sharing.RevokeShare;
+using EnterpriseForms.Application.Features.Sharing.UpdateShare;
 using EnterpriseForms.Application.Features.Teams.ManageTeam;
 using EnterpriseForms.Infrastructure.Authority;
 using EnterpriseForms.Infrastructure.Features.Documents;
@@ -99,6 +100,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<ChildRecordHandlers>();
         services.AddSingleton<CreateShareHandler>();
         services.AddSingleton<RevokeShareHandler>();
+        services.AddSingleton<UpdateShareHandler>();
         services.AddSingleton<ListSharesHandler>();
         services.AddSingleton<CreateTeamHandler>();
         services.AddSingleton<ChangeTeamMembershipHandler>();

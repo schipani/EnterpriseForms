@@ -61,6 +61,18 @@ public sealed record CreateShareRequest(Guid? RecipientUserId, Guid? RecipientTe
 public sealed record ShareResponse(Guid RecordShareId, Guid FormRecordId, string RecipientRole, IReadOnlyList<Guid> FieldValueItemIds, string ShareStatus, CommandOutcome Command);
 
 /// <summary>
+/// C10 M2: the complete new scope of an existing share (<c>PATCH .../shares/{recordShareId}</c> with <c>If-Match</c>). Exactly one of
+/// <c>ShareExpiresOn</c> or <c>NoExpiry = true</c> is required. <c>ParentRecordShareId</c> names the caller's Manager share when the
+/// caller is not the owner; the share keeps its committed parent. <c>UseDevelopmentStepUp</c> as for share creation (G27).
+/// </summary>
+public sealed record UpdateShareRequest(string RecipientRole, IReadOnlyList<string> FieldKeys, DateTimeOffset? ShareExpiresOn = null, bool? NoExpiry = null,
+    Guid? ParentRecordShareId = null, bool? UseDevelopmentStepUp = null);
+
+/// <summary>C10 M2: the share after an Effective update; <c>ShareRevision</c> is also the new <c>ETag</c>.</summary>
+public sealed record UpdateShareResponse(Guid RecordShareId, Guid FormRecordId, string RecipientRole, IReadOnlyList<Guid> FieldValueItemIds, long ShareRevision, string ShareStatus,
+    CommandOutcome Command);
+
+/// <summary>
 /// G27: <c>UseDevelopmentStepUp</c> (default false) presents the development-only synthetic step-up marker; the Authority
 /// accepts it only where that path is enabled (never production or staging).
 /// </summary>
