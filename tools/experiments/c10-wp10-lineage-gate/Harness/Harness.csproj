@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    C10 M1-WP10 legacy lineage dry-run real-PostgreSQL gate. Development/Testing only; not part of EnterpriseForms.All.slnx and never
+    built in place: scripts/dev/c10-wp10-lineage-pg-gate.ps1 copies this folder to a temporary work directory (outside the repository,
+    so no repository build settings apply) and builds it against this tree's Authority Release binaries passed as C10Wp10Binaries. It
+    references no repository project. The command under test always runs as a separate process of those binaries
+    (dotnet AuthorizationAuthority.Api.dll legacy-lineage-dry-run); the harness only seeds a disposable database, observes and checks.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>C10Wp10Harness</AssemblyName>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS1591;CA2007;CA1303</NoWarn>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="$(C10Wp10Binaries)\*.dll" Private="true" />
+  </ItemGroup>
+  <Target Name="RequireC10Wp10Binaries" BeforeTargets="ResolveAssemblyReferences" Condition="'$(C10Wp10Binaries)' == '' Or !Exists('$(C10Wp10Binaries)\AuthorizationAuthority.Api.dll')">
+    <Error Text="Build through scripts/dev/c10-wp10-lineage-pg-gate.ps1 (C10Wp10Binaries must name a folder of Authority Release binaries)." />
+  </Target>
+</Project>

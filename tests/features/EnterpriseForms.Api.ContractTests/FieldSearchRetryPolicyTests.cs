@@ -24,6 +24,37 @@ public sealed class FieldSearchRetryPolicyTests
         public void Retrying(Guid correlationId, string stage, string code, int retryNumber, double delayMilliseconds) => Delays.Add(delayMilliseconds);
     }
 
+    /// <summary>
+    /// A clock that advances by exactly each requested delay and completes it at once, so the step and cap assertions do not
+    /// depend on wall-clock scheduling (on a loaded machine a real 10 ms delay can take seconds and exhaust the total budget).
+    /// </summary>
+    private sealed class SteppingClock : TimeProvider
+    {
+        private long ticks;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => Interlocked.Read(ref ticks);
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            Interlocked.Add(ref ticks, dueTime.Ticks);
+            ThreadPool.UnsafeQueueUserWorkItem(_ => callback(state), null);
+            return new Fired();
+        }
+
+        private sealed class Fired : ITimer
+        {
+            public bool Change(TimeSpan dueTime, TimeSpan period) => false;
+
+            public void Dispose()
+            {
+            }
+
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
     private static FieldSearchLimits Limits(int attempts = 4, int first = 10, int largest = 40, int total = 2000) =>
         new() { RetryMaximumAttempts = attempts, RetryInitialDelayMilliseconds = first, RetryMaximumDelayMilliseconds = largest, RetryMaximumTotalMilliseconds = total };
 
@@ -47,7 +78,7 @@ public sealed class FieldSearchRetryPolicyTests
     public async Task StepsDoubleUpToTheLargestDelayWithinTheirJitterRange(double jitter, double[] expected)
     {
         var observer = new Observer();
-        var policy = new FieldSearchRetryPolicy(Limits(attempts: 4, first: 10, largest: 40), TimeProvider.System, observer, () => jitter);
+        var policy = new FieldSearchRetryPolicy(Limits(attempts: 4, first: 10, largest: 40), new SteppingClock(), observer, () => jitter);
         var budget = policy.Begin();
         for (var i = 0; i < 3; i++)
         {
@@ -59,7 +90,7 @@ public sealed class FieldSearchRetryPolicyTests
         Assert.Equal(3, budget.Retries);
 
         var capped = new Observer();
-        var many = new FieldSearchRetryPolicy(Limits(attempts: 6, first: 10, largest: 20), TimeProvider.System, capped, () => 1.0);
+        var many = new FieldSearchRetryPolicy(Limits(attempts: 6, first: 10, largest: 20), new SteppingClock(), capped, () => 1.0);
         var b = many.Begin();
         while (await many.WaitBeforeRetryAsync(b, "test", "AUTHORITY_NOT_READY", Guid.Empty, null, Ct))
         {
@@ -81,7 +112,7 @@ public sealed class FieldSearchRetryPolicyTests
     [Fact]
     public async Task ARetryNeverStartsWhenItsWaitWouldExhaustTheCallersDeadline()
     {
-        var policy = new FieldSearchRetryPolicy(Limits(first: 100, largest: 100), TimeProvider.System, null, () => 1.0);
+        var policy = new FieldSearchRetryPolicy(Limits(first: 100, largest: 100), new SteppingClock(), null, () => 1.0);
         var budget = policy.Begin();
         Assert.False(await policy.WaitBeforeRetryAsync(budget, "test", "SEARCH_SNAPSHOT_CHANGED", Guid.Empty, TimeSpan.FromMilliseconds(50), Ct));
         Assert.Equal(0, budget.Retries);
