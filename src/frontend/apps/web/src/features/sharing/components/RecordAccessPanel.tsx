@@ -8,6 +8,7 @@ import { ActivityTimeline } from "../../audit";
 import { ErrorPanel } from "../../support";
 import { contributorViewOnlyReasons } from "./contributorPreview";
 import { EditShareDialog } from "./EditShareDialog";
+import { RecordSecurityHistoryCard } from "./RecordSecurityHistoryCard";
 
 /** Role copy follows the Authority's contributor-write switch (Phase C5, D10): never promise an edit that cannot happen. */
 const rolesFor = (contributorWritesEnabled: boolean) => [
@@ -181,6 +182,7 @@ export function RecordAccessPanel({ formRecordId, projection, verifiedScope }: {
           <p className="mt-2 text-sm text-muted">Shares granted and revoked, and changes made by people with shared edit access. Values are never shown here; the full audit history is under Activity and history.</p>
         </Card>
       ) : null}
+      {canListShares && !readOnly ? <RecordSecurityHistoryCard formRecordId={formRecordId} /> : null}
       {!readOnly && editTarget ? <EditShareDialog formRecordId={formRecordId} share={editTarget} projection={projection} onClose={() => setEditTarget(null)} /> : null}
       {!readOnly && open ? <CreateShareDialog formRecordId={formRecordId} projection={projection} contributorWritesEnabled={writesEnabled} onClose={() => setOpen(false)} /> : null}
       <Dialog

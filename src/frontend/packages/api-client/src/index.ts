@@ -192,6 +192,8 @@ export type CreateShareRequest = S["CreateShareRequest"];
 export type ShareResponse = S["ShareResponse"];
 export type RecordShareListResponse = S["RecordShareListResponse"];
 export type ShareDetailsResponse = S["ShareDetailsResponse"];
+export type RecordSecurityHistoryResponse = S["RecordSecurityHistoryResponse"];
+export type RecordSecurityHistoryItemResponse = S["RecordSecurityHistoryItemResponse"];
 export type UpdateShareRequest = S["UpdateShareRequest"];
 export type UpdateShareResponse = S["UpdateShareResponse"];
 export type RecordShareSummaryResponse = S["RecordShareSummaryResponse"];
@@ -418,6 +420,9 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       create: (formRecordId: string, request: CreateShareRequest) => write<ShareResponse>("POST", "shares.create", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}` }),
       /** C10 M2: the Authority's committed share; `shareRevision` is the authoritative revision behind the share ETag. */
       get: (formRecordId: string, recordShareId: string, signal?: AbortSignal) => read<ShareDetailsResponse>("shares.get", { formRecordId, recordShareId }, undefined, "interactive-read", signal),
+      /** C10 M2: the record's sharing and ownership changes from the Authority, each with its own command state. */
+      history: (formRecordId: string, signal?: AbortSignal) => read<RecordSecurityHistoryResponse>("shares.history", { formRecordId }, undefined, "interactive-read", signal),
+      ownershipHistory: (formRecordId: string, signal?: AbortSignal) => read<RecordSecurityHistoryResponse>("shares.ownershipHistory", { formRecordId }, undefined, "interactive-read", signal),
       /** C10 M2: replaces the share's scope. If-Match carries the ETag "{recordShareId}:{shareRevision}" read from `get` (412 when stale). */
       update: (formRecordId: string, recordShareId: string, shareRevision: number | string, request: UpdateShareRequest) =>
         write<UpdateShareResponse>("PATCH", "shares.update", { formRecordId, recordShareId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: `${recordShareId}:${shareRevision}` }),

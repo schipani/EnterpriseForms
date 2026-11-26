@@ -101,6 +101,8 @@ export const ENDPOINTS = {
   "shares.create": { method: "POST", path: "/api/v1/form-records/{formRecordId}/shares" },
   "shares.revoke": { method: "POST", path: "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/revoke" },
   "shares.get": { method: "GET", path: "/api/v1/form-records/{formRecordId}/shares/{recordShareId}" },
+  "shares.history": { method: "GET", path: "/api/v1/form-records/{formRecordId}/shares/history" },
+  "shares.ownershipHistory": { method: "GET", path: "/api/v1/form-records/{formRecordId}/ownership-history" },
   "shares.update": { method: "PATCH", path: "/api/v1/form-records/{formRecordId}/shares/{recordShareId}" },
   "uploads.begin": { method: "POST", path: "/api/v1/upload-sessions" },
   "uploads.chunk": { method: "PUT", path: "/api/v1/upload-sessions/{uploadSessionId}/chunks/{chunkIndex}" },
