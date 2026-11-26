@@ -27,6 +27,7 @@ public enum LegacyShareClassificationOutcome
 
     /// <summary>
     /// The grantor holds no covering Manager share (lost, narrowed, never had).
+    /// This is a verified non-owner classification where ownership evidence was verified.
     /// Proposed outcome: Invalidated with reason <c>LINEAGE_UNRESOLVABLE</c>.
     /// </summary>
     NoCoveringParent = 4,
@@ -35,7 +36,20 @@ public enum LegacyShareClassificationOutcome
     /// Assignment would place the share beyond depth 3, or place a Manager share at depth 3.
     /// Proposed outcome: Invalidated with reason <c>DELEGATION_DEPTH_EXCEEDED</c>.
     /// </summary>
-    ExceedsDepth = 5
+    ExceedsDepth = 5,
+
+    /// <summary>
+    /// Historical evidence is insufficient for reliable classification. This includes:
+    /// - Unknown/null grantor at registration time
+    /// - Unverifiable historical ownership (IsVerifiable = false)
+    /// - Ambiguous ownership (both user and team owner present)
+    /// - Missing or invalid registration evidence
+    ///
+    /// This is NOT a verified non-owner outcome. No assignment or invalidation claim
+    /// can be made on unverifiable inputs. The report builder propagates this
+    /// as a refusal (<see cref="LegacyLineageClassificationReport.EvidenceRefusals"/>), not as a classification decision.
+    /// </summary>
+    InsufficientEvidence = 6
 }
 
 /// <summary>
@@ -79,9 +93,10 @@ public sealed record LegacyShareClassificationEntry
 
     /// <summary>
     /// Keyed pseudonymous reference for the grantor at registration time. Domain-separated with organization binding.
-    /// Never contains names or email addresses.
+    /// Never contains names or email addresses. Null only for <see cref="LegacyShareClassificationOutcome.InsufficientEvidence"/>
+    /// with <see cref="InsufficientEvidenceReason.UnknownGrantor"/>: the report never invents a grantor reference.
     /// </summary>
-    public required string GrantorPseudonymousReference { get; init; }
+    public required string? GrantorPseudonymousReference { get; init; }
 
     /// <summary>The classification outcome.</summary>
     public required LegacyShareClassificationOutcome Classification { get; init; }
@@ -112,6 +127,13 @@ public sealed record LegacyShareClassificationEntry
 
     /// <summary>Indicates the share was created before lineage tracking existed.</summary>
     public required bool IsLegacyShare { get; init; }
+
+    /// <summary>
+    /// When classification is <see cref="LegacyShareClassificationOutcome.InsufficientEvidence"/>,
+    /// contains the structured validation error with privacy-safe reason.
+    /// Null for all other classification outcomes.
+    /// </summary>
+    public LineageEvidenceValidationError? EvidenceValidationError { get; init; }
 }
 
 /// <summary>Identifies whether a share recipient is a user or a team.</summary>
@@ -122,6 +144,52 @@ public enum RecipientKind
 
     /// <summary>The recipient is a team (access conveyed to all active team members).</summary>
     Team = 2
+}
+
+/// <summary>
+/// C10 M1-WP10: reasons why historical evidence is insufficient for classification.
+/// Privacy-safe: contains no PII, actor names, emails or specific field/document identifiers.
+/// </summary>
+public enum InsufficientEvidenceReason
+{
+    /// <summary>The grantor at registration time is unknown or null.</summary>
+    UnknownGrantor = 1,
+
+    /// <summary>Historical ownership evidence exists but is not verifiable (IsVerifiable = false).</summary>
+    UnverifiableOwnership = 2,
+
+    /// <summary>Both user and team ownership present - ambiguous ownership state.</summary>
+    AmbiguousOwnership = 3,
+
+    /// <summary>No historical ownership evidence is available (null OwnerInfoAtRegistration).</summary>
+    MissingOwnershipEvidence = 4
+}
+
+/// <summary>
+/// C10 M1-WP10: structured validation error for incomplete evidence in lineage classification.
+/// Privacy-safe: contains only opaque share ID, organization ID and enum reason.
+/// No actor names, emails, field names, document names or values.
+/// </summary>
+public sealed record LineageEvidenceValidationError
+{
+    /// <summary>Opaque share identifier.</summary>
+    public required Guid RecordShareId { get; init; }
+
+    /// <summary>Opaque organization identifier.</summary>
+    public required Guid OrganizationId { get; init; }
+
+    /// <summary>The reason evidence is insufficient.</summary>
+    public required InsufficientEvidenceReason Reason { get; init; }
+
+    /// <summary>Stable, privacy-safe refusal code.</summary>
+    public string ErrorCode { get; } = LineageEvidenceErrorCodes.EvidenceIncomplete;
+}
+
+/// <summary>C10 M1-WP10: stable refusal codes of the legacy lineage dry run.</summary>
+public static class LineageEvidenceErrorCodes
+{
+    /// <summary>Historical grantor or ownership evidence is missing, unverifiable or ambiguous; no outcome is proposed.</summary>
+    public const string EvidenceIncomplete = "LINEAGE_EVIDENCE_INCOMPLETE";
 }
 
 /// <summary>
@@ -152,6 +220,11 @@ public sealed record LegacyShareClassificationSummary
 
     /// <summary>Shares where the recipient is independently covered (access survives invalidation).</summary>
     public required int IndependentlyCoveredCount { get; init; }
+
+    /// <summary>
+    /// Shares classified as <see cref="LegacyShareClassificationOutcome.InsufficientEvidence"/>: refused, no proposed outcome.
+    /// </summary>
+    public required int InsufficientEvidenceCount { get; init; }
 }
 
 /// <summary>
@@ -173,4 +246,14 @@ public sealed record LegacyLineageClassificationReport
 
     /// <summary>All classified share entries.</summary>
     public IReadOnlyList<LegacyShareClassificationEntry> Entries { get; init; } = [];
+
+    /// <summary>
+    /// The privacy-safe refusals of every share whose historical evidence was incomplete. Not empty means the evidence for
+    /// this revision is incomplete: no assignment or invalidation is proposed for those shares, and a later execution
+    /// (separately authorized, Section 5.1) must not proceed from this report.
+    /// </summary>
+    public IReadOnlyList<LineageEvidenceValidationError> EvidenceRefusals { get; init; } = [];
+
+    /// <summary>True when every evaluated share had complete, verified historical evidence.</summary>
+    public bool IsEvidenceComplete => EvidenceRefusals.Count == 0;
 }

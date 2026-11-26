@@ -100,8 +100,11 @@ public static class LineageReportPiiValidator
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        // Pseudonymous references must be hex strings (32 chars, lowercase hex only)
-        if (!IsValidPseudonym(entry.GrantorPseudonymousReference))
+        // Pseudonymous references must be hex strings (32 chars, lowercase hex only). A grantor reference is absent only
+        // when the grantor itself is unknown; the report never substitutes a placeholder.
+        var grantorAbsentAsRefused = entry.GrantorPseudonymousReference is null &&
+                                     entry.EvidenceValidationError?.Reason == InsufficientEvidenceReason.UnknownGrantor;
+        if (!grantorAbsentAsRefused && !IsValidPseudonym(entry.GrantorPseudonymousReference))
         {
             return false;
         }
@@ -121,7 +124,7 @@ public static class LineageReportPiiValidator
         return true;
     }
 
-    private static bool IsValidPseudonym(string pseudonym)
+    private static bool IsValidPseudonym(string? pseudonym)
     {
         if (string.IsNullOrEmpty(pseudonym))
         {

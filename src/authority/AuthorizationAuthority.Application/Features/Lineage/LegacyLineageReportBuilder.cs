@@ -4,7 +4,9 @@ namespace AuthorizationAuthority.Application.Features.Lineage;
 
 /// <summary>
 /// C10 M1-WP10: builds the legacy lineage classification report from classified entries.
-/// Produces only opaque IDs, counts, enum outcomes and keyed pseudonyms.
+/// Produces only opaque IDs, counts, enum outcomes and keyed pseudonyms. Pure and in-memory: it never writes, submits a
+/// command or persists anything. Shares refused for incomplete historical evidence are carried as
+/// <see cref="LegacyLineageClassificationReport.EvidenceRefusals"/> with no proposed outcome.
 /// </summary>
 public sealed class LegacyLineageReportBuilder
 {
@@ -55,6 +57,30 @@ public sealed class LegacyLineageReportBuilder
     /// </summary>
     public LegacyLineageClassificationReport Build()
     {
+        var refusals = new List<LineageEvidenceValidationError>();
+        foreach (var entry in _entries)
+        {
+            var refused = entry.Classification == LegacyShareClassificationOutcome.InsufficientEvidence;
+            if (refused != entry.EvidenceValidationError is not null)
+            {
+                throw new InvalidOperationException("an evidence refusal must accompany exactly the refused classifications");
+            }
+
+            if (refused && (entry.ProposedParentShareId is not null || entry.ProposedDelegationDepth is not null ||
+                            entry.CandidateParentShareIds.Count != 0 ||
+                            entry.IndependentCoverage != IndependentCoverageAnnotation.NotEvaluated ||
+                            entry.EvidenceValidationError!.RecordShareId != entry.RecordShareId ||
+                            entry.EvidenceValidationError.OrganizationId != entry.OrganizationId))
+            {
+                throw new InvalidOperationException("a refused classification cannot carry an assignment or invalidation claim");
+            }
+
+            if (refused)
+            {
+                refusals.Add(entry.EvidenceValidationError!);
+            }
+        }
+
         var summaries = _entries
             .GroupBy(e => e.OrganizationId)
             .Select(BuildSummary)
@@ -70,7 +96,8 @@ public sealed class LegacyLineageReportBuilder
             ToolVersion = LegacyLineageClassifier.ToolVersion,
             GeneratedOn = _generatedOn == default ? DateTimeOffset.UtcNow : _generatedOn,
             Summaries = summaries,
-            Entries = _entries.ToList()
+            Entries = _entries.ToList(),
+            EvidenceRefusals = refusals
         };
     }
 
@@ -86,7 +113,8 @@ public sealed class LegacyLineageReportBuilder
             MultipleCandidateParentsCount = entries.Count(e => e.Classification == LegacyShareClassificationOutcome.MultipleCandidateParents),
             NoCoveringParentCount = entries.Count(e => e.Classification == LegacyShareClassificationOutcome.NoCoveringParent),
             ExceedsDepthCount = entries.Count(e => e.Classification == LegacyShareClassificationOutcome.ExceedsDepth),
-            IndependentlyCoveredCount = entries.Count(e => e.IndependentCoverage == IndependentCoverageAnnotation.IndependentlyCovered)
+            IndependentlyCoveredCount = entries.Count(e => e.IndependentCoverage == IndependentCoverageAnnotation.IndependentlyCovered),
+            InsufficientEvidenceCount = entries.Count(e => e.Classification == LegacyShareClassificationOutcome.InsufficientEvidence)
         };
     }
 }
@@ -164,6 +192,56 @@ public static class LegacyLineageReportValidator
                     issues.Add($"Entry {entry.RecordShareId} is UnambiguousParent but has no depth");
                 }
             }
+
+            if ((entry.Classification is LegacyShareClassificationOutcome.MultipleCandidateParents
+                    or LegacyShareClassificationOutcome.NoCoveringParent or LegacyShareClassificationOutcome.ExceedsDepth) &&
+                (entry.ProposedParentShareId.HasValue || entry.ProposedDelegationDepth.HasValue))
+            {
+                issues.Add($"Entry {entry.RecordShareId} is {entry.Classification} but proposes an assignment");
+            }
+
+            if (entry.Classification == LegacyShareClassificationOutcome.InsufficientEvidence)
+            {
+                var error = entry.EvidenceValidationError;
+                if (error is null || error.RecordShareId != entry.RecordShareId || error.OrganizationId != entry.OrganizationId)
+                {
+                    issues.Add($"Entry {entry.RecordShareId} is InsufficientEvidence without its own refusal");
+                }
+
+                if (entry.ProposedParentShareId.HasValue || entry.ProposedDelegationDepth.HasValue ||
+                    entry.CandidateParentShareIds.Count != 0 || entry.IndependentCoverage != IndependentCoverageAnnotation.NotEvaluated)
+                {
+                    issues.Add($"Entry {entry.RecordShareId} is InsufficientEvidence but carries an assignment or invalidation claim");
+                }
+
+                if (entry.GrantorPseudonymousReference is null && error?.Reason != InsufficientEvidenceReason.UnknownGrantor)
+                {
+                    issues.Add($"Entry {entry.RecordShareId} omits a known grantor reference");
+                }
+
+                if (error is not null && !report.EvidenceRefusals.Contains(error))
+                {
+                    issues.Add($"Entry {entry.RecordShareId} refusal is not propagated to the report");
+                }
+            }
+            else
+            {
+                if (entry.EvidenceValidationError is not null)
+                {
+                    issues.Add($"Entry {entry.RecordShareId} carries a refusal but was classified {entry.Classification}");
+                }
+
+                if (entry.GrantorPseudonymousReference is null)
+                {
+                    issues.Add($"Entry {entry.RecordShareId} was classified without a grantor reference");
+                }
+            }
+        }
+
+        if (report.EvidenceRefusals.Count !=
+            report.Entries.Count(e => e.Classification == LegacyShareClassificationOutcome.InsufficientEvidence))
+        {
+            issues.Add("Evidence refusals do not match the refused entries");
         }
 
         // Validate summary counts match entries
@@ -176,10 +254,17 @@ public static class LegacyLineageReportValidator
                 issues.Add($"Summary for {summary.OrganizationId} has incorrect total count");
             }
 
-            var actualOwnerGranted = orgEntries.Count(e => e.Classification == LegacyShareClassificationOutcome.OwnerGranted);
-            if (summary.OwnerGrantedCount != actualOwnerGranted)
+            int Count(LegacyShareClassificationOutcome outcome) => orgEntries.Count(e => e.Classification == outcome);
+            if (summary.OwnerGrantedCount != Count(LegacyShareClassificationOutcome.OwnerGranted) ||
+                summary.UnambiguousParentCount != Count(LegacyShareClassificationOutcome.UnambiguousParent) ||
+                summary.MultipleCandidateParentsCount != Count(LegacyShareClassificationOutcome.MultipleCandidateParents) ||
+                summary.NoCoveringParentCount != Count(LegacyShareClassificationOutcome.NoCoveringParent) ||
+                summary.ExceedsDepthCount != Count(LegacyShareClassificationOutcome.ExceedsDepth) ||
+                summary.InsufficientEvidenceCount != Count(LegacyShareClassificationOutcome.InsufficientEvidence) ||
+                summary.IndependentlyCoveredCount !=
+                orgEntries.Count(e => e.IndependentCoverage == IndependentCoverageAnnotation.IndependentlyCovered))
             {
-                issues.Add($"Summary for {summary.OrganizationId} has incorrect OwnerGranted count");
+                issues.Add($"Summary for {summary.OrganizationId} has incorrect classification counts");
             }
         }
 

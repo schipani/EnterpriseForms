@@ -373,7 +373,7 @@ public sealed class LegacyLineageClassifierTests
     }
 
     [Fact]
-    public void ClassifyShareNoCoveringParentUnknownGrantorReturnsNoCoveringParent()
+    public void ClassifyShareUnknownGrantorIsRefusedAsInsufficientEvidence()
     {
         // Arrange
         var shareId = Guid.CreateVersion7();
@@ -394,8 +394,10 @@ public sealed class LegacyLineageClassifierTests
             grantsSnapshot,
             pseudonymizer);
 
-        // Assert
-        Assert.Equal(LegacyShareClassificationOutcome.NoCoveringParent, result.Classification);
+        // Assert: an unknown grantor is never a verified non-owner, so no invalidation is proposed
+        Assert.Equal(LegacyShareClassificationOutcome.InsufficientEvidence, result.Classification);
+        Assert.Equal(InsufficientEvidenceReason.UnknownGrantor, result.EvidenceValidationError?.Reason);
+        Assert.Null(result.GrantorPseudonymousReference);
     }
 
     #endregion
@@ -1192,7 +1194,8 @@ public sealed class LegacyLineageClassifierTests
             OwnerUser, new OwnerInfoAtRegistration { OwnerUserId = OwnerUser, IsVerifiable = false },
             new RecordGrantsSnapshot { ObservedOn = ObservedOn }, new LineagePseudonymizer(Org, TestKeyMaterial));
 
-        Assert.Equal(LegacyShareClassificationOutcome.NoCoveringParent, result.Classification);
+        Assert.Equal(LegacyShareClassificationOutcome.InsufficientEvidence, result.Classification);
+        Assert.Equal(InsufficientEvidenceReason.UnverifiableOwnership, result.EvidenceValidationError?.Reason);
         Assert.Null(result.ProposedDelegationDepth);
     }
 
@@ -1230,7 +1233,7 @@ public sealed class LegacyLineageClassifierTests
         };
         var result = LegacyLineageClassifier.ClassifyShare(CreateShareResource(id, Record), null,
             CreateShareEdges(id, RecipientUser, RecipientKind.User, "reader"), new HashSet<Guid> { FieldItem1 }, [],
-            ManagerUser, null, new RecordGrantsSnapshot { ObservedOn = ObservedOn, ActiveShares = [root, middle, leaf] },
+            ManagerUser, VerifiedUserOwner(OwnerUser), new RecordGrantsSnapshot { ObservedOn = ObservedOn, ActiveShares = [root, middle, leaf] },
             new LineagePseudonymizer(Org, TestKeyMaterial), evaluateIndependentCoverage: true);
 
         Assert.Empty(result.CandidateParentShareIds);
@@ -1257,6 +1260,216 @@ public sealed class LegacyLineageClassifierTests
             .AddEntry(entry with { OrganizationId = Guid.NewGuid() });
         Assert.Throws<InvalidOperationException>(() => crossOrg.Build());
     }
+
+    #region Incomplete historical evidence (independent review correction)
+
+    public static TheoryData<string> IncompleteOwnershipCases => ["unverifiable", "missing", "ambiguous", "empty"];
+
+    private static OwnerInfoAtRegistration? IncompleteOwnership(string kind) => kind switch
+    {
+        "unverifiable" => new OwnerInfoAtRegistration { OwnerUserId = OwnerUser, IsVerifiable = false },
+        "missing" => null,
+        "ambiguous" => new OwnerInfoAtRegistration { OwnerUserId = OwnerUser, OwnerTeamId = Guid.CreateVersion7(), IsVerifiable = true },
+        "empty" => new OwnerInfoAtRegistration { IsVerifiable = true },
+        _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+    };
+
+    private static InsufficientEvidenceReason ExpectedReason(string kind) => kind switch
+    {
+        "unverifiable" => InsufficientEvidenceReason.UnverifiableOwnership,
+        "ambiguous" => InsufficientEvidenceReason.AmbiguousOwnership,
+        _ => InsufficientEvidenceReason.MissingOwnershipEvidence,
+    };
+
+    private static OwnerInfoAtRegistration VerifiedUserOwner(Guid owner) => new() { OwnerUserId = owner, IsVerifiable = true };
+
+    /// <summary>A depth-1 Manager share held by <see cref="ManagerUser"/> that covers FieldItem1: a valid matching parent.</summary>
+    private static ActiveShareInfo MatchingManagerShare() => SnapshotShare(Guid.CreateVersion7(), 1, null) with
+    {
+        DirectUserRecipientIds = new HashSet<Guid> { ManagerUser },
+    };
+
+    private static LegacyShareClassificationEntry Classify(Guid shareId, Guid? grantor, OwnerInfoAtRegistration? owner,
+        IReadOnlyList<ActiveShareInfo> shares, bool coverage = true) =>
+        LegacyLineageClassifier.ClassifyShare(CreateShareResource(shareId, Record), null,
+            CreateShareEdges(shareId, RecipientUser, RecipientKind.User, "reader"), new HashSet<Guid> { FieldItem1 }, [],
+            grantor, owner, new RecordGrantsSnapshot { ObservedOn = ObservedOn, ActiveShares = shares },
+            new LineagePseudonymizer(Org, TestKeyMaterial), evaluateIndependentCoverage: coverage);
+
+    private static void AssertRefusedWithoutClaims(LegacyShareClassificationEntry entry, Guid shareId, InsufficientEvidenceReason reason)
+    {
+        Assert.Equal(LegacyShareClassificationOutcome.InsufficientEvidence, entry.Classification);
+        Assert.NotNull(entry.EvidenceValidationError);
+        Assert.Equal(reason, entry.EvidenceValidationError.Reason);
+        Assert.Equal(shareId, entry.EvidenceValidationError.RecordShareId);
+        Assert.Equal(Org, entry.EvidenceValidationError.OrganizationId);
+        Assert.Equal(LineageEvidenceErrorCodes.EvidenceIncomplete, entry.EvidenceValidationError.ErrorCode);
+        Assert.Null(entry.ProposedParentShareId);
+        Assert.Null(entry.ProposedDelegationDepth);
+        Assert.Empty(entry.CandidateParentShareIds);
+        Assert.Equal(IndependentCoverageAnnotation.NotEvaluated, entry.IndependentCoverage);
+    }
+
+    [Theory]
+    [MemberData(nameof(IncompleteOwnershipCases))]
+    public void IncompleteHistoricalOwnershipWithoutAManagerIsRefusedNotAVerifiedNonOwner(string kind)
+    {
+        var id = Guid.CreateVersion7();
+        var entry = Classify(id, ManagerUser, IncompleteOwnership(kind), []);
+
+        AssertRefusedWithoutClaims(entry, id, ExpectedReason(kind));
+        Assert.NotEqual(LegacyShareClassificationOutcome.NoCoveringParent, entry.Classification);
+        Assert.NotNull(entry.GrantorPseudonymousReference); // the grantor itself is known
+    }
+
+    [Theory]
+    [MemberData(nameof(IncompleteOwnershipCases))]
+    public void IncompleteHistoricalOwnershipWithAValidMatchingManagerAssignsNoParent(string kind)
+    {
+        var id = Guid.CreateVersion7();
+        var manager = MatchingManagerShare();
+        var entry = Classify(id, ManagerUser, IncompleteOwnership(kind), [manager]);
+
+        AssertRefusedWithoutClaims(entry, id, ExpectedReason(kind));
+        Assert.DoesNotContain(manager.RecordShareId, entry.CandidateParentShareIds);
+
+        // The same manager share is accepted as the parent once historical ownership is verified (control case).
+        var verified = Classify(id, ManagerUser, VerifiedUserOwner(OwnerUser), [manager]);
+        Assert.Equal(LegacyShareClassificationOutcome.UnambiguousParent, verified.Classification);
+        Assert.Equal(manager.RecordShareId, verified.ProposedParentShareId);
+        Assert.Null(verified.EvidenceValidationError);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NullOrEmptyGrantorIsRefusedEvenWithVerifiedOwnershipAndAMatchingManager(bool emptyGrantor)
+    {
+        var id = Guid.CreateVersion7();
+        var entry = Classify(id, emptyGrantor ? Guid.Empty : null, VerifiedUserOwner(OwnerUser), [MatchingManagerShare()]);
+
+        AssertRefusedWithoutClaims(entry, id, InsufficientEvidenceReason.UnknownGrantor);
+        Assert.Null(entry.GrantorPseudonymousReference); // no placeholder identity is invented
+        Assert.True(LineageReportPiiValidator.ValidateNoPii(entry));
+    }
+
+    [Fact]
+    public void AVerifiedHistoricalOwnerIsOwnerGrantedEvenWhenOwnershipLaterMoved()
+    {
+        var id = Guid.CreateVersion7();
+        // The grantor owned the record when the share was registered; the manager share in the snapshot is irrelevant.
+        var entry = Classify(id, ManagerUser, VerifiedUserOwner(ManagerUser), [MatchingManagerShare()]);
+
+        Assert.Equal(LegacyShareClassificationOutcome.OwnerGranted, entry.Classification);
+        Assert.Equal(1, entry.ProposedDelegationDepth);
+        Assert.Null(entry.ProposedParentShareId);
+        Assert.Null(entry.EvidenceValidationError);
+    }
+
+    [Fact]
+    public void AVerifiedHistoricalTeamOwnerMemberIsOwnerGrantedAndANonMemberIsAVerifiedNonOwner()
+    {
+        var team = Guid.CreateVersion7();
+        var owner = new OwnerInfoAtRegistration
+        {
+            OwnerTeamId = team,
+            TeamMemberUserIds = new HashSet<Guid> { OwnerUser },
+            IsVerifiable = true,
+        };
+
+        Assert.Equal(LegacyShareClassificationOutcome.OwnerGranted, Classify(Guid.CreateVersion7(), OwnerUser, owner, []).Classification);
+        var nonMember = Classify(Guid.CreateVersion7(), ManagerUser, owner, []);
+        Assert.Equal(LegacyShareClassificationOutcome.NoCoveringParent, nonMember.Classification);
+        Assert.Null(nonMember.EvidenceValidationError);
+    }
+
+    [Fact]
+    public void AVerifiedNonOwnerKeepsTheApprovedClassifications()
+    {
+        Assert.Equal(LegacyShareClassificationOutcome.NoCoveringParent,
+            Classify(Guid.CreateVersion7(), ManagerUser, VerifiedUserOwner(OwnerUser), []).Classification);
+        Assert.Equal(LegacyShareClassificationOutcome.UnambiguousParent,
+            Classify(Guid.CreateVersion7(), ManagerUser, VerifiedUserOwner(OwnerUser), [MatchingManagerShare()]).Classification);
+        Assert.Equal(LegacyShareClassificationOutcome.MultipleCandidateParents,
+            Classify(Guid.CreateVersion7(), ManagerUser, VerifiedUserOwner(OwnerUser), [MatchingManagerShare(), MatchingManagerShare()])
+                .Classification);
+    }
+
+    [Fact]
+    public void TheReportPropagatesEveryRefusalAndProposesNothingForRefusedShares()
+    {
+        var refusedId = Guid.CreateVersion7();
+        var unknownId = Guid.CreateVersion7();
+        var refused = Classify(refusedId, ManagerUser, IncompleteOwnership("unverifiable"), [MatchingManagerShare()]);
+        var unknown = Classify(unknownId, null, VerifiedUserOwner(OwnerUser), []);
+        var owner = Classify(Guid.CreateVersion7(), OwnerUser, VerifiedUserOwner(OwnerUser), []);
+        var nonOwner = Classify(Guid.CreateVersion7(), ManagerUser, VerifiedUserOwner(OwnerUser), []);
+
+        var report = new LegacyLineageReportBuilder().WithAuthorizationRevision(7).WithTimestamp(ObservedOn)
+            .AddEntries([refused, unknown, owner, nonOwner]).Build();
+
+        Assert.False(report.IsEvidenceComplete);
+        Assert.Equal([refusedId, unknownId], report.EvidenceRefusals.Select(r => r.RecordShareId));
+        var summary = Assert.Single(report.Summaries);
+        Assert.Equal(2, summary.InsufficientEvidenceCount);
+        Assert.Equal(1, summary.OwnerGrantedCount);
+        Assert.Equal(1, summary.NoCoveringParentCount);
+        Assert.Equal(0, summary.UnambiguousParentCount);
+        var validation = LegacyLineageReportValidator.Validate(report);
+        Assert.True(validation.IsValid, string.Join("; ", validation.Issues));
+
+        var json = JsonSerializer.Serialize(report);
+        Assert.DoesNotContain(ManagerUser.ToString("D"), json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(OwnerUser.ToString("D"), json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(RecipientUser.ToString("D"), json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(LineageEvidenceErrorCodes.EvidenceIncomplete, json, StringComparison.Ordinal);
+
+        var complete = new LegacyLineageReportBuilder().WithAuthorizationRevision(7).AddEntries([owner, nonOwner]).Build();
+        Assert.True(complete.IsEvidenceComplete);
+    }
+
+    [Fact]
+    public void TheBuilderAndValidatorRejectAnAssignmentOrInvalidationClaimOnARefusedShare()
+    {
+        var refused = Classify(Guid.CreateVersion7(), ManagerUser, IncompleteOwnership("missing"), []);
+        var parent = Guid.CreateVersion7();
+
+        Assert.Throws<InvalidOperationException>(() => new LegacyLineageReportBuilder().WithAuthorizationRevision(3)
+            .AddEntry(refused with { ProposedParentShareId = parent, ProposedDelegationDepth = 2 }).Build());
+        Assert.Throws<InvalidOperationException>(() => new LegacyLineageReportBuilder().WithAuthorizationRevision(3)
+            .AddEntry(refused with { CandidateParentShareIds = [parent] }).Build());
+        Assert.Throws<InvalidOperationException>(() => new LegacyLineageReportBuilder().WithAuthorizationRevision(3)
+            .AddEntry(refused with { EvidenceValidationError = null }).Build());
+        Assert.Throws<InvalidOperationException>(() => new LegacyLineageReportBuilder().WithAuthorizationRevision(3)
+            .AddEntry(refused with { Classification = LegacyShareClassificationOutcome.NoCoveringParent }).Build());
+
+        // A report assembled outside the builder is caught by the validator.
+        var forged = new LegacyLineageClassificationReport
+        {
+            AuthorizationRevisionRead = 3,
+            ToolVersion = LegacyLineageClassifier.ToolVersion,
+            GeneratedOn = ObservedOn,
+            Entries = [refused with { ProposedParentShareId = parent, ProposedDelegationDepth = 2 }],
+            EvidenceRefusals = [],
+        };
+        var validation = LegacyLineageReportValidator.Validate(forged);
+        Assert.False(validation.IsValid);
+        Assert.Contains(validation.Issues, i => i.Contains("assignment or invalidation claim", StringComparison.Ordinal));
+        Assert.Contains(validation.Issues, i => i.Contains("not propagated", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TheValidatorRequiresEverySummaryCount()
+    {
+        var entry = Classify(Guid.CreateVersion7(), ManagerUser, VerifiedUserOwner(OwnerUser), []);
+        var report = new LegacyLineageReportBuilder().WithAuthorizationRevision(4).AddEntry(entry).Build();
+        var tampered = report with { Summaries = [report.Summaries[0] with { NoCoveringParentCount = 0, InsufficientEvidenceCount = 1 }] };
+
+        Assert.True(LegacyLineageReportValidator.Validate(report).IsValid);
+        Assert.False(LegacyLineageReportValidator.Validate(tampered).IsValid);
+    }
+
+    #endregion
 
     private static List<ActiveShareInfo> WithVerifiedAncestors(ActiveShareInfo leaf)
     {

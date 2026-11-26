@@ -60,23 +60,29 @@ public sealed class LegacyLineageClassifier
         // Extract recipient info from edges
         var (recipientId, recipientKind, shareRole) = ExtractRecipientInfo(shareEdges, share.ResourceEntityId, share.OrganizationId);
 
-        // If we cannot determine the grantor at registration, we cannot reliably classify
-        if (grantorAtRegistration is null)
+        // CRITICAL: Check for insufficient evidence BEFORE any classification attempt.
+        // Unverified, null or ambiguous historical ownership cannot fall into verified non-owner.
+        // We must refuse to make any assignment or invalidation claim on unverifiable inputs.
+        var evidenceValidation = ValidateEvidenceForClassification(
+            share.ResourceEntityId,
+            share.OrganizationId,
+            grantorAtRegistration,
+            ownerAtRegistration);
+
+        if (evidenceValidation is not null)
         {
-            return CreateEntry(
+            // Evidence is insufficient - refuse to classify.
+            // This is NOT NoCoveringParent (which implies verified non-owner status).
+            return CreateInsufficientEvidenceEntry(
                 share,
                 shareMetadata,
                 recipientId,
                 recipientKind,
                 shareRole,
-                Guid.Empty, // Unknown grantor
+                grantorAtRegistration,
                 shareFieldItems.Count,
                 shareDocumentBindings.Count,
-                LegacyShareClassificationOutcome.NoCoveringParent,
-                null,
-                null,
-                [],
-                IndependentCoverageAnnotation.NotEvaluated,
+                evidenceValidation,
                 pseudonymizer);
         }
 
@@ -85,10 +91,9 @@ public sealed class LegacyLineageClassifier
                 shareFieldItems, shareDocumentBindings, grantsSnapshot)
             : IndependentCoverageAnnotation.NotEvaluated;
 
-        // Check if the grantor was the owner at registration time
-        // IMPORTANT: We use ownership at grant time, NOT current ownership
-        // If owner at registration is unknown/unverifiable, we cannot assume owner-granted
-        if (ownerAtRegistration is not null && WasGrantorOwnerAtRegistration(grantorAtRegistration.Value, ownerAtRegistration))
+        // Evidence is verified: the grantor is known and historical ownership is verified and unambiguous.
+        // IMPORTANT: ownership at grant time, NOT current ownership.
+        if (WasGrantorOwnerAtRegistration(grantorAtRegistration!.Value, ownerAtRegistration!))
         {
             return CreateEntry(
                 share,
@@ -248,40 +253,25 @@ public sealed class LegacyLineageClassifier
 
     /// <summary>
     /// Determines if the grantor was the owner at registration time.
-    /// Requires IsVerifiable == true and unambiguous owner kind.
+    /// PRECONDITION: ValidateEvidenceForClassification has already passed (returned null).
+    /// This means: ownerInfo is non-null, IsVerifiable is true, and ownership is unambiguous
+    /// (exactly one of OwnerUserId or OwnerTeamId is set, not both).
     /// </summary>
     private static bool WasGrantorOwnerAtRegistration(Guid grantorUserId, OwnerInfoAtRegistration ownerInfo)
     {
-        // Must have verifiable ownership evidence
-        if (!ownerInfo.IsVerifiable)
-        {
-            return false;
-        }
-
-        // Ownership kind must be unambiguous: exactly one of user or team owner, not both
-        var hasUserOwner = ownerInfo.OwnerUserId.HasValue;
-        var hasTeamOwner = ownerInfo.OwnerTeamId.HasValue;
-
-        if (hasUserOwner && hasTeamOwner)
-        {
-            // Ambiguous: both user and team ownership present
-            return false;
-        }
-
-        if (!hasUserOwner && !hasTeamOwner)
-        {
-            // No ownership evidence
-            return false;
-        }
+        // Note: Validation has already ensured:
+        // - IsVerifiable == true
+        // - Exactly one of OwnerUserId or OwnerTeamId is set (not both, not neither)
+        // These preconditions are enforced by ValidateEvidenceForClassification.
 
         // Direct user owner
-        if (hasUserOwner && ownerInfo.OwnerUserId == grantorUserId)
+        if (ownerInfo.OwnerUserId.HasValue && ownerInfo.OwnerUserId == grantorUserId)
         {
             return true;
         }
 
         // Team owner: grantor must be in team member set
-        if (hasTeamOwner && ownerInfo.TeamMemberUserIds.Contains(grantorUserId))
+        if (ownerInfo.OwnerTeamId.HasValue && ownerInfo.TeamMemberUserIds.Contains(grantorUserId))
         {
             return true;
         }
@@ -583,6 +573,121 @@ public sealed class LegacyLineageClassifier
         return candidateLevel >= targetLevel;
     }
 
+    /// <summary>
+    /// Validates whether sufficient evidence exists to perform classification.
+    /// Returns null if evidence is sufficient; returns a validation error otherwise.
+    /// CRITICAL: Unverified, null or ambiguous historical ownership cannot fall into verified non-owner.
+    /// </summary>
+    private static LineageEvidenceValidationError? ValidateEvidenceForClassification(
+        Guid shareId,
+        Guid organizationId,
+        Guid? grantorAtRegistration,
+        OwnerInfoAtRegistration? ownerAtRegistration)
+    {
+        // Case 1: Unknown grantor - we cannot determine who created the share
+        if (grantorAtRegistration is not { } grantor || grantor == Guid.Empty)
+        {
+            return new LineageEvidenceValidationError
+            {
+                RecordShareId = shareId,
+                OrganizationId = organizationId,
+                Reason = InsufficientEvidenceReason.UnknownGrantor
+            };
+        }
+
+        // Case 2: No historical ownership evidence at all
+        if (ownerAtRegistration is null)
+        {
+            return new LineageEvidenceValidationError
+            {
+                RecordShareId = shareId,
+                OrganizationId = organizationId,
+                Reason = InsufficientEvidenceReason.MissingOwnershipEvidence
+            };
+        }
+
+        // Case 3: Historical ownership exists but is not verifiable
+        if (!ownerAtRegistration.IsVerifiable)
+        {
+            return new LineageEvidenceValidationError
+            {
+                RecordShareId = shareId,
+                OrganizationId = organizationId,
+                Reason = InsufficientEvidenceReason.UnverifiableOwnership
+            };
+        }
+
+        // Case 4: Ambiguous ownership - both user and team owner present
+        var hasUserOwner = ownerAtRegistration.OwnerUserId.HasValue;
+        var hasTeamOwner = ownerAtRegistration.OwnerTeamId.HasValue;
+        if (hasUserOwner && hasTeamOwner)
+        {
+            return new LineageEvidenceValidationError
+            {
+                RecordShareId = shareId,
+                OrganizationId = organizationId,
+                Reason = InsufficientEvidenceReason.AmbiguousOwnership
+            };
+        }
+
+        // Case 5: Verifiable but no actual ownership evidence (neither user nor team)
+        // This should not happen with proper data, but we must handle it safely
+        if (!hasUserOwner && !hasTeamOwner)
+        {
+            return new LineageEvidenceValidationError
+            {
+                RecordShareId = shareId,
+                OrganizationId = organizationId,
+                Reason = InsufficientEvidenceReason.MissingOwnershipEvidence
+            };
+        }
+
+        // Evidence is sufficient for classification
+        return null;
+    }
+
+    /// <summary>
+    /// Creates a classification entry for InsufficientEvidence outcome.
+    /// No assignment or invalidation claim is made.
+    /// </summary>
+    private static LegacyShareClassificationEntry CreateInsufficientEvidenceEntry(
+        AuthorityResource share,
+        ShareResourceMetadata? metadata,
+        Guid recipientId,
+        RecipientKind recipientKind,
+        string shareRole,
+        Guid? grantorAtRegistration,
+        int fieldItemCount,
+        int documentItemCount,
+        LineageEvidenceValidationError validationError,
+        LineagePseudonymizer pseudonymizer)
+    {
+        // The registering actor is reported only when it is known; an unknown grantor has no reference rather than a
+        // placeholder that could be read as an identity.
+        return new LegacyShareClassificationEntry
+        {
+            RecordShareId = share.ResourceEntityId,
+            FormRecordId = share.ParentResourceEntityId ?? Guid.Empty,
+            OrganizationId = share.OrganizationId,
+            RecipientKind = recipientKind,
+            RecipientPseudonymousReference = pseudonymizer.PseudonymizeRecipient(recipientId),
+            GrantorPseudonymousReference = grantorAtRegistration is { } grantor && grantor != Guid.Empty
+                ? pseudonymizer.PseudonymizeGrantor(grantor)
+                : null,
+            Classification = LegacyShareClassificationOutcome.InsufficientEvidence,
+            FieldItemCount = fieldItemCount,
+            DocumentItemCount = documentItemCount,
+            CandidateParentShareIds = [],
+            ProposedParentShareId = null, // No assignment claim
+            ProposedDelegationDepth = null, // No depth assignment
+            ShareRole = shareRole,
+            IndependentCoverage = IndependentCoverageAnnotation.NotEvaluated, // Cannot evaluate without valid classification
+            HasExpiry = metadata?.ShareExpiresOn is not null,
+            IsLegacyShare = metadata?.LegacyLineageUnresolved ?? true,
+            EvidenceValidationError = validationError
+        };
+    }
+
     private static LegacyShareClassificationEntry CreateEntry(
         AuthorityResource share,
         ShareResourceMetadata? metadata,
@@ -637,8 +742,9 @@ public sealed record OwnerInfoAtRegistration
     public IReadOnlySet<Guid> TeamMemberUserIds { get; init; } = new HashSet<Guid>();
 
     /// <summary>
-    /// Indicates whether the historical owner information is verifiable.
-    /// If false, the classifier cannot assume owner-granted status.
+    /// Indicates whether the historical owner information is verifiable: the owner principal and, for a team owner, the
+    /// complete team member set at the registration instant. If false, the classifier refuses the share
+    /// (<see cref="LegacyShareClassificationOutcome.InsufficientEvidence"/>): it is neither owner-granted nor a verified non-owner.
     /// </summary>
     public bool IsVerifiable { get; init; }
 }
