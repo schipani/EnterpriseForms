@@ -85,6 +85,9 @@ public sealed class ContentCandidateLeaf
     public byte[] RowSignature { get; set; } = [];
 
     public byte[] LeafDigest { get; set; } = [];
+
+    /// <summary>C10 WP8: the verified attachment version number of an attachment candidate (see <see cref="RecordManifestLeaf.AttachmentVersionNumber"/>).</summary>
+    public int? AttachmentVersionNumber { get; set; }
 }
 
 public static class ContentMutationKinds

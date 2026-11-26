@@ -407,6 +407,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("content_candidate_leaf_id");
 
+                    b.Property<int?>("AttachmentVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("attachment_version_number");
+
                     b.Property<byte[]>("CanonicalPayloadDigest")
                         .IsRequired()
                         .HasColumnType("bytea")
@@ -914,6 +918,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("record_manifest_leaf_id");
+
+                    b.Property<int?>("AttachmentVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("attachment_version_number");
 
                     b.Property<byte[]>("CanonicalPayloadDigest")
                         .IsRequired()

@@ -293,6 +293,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
                 CanonicalPayloadDigest = source.Item.Digest,
                 RowSignature = source.Signature,
                 LeafDigest = manifest.LeafHashes[i],
+                // C10 WP8: the version number of the attachment row validated above (signed column), never a business-supplied value.
+                AttachmentVersionNumber = source.Item.Kind == ManifestItemKind.Attachment
+                    ? source.Item.Document.Column("version_number")?.AsInt32() is { } version and > 0 ? version : throw AuthorityException.Invalid("attachment row has no valid version_number")
+                    : null,
             });
         }
 
@@ -594,6 +598,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             CanonicalPayloadDigest = l.CanonicalPayloadDigest,
             RowSignature = l.RowSignature,
             ManifestLeafDigest = l.LeafDigest,
+            AttachmentVersionNumber = l.AttachmentVersionNumber,
         }));
 
         head.CommittedContentRevision = operation.CandidateContentRevision;

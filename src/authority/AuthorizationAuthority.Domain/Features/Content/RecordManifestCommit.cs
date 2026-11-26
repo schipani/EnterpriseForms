@@ -47,6 +47,13 @@ public sealed class RecordManifestLeaf
     public byte[] RowSignature { get; set; } = [];
 
     public byte[] ManifestLeafDigest { get; set; } = [];
+
+    /// <summary>
+    /// C10 WP8 (Option A): for an attachment leaf, the version number read from the attachment row the Authority verified for this
+    /// accepted commit (its signed <c>version_number</c> column); null for other leaves and for leaves accepted before C10 WP8.
+    /// Not part of the leaf digest, the row signature or the Merkle root.
+    /// </summary>
+    public int? AttachmentVersionNumber { get; set; }
 }
 
 /// <summary>Per-organization hash-chained content checkpoint (protocol §2.2 step 6); archived through the journal.</summary>
