@@ -207,10 +207,12 @@ public sealed record UnlinkChildRecordPayload(Guid FormRecordId, Guid ParentForm
 public sealed record TransferOwnershipPayload(Guid FormRecordId, Guid? NewOwnerUserId, Guid? NewOwnerTeamId, string? StepUpEvidence = null);
 
 /// <summary>
-/// G27: Creating a share requires step-up assurance. <c>StepUpEvidence</c> is the development-only synthetic marker
-/// where the synthetic path is enabled; it is stripped from the journaled payload.
+/// Creates a share with required human step-up and optional expiry. A non-owner must specify a single active Manager
+/// parent. Only synthetic Development/Test accepts the development marker, which is excluded from committed evidence.
 /// </summary>
-public sealed record CreateSharePayload(Guid RecordShareId, Guid FormRecordId, Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole, IReadOnlyList<Guid> FieldItemIds, string? StepUpEvidence = null);
+public sealed record CreateSharePayload(Guid RecordShareId, Guid FormRecordId, Guid? RecipientUserId, Guid? RecipientTeamId,
+    string RecipientRole, IReadOnlyList<Guid> FieldItemIds, string? StepUpEvidence = null, Guid? ParentRecordShareId = null,
+    DateTimeOffset? ShareExpiresOn = null);
 
 /// <summary>
 /// G27: Revoking a share requires step-up assurance. <c>StepUpEvidence</c> is the development-only synthetic marker

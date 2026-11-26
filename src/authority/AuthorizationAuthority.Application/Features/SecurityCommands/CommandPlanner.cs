@@ -91,6 +91,9 @@ public sealed class CommandPlan
     /// commands record only their structured reason code there, whatever the caller sent as <c>change_reason</c>.
     /// </summary>
     public string? CommandReasonOverride { get; set; }
+
+    /// <summary>C10 M1-WP3: share metadata persisted alongside the resource registration (depth, parent, revision).</summary>
+    public Domain.Features.Sharing.ShareResourceMetadata? ShareMetadata { get; set; }
 }
 
 /// <summary>
@@ -125,7 +128,7 @@ public static partial class CommandPlanner
             SecurityCommandKind.UpdateFormUsers => await UpdateFormUsersAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RegisterRecord => await RegisterRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.TransferOwnership => await TransferOwnershipAsync(scope, organizationId, actor, request, graph, humanGate, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.CreateShare => await CreateShareAsync(scope, organizationId, actor, request, graph, humanGate, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.CreateShare => await CreateShareAsync(scope, organizationId, actor, request, graph, humanGate, at, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RevokeShare => await RevokeShareAsync(scope, organizationId, actor, request, graph, humanGate, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UnlinkChildRecord => await UnlinkChildRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.PublishFormSecurityRevision => await PublishFormSecurityRevisionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
@@ -775,7 +778,7 @@ public static partial class CommandPlanner
         return plan;
     }
 
-    private static async Task<CommandPlan> CreateShareAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, HumanCommandStepUpGate humanGate, CancellationToken cancellationToken)
+    private static async Task<CommandPlan> CreateShareAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, HumanCommandStepUpGate humanGate, DateTimeOffset at, CancellationToken cancellationToken)
     {
         var payload = CanonicalJson.Deserialize<CreateSharePayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.FormRecord, payload.FormRecordId);
@@ -824,19 +827,25 @@ public static partial class CommandPlanner
         }
 
         var isOwner = graph.IsRecordOwner(actor.AuthorityUserId, payload.FormRecordId);
-        if (!isOwner)
-        {
-            // Bounded delegation: a manager may share only items currently delegable to them, and may not create further managers.
-            var delegable = graph.DelegableFieldItems(actor.AuthorityUserId, payload.FormRecordId);
-            if (delegable.Count == 0)
-            {
-                throw AuthorityException.Forbidden("sharing requires record ownership or a manager share");
-            }
 
-            if (role == "manager" || payload.FieldItemIds.Any(id => !delegable.Contains(id)))
+        var expiresOn = payload.ShareExpiresOn?.ToUniversalTime();
+        if (expiresOn is { } expiry && (expiry - at < TimeSpan.FromHours(1) || expiry - at > TimeSpan.FromDays(365)))
+        {
+            throw AuthorityException.Invalid("share expiry must be between one hour and 365 days from the Authority clock");
+        }
+
+        var delegationDepth = 1;
+        if (isOwner)
+        {
+            if (payload.ParentRecordShareId is not null)
             {
-                throw new AuthorityException(AuthorityErrorCodes.InvalidCommand, 422, false, "delegation exceeds the actor's delegable scope");
+                throw AuthorityException.Invalid("owner-granted shares cannot have a parent share");
             }
+        }
+        else
+        {
+            delegationDepth = await RequireShareDelegationAsync(scope, graph, organizationId, actor.AuthorityUserId,
+                payload, expiresOn, at, cancellationToken).ConfigureAwait(false);
         }
 
         if (payload.RecipientUserId is { } userId)
@@ -848,8 +857,22 @@ public static partial class CommandPlanner
             await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.Team, payload.RecipientTeamId!.Value, cancellationToken).ConfigureAwait(false);
         }
 
-        // Strip step-up evidence from the journaled payload.
-        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload with { StepUpEvidence = null }) };
+        // The committed share payload includes the effective grant parameters and no step-up evidence.
+        var plan = new CommandPlan
+        {
+            NormalizedPayloadJson = CanonicalJson.Serialize(new
+            {
+                payload.RecordShareId,
+                payload.FormRecordId,
+                payload.RecipientUserId,
+                payload.RecipientTeamId,
+                payload.RecipientRole,
+                payload.FieldItemIds,
+                payload.ParentRecordShareId,
+                DelegationDepth = delegationDepth,
+                ShareExpiresOn = expiresOn,
+            }),
+        };
         plan.RegisterResources.Add(NewResource(organizationId, ResourceTypeNames.RecordShare, payload.RecordShareId, payload.FormRecordId));
         plan.AddEdges.Add((ResourceTypeNames.FormRecord, payload.FormRecordId, "shared_via", ResourceTypeNames.RecordShare, payload.RecordShareId, string.Empty));
         if (payload.RecipientUserId is { } recipientUser)
@@ -865,6 +888,20 @@ public static partial class CommandPlanner
         {
             plan.AddEdges.Add((ResourceTypeNames.FieldItem, fieldItemId, "shared_via", ResourceTypeNames.RecordShare, payload.RecordShareId, string.Empty));
         }
+
+        // C10 M1-WP3: persist share metadata in the same command transaction.
+        plan.ShareMetadata = new Domain.Features.Sharing.ShareResourceMetadata
+        {
+            ShareResourceMetadataId = Guid.CreateVersion7(),
+            OrganizationId = organizationId,
+            RecordShareId = payload.RecordShareId,
+            ResourceTypeName = ResourceTypeNames.RecordShare,
+            ParentRecordShareId = payload.ParentRecordShareId,
+            DelegationDepth = delegationDepth,
+            ShareExpiresOn = expiresOn,
+            ShareMetadataCreatedOn = at,
+            ShareMetadataModifiedOn = at,
+        };
 
         return plan;
     }

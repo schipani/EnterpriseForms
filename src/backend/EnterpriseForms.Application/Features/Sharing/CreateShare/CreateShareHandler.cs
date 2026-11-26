@@ -65,7 +65,7 @@ public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAutho
         }
 
         var recordShareId = CreateFormDefinitionHandler.DeterministicId(idempotencyKey, "share");
-        // G27: UseDevelopmentStepUp emits the synthetic step-up marker to the Authority in dev/test only.
+        // The Authority decides whether it can accept the synthetic marker.
         var payload = JsonSerializer.SerializeToElement(new
         {
             record_share_id = recordShareId,

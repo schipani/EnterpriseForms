@@ -23,7 +23,7 @@ public sealed class TransferOwnershipHandler(IBusinessStore store, IAuthorizatio
         var user = context.ToDelegatedUser();
         var decision = await authority.CheckPermissionAsync(user, new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), ProtectedAction.TransferOwnership), cancellationToken).ConfigureAwait(false);
         // A system administrator override is validated by the authority; a denied discover check still returns the revision needed for CAS.
-        // G27: UseDevelopmentStepUp emits the synthetic step-up marker to the Authority in dev/test only.
+        // The Authority decides whether it can accept the synthetic marker.
         var payload = JsonSerializer.SerializeToElement(new { form_record_id = formRecordId, new_owner_user_id = request.NewOwnerUserId, new_owner_team_id = request.NewOwnerTeamId, step_up_evidence = request.UseDevelopmentStepUp == true ? SyntheticStepUpMarker : null });
         var command = await awaiter.SubmitAndAwaitAsync(user, new SecurityCommandRequest(context.OrganizationId, SecurityCommandKind.TransferOwnership, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), decision.AuthorizationRevision, payload, request.TransferReason), "transfer:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
         var outcome = new CommandOutcome(command.CommandId, command.CommandStatus.ToString(), command.AuthorizationRevision, command.CommandStatus == SecurityCommandStatus.Effective);

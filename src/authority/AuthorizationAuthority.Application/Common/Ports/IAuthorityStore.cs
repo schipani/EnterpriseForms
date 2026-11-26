@@ -7,6 +7,7 @@ using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
+using AuthorizationAuthority.Domain.Features.Sharing;
 
 namespace AuthorizationAuthority.Application.Common.Ports;
 
@@ -107,6 +108,14 @@ public interface IAuthorityScope : IAsyncDisposable
 
     /// <summary>Active resources of the given types whose parent is the given entity (e.g. the protection requirements/releases of a form's fields).</summary>
     Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid organizationId, Guid parentResourceEntityId, IReadOnlyCollection<string> resourceTypeNames, CancellationToken cancellationToken);
+
+    // C10 M1-WP1: share-specific metadata stored alongside the generic AuthorityResource.
+
+    /// <summary>C10 M1-WP1: finds the share metadata by organization and share id (unique key).</summary>
+    Task<ShareResourceMetadata?> FindShareMetadataAsync(Guid organizationId, Guid recordShareId, CancellationToken cancellationToken);
+
+    /// <summary>C10 M1-WP1: adds share metadata for a new share (must be unique per organization/share).</summary>
+    void AddShareMetadata(ShareResourceMetadata metadata);
 
     Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken);
 

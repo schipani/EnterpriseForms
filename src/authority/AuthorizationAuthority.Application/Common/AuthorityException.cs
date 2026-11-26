@@ -213,6 +213,14 @@ public static class AuthorityErrorCodes
     /// <summary>IX-2: the search index is quarantined; only a SearchProjectionRebuild clears it (IX-D7). Never an organization quarantine.</summary>
     public const string SearchIndexQuarantined = "SEARCH_INDEX_QUARANTINED";
 
+    // C10 M1-WP3: share delegation lineage and depth enforcement.
+
+    /// <summary>C10 M1-WP3: a delegated share would exceed the platform maximum delegation depth (3) or organization policy.</summary>
+    public const string DelegationDepthExceeded = "DELEGATION_DEPTH_EXCEEDED";
+
+    /// <summary>C10 M1-WP3: a Manager share cannot be created at the maximum delegation depth (a Manager at depth 3 is refused).</summary>
+    public const string ManagerAtMaximumDepth = "MANAGER_AT_MAXIMUM_DEPTH";
+
     // C8 M4-2 (AC-8.3): audit-access evidence.
 
     /// <summary>403: the caller does not hold view_audit (Security Auditor) in the organization.</summary>

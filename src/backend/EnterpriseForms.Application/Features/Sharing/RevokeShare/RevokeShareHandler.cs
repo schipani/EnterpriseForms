@@ -11,13 +11,13 @@ public sealed class RevokeShareHandler(IBusinessStore store, IAuthorizationAutho
 {
     public const string SyntheticStepUpMarker = "synthetic-development-step-up";
 
-    /// <param name="useDevelopmentStepUp">G27: when true, emits the synthetic step-up marker for dev/test only; ignored in production.</param>
+    /// <param name="useDevelopmentStepUp">G27: request the synthetic marker, which the Authority accepts only in its synthetic Development/Test configuration.</param>
     public async Task<CommandStatusResponse> HandleAsync(RequestContext context, Guid formRecordId, Guid recordShareId, string idempotencyKey, bool useDevelopmentStepUp, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         var user = context.ToDelegatedUser();
         var decision = await authority.CheckPermissionAsync(user, new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), ProtectedAction.ManageAccess), cancellationToken).ConfigureAwait(false);
-        // G27: UseDevelopmentStepUp emits the synthetic step-up marker to the Authority in dev/test only.
+        // The Authority decides whether it can accept the synthetic marker.
         var payload = JsonSerializer.SerializeToElement(new { record_share_id = recordShareId, form_record_id = formRecordId, step_up_evidence = useDevelopmentStepUp ? SyntheticStepUpMarker : null });
         var command = await awaiter.SubmitAndAwaitAsync(user, new SecurityCommandRequest(context.OrganizationId, SecurityCommandKind.RevokeShare, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), decision.AuthorizationRevision, payload, "revoke share"), "revoke:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
         var outcome = new CommandOutcome(command.CommandId, command.CommandStatus.ToString(), command.AuthorizationRevision, command.CommandStatus == SecurityCommandStatus.Effective);

@@ -8,6 +8,7 @@ using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
+using AuthorizationAuthority.Domain.Features.Sharing;
 using AuthorizationAuthority.Infrastructure.Archive;
 using Xunit;
 
@@ -315,6 +316,10 @@ public sealed class ArchiveProcessorTests
         public Task<AuthorityResource?> FindResourceAsync(Guid org, string type, Guid id, CancellationToken ct) => throw new NotSupportedException();
 
         public void AddResource(AuthorityResource resource) => throw new NotSupportedException();
+
+        public Task<ShareResourceMetadata?> FindShareMetadataAsync(Guid org, Guid recordShareId, CancellationToken ct) => throw new NotSupportedException();
+
+        public void AddShareMetadata(ShareResourceMetadata metadata) => throw new NotSupportedException();
 
         public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid org, Guid parent, IReadOnlyCollection<string> types, CancellationToken ct) => Task.FromResult(new List<AuthorityResource>());
 
