@@ -81,6 +81,7 @@ public sealed partial class IndexedSearchService(
             await RequireServableProjectionAsync(scope, organizationId, cancellationToken).ConfigureAwait(false);
 
             var pin = await verifier.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
+            await RequireNoExpiredShareAsync(pin, bound.AuthorityUserId, null, cancellationToken).ConfigureAwait(false);
             var subject = bound.AuthorityUserId.ToString("D");
             var mayQuery = (await verifier.CheckBulkStrictAsync(pin, [new SpiceDbCheck(ResourceTypeNames.FormDefinition, query.FormDefinitionId.ToString("D"), "query_fields", ResourceTypeNames.User, subject)], cancellationToken).ConfigureAwait(false))[0] == SpiceDbCheckOutcome.Allowed;
             var policy = await scope.FindProtectionPolicyAsync(organizationId, cancellationToken).ConfigureAwait(false);
@@ -305,6 +306,7 @@ public sealed partial class IndexedSearchService(
 
             await RequireServableProjectionAsync(scope, organizationId, cancellationToken, snapshot.SearchResultSnapshotId).ConfigureAwait(false);
             var pin = await verifier.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
+            await RequireNoExpiredShareAsync(pin, bound.AuthorityUserId, snapshot.SearchResultSnapshotId, cancellationToken).ConfigureAwait(false);
             var subject = bound.AuthorityUserId.ToString("D");
             var mayQuery = (await verifier.CheckBulkStrictAsync(pin, [new SpiceDbCheck(ResourceTypeNames.FormDefinition, query.FormDefinitionId.ToString("D"), "query_fields", ResourceTypeNames.User, subject)], cancellationToken).ConfigureAwait(false))[0] == SpiceDbCheckOutcome.Allowed;
             var policy = await scope.FindProtectionPolicyAsync(organizationId, cancellationToken).ConfigureAwait(false);
@@ -968,6 +970,27 @@ public sealed partial class IndexedSearchService(
     private static AuthorityException Changed(string detail) => new(IndexedSearchErrorCodes.SnapshotChanged, 409, true, detail);
 
     private static AuthorityException NotReady(string detail) => new(IndexedSearchErrorCodes.IndexNotReady, 503, true, detail);
+
+    /// <summary>
+    /// C10 M1-WP2: the indexed postings do not yet apply access-time share expiry, so while the caller holds an expired share that the
+    /// convergence command has not removed, the index does not answer for them: a first page falls back to the verified scan (which
+    /// applies the expiry overlay); a later page of an existing result snapshot is invalidated, since it was computed before the
+    /// expiry was observed.
+    /// </summary>
+    private async Task RequireNoExpiredShareAsync(VerifiedProjectionSnapshot pin, Guid userId, Guid? resultSnapshotId, CancellationToken cancellationToken)
+    {
+        if (!(await ProjectionIntegrityVerifier.ShareExpiryAsync(pin, cancellationToken).ConfigureAwait(false)).UserHoldsExpiredShare(userId))
+        {
+            return;
+        }
+
+        if (resultSnapshotId is { } id)
+        {
+            throw await InvalidateAsync(id, Changed("a share the search relied on has expired"), cancellationToken).ConfigureAwait(false);
+        }
+
+        throw NotReady("an expired share of the caller is not yet converged; the search index cannot answer for this caller");
+    }
 
     private static AuthorityException NotFound() => new(IndexedSearchErrorCodes.SnapshotNotFound, 404, false, "no such search result");
 }

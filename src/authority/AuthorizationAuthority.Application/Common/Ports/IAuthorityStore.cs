@@ -120,6 +120,15 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>C10 M1-WP5: finds all share metadata records where parent_record_share_id matches the given parent share id.</summary>
     Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid organizationId, Guid parentRecordShareId, CancellationToken cancellationToken);
 
+    /// <summary>C10 M1-WP2: the metadata of the organization's Active shares that carry an expiry (access-time expiry overlay).</summary>
+    Task<List<ShareResourceMetadata>> GetActiveShareMetadataWithExpiryAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>C10 M1-WP2: the active role edges of the given shares and the active <c>shared_via</c> edges whose subject is one of them.</summary>
+    Task<List<AuthorityRelationshipEdge>> GetActiveShareEdgesAsync(Guid organizationId, IReadOnlyCollection<Guid> recordShareIds, CancellationToken cancellationToken);
+
+    /// <summary>C10 M1-WP2: the active <c>team#member</c> edges of the given teams.</summary>
+    Task<List<AuthorityRelationshipEdge>> GetActiveTeamMemberEdgesAsync(Guid organizationId, IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken);
+
     Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken);
 
     void AddProtectionPolicy(OrganizationProtectionPolicy policy);

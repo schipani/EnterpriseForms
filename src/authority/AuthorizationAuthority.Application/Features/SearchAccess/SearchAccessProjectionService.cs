@@ -915,7 +915,8 @@ public sealed partial class SearchAccessProjectionService(
         }
 
         var snapshot = await integrity.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
-        var outcomes = await integrity.CheckBulkAsync(snapshot, checks.Select(c => c.Check).ToList(), cancellationToken).ConfigureAwait(false);
+        // C10 M1-WP2: a projection comparison, not an access decision: the raw projected answers (no share expiry overlay).
+        var outcomes = await integrity.CheckBulkForProjectionComparisonAsync(snapshot, checks.Select(c => c.Check).ToList(), cancellationToken).ConfigureAwait(false);
         if (!await integrity.CompleteAsync(snapshot, "search-access-verify", cancellationToken).ConfigureAwait(false))
         {
             return (checks.Count, sample.Count, "MOVED", "the organization moved during the SpiceDB comparison");

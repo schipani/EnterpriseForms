@@ -92,7 +92,7 @@ public sealed class ProjectionIntegrityVerifier(IAuthorityStore store, ISpiceDbP
             await QuarantineOrMovedAsync(scope, callerLocked, observedState, reason ?? ProjectionIntegrityReasons.MarkerMissing, observed.MarkerSubjectIds, "pin", correlationId, cancellationToken).ConfigureAwait(false);
         }
 
-        return new VerifiedProjectionSnapshot(scope, state, organizationLocked, expected, observed.ReadAt!, correlationId);
+        return new VerifiedProjectionSnapshot(scope, state, organizationLocked, expected, observed.ReadAt!, correlationId) { DecisionInstant = clock.GetUtcNow() };
     }
 
     public async Task<SpiceDbCheckOutcome> CheckAsync(VerifiedProjectionSnapshot snapshot, SpiceDbCheck check, CancellationToken cancellationToken)
@@ -101,7 +101,8 @@ public sealed class ProjectionIntegrityVerifier(IAuthorityStore store, ISpiceDbP
         snapshot.RequireOpen();
         try
         {
-            return await spiceDb.CheckAsync(check, snapshot, cancellationToken).ConfigureAwait(false);
+            var outcome = await spiceDb.CheckAsync(check, snapshot, cancellationToken).ConfigureAwait(false);
+            return (await ApplyShareExpiryAsync(snapshot, [check], [outcome], strict: false, cancellationToken).ConfigureAwait(false))[0];
         }
         catch (Exception ex) when (ex is SpiceDbSnapshotException or SpiceDbSchemaMissingException or SpiceDbUnavailableException)
         {
@@ -111,6 +112,27 @@ public sealed class ProjectionIntegrityVerifier(IAuthorityStore store, ISpiceDbP
     }
 
     public async Task<IReadOnlyList<SpiceDbCheckOutcome>> CheckBulkAsync(VerifiedProjectionSnapshot snapshot, IReadOnlyList<SpiceDbCheck> checks, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        snapshot.RequireOpen();
+        try
+        {
+            var outcomes = await spiceDb.CheckBulkAsync(checks, snapshot, cancellationToken).ConfigureAwait(false);
+            return await ApplyShareExpiryAsync(snapshot, checks, outcomes, strict: false, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is SpiceDbSnapshotException or SpiceDbSchemaMissingException or SpiceDbUnavailableException)
+        {
+            await DecisionReadFailedAsync(snapshot, ex, cancellationToken).ConfigureAwait(false);
+            throw; // unreachable
+        }
+    }
+
+    /// <summary>
+    /// C10 M1-WP2: SpiceDB's answers as projected, without the access-time share expiry overlay. Only for comparing the projection
+    /// with another representation of the same committed graph (the search access projection's verification), never for releasing
+    /// an access decision.
+    /// </summary>
+    public async Task<IReadOnlyList<SpiceDbCheckOutcome>> CheckBulkForProjectionComparisonAsync(VerifiedProjectionSnapshot snapshot, IReadOnlyList<SpiceDbCheck> checks, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         snapshot.RequireOpen();
@@ -132,7 +154,8 @@ public sealed class ProjectionIntegrityVerifier(IAuthorityStore store, ISpiceDbP
         snapshot.RequireOpen();
         try
         {
-            return await spiceDb.CheckBulkStrictAsync(checks, snapshot, cancellationToken).ConfigureAwait(false);
+            var outcomes = await spiceDb.CheckBulkStrictAsync(checks, snapshot, cancellationToken).ConfigureAwait(false);
+            return await ApplyShareExpiryAsync(snapshot, checks, outcomes, strict: true, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is SpiceDbSnapshotException or SpiceDbSchemaMissingException or SpiceDbUnavailableException)
         {
@@ -147,13 +170,117 @@ public sealed class ProjectionIntegrityVerifier(IAuthorityStore store, ISpiceDbP
         snapshot.RequireOpen();
         try
         {
-            return await spiceDb.LookupResourcesAsync(resourceType, permission, subjectType, subjectId, snapshot, maximumResults, cancellationToken).ConfigureAwait(false);
+            var found = await spiceDb.LookupResourcesAsync(resourceType, permission, subjectType, subjectId, snapshot, maximumResults, cancellationToken).ConfigureAwait(false);
+            return await FilterShareExpiryAsync(snapshot, resourceType, permission, subjectType, subjectId, found, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is SpiceDbSnapshotException or SpiceDbSchemaMissingException or SpiceDbUnavailableException)
         {
             await DecisionReadFailedAsync(snapshot, ex, cancellationToken).ConfigureAwait(false);
             throw; // unreachable
         }
+    }
+
+    /// <summary>C10 M1-WP2: the access-time share expiry overlay of the snapshot (loaded once, in the decision's scope, at its instant).</summary>
+    internal static async Task<ShareExpiryOverlay> ShareExpiryAsync(VerifiedProjectionSnapshot snapshot, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        snapshot.RequireOpen();
+        return snapshot.ShareExpiry ??= await ShareExpiryOverlay.LoadAsync(snapshot.Scope, snapshot.OrganizationId, snapshot.DecisionInstant, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// C10 M1-WP2: an Allow that only an expired share could have produced stands only if the subject is an effective owner of the
+    /// record, checked at the same pinned snapshot. Never turns a Deny or Unknown into an Allow.
+    /// </summary>
+    private async Task<IReadOnlyList<SpiceDbCheckOutcome>> ApplyShareExpiryAsync(VerifiedProjectionSnapshot snapshot, IReadOnlyList<SpiceDbCheck> checks,
+        IReadOnlyList<SpiceDbCheckOutcome> outcomes, bool strict, CancellationToken cancellationToken)
+    {
+        var overlay = await ShareExpiryAsync(snapshot, cancellationToken).ConfigureAwait(false);
+        if (overlay.IsEmpty)
+        {
+            return outcomes;
+        }
+
+        var result = outcomes.ToArray();
+        var owners = new List<(int Index, SpiceDbCheck Check)>();
+        for (var i = 0; i < result.Length && i < checks.Count; i++)
+        {
+            var check = checks[i];
+            if (result[i] != SpiceDbCheckOutcome.Allowed)
+            {
+                continue;
+            }
+
+            if (!Guid.TryParse(check.ResourceId, out var resourceId) || !Guid.TryParse(check.SubjectId, out var subjectId))
+            {
+                result[i] = SpiceDbCheckOutcome.Denied; // an Allow the overlay cannot evaluate is not released
+                continue;
+            }
+
+            var (verdict, record) = overlay.Evaluate(check.ResourceType, resourceId, check.Permission, check.SubjectType, subjectId, check.SubjectRelation);
+            if (verdict == ShareExpiryOverlay.Verdict.OwnerPathRequired)
+            {
+                owners.Add((i, new SpiceDbCheck(Domain.Features.Organizations.ResourceTypeNames.FormRecord, record.ToString("D"), "effective_owner", check.SubjectType, check.SubjectId, check.SubjectRelation)));
+            }
+        }
+
+        if (owners.Count > 0)
+        {
+            var ownerOutcomes = strict
+                ? await spiceDb.CheckBulkStrictAsync([.. owners.Select(o => o.Check)], snapshot, cancellationToken).ConfigureAwait(false)
+                : await spiceDb.CheckBulkAsync([.. owners.Select(o => o.Check)], snapshot, cancellationToken).ConfigureAwait(false);
+            for (var j = 0; j < owners.Count; j++)
+            {
+                result[owners[j].Index] = ownerOutcomes[j] == SpiceDbCheckOutcome.Allowed ? SpiceDbCheckOutcome.Allowed : SpiceDbCheckOutcome.Denied;
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>C10 M1-WP2: removes from a lookup every resource the subject reaches only through an expired share (owner paths kept).</summary>
+    private async Task<IReadOnlyList<string>> FilterShareExpiryAsync(VerifiedProjectionSnapshot snapshot, string resourceType, string permission, string subjectType, string subjectId,
+        IReadOnlyList<string> found, CancellationToken cancellationToken)
+    {
+        var overlay = await ShareExpiryAsync(snapshot, cancellationToken).ConfigureAwait(false);
+        if (overlay.IsEmpty || found.Count == 0)
+        {
+            return found;
+        }
+
+        if (!Guid.TryParse(subjectId, out var subject))
+        {
+            return [];
+        }
+
+        var kept = new List<string>(found.Count);
+        var owners = new List<(string Resource, SpiceDbCheck Check)>();
+        foreach (var value in found)
+        {
+            if (!Guid.TryParse(value, out var resource))
+            {
+                continue; // a value that is not an id is never released (callers drop it too)
+            }
+
+            var (verdict, record) = overlay.Evaluate(resourceType, resource, permission, subjectType, subject, string.Empty);
+            if (verdict == ShareExpiryOverlay.Verdict.OwnerPathRequired)
+            {
+                owners.Add((value, new SpiceDbCheck(Domain.Features.Organizations.ResourceTypeNames.FormRecord, record.ToString("D"), "effective_owner", subjectType, subjectId)));
+            }
+            else
+            {
+                kept.Add(value);
+            }
+        }
+
+        if (owners.Count > 0)
+        {
+            var ownerOutcomes = await spiceDb.CheckBulkAsync([.. owners.Select(o => o.Check)], snapshot, cancellationToken).ConfigureAwait(false);
+            var stillOwned = owners.Where((o, j) => ownerOutcomes[j] == SpiceDbCheckOutcome.Allowed).Select(o => o.Resource).ToHashSet(StringComparer.Ordinal);
+            kept = [.. found.Where(v => kept.Contains(v) || stillOwned.Contains(v))];
+        }
+
+        return kept;
     }
 
     /// <summary>IX-5 M1: <see cref="ISpiceDbProjection.LookupSubjectsAsync"/> at the snapshot's pin; a snapshot or datastore failure is a failed decision read (fail closed).</summary>

@@ -331,6 +331,12 @@ public sealed class ArchiveProcessorTests
 
         public Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
 
+        public Task<List<ShareResourceMetadata>> GetActiveShareMetadataWithExpiryAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<AuthorityRelationshipEdge>> GetActiveShareEdgesAsync(Guid org, IReadOnlyCollection<Guid> recordShareIds, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<AuthorityRelationshipEdge>> GetActiveTeamMemberEdgesAsync(Guid org, IReadOnlyCollection<Guid> teamIds, CancellationToken ct) => throw new NotSupportedException();
+
         public Task<List<AuthorityRelationshipEdge>> GetRelationshipEdgeHistoryAsync(Guid organizationId, string resourceTypeName, Guid resourceEntityId, string relationshipName, string subjectTypeName, Guid subjectEntityId, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public Task<Dictionary<Guid, long?>> GetCommittedRevisionsAsync(Guid organizationId, IReadOnlyCollection<Guid> securityCommandIds, CancellationToken cancellationToken) => throw new NotSupportedException();

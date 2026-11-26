@@ -318,6 +318,19 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid organizationId, Guid parentRecordShareId, CancellationToken cancellationToken) =>
             Task.FromResult(s.ShareMetadata.Where(m => m.OrganizationId == organizationId && m.ParentRecordShareId == parentRecordShareId).ToList());
 
+        public Task<List<ShareResourceMetadata>> GetActiveShareMetadataWithExpiryAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.ShareMetadata.Where(m => m.OrganizationId == organizationId && m.ShareExpiresOn is not null &&
+                s.Resources.Any(r => r.OrganizationId == organizationId && r.ResourceTypeName == ResourceTypeNames.RecordShare && r.ResourceEntityId == m.RecordShareId && r.ResourceLifecycleState == ResourceLifecycleStates.Active)).ToList());
+
+        public Task<List<AuthorityRelationshipEdge>> GetActiveShareEdgesAsync(Guid organizationId, IReadOnlyCollection<Guid> recordShareIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Edges.Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null &&
+                ((e.ResourceTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.ResourceEntityId)) ||
+                 (e.SubjectTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.SubjectEntityId)))).ToList());
+
+        public Task<List<AuthorityRelationshipEdge>> GetActiveTeamMemberEdgesAsync(Guid organizationId, IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Edges.Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null && e.ResourceTypeName == ResourceTypeNames.Team &&
+                e.RelationshipName == "member" && teamIds.Contains(e.ResourceEntityId)).ToList());
+
         public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid organizationId, Guid parentResourceEntityId, IReadOnlyCollection<string> resourceTypeNames, CancellationToken cancellationToken) =>
             Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && r.ParentResourceEntityId == parentResourceEntityId && resourceTypeNames.Contains(r.ResourceTypeName) && r.ResourceLifecycleState == ResourceLifecycleStates.Active).ToList());
 

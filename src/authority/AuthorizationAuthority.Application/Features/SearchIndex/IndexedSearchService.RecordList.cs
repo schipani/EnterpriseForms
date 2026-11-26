@@ -63,6 +63,7 @@ public sealed partial class IndexedSearchService
         }
 
         var pin = await verifier.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
+        await RequireNoExpiredShareAsync(pin, bound.AuthorityUserId, null, cancellationToken).ConfigureAwait(false);
         var subject = bound.AuthorityUserId.ToString("D");
         IReadOnlyList<string> discoverable;
         try
