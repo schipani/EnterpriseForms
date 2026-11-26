@@ -518,6 +518,22 @@ public sealed class CommandPlannerTests
         Assert.Equal(1, parent.ShareRevision);
     }
 
+    [Fact]
+    public async Task ExpiredManagerCannotDistinguishAnExistingDependentShareFromAnUnknownId()
+    {
+        var fixture = new SharePlanFixture();
+        var parent = fixture.AddGrant(Item, expiry: SharePlanFixture.At);
+        var dependent = fixture.AddGrant(Item, parent: parent.RecordShareId);
+        var unknown = new ShareResourceMetadata { OrganizationId = Org, RecordShareId = Guid.NewGuid() };
+        var known = await Assert.ThrowsAsync<AuthorityException>(() =>
+            fixture.UpdateAsync(dependent, [Item], parent: parent.RecordShareId, asOwner: false));
+        var missing = await Assert.ThrowsAsync<AuthorityException>(() =>
+            fixture.UpdateAsync(unknown, [Item], parent: parent.RecordShareId, asOwner: false));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, known.ErrorCode);
+        Assert.Equal(known.ErrorCode, missing.ErrorCode);
+        Assert.Equal(known.Message, missing.Message);
+    }
+
     private sealed class SharePlanFixture
     {
         public static readonly DateTimeOffset At = new(2026, 11, 25, 12, 0, 0, TimeSpan.Zero);
