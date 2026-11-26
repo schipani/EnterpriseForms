@@ -1,4 +1,4 @@
-import { useApi } from "@enterpriseforms/app-runtime";
+import { useApi, useSession } from "@enterpriseforms/app-runtime";
 import { Button, buttonClass, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
@@ -10,15 +10,30 @@ import { ErrorPanel } from "../../support";
  */
 export function RecordSharingPage() {
   const { formRecordId } = useParams({ from: "/app/records/$formRecordId/sharing" });
+  const { status, session, bootstrap } = useSession();
+
+  if (status !== "authenticated" || !session?.authenticated || !session.organizationId || !session.userId || !bootstrap) {
+    return <StatusMessage tone="info" title="Sign in to verify sharing access" />;
+  }
+
+  const scope = [session.organizationId, session.userId, session.expiresOn, bootstrap.authorizationRevision] as const;
+  return <VerifiedRecordSharingPage key={JSON.stringify([formRecordId, ...scope])} formRecordId={formRecordId} scope={scope} />;
+}
+
+function VerifiedRecordSharingPage({ formRecordId, scope }: { formRecordId: string; scope: readonly (string | number | null)[] }) {
   const api = useApi();
 
   const projection = useQuery({
-    queryKey: ["records", "projection", formRecordId],
+    queryKey: ["record-sharing", "projection", ...scope, formRecordId],
     queryFn: ({ signal }) => api.records.projection(formRecordId, signal).then((r) => r.result),
     refetchOnMount: "always",
   });
 
-  if (projection.isPending || (projection.isFetching && !projection.isFetchedAfterMount)) {
+  if (projection.fetchStatus === "paused") {
+    return <StatusMessage tone="info" title="Waiting for a connection to verify sharing access" />;
+  }
+
+  if (projection.isPending || (!projection.isFetchedAfterMount && !projection.isError)) {
     return <LoadingBlock label="Verifying record and sharing permissions" />;
   }
 
@@ -56,13 +71,13 @@ export function RecordSharingPage() {
         actions={
           <>
             {backLink}
-            <Button variant="secondary" aria-label="Refresh sharing data" busy={projection.isFetching} onClick={() => void projection.refetch()}>
-              Refresh
+            <Button variant="secondary" busy={projection.isFetching} onClick={() => void projection.refetch()}>
+              Refresh access
             </Button>
           </>
         }
       />
-      <RecordAccessPanel formRecordId={formRecordId} projection={data} readOnly />
+      <RecordAccessPanel formRecordId={formRecordId} projection={data} verifiedScope={scope} />
     </>
   );
 }

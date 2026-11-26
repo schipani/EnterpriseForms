@@ -1,7 +1,7 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * RecordSharingPage tests: authenticated standalone route for sharing manager (C10 M3 first part).
@@ -10,6 +10,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const recordId = "0199a2b3-c4d5-7e6f-8123-456789abcdef";
+const identityScope = ["org-1", "user-1", "2026-11-26T18:00:00Z", 5] as const;
+let sessionStatus = "authenticated";
 
 const baseProjection = {
   formRecordId: recordId,
@@ -53,6 +55,11 @@ const api = {
 vi.mock("@enterpriseforms/app-runtime", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@enterpriseforms/app-runtime")>()),
   useApi: () => api,
+  useSession: () => ({
+    status: sessionStatus,
+    session: { authenticated: true, organizationId: identityScope[0], userId: identityScope[1], expiresOn: identityScope[2] },
+    bootstrap: { authorizationRevision: identityScope[3] },
+  }),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -66,10 +73,14 @@ vi.mock("@tanstack/react-router", () => ({
 
 const { RecordSharingPage } = await import("./RecordSharingPage");
 
-function renderPage(cachedProjection?: typeof baseProjection) {
+function renderPage(cachedProjection?: typeof baseProjection, cachedRecipient?: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   if (cachedProjection) {
-    client.setQueryData(["records", "projection", recordId], cachedProjection);
+    client.setQueryData(["record-sharing", "projection", ...identityScope, recordId], cachedProjection);
+  }
+  if (cachedRecipient) {
+    client.setQueryData(["record-sharing", "shares", ...identityScope, recordId, baseProjection.record.authorizationRevision],
+      { items: [shareRow(cachedRecipient)], authorizationRevision: baseProjection.record.authorizationRevision });
   }
   return render(
     <QueryClientProvider client={client}>
@@ -80,6 +91,11 @@ function renderPage(cachedProjection?: typeof baseProjection) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStatus = "authenticated";
+});
+
+afterEach(() => {
+  onlineManager.setOnline(true);
 });
 
 describe("RecordSharingPage", () => {
@@ -117,9 +133,9 @@ describe("RecordSharingPage", () => {
 
   it("shows existing sharing data without mutation controls when the verified caller can manage access", async () => {
     api.records.projection.mockResolvedValue({
-      result: { ...baseProjection, permissions: { ...baseProjection.permissions, canManageAccess: true } },
+      result: { ...baseProjection, permissions: { ...baseProjection.permissions, canManageAccess: true, canTransferOwnership: true } },
     });
-    api.shares.list.mockResolvedValue({ result: { items: [], totalCount: 0 } });
+    api.shares.list.mockResolvedValue({ result: { items: [], authorizationRevision: baseProjection.record.authorizationRevision } });
     api.audit.record.mockResolvedValue({ result: { events: [] } });
 
     renderPage();
@@ -134,7 +150,7 @@ describe("RecordSharingPage", () => {
     expect(screen.getByText("Your permissions on this record")).toBeInTheDocument();
 
     // Should have refresh and back buttons
-    expect(screen.getByRole("button", { name: "Refresh sharing data" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh access" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to record" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Share fields" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Actions" })).not.toBeInTheDocument();
@@ -142,24 +158,76 @@ describe("RecordSharingPage", () => {
 
   it("does not use cached manage access while rechecking the current projection", async () => {
     api.records.projection.mockResolvedValue({ result: baseProjection });
-    renderPage({ ...baseProjection, permissions: { ...baseProjection.permissions, canManageAccess: true } });
+    renderPage({ ...baseProjection, permissions: { ...baseProjection.permissions, canManageAccess: true, canTransferOwnership: true } });
 
     expect(await screen.findByText("You cannot manage sharing for this record")).toBeInTheDocument();
     expect(api.shares.list).not.toHaveBeenCalled();
     expect(api.audit.record).not.toHaveBeenCalled();
   });
 
+  it("withholds sharing details if the cached permission cannot be reverified offline", () => {
+    onlineManager.setOnline(false);
+    renderPage({ ...baseProjection, permissions: { ...baseProjection.permissions, canManageAccess: true, canTransferOwnership: true } });
+
+    expect(screen.getByText("Waiting for a connection to verify sharing access")).toBeInTheDocument();
+    expect(screen.queryByText("Your permissions on this record")).not.toBeInTheDocument();
+    expect(api.records.projection).not.toHaveBeenCalled();
+    expect(api.shares.list).not.toHaveBeenCalled();
+    expect(api.audit.record).not.toHaveBeenCalled();
+  });
+
+  it("withholds sharing details when the shell session is expired", () => {
+    sessionStatus = "expired";
+    renderPage({ ...baseProjection, permissions: { ...baseProjection.permissions, canManageAccess: true, canTransferOwnership: true } }, "Previously visible recipient");
+
+    expect(screen.getByText("Sign in to verify sharing access")).toBeInTheDocument();
+    expect(screen.queryByText("Previously visible recipient")).not.toBeInTheDocument();
+    expect(api.records.projection).not.toHaveBeenCalled();
+    expect(api.shares.list).not.toHaveBeenCalled();
+    expect(api.audit.record).not.toHaveBeenCalled();
+  });
+
+  it("withholds a cached share when its data cannot be reverified", async () => {
+    api.records.projection.mockResolvedValue({ result: { ...baseProjection, permissions: { ...baseProjection.permissions, canManageAccess: true, canTransferOwnership: true } } });
+    api.shares.list.mockRejectedValue(new Error("The current sharing request was denied"));
+    api.audit.record.mockResolvedValue({ result: { events: [] } });
+    renderPage(undefined, "Previously visible recipient");
+
+    expect(await screen.findByText("The current sharing request was denied")).toBeInTheDocument();
+    expect(screen.queryByText("Previously visible recipient")).not.toBeInTheDocument();
+  });
+
+  it("withholds record-wide grants returned under a different authorization revision", async () => {
+    api.records.projection.mockResolvedValue({ result: { ...baseProjection, permissions: { ...baseProjection.permissions, canManageAccess: true, canTransferOwnership: true } } });
+    api.shares.list.mockResolvedValue({ result: { items: [shareRow("Other-revision recipient")], authorizationRevision: 6 } });
+    api.audit.record.mockResolvedValue({ result: { events: [] } });
+    renderPage();
+
+    expect(await screen.findByText("Sharing access changed. Refresh access to see the latest shares.")).toBeInTheDocument();
+    expect(screen.queryByText("Other-revision recipient")).not.toBeInTheDocument();
+  });
+
+  it("renders a fresh share without the sign-in-gated mutation actions", async () => {
+    api.records.projection.mockResolvedValue({ result: { ...baseProjection, permissions: { ...baseProjection.permissions, canManageAccess: true, canTransferOwnership: true } } });
+    api.shares.list.mockResolvedValue({ result: { items: [shareRow("Team recipient")], authorizationRevision: baseProjection.record.authorizationRevision } });
+    api.audit.record.mockResolvedValue({ result: { events: [] } });
+    renderPage();
+
+    expect(await screen.findByRole("rowheader", { name: "Team recipient" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /revoke|share fields/i })).not.toBeInTheDocument();
+  });
+
   it("renders RecordAccessPanel with correct projection when manager", async () => {
     const projection = {
       ...baseProjection,
-      permissions: { ...baseProjection.permissions, canManageAccess: true },
+      permissions: { ...baseProjection.permissions, canManageAccess: true, canTransferOwnership: true },
       record: {
         ...baseProjection.record,
         values: [{ fieldKey: "given_name", stringValue: "Alice" }],
       },
     };
     api.records.projection.mockResolvedValue({ result: projection });
-    api.shares.list.mockResolvedValue({ result: { items: [], totalCount: 0 } });
+    api.shares.list.mockResolvedValue({ result: { items: [], authorizationRevision: baseProjection.record.authorizationRevision } });
     api.audit.record.mockResolvedValue({ result: { events: [] } });
 
     renderPage();
@@ -171,7 +239,7 @@ describe("RecordSharingPage", () => {
     });
   });
 
-  it("handles partial projection correctly", async () => {
+  it("keeps record-wide grants private from a delegated manager", async () => {
     const projection = {
       ...baseProjection,
       permissions: {
@@ -181,7 +249,7 @@ describe("RecordSharingPage", () => {
       },
     };
     api.records.projection.mockResolvedValue({ result: projection });
-    api.shares.list.mockResolvedValue({ result: { items: [], totalCount: 0 } });
+    api.shares.list.mockResolvedValue({ result: { items: [], authorizationRevision: baseProjection.record.authorizationRevision } });
     // audit.record should not be called for partial projections (RecordAccessPanel logic)
 
     renderPage();
@@ -193,6 +261,7 @@ describe("RecordSharingPage", () => {
 
     // Should not attempt to fetch audit for partial projection
     expect(api.audit.record).not.toHaveBeenCalled();
+    expect(api.shares.list).not.toHaveBeenCalled();
   });
 
   it("includes formDefinitionName in lead text", async () => {
@@ -200,10 +269,10 @@ describe("RecordSharingPage", () => {
       result: {
         ...baseProjection,
         formDefinitionName: "Investigation Record",
-        permissions: { ...baseProjection.permissions, canManageAccess: true },
+        permissions: { ...baseProjection.permissions, canManageAccess: true, canTransferOwnership: true },
       },
     });
-    api.shares.list.mockResolvedValue({ result: { items: [], totalCount: 0 } });
+    api.shares.list.mockResolvedValue({ result: { items: [], authorizationRevision: baseProjection.record.authorizationRevision } });
     api.audit.record.mockResolvedValue({ result: { events: [] } });
 
     renderPage();
@@ -226,3 +295,11 @@ describe("RecordSharingPage", () => {
     });
   });
 });
+
+function shareRow(recipientDisplayName: string) {
+  return {
+    recordShareId: "share-1", recipientDisplayName, recipientRole: "Reader",
+    shareStatus: "Active", fieldKeys: ["description"], sharedByDisplayName: "Record owner",
+    shareCreatedOn: "2026-11-25T18:00:00Z",
+  };
+}
