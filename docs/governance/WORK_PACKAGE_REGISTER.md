@@ -121,3 +121,19 @@ Codex orchestration was discontinued; development continues directly in Claude C
 | M1-WP5 | feat/c10-m1-narrowing-cascade 301770ee, b21af132. Narrowing an item set or a Manager role invalidates uncovered descendants (UpstreamNarrowed) in the same command; a team removal that ends the grantor's only path invalidates that member's delegations (GrantorPathLost). 6 tests. | Member deactivation path loss; ownership-transfer invalidation needs an owner decision (WP-0 §3.4 and CLAUDE.md §4B differ on owner-granted shares). |
 
 **Next executable work:** independent review of the rows above; reconcile M2 and M3 onto the candidate; WP8 document items; WP11 RECORD_OWNERSHIP_TRANSFERRED projection; WP9 record-scoped history; member-deactivation path loss.
+
+## Direct development checkpoint 2 — 2026-11-26
+
+Same mandate and limits as above; still no independent review, merge, push, protection change, persistent-environment change or Stage B run. Work now lands directly on coord/c10-m1-candidate-r2 (C:/t/c10-candidate) as signed commits. Head b35349b1: CI-equivalent .NET gate 3,608 passed, 223 authorized skips, 0 failed, 0 rejected; strict specification validation pass; frontend lint, typecheck, build and 77 files / 650 Vitest tests pass (first frontend run for C10).
+
+| Work package | Signed head and evidence | Remaining |
+| --- | --- | --- |
+| Ownership decision (owner, 2026-11-26) | 669c916f, recorded as WP-0 §3.4.1. Owner-granted shares are durable grants; delegated shares depend on the grantor holding the committed parent Manager share; a transfer invalidates no share. A non-owner may revoke only a delegated share they registered while holding an Active Manager role on its committed parent (previously any grantor, so a former owner kept a revoke right). Unresolved legacy shares: not reparented, not invalidated, revoked by the current owner only. OwnershipTransferShareTests (11). | Independent review of the revoke tightening. |
+| M1-WP5 member deactivation | 669c916f. DisableIdentityBinding invalidates the member's delegations and subtrees (GrantorPathLost) in the same command; held shares, durable and legacy grants kept; re-enabling restores no invalidated share. ShareMemberDeactivationTests (4). | — |
+| M2 share details | 7c7fd9c3 (Authority GetShareDetails), 185833f8 (merge of feat/c10-m2-edit-share), dfd5c3b7 (business GET share, ETag from the Authority's committed share revision). ShareDetailsServiceTests (8), ShareDetailsTests (5). | Effective-scope, /me/access, reassignment endpoints. |
+| M1-WP9 record history | 34af54d6 (Authority security-history from committed edges, own command state per item), 66ee875b (business shares/history and ownership-history). RecordSecurityHistoryTests (5), RecordSecurityHistoryHandlerTests (3). | Superseded expiry-only updates not listed (needs a command-to-record index); Security Auditor path not added. |
+| M1-WP11 transfer projection | 70db79c3. RECORD_OWNERSHIP_TRANSFERRED once per Effective command, keyed by security command id. OwnershipTransferProjectionTests (2). | — |
+| M3 | f958ef3d (merge of feat/c10-m3-sharing-page), d7a312bd (edit dialog: authoritative revision, 412 reload, 409 no retry, DST-safe expiry), b35349b1 (Authority history card). | PG-023 details page, PG-053 transfer UI, PG-066 my access; manual accessibility review. |
+| M1-WP8 documents | Not started beyond the WP1 schema. | Full package. |
+
+**Next executable work:** WP8 document items; remaining M2/M3 endpoints and pages; independent review of every row; PR consolidation once the owner decides (final report of 2026-11-26).
