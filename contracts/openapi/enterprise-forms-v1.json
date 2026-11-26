@@ -3585,6 +3585,7 @@
         "tags": [
           "Sharing"
         ],
+        "summary": "Revokes a share via authority command; effective immediately at the authority barrier. G27: useDevelopmentStepUp (bool query, default false) for the synthetic test path only.",
         "operationId": "RevokeRecordShare",
         "parameters": [
           {
@@ -3603,6 +3604,14 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "useDevelopmentStepUp",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
             }
           }
         ],
@@ -7652,6 +7661,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "useDevelopmentStepUp": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },
@@ -15596,6 +15611,12 @@
           },
           "transferReason": {
             "type": "string"
+          },
+          "useDevelopmentStepUp": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },

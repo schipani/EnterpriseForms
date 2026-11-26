@@ -1344,6 +1344,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Revokes a share via authority command; effective immediately at the authority barrier. G27: useDevelopmentStepUp (bool query, default false) for the synthetic test path only. */
         post: operations["RevokeRecordShare"];
         delete?: never;
         options?: never;
@@ -2601,6 +2602,7 @@ export interface components {
             recipientTeamId: null | string;
             recipientRole: string;
             fieldKeys: string[];
+            useDevelopmentStepUp?: null | boolean;
         };
         CreateTeamRequest: {
             teamName: string;
@@ -4591,6 +4593,7 @@ export interface components {
             /** Format: uuid */
             newOwnerTeamId: null | string;
             transferReason: string;
+            useDevelopmentStepUp?: null | boolean;
         };
         UiPreferenceResponse: {
             textScalePreferenceMode: string;
@@ -7078,7 +7081,9 @@ export interface operations {
     };
     RevokeRecordShare: {
         parameters: {
-            query?: never;
+            query?: {
+                useDevelopmentStepUp?: boolean;
+            };
             header?: never;
             path: {
                 formRecordId: string;

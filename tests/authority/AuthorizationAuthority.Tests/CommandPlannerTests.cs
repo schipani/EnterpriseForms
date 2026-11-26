@@ -45,6 +45,9 @@ public sealed class CommandPlannerTests
         Assert.Equal(AuthorityErrorCodes.ResourceNotRegistered, notRegistered.ErrorCode);
     }
 
+    // G27: HumanCommandStepUpGate for the development-only synthetic step-up path.
+    private static readonly HumanCommandStepUpGate SyntheticHumanGate = HumanCommandStepUpGate.Create(HumanCommandStepUpGate.SyntheticMode, "Testing", "TestIdentityProvider");
+
     [Fact]
     public async Task CreateShareIsBoundedByOwnershipAndAcceptedManifest()
     {
@@ -56,19 +59,20 @@ public sealed class CommandPlannerTests
         scope.Leaves[commitId] = [new RecordManifestLeaf { ManifestItemKindCode = 3, ManifestItemId = Item }];
         var graph = Graph(Edge(ResourceTypeNames.FormRecord, Record, "owner", ResourceTypeNames.User, OwnerUser));
         var shareId = Guid.CreateVersion7();
-        var request = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, new { record_share_id = shareId, form_record_id = Record, recipient_user_id = AttackerUser, recipient_team_id = (Guid?)null, recipient_role = "Reader", field_item_ids = new[] { Item } });
+        // G27: Include step_up_evidence for human commands.
+        var request = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, new { record_share_id = shareId, form_record_id = Record, recipient_user_id = AttackerUser, recipient_team_id = (Guid?)null, recipient_role = "Reader", field_item_ids = new[] { Item }, step_up_evidence = HumanCommandStepUpGate.SyntheticStepUpEvidence });
 
-        var plan = await CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), request, graph, CancellationToken.None);
+        var plan = await CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), request, graph, CancellationToken.None, humanCommandGate: SyntheticHumanGate);
         Assert.Contains(plan.AddEdges, e => e.ResourceType == ResourceTypeNames.FieldItem && e.ResourceId == Item && e.SubjectId == shareId);
         Assert.Contains(plan.AddEdges, e => e.ResourceType == ResourceTypeNames.RecordShare && e.Relation == "reader" && e.SubjectId == AttackerUser);
 
         // A non-owner without a manager share cannot share (no delegation path).
-        var denied = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(AttackerUser), request, graph, CancellationToken.None));
+        var denied = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(AttackerUser), request, graph, CancellationToken.None, humanCommandGate: SyntheticHumanGate));
         Assert.Equal(AuthorityErrorCodes.Forbidden, denied.ErrorCode);
 
         // Items outside the accepted manifest are rejected: no future/unknown items (MRK-30).
-        var unknownItem = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, new { record_share_id = Guid.CreateVersion7(), form_record_id = Record, recipient_user_id = AttackerUser, recipient_team_id = (Guid?)null, recipient_role = "Reader", field_item_ids = new[] { Guid.CreateVersion7() } });
-        var invalid = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), unknownItem, graph, CancellationToken.None));
+        var unknownItem = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, new { record_share_id = Guid.CreateVersion7(), form_record_id = Record, recipient_user_id = AttackerUser, recipient_team_id = (Guid?)null, recipient_role = "Reader", field_item_ids = new[] { Guid.CreateVersion7() }, step_up_evidence = HumanCommandStepUpGate.SyntheticStepUpEvidence });
+        var invalid = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), unknownItem, graph, CancellationToken.None, humanCommandGate: SyntheticHumanGate));
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, invalid.ErrorCode);
     }
 
@@ -90,16 +94,17 @@ public sealed class CommandPlannerTests
             Edge(ResourceTypeNames.RecordShare, managerShare, "manager", ResourceTypeNames.User, managerUser),
             Edge(ResourceTypeNames.FieldItem, Item, "shared_via", ResourceTypeNames.RecordShare, managerShare));
 
-        var withinScope = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, new { record_share_id = Guid.CreateVersion7(), form_record_id = Record, recipient_user_id = AttackerUser, recipient_team_id = (Guid?)null, recipient_role = "Reader", field_item_ids = new[] { Item } });
-        var plan = await CommandPlanner.PlanAsync(scope, Org, Actor(managerUser), withinScope, graph, CancellationToken.None);
+        // G27: Include step_up_evidence for human commands.
+        var withinScope = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, new { record_share_id = Guid.CreateVersion7(), form_record_id = Record, recipient_user_id = AttackerUser, recipient_team_id = (Guid?)null, recipient_role = "Reader", field_item_ids = new[] { Item }, step_up_evidence = HumanCommandStepUpGate.SyntheticStepUpEvidence });
+        var plan = await CommandPlanner.PlanAsync(scope, Org, Actor(managerUser), withinScope, graph, CancellationToken.None, humanCommandGate: SyntheticHumanGate);
         Assert.Contains(plan.AddEdges, e => e.ResourceId == Item);
 
-        var beyondScope = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, new { record_share_id = Guid.CreateVersion7(), form_record_id = Record, recipient_user_id = AttackerUser, recipient_team_id = (Guid?)null, recipient_role = "Reader", field_item_ids = new[] { otherItem } });
-        var ex = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(managerUser), beyondScope, graph, CancellationToken.None));
+        var beyondScope = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, new { record_share_id = Guid.CreateVersion7(), form_record_id = Record, recipient_user_id = AttackerUser, recipient_team_id = (Guid?)null, recipient_role = "Reader", field_item_ids = new[] { otherItem }, step_up_evidence = HumanCommandStepUpGate.SyntheticStepUpEvidence });
+        var ex = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(managerUser), beyondScope, graph, CancellationToken.None, humanCommandGate: SyntheticHumanGate));
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, ex.ErrorCode);
 
-        var amplify = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, new { record_share_id = Guid.CreateVersion7(), form_record_id = Record, recipient_user_id = AttackerUser, recipient_team_id = (Guid?)null, recipient_role = "Manager", field_item_ids = new[] { Item } });
-        var ex2 = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(managerUser), amplify, graph, CancellationToken.None));
+        var amplify = Command(SecurityCommandKind.CreateShare, ResourceKind.FormRecord, Record, new { record_share_id = Guid.CreateVersion7(), form_record_id = Record, recipient_user_id = AttackerUser, recipient_team_id = (Guid?)null, recipient_role = "Manager", field_item_ids = new[] { Item }, step_up_evidence = HumanCommandStepUpGate.SyntheticStepUpEvidence });
+        var ex2 = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(managerUser), amplify, graph, CancellationToken.None, humanCommandGate: SyntheticHumanGate));
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, ex2.ErrorCode);
     }
 
@@ -113,17 +118,18 @@ public sealed class CommandPlannerTests
         var graph = Graph(
             Edge(ResourceTypeNames.FormRecord, Record, "owner", ResourceTypeNames.User, OwnerUser),
             Edge(ResourceTypeNames.Organization, Org, OrganizationRoleNames.SystemAdministrator, ResourceTypeNames.User, admin));
-        var request = Command(SecurityCommandKind.TransferOwnership, ResourceKind.FormRecord, Record, new { form_record_id = Record, new_owner_user_id = AttackerUser, new_owner_team_id = (Guid?)null });
+        // G27: Include step_up_evidence for human commands.
+        var request = Command(SecurityCommandKind.TransferOwnership, ResourceKind.FormRecord, Record, new { form_record_id = Record, new_owner_user_id = AttackerUser, new_owner_team_id = (Guid?)null, step_up_evidence = HumanCommandStepUpGate.SyntheticStepUpEvidence });
 
-        var byOwner = await CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), request, graph, CancellationToken.None);
+        var byOwner = await CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), request, graph, CancellationToken.None, humanCommandGate: SyntheticHumanGate);
         Assert.Single(byOwner.RemoveEdges);
         Assert.Single(byOwner.AddEdges, e => e.SubjectId == AttackerUser);
-        var byAdmin = await CommandPlanner.PlanAsync(scope, Org, Actor(admin), request, graph, CancellationToken.None);
+        var byAdmin = await CommandPlanner.PlanAsync(scope, Org, Actor(admin), request, graph, CancellationToken.None, humanCommandGate: SyntheticHumanGate);
         Assert.Single(byAdmin.AddEdges);
-        await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(AttackerUser), request, graph, CancellationToken.None));
+        await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(AttackerUser), request, graph, CancellationToken.None, humanCommandGate: SyntheticHumanGate));
 
-        var both = Command(SecurityCommandKind.TransferOwnership, ResourceKind.FormRecord, Record, new { form_record_id = Record, new_owner_user_id = AttackerUser, new_owner_team_id = Guid.CreateVersion7() });
-        await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), both, graph, CancellationToken.None));
+        var both = Command(SecurityCommandKind.TransferOwnership, ResourceKind.FormRecord, Record, new { form_record_id = Record, new_owner_user_id = AttackerUser, new_owner_team_id = Guid.CreateVersion7(), step_up_evidence = HumanCommandStepUpGate.SyntheticStepUpEvidence });
+        await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), both, graph, CancellationToken.None, humanCommandGate: SyntheticHumanGate));
     }
 
     [Fact]

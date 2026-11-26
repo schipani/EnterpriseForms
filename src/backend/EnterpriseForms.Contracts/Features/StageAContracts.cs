@@ -51,11 +51,19 @@ public sealed record FormRecordResponse(
 /// <summary><c>FormRecordGroupId</c>: the repeating-section entry the value belongs to (null for a value of the record itself).</summary>
 public sealed record FieldValueResponse(Guid FieldDefinitionId, string FieldKey, Guid FieldValueItemId, string StringValue, string FieldDataType = "String", bool ApplicationEncrypted = false, bool LegacyPlaintext = false, Guid? FormRecordGroupId = null);
 
-public sealed record CreateShareRequest(Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole, IReadOnlyList<string> FieldKeys);
+/// <summary>
+/// G27: <c>UseDevelopmentStepUp</c> (default false) presents the development-only synthetic step-up marker; the Authority
+/// accepts it only where that path is enabled (never production or staging).
+/// </summary>
+public sealed record CreateShareRequest(Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole, IReadOnlyList<string> FieldKeys, bool? UseDevelopmentStepUp = null);
 
 public sealed record ShareResponse(Guid RecordShareId, Guid FormRecordId, string RecipientRole, IReadOnlyList<Guid> FieldValueItemIds, string ShareStatus, CommandOutcome Command);
 
-public sealed record TransferOwnershipRequest(Guid? NewOwnerUserId, Guid? NewOwnerTeamId, string TransferReason);
+/// <summary>
+/// G27: <c>UseDevelopmentStepUp</c> (default false) presents the development-only synthetic step-up marker; the Authority
+/// accepts it only where that path is enabled (never production or staging).
+/// </summary>
+public sealed record TransferOwnershipRequest(Guid? NewOwnerUserId, Guid? NewOwnerTeamId, string TransferReason, bool? UseDevelopmentStepUp = null);
 
 public sealed record CreateTeamRequest(string TeamName);
 

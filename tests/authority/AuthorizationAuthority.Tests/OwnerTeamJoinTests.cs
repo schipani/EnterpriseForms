@@ -71,7 +71,8 @@ public sealed class OwnerTeamJoinTests
         await using var scope = await store.BeginScopeAsync(Ct);
         var graph = new DesiredStateGraph(store.Edges.Where(e => e.RemovedBySecurityCommandId is null).ToList());
         var request = new SecurityCommandRequest(Org, kind, new ResourceRef(resourceKind, resourceId), 3, JsonSerializer.SerializeToElement(payload, CanonicalJson.Options));
-        return await CommandPlanner.PlanAsync(scope, Org, Actor(user), request, graph, Ct, Synthetic);
+        var humanGate = HumanCommandStepUpGate.Create(HumanCommandStepUpGate.SyntheticMode, "Testing", "TestIdentityProvider");
+        return await CommandPlanner.PlanAsync(scope, Org, Actor(user), request, graph, Ct, Synthetic, humanCommandGate: humanGate);
     }
 
     private Task<CommandPlan> AddAsync(Guid actor, Guid member) => PlanAsync(actor, SecurityCommandKind.AddTeamMember, ResourceKind.Team, Team, new TeamMemberPayload(Team, member));
@@ -125,6 +126,6 @@ public sealed class OwnerTeamJoinTests
         var otherRecord = Guid.CreateVersion7();
         store.Resources.Add(new AuthorityResource { AuthorityResourceId = Guid.CreateVersion7(), OrganizationId = Org, ResourceTypeName = ResourceTypeNames.FormRecord, ResourceEntityId = otherRecord, ResourceLifecycleState = ResourceLifecycleStates.Active });
         store.Edges.Add(Edge(ResourceTypeNames.FormRecord, otherRecord, "owner", ResourceTypeNames.User, Member));
-        Assert.Equal(AuthorityErrorCodes.Forbidden, await RejectedAsync(() => PlanAsync(Administrator, SecurityCommandKind.TransferOwnership, ResourceKind.FormRecord, otherRecord, new TransferOwnershipPayload(otherRecord, null, Team))));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, await RejectedAsync(() => PlanAsync(Administrator, SecurityCommandKind.TransferOwnership, ResourceKind.FormRecord, otherRecord, new TransferOwnershipPayload(otherRecord, null, Team, HumanCommandStepUpGate.SyntheticStepUpEvidence))));
     }
 }
