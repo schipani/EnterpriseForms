@@ -169,7 +169,7 @@ public static partial class CommandPlanner
             SecurityCommandKind.TransferOwnership => await TransferOwnershipAsync(scope, organizationId, actor, request, graph, humanGate, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.CreateShare => await CreateShareAsync(scope, organizationId, actor, request, graph, humanGate, at, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateShareScope => await UpdateShareScopeAsync(scope, organizationId, actor, request, graph, humanGate, at, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.RevokeShare => await RevokeShareAsync(scope, organizationId, actor, request, graph, humanGate, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.RevokeShare => await RevokeShareAsync(scope, organizationId, actor, request, graph, humanGate, at, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UnlinkChildRecord => await UnlinkChildRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.PublishFormSecurityRevision => await PublishFormSecurityRevisionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateMandatoryPolicy => await UpdateMandatoryPolicyAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
@@ -355,6 +355,61 @@ public static partial class CommandPlanner
         plan.InvalidatedDescendantShares.AddRange(lost.Select(d => (d.Resource, d.Metadata, Domain.Features.Sharing.ShareInvalidationReasons.GrantorPathLost)));
         // The normalized payload stays {team_id, member_user_id}: membership reconciliation reads it strictly. The invalidations are
         // journalled as the removed edges of this command and as one ShareInvalidated audit entry per share.
+    }
+
+    /// <summary>
+    /// C10 M1-WP5 (WP-0 Section 3.4, "member deactivation"; ownership decision 2026-11-26): a delegated share depends on its grantor
+    /// continuing to hold the committed parent Manager share. A disabled member holds no usable authority, so every Active share the
+    /// member registered under a Manager share they hold (directly or through a team) — and its subtree — is invalidated in the same
+    /// command (<see cref="Domain.Features.Sharing.ShareInvalidationReasons.GrantorPathLost"/>). Owner-granted (depth-1) shares were
+    /// authorized once under owner rights and survive; unresolved legacy shares name no parent, so nothing is claimed for them; the
+    /// shares the member holds are kept (re-enabling restores the member's own access, never an invalidated share). The
+    /// normalized payload is unchanged; the invalidations are journalled as removed edges and ShareInvalidated audit entries.
+    /// </summary>
+    private static async Task InvalidateDisabledGrantorDelegationsAsync(IAuthorityScope scope, Guid organizationId, DesiredStateGraph graph, IdentityBinding binding, CommandPlan plan, CancellationToken cancellationToken)
+    {
+        var member = binding.AuthorityUserId;
+        var heldParents = graph.Edges.Where(e => e.ResourceTypeName == ResourceTypeNames.RecordShare && e.RelationshipName == "manager" && graph.SubjectIncludesUser(e, member))
+            .Select(e => e.ResourceEntityId).Distinct().Order().ToList();
+        var lost = new List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata)>();
+        var seen = new HashSet<Guid>();
+        foreach (var parent in heldParents)
+        {
+            foreach (var child in (await scope.FindShareMetadataByParentAsync(organizationId, parent, cancellationToken).ConfigureAwait(false)).OrderBy(c => c.RecordShareId))
+            {
+                if (child.OrganizationId != organizationId || child.LegacyLineageUnresolved || child.DelegationDepth < 2 || seen.Contains(child.RecordShareId))
+                {
+                    continue;
+                }
+
+                var resource = await scope.FindResourceAsync(organizationId, ResourceTypeNames.RecordShare, child.RecordShareId, cancellationToken).ConfigureAwait(false);
+                if (resource is null || resource.ResourceLifecycleState != ResourceLifecycleStates.Active || resource.ParentResourceEntityId is not { } record ||
+                    (await scope.FindCommandAsync(resource.RegisteredBySecurityCommandId, cancellationToken).ConfigureAwait(false)) is not { } creator ||
+                    creator.OrganizationId != organizationId || creator.ActorIdentityBindingId != binding.IdentityBindingId)
+                {
+                    continue; // another grantor's delegation under the same parent, or not Active
+                }
+
+                seen.Add(child.RecordShareId);
+                lost.Add((resource, child));
+                foreach (var below in await ReadRevokedShareDescendantsAsync(scope, organizationId, record, child.RecordShareId, cancellationToken).ConfigureAwait(false))
+                {
+                    if (seen.Add(below.Metadata.RecordShareId))
+                    {
+                        lost.Add(below);
+                    }
+                }
+            }
+        }
+
+        if (lost.Count == 0)
+        {
+            return;
+        }
+
+        plan.RemoveEdges.AddRange(lost.SelectMany(d => graph.EdgesWithSubject(ResourceTypeNames.RecordShare, d.Metadata.RecordShareId)
+            .Concat(graph.EdgesOf(ResourceTypeNames.RecordShare, d.Metadata.RecordShareId))).Distinct());
+        plan.InvalidatedDescendantShares.AddRange(lost.Select(d => (d.Resource, d.Metadata, Domain.Features.Sharing.ShareInvalidationReasons.GrantorPathLost)));
     }
 
     private static async Task<CommandPlan> RegisterFormDefinitionAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
@@ -1009,7 +1064,7 @@ public static partial class CommandPlanner
         return plan;
     }
 
-    private static async Task<CommandPlan> RevokeShareAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, HumanCommandStepUpGate humanGate, CancellationToken cancellationToken)
+    private static async Task<CommandPlan> RevokeShareAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, HumanCommandStepUpGate humanGate, DateTimeOffset at, CancellationToken cancellationToken)
     {
         var payload = CanonicalJson.Deserialize<RevokeSharePayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.FormRecord, payload.FormRecordId);
@@ -1024,13 +1079,9 @@ public static partial class CommandPlanner
         }
 
         var isOwner = graph.IsRecordOwner(actor.AuthorityUserId, payload.FormRecordId);
-        if (!isOwner)
+        if (!isOwner && !await GrantorStillHoldsDelegatedAuthorityAsync(scope, graph, organizationId, actor, payload.FormRecordId, share, at, cancellationToken).ConfigureAwait(false))
         {
-            var creator = await scope.FindCommandAsync(share.RegisteredBySecurityCommandId, cancellationToken).ConfigureAwait(false);
-            if (creator is null || creator.ActorIdentityBindingId != actor.Binding.IdentityBindingId)
-            {
-                throw AuthorityException.Forbidden("only the owner or the share's grantor may revoke it");
-            }
+            throw AuthorityException.Forbidden("only the owner or the share's grantor may revoke it");
         }
 
         var descendants = await ReadRevokedShareDescendantsAsync(scope, organizationId, payload.FormRecordId,
@@ -1055,6 +1106,35 @@ public static partial class CommandPlanner
         share.ResourceLifecycleState = ResourceLifecycleStates.Revoked;
         plan.RevokeResources.Add(share);
         return plan;
+    }
+
+    /// <summary>
+    /// C10 ownership decision (2026-11-26): a non-owner may revoke a share only while they still hold the authority under which
+    /// they granted it — they registered it, it has committed delegated lineage (a parent; depth 2 or 3), and they still hold an
+    /// Active Manager role on that committed parent, whose own lineage is Active now. An owner-granted (depth-1) share was granted
+    /// under owner rights, so after an ownership transfer its former-owner grantor holds nothing it can be revoked under; a share
+    /// with unresolved legacy lineage names no parent the grantor could be shown to hold, so only the current owner revokes it
+    /// (no parent is inferred, WP-0 Section 5.1).
+    /// </summary>
+    private static async Task<bool> GrantorStillHoldsDelegatedAuthorityAsync(
+        IAuthorityScope scope, DesiredStateGraph graph, Guid organizationId, BoundActor actor, Guid formRecordId, AuthorityResource share, DateTimeOffset at, CancellationToken cancellationToken)
+    {
+        var creator = await scope.FindCommandAsync(share.RegisteredBySecurityCommandId, cancellationToken).ConfigureAwait(false);
+        if (creator is null || creator.OrganizationId != organizationId || creator.ActorIdentityBindingId != actor.Binding.IdentityBindingId)
+        {
+            return false;
+        }
+
+        var metadata = await scope.FindShareMetadataAsync(organizationId, share.ResourceEntityId, cancellationToken).ConfigureAwait(false);
+        if (metadata is not { LegacyLineageUnresolved: false, DelegationDepth: >= 2, ParentRecordShareId: { } parent } ||
+            !await HoldsActiveManagerShareAsync(scope, graph, organizationId, actor.AuthorityUserId, parent, cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        var sharesOnRecord = graph.ShareIdsOfRecord(formRecordId).ToHashSet();
+        var lineage = await ReadShareLineageAsync(scope, organizationId, sharesOnRecord, parent, cancellationToken).ConfigureAwait(false);
+        return Authorization.ShareLineageExpiry.Evaluate(lineage, organizationId, formRecordId, parent, at).Status == Authorization.ShareLineageStatus.Active;
     }
 
     private static void RequireResource(SecurityCommandRequest request, ResourceKind kind, Guid id)

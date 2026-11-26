@@ -89,6 +89,44 @@ scope is no longer a subset of its parent's effective scope to `Invalidated` (re
 `Invalidated` and `Expired` are terminal; a database transition trigger forbids returning to `Active` (as
 `trg_field_search_approval_transition` does for C-188). Independent grants are untouched: every share owns its edges.
 
+### 3.4.1 Ownership transfer and path loss (owner decision, 2026-11-26)
+
+The owner decided that a transfer must not revoke the former owner's grants wholesale: grants that do not depend on the former
+owner's continuing owner rights survive; the former owner loses at once every authority derived solely from ownership;
+delegated grants whose only valid path is lost are invalidated; independent paths and explicit revocations are honoured;
+unknown or ambiguous lineage never yields an invented parent, an unsupported invalidation claim or access.
+
+**Two kinds of grant in the Authority model.** A *durable grant* is a share registered by the record's owner (or an
+owning-team member) at registration: depth 1, no parent, authorized once by its committed `CreateShare`. Its authority is the
+committed decision, not the grantor's continuing ownership. A *delegated grant* (depth 2 or 3) names one committed parent
+Manager share (§3.3) and depends on its grantor continuing to hold that parent: its validity is re-evaluated through lineage
+at every access and by the §3.4 cascades.
+
+**Reconciliation.** §3.4's trigger "ownership transfer ending the grantor's owner rights" has no share in scope: no share's
+authorization path is its grantor's continuing ownership (durable grants have none; delegated grants depend on a Manager share,
+which a transfer does not touch). §4B "separate ACL grants remain unless explicitly revoked" therefore holds without
+exception, and a transfer invalidates no share. What ends is the former owner's *authority*: owner edges move in the transfer
+command, and every share command authorizes a non-owner only through held delegated authority —
+
+| Former owner after a transfer | Outcome |
+|---|---|
+| Create a share without a parent, update any share, transfer | Refused (no owner edge) |
+| Revoke a durable grant they made as owner | Refused: a non-owner revokes only a delegated share they registered while still holding an Active Manager role on its committed parent, whose lineage is Active (tightened from "the grantor may revoke", which let a former owner act under former owner rights) |
+| Shares they hold as a recipient | Kept (independent grant) |
+
+The new owner manages every share, including the former owner's durable grants; revoking a Manager share cascades (§3.4).
+
+**Path loss that does invalidate.** Team-membership removal (the delegator's only path to the parent was that team) and member
+deactivation (a disabled member holds no usable authority) invalidate, in the same command, the shares the member registered
+under a parent Manager share and their subtrees (`GrantorPathLost`). Deactivation keeps the member's own held shares and
+durable grants; re-enabling restores the member's access but never an invalidated share (terminal).
+
+**Legacy lineage.** A share with unresolved legacy lineage (`legacy_lineage_unresolved`) is neither reparented nor invalidated
+by a transfer, a team removal or a deactivation, and only the current owner may revoke it: no committed parent exists that its
+grantor could be shown to hold. Its classification stays with the §5.1 dry run; execution remains unauthorized.
+
+Evidence: `OwnershipTransferShareTests` (11), `ShareMemberDeactivationTests` (4), `ShareGrantorPathLossTests` (2).
+
 ### 3.5 Read surfaces
 
 | Endpoint | Purpose | Authorization |
