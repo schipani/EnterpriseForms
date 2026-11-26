@@ -663,6 +663,9 @@ public sealed class CommandPlannerTests
 
         public void AddShareMetadata(ShareResourceMetadata metadata) => ShareMetadatas[metadata.RecordShareId] = metadata;
 
+        public Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid org, Guid parentRecordShareId, CancellationToken ct) =>
+            Task.FromResult(org == organizationId ? ShareMetadatas.Values.Where(m => m.ParentRecordShareId == parentRecordShareId).ToList() : []);
+
         public OrganizationProtectionPolicy? Policy { get; set; }
 
         public Dictionary<Guid, SecurityCommand> Commands { get; } = [];

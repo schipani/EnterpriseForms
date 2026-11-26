@@ -256,6 +256,13 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             scope.AddShareMetadata(shareMetadata);
         }
 
+        foreach (var (resource, metadata, reason) in plan.InvalidatedDescendantShares)
+        {
+            resource.ResourceLifecycleState = ResourceLifecycleStates.Invalidated;
+            metadata.ShareInvalidationReasonCode = reason;
+            metadata.ShareMetadataModifiedOn = now;
+        }
+
         if (plan.ProtectionPolicy is { } policy)
         {
             policy.UpdatedBySecurityCommandId = command.SecurityCommandId;
