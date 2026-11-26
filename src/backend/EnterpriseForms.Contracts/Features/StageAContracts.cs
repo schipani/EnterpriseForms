@@ -55,7 +55,8 @@ public sealed record FieldValueResponse(Guid FieldDefinitionId, string FieldKey,
 /// G27: <c>UseDevelopmentStepUp</c> (default false) presents the development-only synthetic step-up marker; the Authority
 /// accepts it only where that path is enabled (never production or staging).
 /// </summary>
-public sealed record CreateShareRequest(Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole, IReadOnlyList<string> FieldKeys, bool? UseDevelopmentStepUp = null);
+public sealed record CreateShareRequest(Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole,
+    IReadOnlyList<string> FieldKeys, bool? UseDevelopmentStepUp = null, Guid? ParentRecordShareId = null, DateTimeOffset? ShareExpiresOn = null);
 
 public sealed record ShareResponse(Guid RecordShareId, Guid FormRecordId, string RecipientRole, IReadOnlyList<Guid> FieldValueItemIds, string ShareStatus, CommandOutcome Command);
 

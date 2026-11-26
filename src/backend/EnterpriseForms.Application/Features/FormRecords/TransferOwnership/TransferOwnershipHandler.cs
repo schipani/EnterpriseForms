@@ -1,4 +1,3 @@
-using System.Text.Json;
 using EnterpriseForms.Application.Common;
 using EnterpriseForms.Application.Common.Authority;
 using EnterpriseForms.Application.Common.Persistence;
@@ -9,8 +8,6 @@ namespace EnterpriseForms.Application.Features.FormRecords.TransferOwnership;
 /// <summary>Ownership transfer is an authority command; the local owner projection is updated only after it is Effective and never consulted for authorization.</summary>
 public sealed class TransferOwnershipHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock)
 {
-    public const string SyntheticStepUpMarker = "synthetic-development-step-up";
-
     public async Task<CommandStatusResponse> HandleAsync(RequestContext context, Guid formRecordId, TransferOwnershipRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -23,8 +20,12 @@ public sealed class TransferOwnershipHandler(IBusinessStore store, IAuthorizatio
         var user = context.ToDelegatedUser();
         var decision = await authority.CheckPermissionAsync(user, new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), ProtectedAction.TransferOwnership), cancellationToken).ConfigureAwait(false);
         // A system administrator override is validated by the authority; a denied discover check still returns the revision needed for CAS.
-        // The Authority decides whether it can accept the synthetic marker.
-        var payload = JsonSerializer.SerializeToElement(new { form_record_id = formRecordId, new_owner_user_id = request.NewOwnerUserId, new_owner_team_id = request.NewOwnerTeamId, step_up_evidence = request.UseDevelopmentStepUp == true ? SyntheticStepUpMarker : null });
+        var payload = HumanCommandPayload.Serialize(new
+        {
+            form_record_id = formRecordId,
+            new_owner_user_id = request.NewOwnerUserId,
+            new_owner_team_id = request.NewOwnerTeamId,
+        }, request.UseDevelopmentStepUp == true);
         var command = await awaiter.SubmitAndAwaitAsync(user, new SecurityCommandRequest(context.OrganizationId, SecurityCommandKind.TransferOwnership, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), decision.AuthorizationRevision, payload, request.TransferReason), "transfer:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
         var outcome = new CommandOutcome(command.CommandId, command.CommandStatus.ToString(), command.AuthorizationRevision, command.CommandStatus == SecurityCommandStatus.Effective);
         if (outcome.Effective)

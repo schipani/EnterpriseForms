@@ -11,7 +11,6 @@ namespace EnterpriseForms.Application.Features.Sharing.CreateShare;
 /// <summary>Explicit item-scoped share (CLAUDE.md §4H): field keys map to the accepted manifest's item ids; the authority validates scope, delegation and recipient.</summary>
 public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock)
 {
-    public const string SyntheticStepUpMarker = "synthetic-development-step-up";
     public async Task<ShareResponse> HandleAsync(RequestContext context, Guid formRecordId, CreateShareRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -65,8 +64,7 @@ public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAutho
         }
 
         var recordShareId = CreateFormDefinitionHandler.DeterministicId(idempotencyKey, "share");
-        // The Authority decides whether it can accept the synthetic marker.
-        var payload = JsonSerializer.SerializeToElement(new
+        var commandFields = JsonSerializer.SerializeToNode(new
         {
             record_share_id = recordShareId,
             form_record_id = formRecordId,
@@ -74,8 +72,18 @@ public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAutho
             recipient_team_id = request.RecipientTeamId,
             recipient_role = request.RecipientRole,
             field_item_ids = items.Select(i => i.ItemId).ToList(),
-            step_up_evidence = request.UseDevelopmentStepUp == true ? SyntheticStepUpMarker : null,
-        });
+        })!.AsObject();
+        if (request.ParentRecordShareId is { } parent)
+        {
+            commandFields["parent_record_share_id"] = parent;
+        }
+
+        if (request.ShareExpiresOn is { } expiry)
+        {
+            commandFields["share_expires_on"] = expiry.ToUniversalTime();
+        }
+
+        var payload = HumanCommandPayload.Serialize(commandFields, request.UseDevelopmentStepUp == true);
         var command = await awaiter.SubmitAndAwaitAsync(user, new SecurityCommandRequest(context.OrganizationId, SecurityCommandKind.CreateShare, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), head.AuthorizationRevision, payload, "share"), "share:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
         var outcome = new CommandOutcome(command.CommandId, command.CommandStatus.ToString(), command.AuthorizationRevision, command.CommandStatus == SecurityCommandStatus.Effective);
         if (!outcome.Effective)

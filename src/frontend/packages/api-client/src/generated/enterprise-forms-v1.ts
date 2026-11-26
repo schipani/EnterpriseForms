@@ -2603,6 +2603,10 @@ export interface components {
             recipientRole: string;
             fieldKeys: string[];
             useDevelopmentStepUp?: null | boolean;
+            /** Format: uuid */
+            parentRecordShareId?: null | string;
+            /** Format: date-time */
+            shareExpiresOn?: null | string;
         };
         CreateTeamRequest: {
             teamName: string;
