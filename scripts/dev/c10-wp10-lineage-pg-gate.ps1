@@ -3,14 +3,17 @@
   C10 M1-WP10 legacy lineage dry run: disposable real-PostgreSQL gate. Development/Testing only.
 
 .DESCRIPTION
-  Builds this working tree's Authority test project (Release), starts ONE fresh disposable postgres:18.0 container (tmpfs data,
-  loopback port, random name and password, every statement logged with its application name; removed afterwards; no other stack,
-  volume or database is touched) and runs LegacyLineageDryRunPostgresTests against it. That test creates its own database,
-  migrates it, seeds synthetic legacy shares, runs the dry run as a SELECT-only role and as the administrator, and proves every
-  Authority table is unchanged.
+  Builds this working tree's Authority (Release) and the harness (tools/experiments/c10-wp10-lineage-gate/Harness, a copy in a
+  temporary work directory), starts ONE fresh disposable postgres:18.0 container (tmpfs data, loopback port, random name and
+  password, every statement logged with its application name; removed afterwards; no other stack, volume or database is touched)
+  and runs the harness. The harness creates its own database, migrates it, seeds synthetic legacy shares and runs the command under
+  test as a separate process of the built Authority:
 
-  The gate then reads the server's statement log and requires, for the dry run's application name
-  (authority-legacy-lineage-dry-run): a REPEATABLE READ transaction, SET TRANSACTION READ ONLY, ROLLBACK, and no write, DDL,
+      dotnet AuthorizationAuthority.Api.dll --legacy-lineage-dry-run --organization <uuid> --output <new file>
+
+  as a SELECT-only role and as the administrator, checks classifications, refusals, redaction and refusal exit codes, and proves
+  every Authority table is unchanged. The gate then reads the server's statement log and requires, for the dry run's application
+  name (authority-legacy-lineage-dry-run): a REPEATABLE READ transaction, SET TRANSACTION READ ONLY, ROLLBACK, and no write, DDL,
   privilege, lock or COMMIT statement. Exit code 0 only if every check passed and the container was removed. Not Stage B, not a
   security-test stack run, no Azure call, no persistent database.
 
@@ -18,25 +21,41 @@
   powershell -File scripts\dev\c10-wp10-lineage-pg-gate.ps1 -Evidence C:\out\c10-wp10-run1
 #>
 param(
+    [string]$WorkDir,
     [string]$Evidence,
     [int]$Port = 0
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-if (-not $Evidence) { $Evidence = Join-Path ([System.IO.Path]::GetTempPath()) ('c10-wp10-gate-' + [guid]::NewGuid().ToString('N').Substring(0, 8)) }
+if (-not $WorkDir) { $WorkDir = Join-Path ([System.IO.Path]::GetTempPath()) ('c10-wp10-gate-' + [guid]::NewGuid().ToString('N').Substring(0, 8)) }
+if (-not $Evidence) { $Evidence = Join-Path $WorkDir 'evidence' }
 if ($Port -eq 0) { $Port = Get-Random -Minimum 55500 -Maximum 55900 }
-New-Item -ItemType Directory -Force $Evidence | Out-Null
-Write-Output "evidence directory: $Evidence"
+New-Item -ItemType Directory -Force $WorkDir, $Evidence | Out-Null
+Write-Output "work directory: $WorkDir"
+
+function Invoke-Checked([string]$exe, [string[]]$arguments) {
+    & $exe @arguments | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "$exe $($arguments -join ' ') failed with exit code $LASTEXITCODE" }
+}
 
 if (-not (docker image inspect postgres:18.0 --format '{{.Id}}' 2>$null)) { throw 'postgres:18.0 is not present locally (docker pull postgres:18.0 first)' }
 $dotnet = (Get-Command dotnet).Source
-$project = Join-Path $repo 'tests\authority\AuthorizationAuthority.Tests'
-& $dotnet build $project -c Release -nologo -v q | Out-Host
-if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+
+# 1. The build under test (this working tree) and the harness (a copy outside the repository).
+Invoke-Checked $dotnet @('build', (Join-Path $repo 'src\authority\AuthorizationAuthority.Api\AuthorizationAuthority.Api.csproj'), '-c', 'Release', '-nologo', '-v', 'q')
+$authority = Join-Path $WorkDir 'authority'
+Copy-Item (Join-Path $repo 'src\authority\AuthorizationAuthority.Api\bin\Release\net10.0') $authority -Recurse -Force
 (git -C $repo rev-parse HEAD) + ' plus the working tree (git status --short below)' | Set-Content -Encoding ascii (Join-Path $Evidence 'source.txt')
 git -C $repo status --short | Add-Content -Encoding ascii (Join-Path $Evidence 'source.txt')
+Get-ChildItem $authority -Filter 'AuthorizationAuthority.*.dll' | Sort-Object Name | Get-FileHash -Algorithm SHA256 |
+    ForEach-Object { "$($_.Hash.ToLowerInvariant()) *$(Split-Path -Leaf $_.Path)" } | Set-Content -Encoding ascii (Join-Path $Evidence 'authority-sha256.txt')
+$harness = Join-Path $WorkDir 'harness'
+Copy-Item (Join-Path $repo 'tools\experiments\c10-wp10-lineage-gate\Harness') $harness -Recurse -Force
+Invoke-Checked $dotnet @('build', (Join-Path $harness 'Harness.csproj'), '-c', 'Release', '-nologo', '-v', 'q', "-p:C10Wp10Binaries=$authority")
+$exe = Join-Path $harness 'bin\Release\net10.0\C10Wp10Harness.exe'
 
+# 2. One disposable PostgreSQL container.
 $name = 'c10-wp10-gate-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
 $password = 'c10-wp10-admin-' + [guid]::NewGuid().ToString('N')
 $code = 99
@@ -51,13 +70,12 @@ try {
     }
     Start-Sleep -Seconds 2
 
-    $env:C10_WP10_PG_ADMIN = "Host=127.0.0.1;Port=$Port;Database=c10wp10gate;Username=postgres;Password=$password"
-    $testLog = Join-Path $Evidence 'tests.log'
+    # 3. The harness, then the server's statement log.
     $ErrorActionPreference = 'Continue'
-    & $dotnet test --project $project -c Release --no-build -- --minimum-expected-tests 1 --filter-class '*LegacyLineageDryRunPostgresTests' 2>&1 |
-        ForEach-Object { "$_" } | Tee-Object -FilePath $testLog | Out-Host
-    $testExit = $LASTEXITCODE
-    Remove-Item Env:\C10_WP10_PG_ADMIN
+    $admin = "Host=127.0.0.1;Port=$Port;Database=c10wp10gate;Username=postgres;Password=$password"
+    & $exe --admin $admin --authority $authority --evidence $Evidence 2>&1 | ForEach-Object { "$_" } |
+        Tee-Object -FilePath (Join-Path $Evidence 'harness.log') | Out-Host
+    $harnessExit = $LASTEXITCODE
 
     $serverLog = Join-Path $Evidence 'postgres.log'
     docker logs $name 2>&1 | ForEach-Object { "$_" } | Set-Content -Encoding utf8 $serverLog
@@ -67,8 +85,7 @@ try {
     $statements | Set-Content -Encoding utf8 (Join-Path $Evidence 'dry-run-statements.txt')
 
     $failures = @()
-    if ($testExit -ne 0) { $failures += "integration test failed (exit $testExit)" }
-    if ((Select-String -Path $testLog -Pattern 'skipped: 0' -SimpleMatch -Quiet) -ne $true) { $failures += 'the integration test was skipped' }
+    if ($harnessExit -ne 0) { $failures += "harness failed (exit $harnessExit)" }
     if ($statements.Count -eq 0) { $failures += 'no dry-run statements were logged' }
     foreach ($required in @('^\s*BEGIN( TRANSACTION)? ISOLATION LEVEL REPEATABLE READ', '^\s*SET TRANSACTION READ ONLY', '^\s*ROLLBACK')) {
         if (-not ($statements | Where-Object { $_ -match $required })) { $failures += "missing statement: $required" }
@@ -77,7 +94,7 @@ try {
     if ($writes.Count -gt 0) { $failures += "write-capable statements from the dry run: $($writes.Count)"; $writes | Set-Content -Encoding utf8 (Join-Path $Evidence 'unexpected-statements.txt') }
 
     if ($failures.Count -eq 0) {
-        Write-Output "PASS: $($statements.Count) dry-run statements, all read-only; the integration test passed."
+        Write-Output "PASS: harness passed; $($statements.Count) dry-run statements, all read-only."
         $code = 0
     } else {
         $failures | ForEach-Object { Write-Output "FAIL: $_" }
