@@ -193,6 +193,10 @@ export type ShareResponse = S["ShareResponse"];
 export type RecordShareListResponse = S["RecordShareListResponse"];
 export type ShareDetailsResponse = S["ShareDetailsResponse"];
 export type RecordSecurityHistoryResponse = S["RecordSecurityHistoryResponse"];
+export type ShareEffectiveScopeResponse = S["ShareEffectiveScopeResponse"];
+export type MyAccessResponse = S["MyAccessResponse"];
+export type MyAccessEntryResponse = S["MyAccessEntryResponse"];
+export type TransferOwnershipRequest = S["TransferOwnershipRequest"];
 export type RecordSecurityHistoryItemResponse = S["RecordSecurityHistoryItemResponse"];
 export type UpdateShareRequest = S["UpdateShareRequest"];
 export type UpdateShareResponse = S["UpdateShareResponse"];
@@ -423,6 +427,12 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       /** C10 M2: the record's sharing and ownership changes from the Authority, each with its own command state. */
       history: (formRecordId: string, signal?: AbortSignal) => read<RecordSecurityHistoryResponse>("shares.history", { formRecordId }, undefined, "interactive-read", signal),
       ownershipHistory: (formRecordId: string, signal?: AbortSignal) => read<RecordSecurityHistoryResponse>("shares.ownershipHistory", { formRecordId }, undefined, "interactive-read", signal),
+      /** C10 M2 (PG-023): what the recipient can do through the share now, as the Authority decides. */
+      effectiveScope: (formRecordId: string, recordShareId: string, signal?: AbortSignal) => read<ShareEffectiveScopeResponse>("shares.effectiveScope", { formRecordId, recordShareId }, undefined, "interactive-read", signal),
+      /** C10 M2 (PG-066): the caller's own access sources. */
+      mine: (signal?: AbortSignal) => read<MyAccessResponse>("shares.mine", undefined, undefined, "interactive-read", signal),
+      /** C10 M3 (PG-053): an ownership transfer is an Authority command with reason and step-up; the result says whether it is Effective yet. */
+      transferOwnership: (formRecordId: string, request: TransferOwnershipRequest) => write<CommandStatusResponse>("POST", "records.transferOwnership", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}` }),
       /** C10 M2: replaces the share's scope. If-Match carries the ETag "{recordShareId}:{shareRevision}" read from `get` (412 when stale). */
       update: (formRecordId: string, recordShareId: string, shareRevision: number | string, request: UpdateShareRequest) =>
         write<UpdateShareResponse>("PATCH", "shares.update", { formRecordId, recordShareId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: `${recordShareId}:${shareRevision}` }),

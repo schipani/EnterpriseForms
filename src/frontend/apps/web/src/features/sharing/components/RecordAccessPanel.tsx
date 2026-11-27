@@ -95,6 +95,9 @@ export function RecordAccessPanel({ formRecordId, projection, verifiedScope }: {
       {canManage && !readOnly ? (
         <div>
           <Link to="/app/records/$formRecordId/sharing" params={{ formRecordId }} className={buttonClass("secondary", "sm")}>Open sharing manager</Link>
+          {projection.permissions.canTransferOwnership ? (
+            <Link to="/app/records/$formRecordId/ownership" params={{ formRecordId }} className={`ml-2 ${buttonClass("secondary", "sm")}`}>Transfer ownership</Link>
+          ) : null}
         </div>
       ) : null}
       <Card title="Your permissions on this record">
@@ -158,6 +161,15 @@ export function RecordAccessPanel({ formRecordId, projection, verifiedScope }: {
                 { key: "status", header: "Status", render: (row) => <Badge tone={row.shareStatus === "Active" ? "success" : "neutral"}>{row.shareStatus}</Badge> },
                 { key: "by", header: "Shared by", render: (row) => row.sharedByDisplayName ?? row.sharedByUserId },
                 { key: "created", header: "Created", render: (row) => getActiveFormatter().instant(row.shareCreatedOn) },
+                {
+                  key: "details",
+                  header: "Details",
+                  render: (row) => (
+                    <Link to="/app/records/$formRecordId/sharing/$recordShareId" params={{ formRecordId, recordShareId: row.recordShareId }} aria-label={`Details of the share for ${row.recipientDisplayName ?? row.recipientUserId ?? row.recipientTeamId ?? "recipient"}`}>
+                      Details
+                    </Link>
+                  ),
+                },
                 ...shareActions,
               ]}
             />
