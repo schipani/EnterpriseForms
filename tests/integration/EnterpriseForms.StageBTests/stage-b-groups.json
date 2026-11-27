@@ -45,6 +45,16 @@
       "classes": ["ProjectionIntegrityRollbackTests"]
     },
     {
+      "name": "share-expiry-convergence",
+      "title": "Share Expiry Convergence with Real Elapsed Time (C10 WP-0 §4 tests 8 and 10)",
+      "classes": ["C10ShareNaturalExpiryTests"]
+    },
+    {
+      "name": "share-expiry-restore",
+      "title": "Share Expiry Restore with Real Elapsed Time (C10 WP-0 §4 test 13)",
+      "classes": ["C10ShareExpiryRestoreTests"]
+    },
+    {
       "name": "search-benchmark-indexed",
       "title": "Indexed Search Local Benchmark",
       "classes": ["IndexedSearchLocalBenchmarkTests"]

@@ -108,7 +108,9 @@ jobs:
     name: Stage B integration shard (${{ matrix.group }})
     needs: plan
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # C-201: the two real-elapsed-time share-expiry groups wait out the Authority's one-hour minimum expiry (about 70 min); the
+    # ceiling is raised for every shard, which still ends as soon as its tests do.
+    timeout-minutes: 100
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
