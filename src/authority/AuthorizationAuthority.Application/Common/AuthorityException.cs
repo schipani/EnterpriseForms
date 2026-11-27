@@ -236,6 +236,12 @@ public static class AuthorityErrorCodes
     /// <summary>C10 M1-WP4: the share has active descendants; cascade invalidation (WP5) is required before updating parent scope (422, not retryable).</summary>
     public const string ShareHasActiveDescendants = "SHARE_HAS_ACTIVE_DESCENDANTS";
 
+    /// <summary>
+    /// C10 (child-record ownership, owner decision 2026-11-27): a record with a parent is owned through its parent (CLAUDE.md §4B single
+    /// owner, §4S inheritance) and cannot be transferred on its own; transfer the parent, or unlink the child first (422, not retryable).
+    /// </summary>
+    public const string ChildRecordOwnershipFollowsParent = "CHILD_RECORD_OWNERSHIP_FOLLOWS_PARENT";
+
     // C8 M4-2 (AC-8.3): audit-access evidence.
 
     /// <summary>403: the caller does not hold view_audit (Security Auditor) in the organization.</summary>

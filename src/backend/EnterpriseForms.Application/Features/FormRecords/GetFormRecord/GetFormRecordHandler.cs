@@ -101,7 +101,8 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
             fields,
             documents,
             relationships.Where(r => verified.IsComplete || visibleRelationshipIds.Contains(r.FormRelationshipDefinitionId)).Select(r => new RelationshipDefinitionResponse(r.FormRelationshipDefinitionId, r.ParentFormDefinitionId, r.ChildFormDefinitionId, formNames.GetValueOrDefault(r.ChildFormDefinitionId, string.Empty), r.RelationshipDefinitionKey, r.RelationshipDisplayName, r.MinimumChildCount, r.MaximumChildCount, r.LifecycleStatus)).ToList(),
-            new RecordPermissionsResponse(true, decisions[0].Allowed, decisions[1].Allowed, decisions[2].Allowed, verified.IsComplete, sharedAccess?.Any(a => a.Editable) == true && Lifecycle.RecordLifecycle.IsContentEditable(verified.Header.RecordStatus), verified.Verification.ContributorWritesEnabled),
+            // C10: a child record is owned through its parent and cannot be transferred on its own (the Authority refuses it).
+            new RecordPermissionsResponse(true, decisions[0].Allowed, decisions[1].Allowed, decisions[2].Allowed && verified.Header.ParentFormRecordId is null, verified.IsComplete, sharedAccess?.Any(a => a.Editable) == true && Lifecycle.RecordLifecycle.IsContentEditable(verified.Header.RecordStatus), verified.Verification.ContributorWritesEnabled),
             verified.Header.ParentFormRecordId,
             verified.Header.FormRelationshipDefinitionId,
             verified.ETag,

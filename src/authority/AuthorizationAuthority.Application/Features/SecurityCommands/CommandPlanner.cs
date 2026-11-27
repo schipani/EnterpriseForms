@@ -921,6 +921,14 @@ public static partial class CommandPlanner
             throw AuthorityException.Forbidden("ownership transfer requires the current owner or an audited system administrator override");
         }
 
+        // C10 (child-record ownership, owner decision 2026-11-27): a child record is owned only through its parent (§4B single owner, §4S
+        // inheritance), so it is never transferred on its own, on the owner and the administrator paths alike. A direct owner edge would
+        // give it a second effective owner that outlives a transfer of the parent. Transferring the parent moves the child with it.
+        if (graph.ParentRecordOf(payload.FormRecordId) is not null)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.ChildRecordOwnershipFollowsParent, 422, false, "a child record is owned through its parent; transfer the parent record, or unlink the child first");
+        }
+
         if (!isOwner && (payload.NewOwnerUserId == actor.AuthorityUserId
                          || (payload.NewOwnerTeamId is { } teamId && graph.EdgesOf(ResourceTypeNames.Team, teamId, "member").Any(e => e.SubjectTypeName == ResourceTypeNames.User && e.SubjectEntityId == actor.AuthorityUserId))))
         {
