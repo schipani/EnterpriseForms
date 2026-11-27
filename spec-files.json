@@ -454,8 +454,8 @@
     },
     {
       "path": "docs/decisions/ADR-PB-011-GITHUB-ACTIONS-SECURE-DELIVERY.md",
-      "sha256": "ab9afb82f5144a01a7dc35b13aeaa73a07ed112eb9be349f81c87eeef9bc2f17",
-      "bytes": 9276
+      "sha256": "2339aa7871ba54dfe26359d58c33ac60a8d273c6c611e10a542eda1010242046",
+      "bytes": 11060
     },
     {
       "path": "docs/decisions/ADR-PB-012-SECURITY-EVIDENCE-RELEASE-GOVERNANCE.md",
@@ -479,8 +479,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "0a0624e21472379aa95f3bb1d0a2b008b2a2a28a439dd5696a7549d13b37de35",
-      "bytes": 350661
+      "sha256": "a7050be27faf3f1bcebd5aba42761ec148faceb35a6b8b66f6b79873b6e96aff",
+      "bytes": 351839
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -499,8 +499,8 @@
     },
     {
       "path": "docs/delivery/BUILD00_REPOSITORY_PROTECTION.md",
-      "sha256": "51029886dd3896bb7be68341b2adeb4107652bd382f57d2e12180ce7a945316a",
-      "bytes": 12963
+      "sha256": "be0edc6b662fc3a25b04cc912bfd8167dd1c1684a185f29486c334b7833ac11b",
+      "bytes": 13252
     },
     {
       "path": "docs/delivery/PB11_CICD_ACCEPTANCE_TESTS.csv",
@@ -1244,8 +1244,8 @@
     },
     {
       "path": "scripts/governance/verify_repository_protection.py",
-      "sha256": "a54e20a8a28bb4d3e991ed65a14ffc50542e9a5d2fafce11120bba9e9ab36307",
-      "bytes": 8346
+      "sha256": "0670f4baa6125556c21c9782585357d22bc1f9a4487f767be03037d5a4feff7e",
+      "bytes": 9241
     },
     {
       "path": "scripts/integrity/generate_control_checklist.py",
