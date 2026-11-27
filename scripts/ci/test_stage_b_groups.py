@@ -173,6 +173,82 @@ class ResultTests(unittest.TestCase):
         self.assertEqual(code, 1)
 
 
+MANIFEST_ENV = {
+    "namespace": NS,
+    "minimumTotalTests": 1,
+    "groups": [
+        {"name": "quiet", "title": "Quiet", "classes": ["OneTests"]},
+        {"name": "sweep", "title": "Sweep", "stackEnvironment": {"IX1_SEARCH_SWEEP_INTERVAL_SECONDS": "10"}, "classes": ["TwoTests"]},
+        {"name": "slower", "title": "Slower", "stackEnvironment": {"IX1_SEARCH_SWEEP_INTERVAL_SECONDS": "60"}, "classes": ["ThreeTests"]},
+    ],
+}
+
+
+class StackEnvironmentTests(unittest.TestCase):
+    """BH-1 (C-193): per-group environment of the disposable stack; allowlisted, range-checked, shortest interval wins."""
+
+    def run_tool(self, manifest: dict, *args: str) -> tuple[int, str]:
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "m.json"
+            path.write_text(__import__("json").dumps(manifest), encoding="utf-8")
+            out = io.StringIO()
+            with redirect_stdout(out), __import__("contextlib").redirect_stderr(io.StringIO()):
+                code = sbg.main(["--manifest", str(path), "stack-env", *args])
+        return code, out.getvalue()
+
+    def test_a_valid_declaration_passes_coverage(self) -> None:
+        self.assertEqual(sbg.check_coverage(MANIFEST_ENV, DISCOVERED), [])
+
+    def test_a_key_outside_the_allowlist_fails(self) -> None:
+        bad = {**MANIFEST_ENV, "groups": [{**MANIFEST_ENV["groups"][0], "stackEnvironment": {"SearchIndex__Mode": "Off"}}]}
+        self.assertTrue(any("not allowlisted" in e for e in sbg.check_stack_environment(bad)))
+
+    def test_values_outside_the_range_or_not_integer_strings_fail(self) -> None:
+        for value in ("0", "3600", "ten", 10, "-5", "1.5"):
+            bad = {**MANIFEST_ENV, "groups": [{**MANIFEST_ENV["groups"][0], "stackEnvironment": {"IX1_SEARCH_SWEEP_INTERVAL_SECONDS": value}}]}
+            self.assertEqual(len(sbg.check_stack_environment(bad)), 1, value)
+
+    def test_the_shortest_interval_wins_when_groups_share_a_stack(self) -> None:
+        self.assertEqual(sbg.stack_environment(MANIFEST_ENV["groups"]), {"IX1_SEARCH_SWEEP_INTERVAL_SECONDS": "10"})
+        self.assertEqual(sbg.stack_environment(MANIFEST_ENV["groups"][2:]), {"IX1_SEARCH_SWEEP_INTERVAL_SECONDS": "60"})
+        self.assertEqual(sbg.stack_environment(MANIFEST_ENV["groups"][:1]), {})
+
+    def test_every_allowlisted_key_is_printed_and_empty_means_the_overlay_default(self) -> None:
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--groups", "quiet"), (0, "IX1_SEARCH_SWEEP_INTERVAL_SECONDS=\n"))
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--groups", "quiet,slower"), (0, "IX1_SEARCH_SWEEP_INTERVAL_SECONDS=60\n"))
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--groups", "all"), (0, "IX1_SEARCH_SWEEP_INTERVAL_SECONDS=10\n"))
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--defaults"), (0, "IX1_SEARCH_SWEEP_INTERVAL_SECONDS=\n"))
+
+    def test_classes_resolve_to_their_groups_exactly_or_by_substring(self) -> None:
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--class", "TwoTests"), (0, "IX1_SEARCH_SWEEP_INTERVAL_SECONDS=10\n"))
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--class", "Two")[0], 1)  # exact names only
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--class-pattern", "Tests"), (0, "IX1_SEARCH_SWEEP_INTERVAL_SECONDS=10\n"))
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--class-pattern", "One"), (0, "IX1_SEARCH_SWEEP_INTERVAL_SECONDS=\n"))
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--groups", "gamma")[0], 1)
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--class-pattern", "Nothing")[0], 1)
+
+    def test_exact_class_requires_one_manifest_class_bh1_corrective(self) -> None:
+        """BH-1 corrective: --class (exact match) must resolve to exactly one manifest class. A partial name that could
+        match multiple classes (via --class-pattern) is refused by --class, preserving the C-131 focused authorization
+        exception which requires exactly one manifest class before touching the stack."""
+        # --class requires the full class name and matches exactly one
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--class", "TwoTests")[0], 0)
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--class", "ThreeTests")[0], 0)
+        # A partial name that could match multiple classes via --class-pattern is refused by --class
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--class", "Tests")[0], 1)
+        # Even a unique substring is refused by --class (exact match semantics)
+        self.assertEqual(self.run_tool(MANIFEST_ENV, "--class", "Two")[0], 1)
+        # --class-pattern with a substring that matches multiple groups still succeeds (merges their environments)
+        code, out = self.run_tool(MANIFEST_ENV, "--class-pattern", "Tests")
+        self.assertEqual(code, 0)
+        # The shortest interval wins when multiple groups are matched
+        self.assertIn("10", out)
+
+    def test_an_invalid_manifest_is_refused_by_the_command(self) -> None:
+        bad = {**MANIFEST_ENV, "groups": [{**MANIFEST_ENV["groups"][1], "stackEnvironment": {"IX1_SEARCH_SWEEP_INTERVAL_SECONDS": "0"}}]}
+        self.assertEqual(self.run_tool(bad, "--groups", "all")[0], 1)
+
+
 class RealManifestTests(unittest.TestCase):
     def test_every_test_class_source_file_is_assigned(self) -> None:
         """Offline guard (no build needed): each `[Collection]` class in Tests/ is named by exactly one group."""
@@ -185,6 +261,22 @@ class RealManifestTests(unittest.TestCase):
         in_source = {p.name.split(".")[0] for p in tests.glob("*.cs")}
         self.assertEqual(sorted(in_source - set(assigned)), [], "test class files that belong to no group")
         self.assertEqual(sorted(set(assigned) - in_source), [], "manifest classes with no source file")
+
+    def test_classes_that_wait_for_search_index_sweep_passes_declare_the_short_interval(self) -> None:
+        """BH-1 (C-193): a test class that waits for Authority search-index sweep passes (S-A/S-B) must run on a stack with the
+        10 s interval; the overlay default is 300 s. Detected from the test sources so that a new sweep test cannot be added to a
+        quiet group unnoticed."""
+        import re
+        manifest = sbg.load_manifest(sbg.DEFAULT_MANIFEST)
+        owner = {c: g for g in manifest["groups"] for c in g["classes"]}
+        pattern = re.compile(r"\bS-[AB]\b|[Ss]earch-index sweep|sweep cycles|SearchIndexSweep|one S-A interval")
+        tests = sbg.DEFAULT_MANIFEST.parent / "Tests"
+        waiting = sorted({p.name.split(".")[0] for p in tests.glob("*.cs") if pattern.search(p.read_text(encoding="utf-8"))})
+        self.assertIn("SearchIndexBuilderStackTests", waiting)
+        for cls in waiting:
+            interval = owner[cls].get("stackEnvironment", {}).get("IX1_SEARCH_SWEEP_INTERVAL_SECONDS")
+            self.assertEqual(interval, "10", f"{cls} waits for sweep passes but its group '{owner[cls]['name']}' does not declare 10 s")
+        self.assertEqual(sbg.check_stack_environment(manifest), [])
 
 
 if __name__ == "__main__":

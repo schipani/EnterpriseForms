@@ -11,6 +11,8 @@ gatekeeper that makes the split safe:
   verify-group  one group's TRX results vs the tests discovered for that group (run inside the shard job).
   verify-all    every group's TRX results vs the full discovery: all groups present, each test executed exactly once and
                 passed, executed total >= the baseline. Never trusts an exit code.
+  stack-env     the disposable stack environment a group (or the groups of matching classes) needs, as KEY=VALUE lines
+                (BH-1, C-193). Only allowlisted keys of the security-test overlay; never production configuration.
 
 The discovered list is the output of `dotnet test --project <csproj> --no-build --list-tests [-- --filter-class ...]`.
 """
@@ -26,6 +28,12 @@ from pathlib import Path
 
 NS = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
 DEFAULT_MANIFEST = Path(__file__).resolve().parents[2] / "tests/integration/EnterpriseForms.StageBTests/stage-b-groups.json"
+
+
+# BH-1 (C-193): per-group environment for the disposable security-test stack. Allowlisted keys only, each with an inclusive
+# integer range; when several groups share one stack (local release runs, wildcard class filters), the shortest interval wins,
+# so a test that waits for sweep passes is never run on a stack with a longer interval than its group declares.
+STACK_ENVIRONMENT_RANGES = {"IX1_SEARCH_SWEEP_INTERVAL_SECONDS": (1, 3599)}  # < SearchIndex:CheapPassDeadlineSeconds (3600)
 
 
 def load_manifest(path: Path) -> dict:
@@ -103,7 +111,39 @@ def check_coverage(manifest: dict, discovered: Counter) -> list[str]:
     for group in groups:
         if sum(discovered.get(c, 0) for c in group["classes"]) == 0:
             errors.append(f"group '{group['name']}' would execute zero tests")
+    errors += check_stack_environment(manifest)
     return errors
+
+
+def check_stack_environment(manifest: dict) -> list[str]:
+    errors: list[str] = []
+    for group in manifest["groups"]:
+        environment = group.get("stackEnvironment", {})
+        if not isinstance(environment, dict):
+            errors.append(f"group '{group['name']}' stackEnvironment must be an object")
+            continue
+        for key, value in environment.items():
+            if key not in STACK_ENVIRONMENT_RANGES:
+                errors.append(f"group '{group['name']}' stackEnvironment key {key} is not allowlisted")
+                continue
+            low, high = STACK_ENVIRONMENT_RANGES[key]
+            if not (isinstance(value, str) and value.isdigit() and low <= int(value) <= high):
+                errors.append(f"group '{group['name']}' stackEnvironment {key}={value!r} must be an integer string in {low}..{high}")
+    return errors
+
+
+def stack_environment(groups: list[dict]) -> dict[str, str]:
+    """The environment one stack needs for all of the given groups: the shortest declared value of each allowlisted key."""
+    merged: dict[str, int] = {}
+    for group in groups:
+        for key, value in group.get("stackEnvironment", {}).items():
+            merged[key] = min(merged.get(key, int(value)), int(value))
+    return {key: str(value) for key, value in sorted(merged.items())}
+
+
+def groups_for_classes(manifest: dict, pattern: str, exact: bool) -> list[dict]:
+    """Groups owning the classes a focused run selects: an exact class name (stage-b.ps1 -Class) or a substring (test.ps1 *X*)."""
+    return [g for g in manifest["groups"] if any(c == pattern if exact else pattern in c for c in g["classes"])]
 
 
 def group_expected(manifest: dict, ids: Counter, group: str, namespace: str) -> Counter:
@@ -192,6 +232,33 @@ def cmd_filter(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_stack_env(args: argparse.Namespace) -> int:
+    manifest = load_manifest(args.manifest)
+    errors = check_stack_environment(manifest)
+    if errors:
+        for error in errors:
+            print("FAIL ", error, file=sys.stderr)
+        return 1
+    if args.defaults:
+        selected = []  # no integration test selected (e.g. Playwright only): every key at the overlay default
+    elif args.groups:
+        selected, unknown = select_groups(manifest, args.groups)
+        if unknown:
+            print("unknown Stage B group(s): " + ", ".join(unknown), file=sys.stderr)
+            return 1
+    else:
+        selected = groups_for_classes(manifest, args.class_name or args.class_pattern, exact=bool(args.class_name))
+        if not selected:
+            print(f"no Stage B group owns a class matching '{args.class_name or args.class_pattern}'", file=sys.stderr)
+            return 1
+    # Every allowlisted key is printed; an empty value means "the overlay default" (compose `${KEY:-default}` treats an empty
+    # value as unset), so a stack started earlier for another group is reconciled rather than silently kept.
+    resolved = stack_environment(selected)
+    for key in sorted(STACK_ENVIRONMENT_RANGES):
+        print(f"{key}={resolved.get(key, '')}")
+    return 0
+
+
 def cmd_list(args: argparse.Namespace) -> int:
     for g in load_manifest(args.manifest)["groups"]:
         print(f"{g['name']:36s} {g['title']}")
@@ -265,6 +332,13 @@ def main(argv: list[str] | None = None) -> int:
     va.add_argument("--min-total", type=int, default=0)
     va.add_argument("--artifact-prefix", default="stage-b-evidence-")
     va.set_defaults(fn=cmd_verify_all)
+    se = sub.add_parser("stack-env")
+    target = se.add_mutually_exclusive_group(required=True)
+    target.add_argument("--groups", help="'all' or a comma-separated list of group names")
+    target.add_argument("--class", dest="class_name", help="exact test class name (scripts/dev/stage-b.ps1 -Class)")
+    target.add_argument("--class-pattern", help="substring of test class names (scripts/dev/test.ps1 -Class, filter *X*)")
+    target.add_argument("--defaults", action="store_true", help="no integration test selected: every key at the overlay default")
+    se.set_defaults(fn=cmd_stack_env)
     args = parser.parse_args(argv)
     return args.fn(args)
 

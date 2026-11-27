@@ -53,6 +53,21 @@ function Step([string]$Name, [scriptblock]$Body) {
   if ($LASTEXITCODE -ne 0) { throw "FAILED: $Name (exit $LASTEXITCODE)" }
   $timings.Add(('{0,6:N0}s  {1}' -f $clock.Elapsed.TotalSeconds, $Name))
 }
+
+# Resolve the focused exception to one file in the default Playwright configuration.
+function ResolveSpecFile([string]$Name) {
+  $normalized = $Name.Replace('\', '/')
+  $candidates = @(Get-ChildItem -LiteralPath (Join-Path $web 'e2e') -Filter '*.spec.ts' -File -Recurse | ForEach-Object {
+    $relative = $_.FullName.Substring($web.Length + 1).Replace('\', '/')
+    if ($Name -ceq $_.Name -or $Name -ceq ($_.BaseName -replace '\.spec$', '') -or $normalized -ceq $relative) { $relative }
+  })
+  if ($candidates.Count -ne 1) {
+    throw '-Spec must name one existing spec in e2e. Use its basename, filename, or exact relative path.'
+  }
+  # Playwright interprets CLI selectors as regular expressions against full paths.
+  return '[\\/]' + ([regex]::Escape($candidates[0]) -replace '/', '[\\/]') + '$'
+}
+
 function InDir([string]$Dir, [scriptblock]$Body) { Push-Location $Dir; try { & $Body } finally { Pop-Location } }
 function Stack([string[]]$ComposeArgs) { InDir $docker { if (-not (Test-Path .env)) { Copy-Item env.example .env }; docker @compose @ComposeArgs } }
 # Whole-stack start. `up --wait` on the full profile reports failure when a one-shot service (dev-seed, *-migrate, vault-transit-init)
@@ -67,6 +82,22 @@ function StackUpAll {
   if ($failed.Count -gt 0) { Write-Host "one-shot service failed: $failed" -ForegroundColor Red; $global:LASTEXITCODE = 1 }
 }
 
+# BH-1 (C-193): apply the disposable stack environment the selected Stage B tests need (stage-b-groups.json stackEnvironment,
+# resolved by scripts/ci/stage_b_groups.py stack-env; when several groups share this stack the shortest sweep interval wins). An
+# empty value removes the variable, so the security-test overlay default applies; a value set by hand in this shell is replaced,
+# with a notice. Affects the enterpriseforms-sectest compose project only; never the dev stack or production configuration.
+function ApplyStackEnvironment([string[]]$Selection) {
+  $lines = @(python (Join-Path $root 'scripts/ci/stage_b_groups.py') stack-env @Selection)
+  if ($LASTEXITCODE -ne 0) { throw 'cannot resolve the Stage B stack environment of the selected tests' }
+  foreach ($line in $lines) {
+    $key, $value = $line -split '=', 2
+    $current = [Environment]::GetEnvironmentVariable($key)
+    if ($current -and $current -ne $value) { Write-Host "Replacing $key=$current from this shell with '$value' (empty = overlay default) for the selected tests." -ForegroundColor Yellow }
+    [Environment]::SetEnvironmentVariable($key, $(if ($value) { $value } else { $null }))
+    Write-Host "Stack environment: $key=$(if ($value) { $value } else { '(overlay default)' })"
+  }
+}
+
 try {
   if ($Level -eq 1) {
     Step '.NET build + unit/architecture/contract tests' {
@@ -77,6 +108,17 @@ try {
   }
 
   if ($Level -eq 2) {
+    # BH-1 corrective: resolve -Spec to exactly one existing spec file BEFORE any stack step. The C-131 focused authorization
+    # exception requires exactly one spec; unknown, ambiguous or wildcard selectors are refused.
+    $resolvedSpec = $null
+    if ($Spec) { $resolvedSpec = ResolveSpecFile $Spec }
+    # BH-1 corrective: use --class (exact match) instead of --class-pattern (substring). The focused authorization exception
+    # (C-131) requires exactly one manifest class; a broad substring could select multiple Stage B classes.
+    if ($Class) { ApplyStackEnvironment @('--class', $Class) } elseif (-not ($Spec -or $Browser)) { ApplyStackEnvironment @('--groups', 'all') } else { ApplyStackEnvironment @('--defaults') }
+    if ($NoRebuild) {
+      # BH-1: the stack is reused as-is except the authority, which compose recreates only if its configuration differs.
+      Step 'Stack environment (authority only, no rebuild)' { Stack @('up', '-d', '--no-deps', '--wait', 'authority') }
+    }
     if (-not $NoRebuild) {
       # Incremental: BuildKit reuses unchanged layers and compose recreates only containers whose image changed.
       Step 'Stack up (incremental build, stays running)' { StackUpAll }
@@ -84,7 +126,9 @@ try {
     if ($Class -or -not ($Spec -or $Browser)) {
       Step 'Stage B integration tests' {
         InDir $root {
-          $filter = if ($Class) { @('--filter-class', "*$Class*") } else { @() }
+          # BH-1 corrective: use exact manifest class name instead of *$Class* substring. The focused authorization
+          # exception (C-131) requires exactly one manifest class; validate before touching the stack.
+          $filter = if ($Class) { @('--filter-class', "EnterpriseForms.StageBTests.Tests.$Class") } else { @() }
           if ($Class -and $ExcludeBenchmarks) { $filter += @('--filter-not-trait', 'Category=Benchmark') }
           dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release -- --minimum-expected-tests $(if ($Class) { 1 } else { 10 }) @filter @report
         }
@@ -94,7 +138,8 @@ try {
       Step 'Playwright (real stack via Vite proxy)' {
         InDir $web {
           $env:API_TARGET = 'http://127.0.0.1:5180'
-          if ($Spec) { npx playwright test $Spec } else { npx playwright test }
+          # The focused selector matches only the resolved spec file.
+          if ($resolvedSpec) { npx playwright test $resolvedSpec } else { npx playwright test }
         }
       }
     }
@@ -136,6 +181,7 @@ try {
     if ($stageBAuthorized) {
       # The Stage B stack must start from empty volumes: a stack reused after the tamper tests can quarantine (ARCHIVE_BODY_MISMATCH).
       Step 'Stage B: clean stack' { Stack @('down', '-v', '--remove-orphans') }
+      ApplyStackEnvironment @('--groups', 'all')
       Step 'Stage B: start full stack' { StackUpAll }
       Step 'Stage B: integration tests' {
         InDir $root { dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release --results-directory artifacts/stage-b/test-results --report-xunit-trx -- --minimum-expected-tests 10 }

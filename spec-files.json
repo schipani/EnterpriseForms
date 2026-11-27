@@ -959,8 +959,8 @@
     },
     {
       "path": "docs/testing/STAGE_B_RELEASE_ONLY_POLICY.md",
-      "sha256": "98777826b8f6369ada765a58bd40001f5598eb3085779d07dfdd7be91fbc296a",
-      "bytes": 9290
+      "sha256": "15298c743f5fb36fc516207933126152e6ff4cbd876ec1d21597b4781ad3588f",
+      "bytes": 9917
     },
     {
       "path": "docs/ui/C1_DESIGNER_UX_IMPLEMENTATION_BRIEF.md",
@@ -1099,8 +1099,8 @@
     },
     {
       "path": "scripts/ci/stage_b_groups.py",
-      "sha256": "0cbdbd17d0916492f6a7017e29c8fdd4589314e749a68c9c2985d726d389fd86",
-      "bytes": 12859
+      "sha256": "dbba032410403d34f950ae322644d5cdb523a7b7ec9e9abf2824268256dd542c",
+      "bytes": 17157
     },
     {
       "path": "scripts/ci/summarize_trx.py",
@@ -1109,8 +1109,8 @@
     },
     {
       "path": "scripts/ci/test_stage_b_groups.py",
-      "sha256": "e911c24adbc3941b2d5b452bbd497ee705bf8c2b8d459fec8da7ea124bb479fb",
-      "bytes": 10056
+      "sha256": "e4c052060551d068b3003eec939a8452f39ec70ffc632b931a82f5aad945b14d",
+      "bytes": 16488
     },
     {
       "path": "scripts/ci/test_test_results.py",
@@ -1239,13 +1239,13 @@
     },
     {
       "path": "scripts/dev/stage-b.ps1",
-      "sha256": "b163d1146b5036dd4193a1d37316fe372f3af312f307037490bd1df96c6c4960",
-      "bytes": 7305
+      "sha256": "2f786477845dcaf87b886af8f42f3f87334118844ec88b78bc9572e5c095b123",
+      "bytes": 8988
     },
     {
       "path": "scripts/dev/test.ps1",
-      "sha256": "1f1d7e6dd1494f35bdafb3ae56aae1e51296f8c74e24964f93f9c20c8e0b69f4",
-      "bytes": 10060
+      "sha256": "da8f49c6166b38c5fd1903c27a015be8db35a2147103fe4a52e4b7d8c3a282c9",
+      "bytes": 13518
     },
     {
       "path": "scripts/dev/wp5b-mutations.py",
