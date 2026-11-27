@@ -563,6 +563,11 @@
       "bytes": 3944
     },
     {
+      "path": "docs/governance/WORK_PACKAGE_REGISTER.md",
+      "sha256": "6735636084f4be7d0c6dbc4cb39437f8c5b82ba127a6112a7b3df4eb46782c00",
+      "bytes": 37761
+    },
+    {
       "path": "docs/identity/PB08_IDENTITY_ASSURANCE_STANDARD.md",
       "sha256": "5cbca36ab705d1bf8856e3576b1fbb52d5c8314030d8e51f3a14ca8b9da653b9",
       "bytes": 7162

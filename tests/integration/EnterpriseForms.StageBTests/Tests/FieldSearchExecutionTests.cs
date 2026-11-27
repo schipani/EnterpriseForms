@@ -210,6 +210,35 @@ public sealed class FieldSearchExecutionTests(StageBFixture fixture)
         Assert.Equal("SEARCH_FIELD_NOT_ALLOWED", foreign.ErrorCode);
     }
 
+    /// <summary>
+    /// C10 WP-0 §4 test 9 (verified search): an expiring share is honoured by field search at the expiry instant, before the convergence
+    /// loop (every 30 s in Development/Testing) has changed the share; the record is no longer found and no count reveals it.
+    /// </summary>
+    [Fact]
+    public async Task AnExpiredShareStopsFieldSearchAtTheExpiryInstantBeforeConvergence()
+    {
+        var w = await WorkspaceAsync("c10-search-expiry");
+        var a = await CreateAsync(w, Values("CR-9001", 1, "2026-03-03", "open", false));
+        var expiresOn = DateTimeOffset.UtcNow.AddSeconds(20);
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{a:D}/shares", w.S.Token(w.S.Clerk), new { useDevelopmentStepUp = true, recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" }, shareExpiresOn = expiresOn });
+        Assert.True(share.IsSuccess, share.Body);
+        var shareId = share.Root.GetProperty("recordShareId").GetGuid();
+        await w.S.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
+        Assert.Equal([a], Ids(await SearchAsync(w, w.S.Reader, [Cond(w.Reference, "equals", "String", "CR-9001")])));
+
+        var wait = expiresOn.AddMilliseconds(500) - DateTimeOffset.UtcNow;
+        if (wait > TimeSpan.Zero)
+        {
+            await Task.Delay(wait, TestContext.Current.CancellationToken);
+        }
+
+        Assert.True(fixture.Stack.AuthorityObserverSql($"SELECT resource_lifecycle_state FROM authority_resources WHERE resource_type_name = 'record_share' AND resource_entity_id = '{shareId:D}';").Trim() == "Active",
+            "convergence ran before the search; rerun (the loop runs every 30 s)");
+        var expired = await SearchAsync(w, w.S.Reader, [Cond(w.Reference, "equals", "String", "CR-9001")]);
+        Assert.Empty(Ids(expired));
+        Assert.Equal(0, expired.Root.GetProperty("totalCount").GetInt32());
+    }
+
     /// <summary>AC6-T09, ENC-SR-14, owner: revocation and withdrawal stop searching and end open result pages.</summary>
     [Fact]
     public async Task RevokingSearchPermissionOrWithdrawingApprovalEndsOpenPagesAndFurtherSearches()
