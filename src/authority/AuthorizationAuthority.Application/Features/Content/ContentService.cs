@@ -1199,6 +1199,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         List<VerifiedProjectionItem> authorized;
         List<VerifiedProjectionItem> readable = [];
         List<VerifiedProjectionItem> editable = [];
+        List<VerifiedProjectionItem>? downloadable = null;
         if (fullRead)
         {
             authorized = expected.Select(l => new VerifiedProjectionItem((ManifestItemKind)l.ManifestItemKindCode, l.ManifestItemId)).ToList();
@@ -1210,10 +1211,14 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             var fieldLeaves = expected.Where(l => l.ManifestItemKindCode is (byte)ManifestItemKind.FieldValue or (byte)ManifestItemKind.FieldSelection).ToList();
             readable = await CheckFieldLeavesAsync(snapshot, fieldLeaves, "read", subject, cancellationToken).ConfigureAwait(false);
             editable = includeEditable ? await CheckFieldLeavesAsync(snapshot, fieldLeaves, "edit", subject, cancellationToken).ConfigureAwait(false) : [];
+            // C10 WP8-A: attachments covered by a live document binding at their verified version (view), and those also downloadable.
+            var (documentsViewable, documentsDownloadable) = await ShareDocumentReadability.EvaluateAsync(verifier, snapshot, scope, state.OrganizationId, formRecordId, bound.AuthorityUserId, expected, cancellationToken).ConfigureAwait(false);
+            readable.AddRange(documentsViewable);
+            downloadable = documentsDownloadable;
             authorized = requestedAction == RequestedAction.Edit ? editable : readable;
         }
 
-        return (new VerifyRecordProjectionResult(true, null, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, authorized, fullRead, correlationId, readable, editable, contributorWrites.Enabled), false);
+        return (new VerifyRecordProjectionResult(true, null, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, authorized, fullRead, correlationId, readable, editable, contributorWrites.Enabled, downloadable), false);
     }
 
     private async Task<List<VerifiedProjectionItem>> CheckFieldLeavesAsync(VerifiedProjectionSnapshot snapshot, List<RecordManifestLeaf> fieldLeaves, string permission, string subject, CancellationToken cancellationToken)

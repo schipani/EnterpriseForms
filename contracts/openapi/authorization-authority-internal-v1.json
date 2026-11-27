@@ -13463,6 +13463,15 @@
           "contributor_writes_enabled": {
             "type": "boolean",
             "default": false
+          },
+          "downloadable_items": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/VerifiedProjectionItem"
+            }
           }
         }
       },
