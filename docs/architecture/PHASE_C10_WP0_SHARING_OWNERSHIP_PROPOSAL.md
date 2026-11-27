@@ -393,3 +393,78 @@ Test obligations across C10: CLAUDE.md §11 #23–#27, #56–#62; SEC-08, SEC-11
 replacement negatives; cascade on revoke, expiry, narrowing, team removal and transfer; 412/428/409; cursor invalidation at
 expiry; cross-tenant parents, recipients, documents and transfer targets; administrator transfer without content access;
 A11; journal-derived history including pending commands.
+
+## 10. C10 implementation record (Development/Test, 2026-11-27; not formal acceptance)
+
+Signed candidate `coord/c10-m1-candidate-r2` at `2b0887c1`: CI-equivalent .NET gate 3,635 passed, 0 failed, 223 authorized skips, 0
+rejected; strict specification validation; frontend lint, typecheck, build and 659 unit tests. Per-package heads and evidence are in
+`docs/governance/WORK_PACKAGE_REGISTER.md` (checkpoints 1–4). Nothing has been independently reviewed.
+
+### 10.1 Status against Section 9
+
+| WP | Status | Disposition |
+| --- | --- | --- |
+| WP1 schema | Done | Disposable databases only |
+| WP2 access-time expiry | Done | Checks, projection, discover, catalogue and indexed search (owner decision D5: expired shares excluded from share-only candidates; snapshot ends at the earliest live expiry) |
+| WP3 lineage and depth | Done | |
+| WP4 update and share revision | Done | |
+| WP5 cascades | Done | Revoke, expiry, narrowing (fields and documents), team removal, deactivation (D2, terminal), transfer (§3.4.1: invalidates nothing) |
+| WP6 ExpireShare | Done | §4 tests 8, 9, 13, 16 need real infrastructure |
+| WP7 step-up | Done | Staging and production refuse the development substitute |
+| WP8-A documents | Done | Version boundary from Authority-verified attachment rows (Option A); attachments accepted before it are refused until their record's next accepted commit (production-readiness obligation; backfill deferred) |
+| WP8-B replacement through a share | **Not implemented** | §10.2 |
+| WP9 journal and history | Done | Every committed expiry change listed (D6) |
+| WP10 lineage dry run | Done | Execution remains unauthorized |
+| WP11 business adapters | Done | M2: PATCH, details, effective scope, histories, `/me/access`, member reassignment |
+| WP12 SRC-1 | Done | |
+
+M3 pages: PG-022 (edit, history), PG-023, PG-053 (transfer, member reassignment), PG-066.
+
+### 10.2 WP8-B (R4) assessment
+
+- **How owners replace a document.** `UploadSessionHandlers.CommitAsync` (business) stages a complete new candidate: every current row
+  cloned unchanged, the replaced attachment's row omitted, and the processed version row added — same `file_attachment_id` (the
+  manifest item id), next `version_number`, fresh storage object and envelope from the scanning/encryption worker. Each content change
+  operation stages its own immutable rows; earlier versions stay as earlier operations' rows. The Authority accepts it in
+  `ContentService.PrepareAsync` through `ClassifyMutations` because the caller is the record owner.
+- **Why a share cannot reuse it today.** A non-owner goes through `ContentDeltaRules.ClassifyShareScoped` (Prepare only; the attachment
+  rule is `ShareUpdatable: false` and `version_number` is a key column) and `ContentService.AuthorizeMutations` (Prepare and Commit;
+  only field value and selection updates). The business commit also requires a complete (owner) read.
+- **Is CARV 4 mandatory?** Not by the CARV contract itself (`docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md` §3/§19: the version is
+  incremented only when "Prepare starts enforcing a rule that Commit does not fully re-derive"; "every check Commit can re-derive from
+  staged bytes is re-run there"). It is mandatory only if the replacement rule includes a Prepare-only check.
+- **Smallest secure approach without CARV 4** (every new check re-derived at Commit, so the existing fence is unchanged):
+  1. A share editor's candidate may contain exactly one Attachment Update, every other item Unchanged (Commit derives mutation kinds
+     from the candidate and accepted leaves).
+  2. Authority state at Commit: the actor holds a live share whose binding allows replace for that attachment (same rule as
+     `ShareDocumentReadability`, plus `CanReplaceDocument`), contributor writes enabled (G20 switch, default off).
+  3. Version: candidate `version_number` = the accepted leaf's verified `AttachmentVersionNumber` + 1 (Option A evidence).
+  4. All other attachment checks are the owner path's own (identity binding, registered schema, envelope rules, data-key ledger);
+     the version row comes from the same scanning/encryption worker.
+  5. In the same Commit transaction as the content head: extend that share's binding `SharedThroughVersionNumber` to the new version.
+  An older build that commits an operation prepared this way refuses it (its `AuthorizeMutations` rejects non-owner attachment
+  mutations): fail closed across a rolling deployment.
+- **Contract conflict to resolve first.** §3.6 says the extension "is bounded by the parent share's effective scope (§3.3)". For a
+  delegated share the parent's boundary is the earlier version, so the child's extension would exceed it, and the WP5 narrowing
+  rule (`ShareDocuments.Covers`) would later invalidate the child. Extending the parent too would show the new version to the
+  upstream manager, contradicting "versions added by anyone else stay invisible". Recommended reading: replacement through a share
+  only on owner-granted (depth 1) shares; a delegated share is refused `canReplaceDocument`.
+- **Estimate (observed Claude Code speed):** best 1 h, expected 2 h, worst 3.5 h including tests. Requires: owner choice of the
+  delegation reading, and independent confirmation that no CARV increment is needed.
+- **If CARV 4 were nevertheless chosen** (e.g. a Prepare-only envelope-freshness check is required): `CurrentVersion = 4`, a fourth
+  floor migration with its exact definition added to the recognized set, and the existing guard tests; owner authorization required.
+
+### 10.3 Remaining obligations
+
+- **Independent review:** every package, especially D5 (G06 search path), the WP8-A partial-read release rule
+  (`ShareDocumentReadability`) and download path, the revoke tightening (§3.4.1), the D6 migration and trigger, and the
+  Option A capture in `ContentService` Prepare/Commit.
+- **PR consolidation (owner authorization):** merge #79 then #80; merge #77 (with #82 folded in) and #78; move the register from #81
+  into the C10 PR and close #81 (retire the Codex policy documents); close #83–#85 as superseded (heads are ancestors of the
+  candidate); one signed merge of `main` into the candidate taking main's final versions of the copied #77–#80 files; one C10 PR.
+- **Focused Stage B (release authorization, C-131 §1, fresh isolated stack):** a new share-lifecycle class (expiry, cascades,
+  deactivation/reactivation, transfer, documents and version boundaries, D5 search), plus `SharingTests`, `ContributorWriteTests`
+  and the functional search subset; §4 tests 8, 9, 13, 16; download and stream re-checks.
+- **Accessibility:** Playwright axe for PG-022/023/053/066 and the reassignment page (isolated stack); manual NVDA and VoiceOver.
+- **Production readiness:** attachment version evidence for attachments accepted before WP8 (backfill deferred, fail closed until
+  then); `ExpireShare` convergence outside Development/Testing; real step-up (PRD-1); Azure staging evidence; G06 closure.
