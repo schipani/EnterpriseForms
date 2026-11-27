@@ -173,3 +173,21 @@ Candidate coord/c10-m1-candidate-r2 at 241cf8b9 (signed, clean; corrections 3d14
 
 Candidate coord/c10-m1-candidate-r2 at f04cdb5b (signed, clean; 68ef7fb6 correction, 2c93c8d8 Stage B preparation and flag fix, f04cdb5b record). CI-equivalent .NET gate 3,677 passed, 0 failed, 223 authorized skips, 0 rejected; strict specification validation; frontend lint, typecheck, build and 81 files / 665 tests; Stage B and security test projects build; Stage B group coverage 456 tests in 12 groups. Child records are never transferred on their own (owner and administrator paths); the reported retention sequence is refused; reviewer agent (Claude Code subagent, fresh context, read-only; not a human or external review) confirmed the Authority correction and the corrected transfer flag. Limitation reported: pre-correction direct owner edges on children still confer ownership; minimum remediation needs an owner decision (WP-0 Section 10.6). Focused Stage B prepared (three classes, one Playwright spec, development step-up on 82 existing calls), not executed. Governance amendment A-24 prepared with exact changes, not applied; live and checked-in policies unchanged. No push, merge, PR closure, Stage B, live protection change, persistent change, capability activation or acceptance.
 
+## Direct development checkpoint 9 — 2026-11-27 (governance, consolidation and focused Stage B, C-199/C-200)
+
+Candidate `coord/c10-m1-candidate-r2`, pushed as `c10/consolidated` (PR #88, not merged). Records commit follows the last code commit `9403ace6` (signed).
+- **Governance:** A-24 integrated as PR #86 (squash `e5a9f0fc`). The live ruleset matches the checked-in one. The verifier reports 17 PASS, 0 FAIL, 7 DEFERRED.
+- **Consolidation:** #79, #80, #77 (with #82) and #78 integrated in that order. #81–#85 closed after preservation in signed `archive/*` tags (WP-0 §10.10). The signed merge of `main` is `4785eab5`.
+- **Inventory:** 0 children with a direct owner edge, in any store.
+- **Focused Stage B (C-200, local fresh `enterpriseforms-sectest`):** every selected group, class and spec passes at the final heads:
+  - records-lifecycle C10 classes 9/9 and 2/2;
+  - existing records-lifecycle classes 68/68 at `e6779ca2`, with the upload-dependent classes retested 12/12 and 11/11 at `9403ace6`;
+  - projection-integrity-restore 14/14 (fresh stack);
+  - Document 3/3, DocumentEncryptionAudit 5/5, ParentChild 2/2, FieldSearchExecution 14/14, IndexedSearchQueryStack 21/21;
+  - Playwright c10-sharing-pages 6/6 (axe) and contributor-writes 4/4.
+- **Stage B product defects:** four found and corrected, plus CodeQL alert 8.
+- **CI-equivalent gate:** .NET 3,677 passed, 0 failed, 223 authorized skips, 0 rejected; frontend lint, typecheck, build and 81 files / 665 tests; strict specification validation; OpenAPI unchanged.
+- **Not proven or not implemented:** real-loop expiry convergence; CONS-23 long-download re-check (mandatory; minimum correction reported).
+- **Not done:** merge, formal acceptance, production change, capability activation outside the disposable stack, C11.
+
+**Next permitted step:** owner review of PR #88 and the WP-0 §10.10 report, then the owner's integration decision.

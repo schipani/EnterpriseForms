@@ -675,5 +675,114 @@ Estimated run time: 2–3 h (worst case about 4 h with one fix cycle).
 - G06 closure.
 - Production expiry processing (the convergence loop runs only in Development/Testing).
 - Manual NVDA and VoiceOver verification of the five C10 pages (PB14-44…48).
-- The pre-correction child owner-edge inventory and, if needed, remediation (§10.6).
+- ~~The pre-correction child owner-edge inventory and, if needed, remediation (§10.6).~~ Closed by evidence (§10.10): 0 affected records in every Development/Test store.
+- CONS-23 long-download revocation re-check (mandatory, not implemented; minimum correction in §10.10).
+- Real-loop expiry convergence evidence (§4 tests 8, 10 and 13; §10.10).
+- Product reviewer sign-off.
 
+### 10.10 Governance, consolidation and focused Stage B (owner authorization 2026-11-27, C-200; Development/Test, not acceptance)
+
+**Child-record ownership inventory (§10.6, read-only).** Each Authority store was copied read-only into a throwaway volume. Each copy was queried with no network, in a read-only transaction, for records with both an active `parent` edge and an active direct `owner` edge, current or historic.
+
+| Store | Records with a parent | Affected | Historic |
+| --- | --- | --- | --- |
+| `enterpriseforms-sectest` | 2 | 0 | 0 |
+| `enterpriseforms-dev` | 14 | 0 | 0 |
+| `enterpriseforms` (older dev) | 22 | 0 | 0 |
+
+No production data exists. The §10.6 limitation is closed by this evidence: no ownership data was changed and no remediation is needed.
+
+**Governance (A-24, C-199).** Integrated as PR #86 (squash `e5a9f0fc`) under the owner's authorization, with the required checks passing. The checked-in ruleset now matches the live ruleset 25341169: 0 approvals, no last-push review, no code-owner review. The verifier reports 17 PASS, 0 FAIL, 7 DEFERRED, including the new deferred row "3.3 independent human approval of the last push".
+
+**PR consolidation.**
+- Merge order:
+  - #79 (`a05e70fa`);
+  - #80 (`820b4735`);
+  - #77, with #82 folded in and the manifests regenerated (`12ae941f`);
+  - #78 (`3c463a24`, the `main` that the candidate merged).
+- #81–#85 were closed only after their content was verified in signed archive tags:
+  - `archive/pr77-c9-closeout-5865eb89`;
+  - `pr78-bh1-baseline-be2e4f0b`;
+  - `pr79-deps-seroval-146dff37`;
+  - `pr80-deps-zod-977e7ee5`;
+  - `pr81-coordinator-95ee28d5`;
+  - `pr82-c195-baseline-cdfc566b`;
+  - `pr83-c10-authority-1488f775`;
+  - `pr84-c10-step-up-b70de6ad`;
+  - `pr85-c10-lineage-48dcc4b8`;
+  - `c10-candidate-r2-f04cdb5b`;
+  - `c10-register-checkpoint8-5e951a7a`;
+  - `c10-consolidated-4785eab5`.
+- The #81 register is carried at `docs/governance/WORK_PACKAGE_REGISTER.md`. The Codex policy documents are retired.
+- The signed merge of `main` into the candidate is `4785eab5`. The full gate passed: .NET 3,677 passed, 0 failed, 223 authorized skips; frontend 665; strict validation.
+- Consolidated PR: #88 (`c10/consolidated`), **not merged**.
+
+**Focused Stage B.** Runs used the local `enterpriseforms-sectest` stack, rebuilt from the candidate after each product fix. Only the approved groups, classes and specs ran. Each rerun is a new run id recorded with `-RetryOf`. There was no automatic full repeat.
+
+| Run id | Head | Selection | Result |
+| --- | --- | --- | --- |
+| 20261127-072808-ca7ce123 | 4785eab5 | group records-lifecycle (C-200) | 50/79; 29 `PB08_STEP_UP_NOT_AVAILABLE` (the test stack lacked `HumanCommand__StepUp`) |
+| 20261127-074430-0e07f7e9 | e6779ca2 | group records-lifecycle, retry | 72/79; all 7 failures in the two new C10 classes; every existing class passed |
+| 20261127-081151-6405743e, -081639-883187f7 | d5c75a0c | the two C10 classes, retries | 4/9, 1/2 |
+| 20261127-082438-9fb48983, -083005-21ffb978 | 2019facc | the two C10 classes, retries | 7/9, 1/2 |
+| 20261127-083516-7cd21eae, -084047-80b40007 | ca1efd72 | C10ShareLifecycleTests, C10DatabaseVerificationTests | 9/9, 2/2 |
+| 20261127-084215-2d4bf70d | ca1efd72 | SharingTests | 2/2 |
+| 20261127-084236-fe0dcfdf | ca1efd72 | ContributorWriteTests | 7/7 |
+| 20261127-084337-6b906839 | ca1efd72 | DocumentTests | 3/3 |
+| 20261127-084535-a25a6fe9 | ca1efd72 | ParentChildTests | 2/2 |
+| 20261127-084611-d6ae83e4 | ca1efd72 | FieldSearchExecutionTests (functional) | 14/14 |
+| 20261127-084838-bd7f2447 | ca1efd72 | IndexedSearchQueryStackTests (functional) | 21/21 |
+| 20261127-084412-68982ba3 | ca1efd72 | DocumentEncryptionAuditTests | 3/5 (removed-document regression; promote expectation) |
+| 20261127-091201-2083cd55 | 402fb4f1 | DocumentEncryptionAuditTests | 5/5 |
+| 20261127-091350-675d7684 | 402fb4f1 | DocumentTests | 3/3 |
+| 20261127-091427-f845455c | 402fb4f1 | C10ShareLifecycleTests | 9/9 |
+| 20261127-092614-932f3e8e | 402fb4f1 + spec fix | Playwright c10-sharing-pages | 6/6 |
+| 20261127-092735-97e33f03 | 402fb4f1 + spec fix | Playwright contributor-writes | 4/4 |
+| 20261127-092932-c0582345 | 9403ace6 | group projection-integrity-restore, fresh stack (C-200) | 14/14 |
+| 20261127-093319-6063a121, -093531-be13d63f | 9403ace6 | RecordLifecycleTests, RecordRestoreTests (the upload path changed after their passing run) | 12/12, 11/11 |
+
+No test was skipped in any run. `-ExcludeBenchmarks` left out only the benchmark-tagged tests. Stack and test time came to about 2.5 hours.
+
+**Verified-search expiry** is covered by `FieldSearchExecutionTests.AnExpiredShareStopsFieldSearchAtTheExpiryInstantBeforeConvergence`, using the existing harness: field search stops at the expiry instant, before convergence.
+
+**Product defects found by Stage B (minimal corrections, retested):**
+1. **Test-stack step-up (`e6779ca2`).** The disposable test stack did not enable the synthetic human-command step-up that G27 requires. Fixed with `HumanCommand__StepUp: SyntheticDevelopment` in `compose.security-test.yaml`. This applies in Development/Testing only; elsewhere the Authority refuses it.
+2. **Share-replacement admission (`d5c75a0c`).** At begin, the admission looked up the attachment's field among the caller's authorized attachments. A replacement-only recipient does not see those, so every such replacement was refused. It now checks the verified record rows.
+3. **Upload re-checks and share-scope update (`2019facc`).**
+   - Chunk upload and completion re-checked only record Edit permission, so every admitted share replacement was refused. They now also accept the Authority still listing the attachment as replaceable.
+   - Share-scope update deleted narrowed projection rows, which the business runtime role may not do (G08). The error was `permission denied for table record_share_fields`, returned as 503. Narrowed rows are now marked unshared, and list and detail show shared rows only.
+4. **Removed-document regression from C10 WP8-A (`402fb4f1`).**
+   - After a document was removed, a full reader could still download its earlier versions with `?versionNumber=1`, contrary to B-05. A document absent from the accepted current content now releases no version.
+   - In the same commit, the chunk re-check now runs before the caller's chunk index is examined (CodeQL `cs/user-controlled-bypass`, alert 8 on PR #88).
+
+**Test corrections** (`d5c75a0c`, `ca1efd72`, `402fb4f1`, `9403ace6`):
+- Share expiry must be at least one hour ahead. Tests now create a valid expiry, then move it a few seconds ahead with AuthorityDb administrator SQL on the disposable stack.
+- A delegated expiry stays within its parent's expiry.
+- The trigger test uses an Invalidated share, because Revoked is not a terminal state (§4 test 6).
+- A stale ETag expects `PRECONDITION_FAILED` (412).
+- An outside-boundary replacement is expected to be refused at begin.
+- Contributor writes are re-enabled after the crash-induced Authority restart.
+- Under C-197 decision 2, a forged historic copy is not found (404) instead of refused with 423. It is never released, and detecting the unexpected row is now the reconciliation sweep's job (CLAUDE.md 4O).
+- The browser specs tick the G27 step-up and wait for the Access tab's shares heading.
+
+**Limitation: real-loop expiry convergence (§4 tests 8, 10 and 13).**
+- Moving the expiry makes the committed expiry disagree with the source command. The convergence loop therefore refuses it (`PAYLOAD_EXPIRY_MISMATCH`), and after two passes raises the alert `SHARE_EXPIRY_NOT_CONVERGED`. Access stays denied.
+- The focused run proves access-time enforcement, and that a tampered expiry never converges.
+- It does not prove real convergence, descendant convergence, or test 13 (`C10ShareExpiryRestoreTests` was removed). Real convergence is covered only by the Authority unit tests with a test clock.
+- Evidence needs either a run of at least 65 minutes with a genuine expiry, or a Testing-only Authority clock (owner decision).
+
+**CONS-23 (mandatory, not implemented, pre-existing).**
+- **Requirement:** `trust_authority/CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md`, "Long streams and strict revocation", normative through CLAUDE.md 4L.5, 4M and 4N. Downloads use short bounded chunks, with an independent Authority re-check at a documented maximum interval (for example ≤5 s) before more plaintext is sent. The stream terminates when the revision changes or the Authority is unavailable. The CONS-23 test: "Stream terminates within documented baseline recheck bound".
+- **Current state:** `DocumentHandlers.DownloadAsync` checks only at admission, then streams the whole decrypted document. A revocation takes effect at the next request.
+- **Minimum correction:**
+  - Decrypt the verified envelope segment by segment in the download writer.
+  - Once the configured interval has passed, re-check the Authority before writing the next segment. The interval is `Documents:StreamRecheckIntervalSeconds`, default 5, with an enforced upper bound. The check is Read and, for share recipients, the document's download binding, at the admitted authorization revision.
+  - Abort the response on denial, revision change or Authority unavailability, with an audited `DOCUMENT_DOWNLOAD_FAILED`.
+  - Add a contract test with a fake Authority, and a Stage B CONS-23 test: revoke during a throttled large download, and check the stream stops within the bound.
+- No acceptance claim covers long-download revocation until this exists. It is a mandatory requirement and is not silently deferred: it needs the owner's authorization as a separate correction.
+
+**Automated accessibility.** 6/6 passed: axe checks (WCAG 2.0, 2.1 and 2.2, levels A and AA) with no horizontal scrolling.
+- Pages: PG-022, PG-023, PG-053 transfer, PG-053 reassignment and PG-066.
+- Widths: 320, 768 and 1440 px, plus 640 and 320 px (a 1280 px window at 200% and 400% zoom).
+
+Manual NVDA and VoiceOver review is outstanding (PB14-44…48).
