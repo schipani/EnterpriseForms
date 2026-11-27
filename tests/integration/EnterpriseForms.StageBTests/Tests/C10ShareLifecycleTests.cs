@@ -291,6 +291,15 @@ public sealed class C10ShareLifecycleTests(StageBFixture fixture)
         Assert.True((await s.WaitProjectionAsync(s.Reader, child, Settle)).Root.GetProperty("permissions").GetProperty("isCompleteProjection").GetBoolean());
         Assert.True(Denied(await s.ProjectionAsync(s.Clerk, child)));
         Assert.Equal("0", fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM authority_relationship_edges WHERE resource_type_name = 'form_record' AND resource_entity_id = '{child:D}' AND relationship_name = 'owner' AND relationship_removed_on IS NULL;").Trim());
+
+        // Once unlinked, the former child is a top-level record of its unlinking owner: the action returns and a transfer works.
+        var unlinked = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/related/{child:D}/unlink", s.Token(s.Reader), new { removalReason = "C10 detach before transfer" });
+        Assert.True(unlinked.IsSuccess, unlinked.Body);
+        await s.WaitGateReadyAsync(Settle);
+        var detached = await UntilAsync(() => s.ProjectionAsync(s.Reader, child), r => r.IsSuccess && r.Root.GetProperty("permissions").GetProperty("canTransferOwnership").GetBoolean(), Settle);
+        Assert.True(detached.Root.GetProperty("permissions").GetProperty("canTransferOwnership").GetBoolean(), detached.Body);
+        var moved = await TransferAsync(s, s.Reader, child, s.Clerk);
+        Assert.True(moved.IsSuccess, moved.Body);
     }
 
     // ---- delegation (F-6 regression against the real Authority) ----

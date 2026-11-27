@@ -578,7 +578,7 @@ No CARV increment, content-acceptance floor migration or deployment-fencing chan
 | F6 | **Corrected (display).** The share list shows the Authority's lifecycle state of each locally Active share it can read there; otherwise, or on any Authority error, the local status. One Authority read per locally Active share (cost noted) |
 | N-2 | **Corrected.** The ownership view reads the commands of the record's owner edges; both views filter before truncating, and a capped share view stops at the oldest command read |
 | Read audit (N-3) | **Corrected as required by CLAUDE.md §4D** (read operations captured; access to audit audited): `RECORD_OWNERSHIP_HISTORY_VIEWED` and `MEMBER_OWNED_RECORDS_VIEWED` (identifiers and counts), written after the Authority allowed the read; a failed audit write fails the read. The AC-8 audit-read contract defers PG-053 and is unchanged |
-| Child-record transfer (pre-existing) | **Not corrected — reported (owner instruction).** It conflicts with mandatory requirements: §2 invariant 6, §3.4.1 and §3.7 ("former owner loses owner-derived rights"), CLAUDE.md §4B (one owner at every committed state) and §4S (child ownership derives from the parent). It is exploitable for insider retention: the parent owner transfers the child to themself (or to their team; the self-transfer refusal applies to administrators only), then transfers the parent, and keeps full owner rights on the child. An administrator's transfer of a child does not remove the parent owner. **Minimum correction:** `TransferOwnership` refuses a record that has a parent (owner and administrator paths) with a clear code (transfer the parent, or unlink first); the business maps it and the UI hides transfer for child records; tests for both paths and for a parent transfer moving the child. Optional hardening: ignore direct owner edges on records with a parent edge, and check Development/Test data for existing ones |
+| Child-record transfer (pre-existing) | **Corrected afterwards (owner approval 2026-11-27, §10.6).** Reported here first:  It conflicts with mandatory requirements: §2 invariant 6, §3.4.1 and §3.7 ("former owner loses owner-derived rights"), CLAUDE.md §4B (one owner at every committed state) and §4S (child ownership derives from the parent). It is exploitable for insider retention: the parent owner transfers the child to themself (or to their team; the self-transfer refusal applies to administrators only), then transfers the parent, and keeps full owner rights on the child. An administrator's transfer of a child does not remove the parent owner. **Minimum correction:** `TransferOwnership` refuses a record that has a parent (owner and administrator paths) with a clear code (transfer the parent, or unlink first); the business maps it and the UI hides transfer for child records; tests for both paths and for a parent transfer moving the child. Optional hardening: ignore direct owner edges on records with a parent edge, and check Development/Test data for existing ones |
 
 **Existing-record compatibility limitations.**
 - A head accepted before the content evidence works through the Prepare-observed fallback; the first such commit writes evidence onto every attachment leaf.
@@ -592,4 +592,88 @@ No CARV increment, content-acceptance floor migration or deployment-fencing chan
 - business handler tests of concurrent uploads and of the stale-number refusal against real stores;
 - an end-to-end test of delegated share creation and update against the real Authority (the F-6 regression would have been caught there);
 - an end-to-end test that an ETag read before an extension is refused after it.
+
+### 10.6 Child-record ownership correction (owner approval 2026-11-27; Development/Test, not acceptance)
+
+**Correction (`68ef7fb6`, `2c93c8d8`).**
+- `TransferOwnership` refuses a record that has a parent, on the owner and the administrator paths, before any edge changes (`CHILD_RECORD_OWNERSHIP_FOLLOWS_PARENT`, 422); a caller who is neither owner nor administrator still gets 403 first.
+- The reported sequence (transfer the child to oneself or one's team, then the parent) fails at its first step; transferring the parent still moves the child (`parent->effective_owner`); shares on the child are untouched.
+- The business passes the refusal through as for every Authority refusal (status and code); reassignment reports it per record.
+- The record projection reports no transfer permission while the record is linked to a parent (the current business link, so an unlinked record regains it; reviewer finding D-1 on `68ef7fb6`, corrected in `2c93c8d8`), so the UI hides the action.
+- No other path gives a child a direct owner edge: child registration adds only a `parent` edge, `UnlinkChildRecord` removes the parent edge first, and no link or reparent command exists.
+- Tests: `ChildRecordOwnershipTransferTests` (3); Stage B `C10ShareLifecycleTests.AChildRecordIsNeverTransferredOnItsOwnAndFollowsItsParent` (prepared, not run).
+
+**Limitation: direct owner edges created on children before the correction.** A child with both a `parent` edge and a pre-correction direct `owner` edge still gives that owner full effective ownership (`effective_owner = owner + parent->effective_owner`), so the reported retention survives for such records. The correction also removes the earlier, accidental remedy (a further transfer of the child), so the only remaining route is the parent owner unlinking the child (which leaves two direct owners until the now top-level record is transferred). A member who holds such an edge cannot be disabled (`OWNS_RECORDS`) until it is removed. No ownership data was changed. **Minimum remediation (owner decision required):**
+1. A read-only inventory of records with an active `parent` edge and an active `owner` edge (record id, owner subject, creating command; identifiers only), reusing the legacy-lineage dry-run pattern, run on Development/Test and any shared environment and recorded.
+2. If it finds none and no production data exists: record the limitation as closed by evidence.
+3. If any exist: an explicit, journalled, audited command with reason and step-up, run by the parent's effective owner or the administrator override, that removes a child's direct owner edges to restore inheritance. Not an implicit rule that ignores such edges (that silently changes effective rights and cannot be expressed cleanly in the SpiceDB schema).
+
+### 10.7 Focused Stage B readiness (prepared, not executed)
+
+**New tests (compile and are discovered; group coverage `stage_b_groups.py plan`: 456 tests in 12 groups, each class once):**
+
+| Class / spec | Group | Covers |
+| --- | --- | --- |
+| `C10ShareLifecycleTests` (9) | records-lifecycle | update under revision and stale 412; narrowing; history; revocation; access-time expiry on projection, record list, My access, effective scope and download before convergence (§4 test 9); inherited expiry with an independent grant and convergence of descendants (test 10; the set-based descendant read on real PostgreSQL); expiry racing a revoke, an update and a transfer (test 8); member deactivation and reactivation; child-record ownership; delegated shares against the real Authority (F-6 regression); document boundary, replacement, D-5 share revision and journal entry, stale ETag, owner version outside the boundary; live download re-check after revocation; business upload admission; numbering from the accepted version and the stale-commit refusal (decision 2) |
+| `C10DatabaseVerificationTests` (2) | records-lifecycle | C10 evidence columns nullable, both checks installed and enforced; business partial index definition; terminal-state and D6 triggers refusing even the AuthorityDb administrator; a commit that crashes inside the transaction after the boundary changed rolls back the boundary, share revision, head and journal together, and the retry succeeds |
+| `C10ShareExpiryRestoreTests` (1) | projection-integrity-restore (own stack) | §4 test 13: a restore of the share's pre-convergence state leaves it denied and convergence runs again |
+| `e2e/c10-sharing-pages.spec.ts` (6) | browser | axe (WCAG 2.0/2.1/2.2 A and AA) and no horizontal scroll on PG-022, PG-023, PG-053 transfer, PG-053 reassignment and PG-066 at 320, 768 and 1440 px and at 640 and 320 px (1280 px at 200% and 400%) |
+
+**Existing tests prepared:** G27 made step-up mandatory for share creation, revocation and ownership transfer, so 82 existing Stage B and security-test calls (51 share creations, 7 transfers and 21 revocations through the API, plus 3 request bodies and direct Authority commands) now send the development step-up (no assertion changed; the commit message of `2c93c8d8` says 81). Without it they would fail at the Authority (`STEP_UP_REQUIRED`).
+
+**Focused run (needs your release-testing authorization; fresh security-test stack):**
+1. Groups `records-lifecycle` (new classes, `SharingTests`, `ContributorWriteTests`, `Ix6RecordListStackTests`, lifecycle and restore classes) and `projection-integrity-restore` (its own stack).
+2. Classes `DocumentTests`, `DocumentEncryptionAuditTests`, `ParentChildTests`, `FieldSearchExecutionTests` and `IndexedSearchQueryStackTests` with `-ExcludeBenchmarks` (functional search coverage of expiry).
+3. Playwright `c10-sharing-pages.spec.ts` and `contributor-writes.spec.ts` against the isolated browser stack.
+
+Estimated run time: 2–3 h (worst case about 4 h with one fix cycle).
+
+**Not covered by this focused run:**
+- the verified-search and indexed-posting branches of §4 test 9 (covered only by the existing search classes, not with an expiring share);
+- server-side re-checks during a long download stream (none is implemented; revocation is re-checked on the next request);
+- real passkey step-up (PRD-1);
+- Azure staging (HSM, ledger, real database privileges);
+- production expiry processing;
+- manual NVDA and VoiceOver checks.
+
+### 10.8 Repository governance: proposed Development/Test amendment (prepared, not applied)
+
+**Discrepancy (read-only check, 2026-11-27).**
+
+| Setting | Checked in (`.github/rulesets/main-branch-protection.json`, ADR-PB-011 A-21) | Live ruleset 25341169 |
+| --- | --- | --- |
+| Required approving reviews | 1 | 0 |
+| Last-push approval | required | not required |
+| Code-owner review | required (A-21: not enforceable, deferred) | not required |
+| Stale-review dismissal, thread resolution, signatures, linear history, no deletion or force-push, 4 strict status checks, no bypass actors | required | same |
+| Allowed merge methods | not stated | merge, squash, rebase (merge commits are blocked by linear history) |
+
+`scripts/governance/verify_repository_protection.py` therefore reports "main ruleset: PR + 1 approval…" as FAIL against the live settings. The repository has one collaborator, so no GitHub approval by another person is possible.
+
+**Proposed owner decision (A-24, Development/Test integration on the sole-owner repository).**
+1. On the public development repository, a pull request into `main` is integrated on the owner's explicit, recorded authorization (decision log), which is the Development/Test integration decision.
+2. Review by AI reviewer agents (fresh context, read-only, recorded with their findings and dispositions) is technical review evidence. It is never described as independent human review or as a GitHub approval, and it does not satisfy any production review requirement.
+3. Every other control stays enforced: required status checks (strict), signed commits, linear history, no deletion or force-push, no bypass actors, stale-review dismissal, thread resolution, secret scanning and push protection, Dependabot, CodeQL, the release-tag ruleset, and the Stage B release-only policy.
+4. Production review requirements are unchanged: independent human approval of the last push and enforceable CODEOWNERS security-owner review remain production prerequisites, delivered by the private Azure DevOps migration (A-21, A-23).
+5. The amendment ends at that migration or when a second eligible reviewer exists, whichever is first; then the checked-in ruleset returns to one approval with last-push approval.
+
+**Exact changes for approval (none made yet).**
+- `.github/rulesets/main-branch-protection.json`: `required_approving_review_count` 1 → 0, `require_last_push_approval` true → false, `require_code_owner_review` true → false; every other rule unchanged. This matches the live ruleset, so no live setting changes.
+- `scripts/governance/verify_repository_protection.py`: the main-ruleset row accepts 0 approvals only while A-24 applies, and adds a DEFERRED row "independent human approval of the last push (A-24 until the Azure DevOps migration)".
+- `docs/decisions/ADR-PB-011-GITHUB-ACTIONS-SECURE-DELIVERY.md`: append Amendment A-24 (points 1–5).
+- `docs/delivery/BUILD00_REPOSITORY_PROTECTION.md`: control 3.3 row updated to match.
+- `docs/decisions/PHASE_C_DECISION_LOG.md`: the decision entry.
+- Optional, not part of the minimum: restrict live allowed merge methods to squash and rebase (a live change; needs its own approval).
+
+### 10.9 Obligations retained (not complete)
+
+- Prove that no incompatible older Authority build can serve content writes before D-1 is relied upon in a shared environment.
+- G14: implement re-application of `ShareDocumentBoundaryExtended` in recovery.
+- Production backfill of attachment version and content evidence.
+- Real passkey step-up (PRD-1).
+- Azure staging validation.
+- G06 closure.
+- Production expiry processing (the convergence loop runs only in Development/Testing).
+- Manual NVDA and VoiceOver verification of the five C10 pages (PB14-44…48).
+- The pre-correction child owner-edge inventory and, if needed, remediation (§10.6).
 
