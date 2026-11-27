@@ -476,7 +476,27 @@ public interface IShareDetailsAuthority
 
     /// <summary>C10 M1-WP9: the record's sharing and ownership history from committed Authority edges (owner or ManageAccess).</summary>
     Task<AuthorityRecordSecurityHistory> GetRecordSecurityHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, CancellationToken cancellationToken);
+
+    /// <summary>C10 M2: what a share's recipient can do through it now and why (same readers as the details).</summary>
+    Task<AuthorityShareEffectiveScope> GetShareEffectiveScopeAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken);
+
+    /// <summary>C10 M2 (PG-066): the caller's own access sources.</summary>
+    Task<AuthorityMyAccess> GetMyAccessAsync(DelegatedUserContext user, Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>C10 M2 (D8-4, PG-053): the Active records a member directly owns, for administrator reassignment.</summary>
+    Task<AuthorityMemberOwnedRecords> GetMemberOwnedRecordsAsync(DelegatedUserContext user, Guid organizationId, Guid memberUserId, CancellationToken cancellationToken);
 }
+
+public sealed record AuthorityMemberOwnedRecords(Guid MemberUserId, IReadOnlyList<Guid> FormRecordIds, bool Truncated, long AuthorizationRevision);
+
+public sealed record AuthorityShareLineageStep(Guid RecordShareId, int DelegationDepth, DateTimeOffset? ShareExpiresOn);
+
+public sealed record AuthorityShareEffectiveScope(Guid RecordShareId, Guid FormRecordId, string Status, string? RecipientKind, string? RecipientRole, DateTimeOffset? EffectiveExpiresOn,
+    IReadOnlyList<Guid> FieldItemIds, IReadOnlyList<AuthorityShareDocumentDetail> Documents, bool CanDelegate, IReadOnlyList<AuthorityShareLineageStep> Lineage, long AuthorizationRevision);
+
+public sealed record AuthorityMyAccessEntry(Guid FormRecordId, string AccessSource, Guid? RecordShareId, Guid? TeamId, string? RecipientRole, DateTimeOffset? EffectiveExpiresOn, bool ExpiringSoon);
+
+public sealed record AuthorityMyAccess(IReadOnlyList<AuthorityMyAccessEntry> Entries, bool Truncated, int ExpiringWithinDays, long AuthorizationRevision);
 
 public sealed record AuthorityRecordSecurityChange(string ChangeKind, Guid? RecordShareId, string? ShareEndState, string? InvalidationReasonCode, string? SubjectKind, Guid? SubjectId, DateTimeOffset? ShareExpiresOn = null);
 

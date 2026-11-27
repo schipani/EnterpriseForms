@@ -19,7 +19,31 @@ public sealed class ShareDetailsService(IAuthorityStore store, TimeProvider cloc
 {
     private const int MaximumLineageDepth = 3;
 
-    public async Task<ShareDetails> GetAsync(VerifiedActor actor, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken)
+    public async Task<ShareDetails> GetAsync(VerifiedActor actor, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken) =>
+        (await ReadAsync(actor, organizationId, formRecordId, recordShareId, cancellationToken).ConfigureAwait(false)).Details;
+
+    /// <summary>
+    /// C10 M2 (WP-0 Section 3.5, PG-023): what the share's recipient can do through it now and why — same readers and answer for
+    /// everyone else as <see cref="GetAsync"/>. Active only when the share and its lineage are Active at the Authority's clock.
+    /// </summary>
+    public async Task<ShareEffectiveScope> GetEffectiveScopeAsync(VerifiedActor actor, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken)
+    {
+        var (details, chain, now) = await ReadAsync(actor, organizationId, formRecordId, recordShareId, cancellationToken).ConfigureAwait(false);
+        var status = details.LegacyLineageUnresolved ? ShareLineageStatus.LegacyUnresolved : ShareLineageExpiry.Evaluate(chain, organizationId, formRecordId, recordShareId, now).Status;
+        var active = status == ShareLineageStatus.Active && details.LifecycleState == ResourceLifecycleStates.Active;
+        var lineage = new List<ShareLineageStep>();
+        for (var cursor = (Guid?)recordShareId; cursor is { } id && chain.TryGetValue(id, out var node) && lineage.Count < MaximumLineageDepth; cursor = node.Metadata?.ParentRecordShareId)
+        {
+            lineage.Add(new ShareLineageStep(id, node.Metadata?.DelegationDepth ?? 0, node.Metadata?.ShareExpiresOn));
+        }
+
+        return new ShareEffectiveScope(recordShareId, formRecordId, active ? "Active" : status == ShareLineageStatus.Active ? "Invalid" : status.ToString(),
+            details.RecipientKind, active ? details.RecipientRole : null, details.EffectiveExpiresOn,
+            active ? details.FieldItemIds : [], active ? details.Documents ?? [] : [], active && details.RecipientRole == RecipientRoles.Manager && details.DelegationDepth < MaximumLineageDepth,
+            lineage, details.AuthorizationRevision);
+    }
+
+    private async Task<(ShareDetails Details, Dictionary<Guid, ShareLineageNode> Chain, DateTimeOffset Now)> ReadAsync(VerifiedActor actor, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(actor);
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
@@ -60,7 +84,7 @@ public sealed class ShareDetailsService(IAuthorityStore store, TimeProvider cloc
             ? (await scope.FindIdentityBindingByIdAsync(command.ActorIdentityBindingId, cancellationToken).ConfigureAwait(false)) is { } binding && binding.OrganizationId == organizationId ? binding.AuthorityUserId : (Guid?)null
             : null;
 
-        return new ShareDetails(
+        return (new ShareDetails(
             recordShareId,
             formRecordId,
             share.ResourceLifecycleState,
@@ -77,7 +101,7 @@ public sealed class ShareDetailsService(IAuthorityStore store, TimeProvider cloc
             metadata.ShareInvalidationReasonCode,
             grantor,
             state.AuthorizationRevision,
-            documents);
+            documents), chain, now);
     }
 
     private static AuthorityException Unavailable() => AuthorityException.NotRegistered("share is not available to this actor");

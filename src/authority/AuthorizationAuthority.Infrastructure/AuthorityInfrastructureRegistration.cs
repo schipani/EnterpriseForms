@@ -109,6 +109,8 @@ public static class AuthorityInfrastructureRegistration
         services.AddSingleton<FormAccessService>();
         services.AddSingleton<AuthorizationAuthority.Application.Features.Sharing.ShareDetailsService>();
         services.AddSingleton<AuthorizationAuthority.Application.Features.Sharing.RecordSecurityHistoryService>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.Sharing.MyAccessService>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.Sharing.OwnedRecordsService>();
         services.AddSingleton<ContentService>();
         services.AddSingleton<ProjectionProcessor>();
         services.AddSingleton<ArchiveProcessor>();

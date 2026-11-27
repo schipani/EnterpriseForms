@@ -230,6 +230,56 @@
         }
       }
     },
+    "/internal/v1/records/{organizationId}/{formRecordId}/shares/{recordShareId}/effective-scope": {
+      "get": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "What a share's recipient can do through it now and why (same readers as GetShareDetails; fails closed while the gate is closed).",
+        "operationId": "GetShareEffectiveScope",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "recordShareId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareEffectiveScope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/records/{organizationId}/{formRecordId}/security-history": {
       "get": {
         "tags": [
@@ -264,6 +314,79 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RecordSecurityHistory"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/me/{organizationId}/access": {
+      "get": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "The caller's own owned, team-owned, direct-share and team-share access from committed Authority state; fails closed while the gate is closed.",
+        "operationId": "GetMyAccess",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyAccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/members/{organizationId}/{memberUserId}/owned-records": {
+      "get": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "Active records a member directly owns (ids only) for administrator reassignment; Security Administrators and organization owners only.",
+        "operationId": "GetMemberOwnedRecords",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "memberUserId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberOwnedRecords"
                 }
               }
             }
@@ -5330,6 +5453,39 @@
           "AttachmentLifecycle"
         ]
       },
+      "MemberOwnedRecords": {
+        "required": [
+          "member_user_id",
+          "form_record_ids",
+          "truncated",
+          "authorization_revision"
+        ],
+        "type": "object",
+        "properties": {
+          "member_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_record_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "MembershipApprovalRequest": {
         "required": [
           "confirm_organization_id",
@@ -5597,6 +5753,93 @@
           "security_command_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "MyAccess": {
+        "required": [
+          "entries",
+          "truncated",
+          "expiring_within_days",
+          "authorization_revision"
+        ],
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyAccessEntry"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "expiring_within_days": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "MyAccessEntry": {
+        "required": [
+          "form_record_id",
+          "access_source",
+          "record_share_id",
+          "team_id",
+          "recipient_role",
+          "effective_expires_on",
+          "expiring_soon"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "access_source": {
+            "type": "string"
+          },
+          "record_share_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "team_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recipient_role": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "effective_expires_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "expiring_soon": {
+            "type": "boolean"
           }
         }
       },
@@ -13320,6 +13563,113 @@
               "string"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "ShareEffectiveScope": {
+        "required": [
+          "record_share_id",
+          "form_record_id",
+          "status",
+          "recipient_kind",
+          "recipient_role",
+          "effective_expires_on",
+          "field_item_ids",
+          "documents",
+          "can_delegate",
+          "lineage",
+          "authorization_revision"
+        ],
+        "type": "object",
+        "properties": {
+          "record_share_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "recipient_kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "recipient_role": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "effective_expires_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "field_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShareDocumentDetail"
+            }
+          },
+          "can_delegate": {
+            "type": "boolean"
+          },
+          "lineage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShareLineageStep"
+            }
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "ShareLineageStep": {
+        "required": [
+          "record_share_id",
+          "delegation_depth",
+          "share_expires_on"
+        ],
+        "type": "object",
+        "properties": {
+          "record_share_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "delegation_depth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "share_expires_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },

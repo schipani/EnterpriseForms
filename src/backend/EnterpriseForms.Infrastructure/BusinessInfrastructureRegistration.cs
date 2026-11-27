@@ -104,6 +104,8 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<UpdateShareHandler>();
         services.AddSingleton<EnterpriseForms.Application.Features.Sharing.GetShare.GetShareHandler>();
         services.AddSingleton<EnterpriseForms.Application.Features.Sharing.ShareHistory.RecordSecurityHistoryHandler>();
+        services.AddSingleton<EnterpriseForms.Application.Features.Sharing.MyAccess.MyAccessHandlers>();
+        services.AddSingleton<EnterpriseForms.Application.Features.Sharing.MyAccess.ReassignRecordsHandler>();
         services.AddSingleton<ListSharesHandler>();
         services.AddSingleton<CreateTeamHandler>();
         services.AddSingleton<ChangeTeamMembershipHandler>();

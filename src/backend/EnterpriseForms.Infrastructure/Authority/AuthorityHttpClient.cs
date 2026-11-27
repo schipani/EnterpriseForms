@@ -59,6 +59,15 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
     public Task<AuthorityRecordSecurityHistory> GetRecordSecurityHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, CancellationToken cancellationToken) =>
         SendAsync<AuthorityRecordSecurityHistory>(HttpMethod.Get, $"internal/v1/records/{organizationId:D}/{formRecordId:D}/security-history", user, null, null, cancellationToken);
 
+    public Task<AuthorityShareEffectiveScope> GetShareEffectiveScopeAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityShareEffectiveScope>(HttpMethod.Get, $"internal/v1/records/{organizationId:D}/{formRecordId:D}/shares/{recordShareId:D}/effective-scope", user, null, null, cancellationToken);
+
+    public Task<AuthorityMyAccess> GetMyAccessAsync(DelegatedUserContext user, Guid organizationId, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityMyAccess>(HttpMethod.Get, $"internal/v1/me/{organizationId:D}/access", user, null, null, cancellationToken);
+
+    public Task<AuthorityMemberOwnedRecords> GetMemberOwnedRecordsAsync(DelegatedUserContext user, Guid organizationId, Guid memberUserId, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityMemberOwnedRecords>(HttpMethod.Get, $"internal/v1/members/{organizationId:D}/{memberUserId:D}/owned-records", user, null, null, cancellationToken);
+
     /// <summary>Any number of checks: split into authority calls of at most 250 and recombined only at one revision (C-27).</summary>
     public Task<IReadOnlyList<PermissionDecision>> CheckPermissionsBatchAsync(DelegatedUserContext user, IReadOnlyList<PermissionCheckRequest> requests, CancellationToken cancellationToken) =>
         PermissionCheckBatching.CheckAllAsync(requests, async (chunk, token) =>

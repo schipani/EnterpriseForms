@@ -1352,6 +1352,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/effective-scope": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the share's recipient can do through it now (Active only while the share and its lineage are), with its lineage; same readers as the share details. */
+        get: operations["GetRecordShareEffectiveScope"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-records/{formRecordId}/shares/{recordShareId}": {
         parameters: {
             query?: never;
@@ -1398,6 +1415,57 @@ export interface paths {
         get: operations["GetRecordOwnershipHistory"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's own owned, team-owned, direct-share and team-share access (expired shares omitted, expiring soon flagged), from the authority. */
+        get: operations["GetMyAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/members/{memberUserId}/owned-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Active records a member directly owns (ids only), for Security Administrators and organization owners. */
+        get: operations["GetMemberOwnedRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/members/{memberUserId}/reassign-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transfers each record the member directly owns with its own TransferOwnership command (reason and step-up; administrator override rules apply); reports each record's outcome. */
+        post: operations["ReassignMemberRecords"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3423,6 +3491,14 @@ export interface components {
             /** Format: date-time */
             expiresOn?: null | string;
         };
+        MemberOwnedRecordsResponse: {
+            /** Format: uuid */
+            memberUserId: string;
+            formRecordIds: string[];
+            truncated: boolean;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+        };
         MemberRoleChangeRequest: {
             roleName: string;
             reason: string;
@@ -3471,6 +3547,28 @@ export interface components {
             cancelledOn?: null | string;
             /** @default false */
             canChange: boolean;
+        };
+        MyAccessEntryResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            formDefinitionName: null | string;
+            accessSource: string;
+            /** Format: uuid */
+            recordShareId: null | string;
+            /** Format: uuid */
+            teamId: null | string;
+            recipientRole: null | string;
+            /** Format: date-time */
+            effectiveExpiresOn: null | string;
+            expiringSoon: boolean;
+        };
+        MyAccessResponse: {
+            entries: components["schemas"]["MyAccessEntryResponse"][];
+            truncated: boolean;
+            /** Format: int32 */
+            expiringWithinDays: number | string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
         };
         NumberFormatCatalogResponse: {
             catalogVersion: string;
@@ -3796,6 +3894,27 @@ export interface components {
             authorizationRevision: number | string;
             countsAreApproximate: boolean;
             scopeStatement: string;
+        };
+        ReassignedRecordResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            commandStatus: string;
+            effective: boolean;
+            refusalCode: null | string;
+        };
+        ReassignRecordsRequest: {
+            /** Format: uuid */
+            newOwnerUserId: null | string;
+            /** Format: uuid */
+            newOwnerTeamId: null | string;
+            transferReason: string;
+            useDevelopmentStepUp?: null | boolean;
+        };
+        ReassignRecordsResponse: {
+            /** Format: uuid */
+            memberUserId: string;
+            records: components["schemas"]["ReassignedRecordResponse"][];
+            truncated: boolean;
         };
         ReclassifyFieldRequest: {
             targetClassification: string;
@@ -4615,6 +4734,30 @@ export interface components {
             fileAttachmentId: string;
             canDownloadDocument: boolean;
             canReplaceDocument?: null | boolean;
+        };
+        ShareEffectiveScopeResponse: {
+            /** Format: uuid */
+            recordShareId: string;
+            /** Format: uuid */
+            formRecordId: string;
+            status: string;
+            recipientRole: null | string;
+            /** Format: date-time */
+            effectiveExpiresOn: null | string;
+            fieldValueItemIds: string[];
+            documents: components["schemas"]["ShareDocumentDetailResponse"][];
+            canDelegate: boolean;
+            lineage: components["schemas"]["ShareLineageStepResponse"][];
+            /** Format: int64 */
+            authorizationRevision: number | string;
+        };
+        ShareLineageStepResponse: {
+            /** Format: uuid */
+            recordShareId: string;
+            /** Format: int32 */
+            delegationDepth: number | string;
+            /** Format: date-time */
+            shareExpiresOn: null | string;
         };
         ShareResponse: {
             /** Format: uuid */
@@ -7267,6 +7410,29 @@ export interface operations {
             };
         };
     };
+    GetRecordShareEffectiveScope: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+                recordShareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareEffectiveScopeResponse"];
+                };
+            };
+        };
+    };
     GetRecordShare: {
         parameters: {
             query?: never;
@@ -7360,6 +7526,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecordSecurityHistoryResponse"];
+                };
+            };
+        };
+    };
+    GetMyAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyAccessResponse"];
+                };
+            };
+        };
+    };
+    GetMemberOwnedRecords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memberUserId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberOwnedRecordsResponse"];
+                };
+            };
+        };
+    };
+    ReassignMemberRecords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memberUserId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReassignRecordsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReassignRecordsResponse"];
                 };
             };
         };

@@ -100,6 +100,28 @@ public sealed record RecordSecurityHistoryItemResponse(Guid SecurityCommandId, s
 
 public sealed record RecordSecurityHistoryResponse(Guid FormRecordId, IReadOnlyList<RecordSecurityHistoryItemResponse> Items, bool Truncated, long AuthorizationRevision);
 
+/// <summary>C10 M2 (PG-023): what the recipient can do through the share now, as the Authority decides; empty unless Status is Active.</summary>
+public sealed record ShareEffectiveScopeResponse(Guid RecordShareId, Guid FormRecordId, string Status, string? RecipientRole, DateTimeOffset? EffectiveExpiresOn,
+    IReadOnlyList<Guid> FieldValueItemIds, IReadOnlyList<ShareDocumentDetailResponse> Documents, bool CanDelegate, IReadOnlyList<ShareLineageStepResponse> Lineage, long AuthorizationRevision);
+
+public sealed record ShareLineageStepResponse(Guid RecordShareId, int DelegationDepth, DateTimeOffset? ShareExpiresOn);
+
+/// <summary>C10 M2 (PG-066): one of the caller's own access sources; the form name is a display hint from the local directory.</summary>
+public sealed record MyAccessEntryResponse(Guid FormRecordId, string? FormDefinitionName, string AccessSource, Guid? RecordShareId, Guid? TeamId, string? RecipientRole, DateTimeOffset? EffectiveExpiresOn, bool ExpiringSoon);
+
+public sealed record MyAccessResponse(IReadOnlyList<MyAccessEntryResponse> Entries, bool Truncated, int ExpiringWithinDays, long AuthorizationRevision);
+
+/// <summary>C10 M2 (D8-4, PG-053): the Active records a member directly owns (ids only), as the Authority lists them for administrators.</summary>
+public sealed record MemberOwnedRecordsResponse(Guid MemberUserId, IReadOnlyList<Guid> FormRecordIds, bool Truncated, long AuthorizationRevision);
+
+/// <summary>C10 M2 (PG-053): reassign every record a member directly owns; each record is one TransferOwnership with this reason and step-up.</summary>
+public sealed record ReassignRecordsRequest(Guid? NewOwnerUserId, Guid? NewOwnerTeamId, string TransferReason, bool? UseDevelopmentStepUp = null);
+
+/// <param name="CommandStatus">The Authority command state, or Refused (with the refusal code) when no command was accepted.</param>
+public sealed record ReassignedRecordResponse(Guid FormRecordId, string CommandStatus, bool Effective, string? RefusalCode);
+
+public sealed record ReassignRecordsResponse(Guid MemberUserId, IReadOnlyList<ReassignedRecordResponse> Records, bool Truncated);
+
 /// <summary>C10 M2: the share after an Effective update; <c>ShareRevision</c> is also the new <c>ETag</c>.</summary>
 public sealed record UpdateShareResponse(Guid RecordShareId, Guid FormRecordId, string RecipientRole, IReadOnlyList<Guid> FieldValueItemIds, long ShareRevision, string ShareStatus,
     CommandOutcome Command);

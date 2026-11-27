@@ -3,6 +3,7 @@ using EnterpriseForms.Api.Features.FormDefinitions;
 using EnterpriseForms.Application.Features.Sharing.CreateShare;
 using EnterpriseForms.Application.Features.Sharing.GetShare;
 using EnterpriseForms.Application.Features.Sharing.ListShares;
+using EnterpriseForms.Application.Features.Sharing.MyAccess;
 using EnterpriseForms.Application.Features.Sharing.RevokeShare;
 using EnterpriseForms.Application.Features.Sharing.ShareHistory;
 using EnterpriseForms.Application.Features.Sharing.UpdateShare;
@@ -46,6 +47,16 @@ public static class SharingEndpoints
             .WithName("GetRecordSharingHistory")
             .WithSummary("Sharing and ownership changes of a record from the authority's committed state, newest first, each with its command state (owner or access manager; others 404).");
 
+        // C10 M2 (WP-0 §3.5, PG-023): what the share's recipient can do now and why, decided by the Authority.
+        group.MapGet("/{recordShareId:guid}/effective-scope", static async Task<Ok<ShareEffectiveScopeResponse>> (Guid formRecordId, Guid recordShareId, HttpContext http, MyAccessHandlers handler, CancellationToken cancellationToken) =>
+            {
+                var context = BusinessAuthentication.RequireContext(http);
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(await handler.GetEffectiveScopeAsync(context, formRecordId, recordShareId, cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetRecordShareEffectiveScope")
+            .WithSummary("What the share's recipient can do through it now (Active only while the share and its lineage are), with its lineage; same readers as the share details.");
+
         var recordGroup = endpoints.MapGroup(ApiVersions.V1Prefix + "/form-records/{formRecordId:guid}").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
         recordGroup.MapGet("/ownership-history", static async Task<Ok<RecordSecurityHistoryResponse>> (Guid formRecordId, HttpContext http, RecordSecurityHistoryHandler handler, CancellationToken cancellationToken) =>
             {
@@ -55,6 +66,35 @@ public static class SharingEndpoints
             })
             .WithName("GetRecordOwnershipHistory")
             .WithSummary("Ownership changes of a record from the authority's committed state, newest first, each with its command state.");
+
+        // C10 M2 (WP-0 §3.5, PG-066): the caller's own access sources from the Authority.
+        var meGroup = endpoints.MapGroup(ApiVersions.V1Prefix + "/me").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
+        meGroup.MapGet("/access", static async Task<Ok<MyAccessResponse>> (HttpContext http, MyAccessHandlers handler, CancellationToken cancellationToken) =>
+            {
+                var context = BusinessAuthentication.RequireContext(http);
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(await handler.GetMyAccessAsync(context, cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetMyAccess")
+            .WithSummary("The caller's own owned, team-owned, direct-share and team-share access (expired shares omitted, expiring soon flagged), from the authority.");
+
+        // C10 M2 (WP-0 §3.7, D8-4, PG-053): administrator reassignment of a member's records (one transfer command per record).
+        var members = endpoints.MapGroup(ApiVersions.V1Prefix + "/members/{memberUserId:guid}").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
+        members.MapGet("/owned-records", static async Task<Ok<MemberOwnedRecordsResponse>> (Guid memberUserId, HttpContext http, ReassignRecordsHandler handler, CancellationToken cancellationToken) =>
+            {
+                var context = BusinessAuthentication.RequireContext(http);
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(await handler.ListAsync(context, memberUserId, cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetMemberOwnedRecords")
+            .WithSummary("Active records a member directly owns (ids only), for Security Administrators and organization owners.");
+        members.MapPost("/reassign-records", static async Task<Ok<ReassignRecordsResponse>> (Guid memberUserId, ReassignRecordsRequest request, HttpContext http, ReassignRecordsHandler handler, CancellationToken cancellationToken) =>
+            {
+                var context = BusinessAuthentication.RequireContext(http);
+                return TypedResults.Ok(await handler.ReassignAsync(context, memberUserId, request, FormDefinitionEndpoints.RequireIdempotencyKey(http), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("ReassignMemberRecords")
+            .WithSummary("Transfers each record the member directly owns with its own TransferOwnership command (reason and step-up; administrator override rules apply); reports each record's outcome.");
 
         // C10 M2 (WP-0 §3.5, D10-3): the authoritative share details; the ETag is the Authority's committed share revision.
         group.MapGet("/{recordShareId:guid}", static async Task<Ok<ShareDetailsResponse>> (Guid formRecordId, Guid recordShareId, HttpContext http, GetShareHandler handler, CancellationToken cancellationToken) =>
