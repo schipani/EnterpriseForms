@@ -8,7 +8,7 @@ import { ErrorPanel } from "../../support";
 
 /**
  * PG-053 reassignment of a member's records (C10 M3, WP-0 Section 3.7, D8-4): before a member who owns records is disabled, a
- * Security Administrator or organization owner moves each record the member directly owns. Each record is its own ownership transfer
+ * Security Administrator moves each record the member directly owns. Each record is its own ownership transfer
  * with this reason and step-up, decided by the authorization authority (an administrator can never make themselves or a team they
  * belong to the owner); the page shows every record's own outcome, and pending transfers as pending.
  */

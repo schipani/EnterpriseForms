@@ -84,22 +84,19 @@ internal sealed class ShareExpiryOverlay
         for (var level = 0; level < 3 && frontier.Count > 0; level++)
         {
             var next = new List<Guid>();
-            foreach (var parent in frontier)
+            // Re-review N-1: one set-based read per level, not one per share.
+            foreach (var child in await scope.FindShareMetadataByParentsAsync(organizationId, frontier, cancellationToken).ConfigureAwait(false))
             {
-                var bound = effective[parent];
-                foreach (var child in await scope.FindShareMetadataByParentAsync(organizationId, parent, cancellationToken).ConfigureAwait(false))
+                if (child.OrganizationId != organizationId || child.ParentRecordShareId is not { } parent || !effective.TryGetValue(parent, out var bound))
                 {
-                    if (child.OrganizationId != organizationId)
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    var childBound = child.ShareExpiresOn is { } own && own < bound ? own : bound;
-                    if (!effective.TryGetValue(child.RecordShareId, out var known) || childBound < known)
-                    {
-                        effective[child.RecordShareId] = childBound;
-                        next.Add(child.RecordShareId);
-                    }
+                var childBound = child.ShareExpiresOn is { } own && own < bound ? own : bound;
+                if (!effective.TryGetValue(child.RecordShareId, out var known) || childBound < known)
+                {
+                    effective[child.RecordShareId] = childBound;
+                    next.Add(child.RecordShareId);
                 }
             }
 

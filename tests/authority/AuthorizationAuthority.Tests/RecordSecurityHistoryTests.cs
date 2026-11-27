@@ -63,6 +63,16 @@ public sealed class RecordSecurityHistoryTests
         return status.CommandId;
     }
 
+    /// <summary>C10 re-review: a reader's own authority comes only from Effective grants, so tests that read through a new grant project it first.</summary>
+    private void MakeEffective(params Guid[] commands)
+    {
+        foreach (var command in store.Commands.Where(c => commands.Length == 0 ? c.CommandStateName == SecurityCommandStates.CommittedAwaitingProjection : commands.Contains(c.SecurityCommandId)))
+        {
+            command.CommandStateName = SecurityCommandStates.Effective;
+            command.CommandEffectiveOn = clock.GetUtcNow();
+        }
+    }
+
     private Task<RecordSecurityHistory> ReadAsync(Guid actor) =>
         new RecordSecurityHistoryService(store, clock).GetAsync(new VerifiedActor("https://idp", actor.ToString("N"), "test"), org, record, Ct);
 
@@ -83,12 +93,14 @@ public sealed class RecordSecurityHistoryTests
     public async Task TheHistoryListsEveryChangeNewestFirstWithItsOwnState()
     {
         var h = await HistoryAsync();
+        MakeEffective(h.Transfer); // the new owner reads through the Effective transfer; the other commands stay pending
 
         var history = await ReadAsync(newOwner);
 
         Assert.False(history.Truncated);
         Assert.Equal(new[] { h.Transfer, h.Revoke, h.Update, h.Delegate, h.Create }, history.Items.Select(i => i.SecurityCommandId));
-        Assert.All(history.Items, i => Assert.Equal(SecurityCommandStates.CommittedAwaitingProjection, i.CommandState)); // never claimed Effective
+        Assert.Equal(SecurityCommandStates.Effective, history.Items[0].CommandState);
+        Assert.All(history.Items.Skip(1), i => Assert.Equal(SecurityCommandStates.CommittedAwaitingProjection, i.CommandState)); // never claimed Effective
         var transfer = history.Items[0];
         Assert.Equal(nameof(SecurityCommandKind.TransferOwnership), transfer.CommandKind);
         Assert.Equal(owner, transfer.ActorUserId);
@@ -111,13 +123,14 @@ public sealed class RecordSecurityHistoryTests
         var effective = store.Commands.Single(c => c.SecurityCommandId == h.Create);
         effective.CommandStateName = SecurityCommandStates.Effective;
         effective.CommandEffectiveOn = clock.GetUtcNow();
+        MakeEffective(h.Transfer);
 
         var history = await ReadAsync(newOwner);
 
         var item = history.Items.Single(i => i.SecurityCommandId == h.Create);
         Assert.Equal(SecurityCommandStates.Effective, item.CommandState);
         Assert.NotNull(item.EffectiveOn);
-        Assert.Equal(SecurityCommandStates.CommittedAwaitingProjection, history.Items.Single(i => i.SecurityCommandId == h.Transfer).CommandState);
+        Assert.Equal(SecurityCommandStates.CommittedAwaitingProjection, history.Items.Single(i => i.SecurityCommandId == h.Revoke).CommandState);
     }
 
     [Fact]
@@ -127,6 +140,7 @@ public sealed class RecordSecurityHistoryTests
         var step = HumanCommandStepUpGate.SyntheticStepUpEvidence;
         await SubmitAsync(owner, SecurityCommandKind.CreateShare, new CreateSharePayload(managerShare, record, manager, null, RecipientRoles.Manager, [first], step));
         await SubmitAsync(owner, SecurityCommandKind.CreateShare, new CreateSharePayload(Guid.NewGuid(), record, reader, null, RecipientRoles.Reader, [first], step));
+        MakeEffective();
 
         Assert.Equal(2, (await ReadAsync(manager)).Items.Count);
         Assert.Equal(2, (await ReadAsync(owner)).Items.Count);
@@ -203,6 +217,7 @@ public sealed class RecordSecurityHistoryTests
         var step = HumanCommandStepUpGate.SyntheticStepUpEvidence;
         await SubmitAsync(owner, SecurityCommandKind.CreateShare, new CreateSharePayload(Guid.NewGuid(), record, manager, null, RecipientRoles.Manager, [first], step));
         var transfer = await SubmitAsync(owner, SecurityCommandKind.TransferOwnership, new TransferOwnershipPayload(record, newOwner, null, step));
+        MakeEffective();
 
         var asManager = await ReadAsync(manager); // the owner-granted manager share survives the transfer
         Assert.NotEmpty(asManager.Items);
@@ -220,6 +235,21 @@ public sealed class RecordSecurityHistoryTests
 
         Assert.Equal(AuthorityErrorCodes.ResourceNotRegistered, (await Assert.ThrowsAsync<AuthorityException>(() => ReadAsync(auditor))).ErrorCode); // share history: not an auditor read
         Assert.Contains((await ReadAsync(newOwner)).Items, i => i.SecurityCommandId == transfer); // the owner sees every change
+    }
+
+    [Fact]
+    public async Task AGrantAwaitingItsProjectionConfersNoReadButItsCommandIsListedToReadersInEffect()
+    {
+        // C10 re-review (F-5/F3 residual, A11): a reader's own authority is never a pending grant.
+        var step = HumanCommandStepUpGate.SyntheticStepUpEvidence;
+        var create = await SubmitAsync(owner, SecurityCommandKind.CreateShare, new CreateSharePayload(Guid.NewGuid(), record, manager, null, RecipientRoles.Manager, [first], step));
+
+        Assert.Equal(AuthorityErrorCodes.ResourceNotRegistered, (await Assert.ThrowsAsync<AuthorityException>(() => ReadAsync(manager))).ErrorCode);
+        var listed = Assert.Single((await ReadAsync(owner)).Items); // the owner's grant predates the command
+        Assert.Equal((create, SecurityCommandStates.CommittedAwaitingProjection), (listed.SecurityCommandId, listed.CommandState));
+
+        MakeEffective(create);
+        Assert.Single((await ReadAsync(manager)).Items);
     }
 
     [Fact]

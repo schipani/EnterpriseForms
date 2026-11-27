@@ -18,8 +18,8 @@ namespace AuthorizationAuthority.Application.Features.Sharing;
 /// record's current owner (or an owning-team member) and a holder of an Active Manager share on the record with Active lineage (ManageAccess),
 /// a non-owner seeing no owner changes; for ownership history, the current owner and a Security Auditor of the organization, seeing owner
 /// changes only. Everyone else gets the answer for an unknown record. The read uses committed desired state, which is never behind the
-/// projection, so a revoked manager is refused at once; pending commands are listed with their own state (Section 3.5), so only an
-/// integrity quarantine refuses the read (review F-5).
+/// projection, so a revoked manager is refused at once, and the reader's own authority comes only from grants whose commands are in
+/// effect (A11); pending commands are listed with their own state (Section 3.5); an integrity quarantine refuses the read (review F-5).
 /// </summary>
 public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProvider clock)
 {
@@ -47,10 +47,13 @@ public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProv
         }
 
         var graph = new DesiredStateGraph(await scope.GetActiveEdgesAsync(organizationId, cancellationToken).ConfigureAwait(false));
-        var isOwner = graph.IsRecordOwner(bound.AuthorityUserId, formRecordId);
+        // C10 re-review (F-5/F3 residual): the reader's own authority comes only from grants whose commands are in effect (A11); a grant
+        // still awaiting its projection or archive receipt confers no read. Pending commands are still listed with their own state.
+        var readerGraph = await InEffectAsync(scope, state, graph, cancellationToken).ConfigureAwait(false);
+        var isOwner = readerGraph.IsRecordOwner(bound.AuthorityUserId, formRecordId);
         var permitted = isOwner || (ownershipView
-            ? graph.HasOrganizationRole(organizationId, bound.AuthorityUserId, OrganizationRoleNames.SecurityAuditor)
-            : await ManagesAccessAsync(scope, graph, organizationId, formRecordId, bound.AuthorityUserId, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false));
+            ? readerGraph.HasOrganizationRole(organizationId, bound.AuthorityUserId, OrganizationRoleNames.SecurityAuditor)
+            : await ManagesAccessAsync(scope, readerGraph, organizationId, formRecordId, bound.AuthorityUserId, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false));
         if (!permitted)
         {
             throw Unavailable();
@@ -196,6 +199,29 @@ public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProv
     }
 
     private static AuthorityException Unavailable() => AuthorityException.NotRegistered("record history is not available to this actor");
+
+    /// <summary>
+    /// The committed edges whose creating command is in effect. While the gate is open every committed command is projected and archived,
+    /// so the graph is unchanged; otherwise edges created by a command that is not Effective are left out (removals already apply).
+    /// </summary>
+    private static async Task<DesiredStateGraph> InEffectAsync(IAuthorityScope scope, OrganizationAuthorizationState state, DesiredStateGraph graph, CancellationToken cancellationToken)
+    {
+        if (await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false) == ProjectionGateState.Ready)
+        {
+            return graph;
+        }
+
+        var pending = new HashSet<Guid>();
+        foreach (var commandId in graph.Edges.Select(e => e.CreatedBySecurityCommandId).Where(id => id != Guid.Empty).Distinct())
+        {
+            if (await scope.FindCommandAsync(commandId, cancellationToken).ConfigureAwait(false) is { } command && command.CommandStateName != SecurityCommandStates.Effective)
+            {
+                pending.Add(commandId);
+            }
+        }
+
+        return pending.Count == 0 ? graph : new DesiredStateGraph([.. graph.Edges.Where(e => !pending.Contains(e.CreatedBySecurityCommandId))]);
+    }
 
     /// <summary>ManageAccess through sharing: an Active Manager role on an Active share of the record whose lineage is Active now.</summary>
     private static async Task<bool> ManagesAccessAsync(IAuthorityScope scope, DesiredStateGraph graph, Guid organizationId, Guid formRecordId, Guid userId, DateTimeOffset now, CancellationToken cancellationToken)

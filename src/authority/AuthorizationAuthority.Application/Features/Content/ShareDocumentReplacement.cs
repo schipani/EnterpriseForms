@@ -7,7 +7,7 @@ namespace AuthorizationAuthority.Application.Features.Content;
 
 /// <summary>
 /// C10 WP8-B (WP-0 Sections 3.6 and 3.6.1, owner decision 2026-11-27): a share editor's replacement of exactly one attachment with its
-/// next accepted version (a number above the accepted one), under the existing content acceptance rule version. The version, record,
+/// next version (exactly the accepted one + 1, owner decision C-196), under the existing content acceptance rule version. The version, record,
 /// organization and scan are re-derived here at Commit from the verified staged bytes and the accepted leaves; the field and the other
 /// identity columns are re-derived at Commit by the item identity binding (<c>ContentItemIdentityRules.BindAtCommitAsync</c>), and the
 /// staged bytes are digest-bound to the candidate recorded at Prepare; the schema, envelope and data-key rules are the owner path's own,
@@ -49,9 +49,9 @@ internal static class ShareDocumentReplacement
             throw Refused("the attachment has no verified version evidence yet");
         }
 
-        if (candidate.Column(VersionColumn)?.AsInt32() is not { } next || next <= trusted)
+        if (candidate.Column(VersionColumn)?.AsInt32() != trusted + 1)
         {
-            throw Refused("a replacement must carry a version above the accepted one");
+            throw Refused("a replacement must be exactly the next version");
         }
 
         if (candidate.Column("file_attachment_id")?.AsUuid() != item || candidate.Column("form_record_id")?.AsUuid() != formRecordId ||

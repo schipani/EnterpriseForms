@@ -289,8 +289,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C10_WP0_SHARING_OWNERSHIP_PROPOSAL.md",
-      "sha256": "d6228cd7d1a9755ef08484c74481cd2306b36c8ea297183065dd0bd6c9654dca",
-      "bytes": 57863
+      "sha256": "72aadc55529cc5a8c79e9b9a5ee44b001f336a1bfa7c8a76ddfd864d09bc826c",
+      "bytes": 59315
     },
     {
       "path": "docs/architecture/PHASE_C3_REPEATING_GROUPS_AND_DEPENDENT_DROPDOWNS.md",

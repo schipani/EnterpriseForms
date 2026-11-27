@@ -162,10 +162,9 @@ The extension "bounded by the parent share's effective scope" above cannot hold 
 earlier version, and extending the parent would show the new version to the upstream manager. Resolution: `canReplaceDocument` may be
 set only on a share the record owner grants directly (depth 1, no parent, resolved lineage) with the Contributor or Manager role; a
 delegated share never carries it, and a request for it is rejected (`DOCUMENT_REPLACE_REQUIRES_OWNER_GRANT`), never silently
-reduced. Viewing and downloading still delegate. A replacement is the next accepted version of the one shared attachment — a version
-number above the accepted one (numbers consumed by uploads that were never accepted are skipped; independent review, §10.4) — with no
-other content change, behind the contributor-write switch, and only while the accepted version lies within the authorizing share's
-boundary (a later version by the owner can neither be seen nor superseded through the share; review D-2); only the replacing share's
+reduced. Viewing and downloading still delegate. A replacement is exactly the next verified version of the one shared attachment, with
+no other content change, behind the contributor-write switch, and only while the accepted version lies within the authorizing share's
+boundary (a later version by the owner can neither be seen nor superseded through the share; independent review D-2, §10.4); only the replacing share's
 boundary advances, in the content commit that accepts the version; no other share is extended; if more than one of the actor's shares
 could authorize it, it is refused (`DOCUMENT_REPLACE_SHARE_AMBIGUOUS`).
 - Entry (repeating-group instance) shares stay refused in C10 (`FIELD_IN_REPEATING_GROUP`); their design is deferred.
@@ -495,30 +494,46 @@ admission. **CARV:** reviewers (1) and (2) independently concluded that WP8-B ne
 
 | Finding | Correction |
 | --- | --- |
-| Expired share still authorizes field writes (high) | `ShareDocumentReadability.ExpiredSharesAsync`: shares expired at the instant (own or ancestor expiry) confer no edit scope at Prepare and again at Commit (`DesiredStateGraph.EditableFieldItemsViaShares`) |
+| Expired share still authorizes field writes (high) | `ShareDocumentReadability.ExpiredSharesAsync`: shares expired at the instant (own or ancestor expiry) confer no edit scope at Prepare and again at Commit (`DesiredStateGraph.EditableFieldItemsViaShares`). Lineage status Invalid is not excluded (legacy edge-only shares); normal commands remove such edges |
 | Replacement past the share's boundary (D-2) | `ReplaceableAsync` requires the accepted version to lie within the binding's boundary, at Prepare, Commit and in the advisory list |
-| Replacement refused after any unaccepted upload (found during correction) | The business numbers versions from all rows, so accepted numbers can skip; the rule is "above the accepted version" at Prepare (`ContentDeltaRules`) and Commit (`ShareDocumentReplacement`) |
 | Attachment version number not checked on the owner path (D-1, partial) | `AttachmentVersionRules`: a candidate attachment version number is positive and never below the accepted one, on every non-migration path, at Prepare and re-derived at Commit. See residual below |
-| Snapshot and cursor expiry bound ignored the lineage minimum (F-1) | `ShareExpiryOverlay` propagates every expiry to descendants (lineage minimum); `NextExpiryFor` and the expired set use it |
+| Snapshot and cursor expiry bound ignored the lineage minimum (F-1) | `ShareExpiryOverlay` propagates every expiry to descendants (lineage minimum), one set-based read per level (`FindShareMetadataByParentsAsync`, re-review N-1); `NextExpiryFor` and the expired set use it |
 | Record-list continuation decided by a client field (F-8) | A page with `Offset > 0` is a continuation |
 | Share create and revoke from the Access tab sent no step-up (F-2) | The create dialog and the revoke confirmation ask for the development step-up and send it |
 | Organization Owner could list another member's owned records (F-3) | `OwnedRecordsService` admits only Security Administrators (the transfer override's role) |
 | Ownership history readable by Managers; Security Auditor had none (F-4) | `view=ownership`: owner or Security Auditor, owner changes only; share history: owner or ManageAccess, a non-owner sees no owner changes |
-| History served under integrity quarantine (F-5, partial) | Refused while the organization is quarantined. Pending commands are still listed with their own state (§3.5), so projection lag does not refuse the read; the re-review checks this reading |
+| History served under integrity quarantine (F-5) | Refused while the organization is quarantined. Pending commands are still listed with their own state (§3.5), but the reader's own authority comes only from grants whose commands are Effective (re-review residual) |
 | One failing share stopped the expiry pass (F5) | Per-share failure is logged and counted as unconverged; the alert fires after two passes |
 | Partial readers saw the full version history (D-3) | A share recipient's document detail lists only the version released to them |
 | Unreachable historic-download branch for recipients (D-4) | Removed: recipients download the current released version only (historic verification needs full read at the Authority) |
 | Share-replacement upload declared another field's policy (F-7) | The declared field must be the replaced attachment's own field (same answer as an unknown attachment otherwise) |
 | `RequireAtCommit` dead field check (O-1/F7) | Removed; the field and other identity columns are re-derived at Commit by `ContentItemIdentityRules.BindAtCommitAsync` (documented) |
 
+**Re-review of the corrections (same three reviewers, 2026-11-27).** Confirmed resolved: F1, F2/D-2, D-3, D-4, O-1/F7, F-1, F-2, F-3,
+F-4, F-7, F-8, F5, §4 test 16 (static). CARV re-confirmed: no increment. Corrected after the re-review: the replacement version rule had
+been relaxed to "above the accepted version", which contradicted C-196 and let a compromised business push a boundary to the maximum
+number; it is restored to exactly the next version. History readers are authorized only through Effective grants. The overlay's
+descendant read is set-based (N-1). F1 comment wording corrected.
+
 **Not corrected — owner decision required:**
+
+- **Replacement after an unaccepted upload (functional, fail closed; found during correction):** the business assigns
+  `max(every version row) + 1`, so after any upload that was never accepted the next number skips one and replacement through a share
+  is refused permanently for that attachment. Options: the business assigns the accepted version + 1, or a bounded skip is allowed
+  (the owner rule says "exactly the next verified version").
+- **N-2 (low):** history truncation is applied before the view filter, so an ownership view can miss an older change behind many
+  newer share commands (with `truncated = true`).
+- **Read audit (F-3 residual, N-3; low–medium):** owned-record listing and Security Auditor ownership-history reads are not journaled
+  (CLAUDE.md §4D); `AuditAccessService` is the precedent.
 
 - **D-1 residual (high, Level 2 hostile-business writes):** new attachment content that keeps the accepted version number. Every carried
   row is re-staged with a new operation binding, so Commit cannot tell an unchanged attachment from new bytes under the same number
   without accepted content evidence, which the Authority does not hold; a Prepare-only comparison is exactly what the E3 contract
   says requires a CARV increment (not authorized). Options: (a) extend Option A with Authority-verified content evidence (e.g. the
   attachment's ciphertext digest) on manifest and candidate leaves, captured at Prepare and re-derived at Commit (a Development/Test
-  migration; no CARV increment); (b) CARV 4 with a Prepare-only rule (not authorized). Until decided, a compromised business can
+  migration; no CARV increment); (b) resend the current items with Commit and re-prove them against the accepted leaves
+  (`E3_M2B_IMPLEMENTATION_CONTRACT.md` §3.2, OD-M2-24; no migration, no CARV increment, both API contracts change; re-review);
+  (c) CARV 4 with a Prepare-only rule (not authorized). Until decided, a compromised business can
   give a recipient the owner's new bytes under a number the share already covers.
 - **D-5:** the boundary advance in the content commit is recorded in no security journal entry, and the share ETag does not change.
   A restore or replay would drop the extension (fail closed: the recipient loses the new version). Decide whether to add it to the

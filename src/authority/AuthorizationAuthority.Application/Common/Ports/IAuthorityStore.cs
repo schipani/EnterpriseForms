@@ -120,6 +120,18 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>C10 M1-WP5: finds all share metadata records where parent_record_share_id matches the given parent share id.</summary>
     Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid organizationId, Guid parentRecordShareId, CancellationToken cancellationToken);
 
+    /// <summary>C10 re-review (N-1): the metadata of every share whose parent is one of <paramref name="parentRecordShareIds"/>, in one read.</summary>
+    async Task<List<ShareResourceMetadata>> FindShareMetadataByParentsAsync(Guid organizationId, IReadOnlyCollection<Guid> parentRecordShareIds, CancellationToken cancellationToken)
+    {
+        var result = new List<ShareResourceMetadata>();
+        foreach (var parent in parentRecordShareIds)
+        {
+            result.AddRange(await FindShareMetadataByParentAsync(organizationId, parent, cancellationToken).ConfigureAwait(false));
+        }
+
+        return result;
+    }
+
     /// <summary>C10 M1-WP2: the metadata of the organization's Active shares that carry an expiry (access-time expiry overlay).</summary>
     Task<List<ShareResourceMetadata>> GetActiveShareMetadataWithExpiryAsync(Guid organizationId, CancellationToken cancellationToken);
 

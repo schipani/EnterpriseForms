@@ -14,7 +14,8 @@ namespace AuthorizationAuthority.Tests;
 /// C10 independent review corrections through the real Prepare and Commit:
 /// F1 — an expired share (its own expiry or an ancestor's) confers no edit scope, whether or not convergence has run, at Prepare and at Commit;
 /// D-2 — a replacement is refused when the accepted version lies outside the authorizing share's boundary (Prepare and Commit);
-/// the replacement version is any number above the accepted one (numbers consumed by unaccepted uploads are skipped);
+/// the replacement is exactly the next version (owner decision C-196): a number skipped by an unaccepted upload is refused (fail closed;
+/// recorded for an owner decision, WP-0 Section 10.4);
 /// D-1 (partial) — an attachment's version number never decreases;
 /// E-3/E-4/E-5 — narrowing, team removal between Prepare and Commit, and an attachment without version evidence.
 /// </summary>
@@ -72,13 +73,14 @@ public sealed partial class ContributorWriteProtocolTests
     }
 
     [Fact]
-    public async Task OnlyALaterCleanVersionOfTheSharedDocumentAloneIsAccepted()
+    public async Task OnlyTheExactNextCleanVersionOfTheSharedDocumentAloneIsAccepted()
     {
         var h = await new Harness().CreatedAsync();
         var binding = ReplaceShare(h);
 
         await Assert.ThrowsAsync<AuthorityException>(() => PrepareReplacementAsync(h, NextVersion(h, version: 1)));          // the same number with new bytes
         await Assert.ThrowsAsync<AuthorityException>(() => PrepareReplacementAsync(h, NextVersion(h, version: 0)));          // a lower number
+        await Assert.ThrowsAsync<AuthorityException>(() => PrepareReplacementAsync(h, NextVersion(h, version: 3)));          // a skipped number
         await Assert.ThrowsAsync<AuthorityException>(() => PrepareReplacementAsync(h, NextVersion(h, verdict: "Infected")));  // not clean
         var mixed = Change(NextVersion(h), h.Other, r => r.With("string_value", RowValue.Text("also changed")));
         await Assert.ThrowsAsync<AuthorityException>(() => PrepareReplacementAsync(h, mixed));                               // another change in the same operation
@@ -87,15 +89,17 @@ public sealed partial class ContributorWriteProtocolTests
     }
 
     [Fact]
-    public async Task AVersionNumberSkippedByAnUnacceptedUploadIsAcceptedAndTheBoundaryFollowsIt()
+    public async Task AVersionNumberSkippedByAnUnacceptedUploadIsRefusedAndMovesNoBoundary()
     {
+        // Fail closed until the owner decides (WP-0 Section 10.4): the business numbers versions from every row, so after an unaccepted
+        // upload its next number skips one, and replacement through the share is refused.
         var h = await new Harness().CreatedAsync();
         var binding = ReplaceShare(h);
 
-        var (prepared, candidate) = await PrepareReplacementAsync(h, NextVersion(h, version: 3)); // version 2 was processed but never accepted
-        await h.CommitAsync(h.Contributor, prepared, candidate);
+        await Assert.ThrowsAsync<AuthorityException>(() => PrepareReplacementAsync(h, NextVersion(h, version: 3))); // version 2 was processed but never accepted
 
-        Assert.Equal(3, binding.SharedThroughVersionNumber);
+        Assert.Equal(1, binding.SharedThroughVersionNumber);
+        Assert.Equal(1, h.Head.CommittedContentRevision);
     }
 
     [Fact]

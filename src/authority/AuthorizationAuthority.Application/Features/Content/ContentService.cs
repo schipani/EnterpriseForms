@@ -205,7 +205,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             {
                 // Phase C5 share editor: switch, scope, current-snapshot proof (D4) and column-class classification (D14/D15).
                 // C10 WP8-B: or the replacement of exactly one attachment through an owner-granted share (re-derived at Commit).
-                // C10 (review F1): an expired share, or one whose lineage is broken, confers no edit scope (re-derived at Commit).
+                // C10 (review F1): an expired share (its own or an ancestor's expiry) confers no edit scope (re-derived at Commit).
                 notLive = await ShareDocumentReadability.ExpiredSharesAsync(scope, state.OrganizationId, request.FormRecordId, graph.EditorSharesOf(bound.AuthorityUserId, request.FormRecordId), decisionInstant, cancellationToken).ConfigureAwait(false);
                 replaceable = await ShareDocumentReadability.ReplaceableAsync(scope, state.OrganizationId, request.FormRecordId, bound.AuthorityUserId, decisionInstant, currentLeaves, cancellationToken).ConfigureAwait(false);
                 RequireShareEditor(graph, bound, request.FormRecordId, replaceable.Count > 0, notLive);
@@ -449,7 +449,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
                 if (shareEditorOperation)
                 {
                     // C10 WP8-B: the replace authority is re-derived here from the current committed state (expiry, revocation, narrowing).
-                    // C10 (review F1): so is the exclusion of expired and broken-lineage shares from the edit scope.
+                    // C10 (review F1): so is the exclusion of expired shares from the edit scope.
                     var commitInstant = clock.GetUtcNow();
                     commitNotLive = await ShareDocumentReadability.ExpiredSharesAsync(scope, state.OrganizationId, request.FormRecordId, commitGraph.EditorSharesOf(bound.AuthorityUserId, request.FormRecordId), commitInstant, cancellationToken).ConfigureAwait(false);
                     commitReplaceable = await ShareDocumentReadability.ReplaceableAsync(scope, state.OrganizationId, request.FormRecordId, bound.AuthorityUserId, commitInstant, currentLeaves, cancellationToken).ConfigureAwait(false);
@@ -590,8 +590,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             }
         }
 
-        // C10 WP8-B: a share editor's attachment replacement, re-derived from the verified staged bytes and the accepted leaves (a
-        // version above the accepted one, the same record and organization, a clean scan), and the one authorizing share it extends.
+        // C10 WP8-B: a share editor's attachment replacement, re-derived from the verified staged bytes and the accepted leaves (the
+        // next verified version, the same record and organization, a clean scan), and the one authorizing share it extends.
         Domain.Features.Sharing.ShareDocumentBinding? replacingBinding = null;
         int replacementVersion = 0;
         if (shareEditorOperation && ShareDocumentReplacement.ReplacedItem(mutations) is { } replacedItem)

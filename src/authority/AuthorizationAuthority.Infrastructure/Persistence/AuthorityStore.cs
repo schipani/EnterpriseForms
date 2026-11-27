@@ -462,6 +462,13 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid organizationId, Guid parentRecordShareId, CancellationToken cancellationToken) =>
             context.ShareResourceMetadatas.Where(s => s.OrganizationId == organizationId && s.ParentRecordShareId == parentRecordShareId).ToListAsync(cancellationToken);
 
+        // C10 re-review (N-1): the expiry overlay's descendant read, one query per lineage level (no tracking: a decision never changes them).
+        public Task<List<ShareResourceMetadata>> FindShareMetadataByParentsAsync(Guid organizationId, IReadOnlyCollection<Guid> parentRecordShareIds, CancellationToken cancellationToken) =>
+            parentRecordShareIds.Count == 0
+                ? Task.FromResult(new List<ShareResourceMetadata>())
+                : context.ShareResourceMetadatas.AsNoTracking()
+                    .Where(s => s.OrganizationId == organizationId && s.ParentRecordShareId != null && parentRecordShareIds.Contains(s.ParentRecordShareId.Value)).ToListAsync(cancellationToken);
+
         // C10 M1-WP2: the access-time expiry overlay's reads (no tracking: a decision never changes them).
         public Task<List<ShareResourceMetadata>> GetActiveShareMetadataWithExpiryAsync(Guid organizationId, CancellationToken cancellationToken) =>
             context.ShareResourceMetadatas.AsNoTracking()

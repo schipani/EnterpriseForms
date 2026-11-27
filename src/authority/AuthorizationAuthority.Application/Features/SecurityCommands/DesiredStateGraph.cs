@@ -86,7 +86,7 @@ public sealed class DesiredStateGraph(IReadOnlyList<AuthorityRelationshipEdge> a
 
     /// <summary>
     /// Field items the user may edit through shares (contributor/manager), excluding ownership. C10 (review F1): shares in
-    /// <paramref name="excludedShareIds"/> (expired or with a broken lineage at the decision instant) confer nothing.
+    /// <paramref name="excludedShareIds"/> (expired at the decision instant: their own or an ancestor's expiry) confer nothing.
     /// </summary>
     public IReadOnlySet<Guid> EditableFieldItemsViaShares(Guid userId, Guid formRecordId, IReadOnlySet<Guid>? excludedShareIds = null)
     {
