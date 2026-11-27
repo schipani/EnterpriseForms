@@ -141,3 +141,18 @@ Same mandate and limits as above; still no independent review, merge, push, prot
 ## Direct development checkpoint 3 — 2026-11-26
 
 D6 complete on the candidate at 8c712cb3: security_commands.target_form_record_id (immutable by trigger, backfilled from committed payloads, Development/Test only) and ix_journal_security_command; the record history now lists every committed expiry change including superseded ones, each marked journal-backed only when its authorization-journal entry exists. Verified on a disposable PostgreSQL 18 (backfill, trigger, indexes, Down). WP8 reassessed (owner-approved split WP8-A / WP8-B); WP8-A is blocked on one design point: the Authority does not persist an attachment's version number, so shared_through_version_number cannot yet be set from Authority evidence at grant time (see the session report). No WP8 code committed.
+
+## Direct development checkpoint 4 — 2026-11-27
+
+Candidate coord/c10-m1-candidate-r2 at 2b0887c1 (clean tree, signed). CI-equivalent .NET gate: 3,635 passed, 0 failed, 223 authorized skips, 0 rejected; strict specification validation pass; frontend lint, typecheck, build and 78 files / 659 Vitest tests pass. No independent review, merge, push, protection change, persistent-environment change or Stage B run.
+
+| Item | Signed heads | Evidence | Remaining |
+| --- | --- | --- | --- |
+| D6 expiry history | 8c712cb3 | target_form_record_id + journal index; disposable PostgreSQL 18 (backfill, trigger, Down) | — |
+| WP8-A documents | 68bef48c, aa0b7abc, 6779cb71, 836fa9e8, b6f2dc98, 9ebb056d | version evidence from verified attachment rows; document-only shares; flags, delegation caps, boundaries; updates and narrowing; partial-read release and download within the boundary; details; UI | Existing attachments need their record's next accepted commit before sharing (production-readiness obligation) |
+| WP8-B replacement | — | Blocked: needs CARV 4 and a fourth floor migration (E3 governance); owner decision pending | Owner decision |
+| D5 indexed search | c64ae256 | Expired shares excluded from share-only candidates; no blanket refusal; snapshot ends at the earliest live expiry; real-PostgreSQL gate scripts/dev/c10-d5-share-only-pg-gate.ps1 4/4 | G06 review (not closed) |
+| M2 | 492fe1a7 | effective scope, /me/access, member owned records and reassignment | — |
+| M3 | 9d0b3f5f, 2b0887c1 | PG-023, PG-053 (transfer and reassignment), PG-066; disable dialog text per D2 | Playwright axe and manual NVDA/VoiceOver not run |
+
+Consolidation check: every C10 worktree head is in the candidate except feat/c10-m2-share-etags 0ac77c3c, whose two files are byte-identical in the candidate (4f8ad734); other worktrees hold only untracked test logs.
