@@ -1,3 +1,4 @@
+using EnterpriseForms.Application.Common;
 using EnterpriseForms.Application.Common.Authority;
 using EnterpriseForms.Application.Features.Documents.Documents;
 using EnterpriseForms.Application.Features.FormDefinitions.Layout;
@@ -177,5 +178,65 @@ public sealed class Cons23DownloadRecheckTests
         Assert.Equal("DOWNLOAD_NOT_PERMITTED", Current.Evaluate(Fresh(41, complete: false, Version(AdmittedVersion), downloadable: false))); // view-only binding
         Assert.Equal("FULL_READ_REQUIRED", Historic.Evaluate(Fresh(41, complete: false, Version(AdmittedVersion), downloadable: true)));
         Assert.Equal("DOCUMENT_NOT_RELEASED", Historic.Evaluate(Fresh(41, complete: true, null)));
+    }
+
+    // ---- the browser session and the failure classification (independent review findings 2 and 8b) ----
+
+    private sealed class Sessions(bool valid, Exception? failure = null) : IBrowserSessionStateAuthority
+    {
+        public int Validations { get; private set; }
+
+        public Task<BrowserSessionState> CreateSessionAsync(DelegatedUserContext user, string sessionDigestBase64, DateTimeOffset absoluteExpiresOn, string? replacedSessionDigestBase64, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<BrowserSessionState> ValidateSessionAsync(DelegatedUserContext user, string sessionDigestBase64, CancellationToken cancellationToken)
+        {
+            Validations++;
+            return failure is null ? Task.FromResult(new BrowserSessionState(valid, valid ? null : "REVOKED", null, Guid.CreateVersion7())) : Task.FromException<BrowserSessionState>(failure);
+        }
+
+        public Task<BrowserSessionState> RevokeSessionAsync(DelegatedUserContext user, string sessionDigestBase64, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private static RequestContext Context(string? sessionDigest) =>
+        new(Guid.CreateVersion7(), Guid.CreateVersion7(), "https://issuer.test", "subject", "Test", "assertion", Guid.CreateVersion7()) { SessionDigestBase64 = sessionDigest };
+
+    [Fact]
+    public async Task ARevokedOrExpiredBrowserSessionStopsTheStream()
+    {
+        var sessions = new Sessions(valid: false);
+        var stopped = await Assert.ThrowsAsync<DocumentStreamInterruptedException>(() => DocumentStreamRechecks.RequireValidSessionAsync(sessions, Context("digest"), TestContext.Current.CancellationToken));
+        Assert.Equal(DocumentStreamRechecks.SessionInvalid, stopped.ReasonCode);
+        Assert.Equal(1, sessions.Validations);
+    }
+
+    [Fact]
+    public async Task AValidSessionContinuesAndABearerRequestHasNoSessionToCheck()
+    {
+        var sessions = new Sessions(valid: true);
+        await DocumentStreamRechecks.RequireValidSessionAsync(sessions, Context("digest"), TestContext.Current.CancellationToken);
+        await DocumentStreamRechecks.RequireValidSessionAsync(sessions, Context(null), TestContext.Current.CancellationToken);
+        Assert.Equal(1, sessions.Validations);
+    }
+
+    [Fact]
+    public async Task ASessionRegistryThatCannotAnswerFailsTheRecheck()
+    {
+        var sessions = new Sessions(valid: true, new HttpRequestException("unreachable"));
+        var failure = await Assert.ThrowsAsync<HttpRequestException>(() => DocumentStreamRechecks.RequireValidSessionAsync(sessions, Context("digest"), TestContext.Current.CancellationToken));
+        Assert.Equal(DocumentStreamRechecks.AuthorityUnavailable, DocumentStreamRechecks.Classify(failure, CancellationToken.None)!.ReasonCode);
+    }
+
+    [Fact]
+    public void EveryRecheckFailureBecomesAnInterruptionExceptTheRequestsOwnCancellation()
+    {
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        Assert.Null(DocumentStreamRechecks.Classify(new OperationCanceledException(cancelled.Token), cancelled.Token));
+        Assert.Equal(DocumentStreamRechecks.AuthorityUnavailable, DocumentStreamRechecks.Classify(new TaskCanceledException("authority timeout"), CancellationToken.None)!.ReasonCode); // a timeout, not the client
+        Assert.Equal("INTEGRITY_VERIFICATION_FAILED", DocumentStreamRechecks.Classify(new BusinessException("INTEGRITY_VERIFICATION_FAILED", 423), CancellationToken.None)!.ReasonCode);
+        Assert.Equal("PERMISSION_DENIED", DocumentStreamRechecks.Classify(new AuthorityClientException("PERMISSION_DENIED", 403, retryable: false), CancellationToken.None)!.ReasonCode);
+        Assert.Equal(DocumentStreamRechecks.AuthorityUnavailable, DocumentStreamRechecks.Classify(new HttpRequestException("down"), CancellationToken.None)!.ReasonCode);
+        var already = new DocumentStreamInterruptedException(DocumentStreamRechecks.SessionInvalid);
+        Assert.Same(already, DocumentStreamRechecks.Classify(already, CancellationToken.None));
     }
 }

@@ -16,7 +16,7 @@ using EnterpriseForms.Domain.Features.SecurityOperations;
 namespace EnterpriseForms.Application.Features.Documents.Documents;
 
 /// <summary>Authorized document projection, version history, download (server-side decrypt) and removal (new content revision without the leaf).</summary>
-public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider storage, IFileEncryptionService encryption, VerifiedRecordReader reader, RecordCandidateStager stager, IAuthorizationAuthorityClient authority, TimeProvider clock, ISecurityIncidentRecorder incidents, IDecryptionFailureRecorder decryptionFailures, DocumentStreamOptions streamOptions)
+public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider storage, IFileEncryptionService encryption, VerifiedRecordReader reader, RecordCandidateStager stager, IAuthorizationAuthorityClient authority, TimeProvider clock, ISecurityIncidentRecorder incidents, IDecryptionFailureRecorder decryptionFailures, DocumentStreamOptions streamOptions, IBrowserSessionStateAuthority sessions)
 {
     public async Task<IReadOnlyList<DocumentSummaryResponse>> ListAsync(RequestContext context, Guid formRecordId, CancellationToken cancellationToken)
     {
@@ -121,7 +121,9 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             catch (DocumentStreamInterruptedException interrupted)
             {
                 // CONS-23: no further plaintext is written; the response is aborted (incomplete body) and the stop is audited.
-                await AuditRecorder.RecordAsync(store, context, clock, AuditCategories.Document, AuditActions.DocumentDownloadFailed, "document download stopped by the Authority re-check", formRecordId, "Denied",
+                // An unavailable Authority is a failure to decide, not a denial (independent review finding 7).
+                var outcome = interrupted.ReasonCode == DocumentStreamRechecks.AuthorityUnavailable ? "Failed" : "Denied";
+                await AuditRecorder.RecordAsync(store, context, clock, AuditCategories.Document, AuditActions.DocumentDownloadFailed, "document download stopped by the Authority re-check", formRecordId, outcome,
                     new { fileAttachmentId, versionNumber = captured.VersionNumber, reasonCode = interrupted.ReasonCode }, CancellationToken.None).ConfigureAwait(false);
                 throw;
             }
@@ -136,32 +138,22 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
     }
 
     /// <summary>
-    /// CONS-23: one re-check of a streaming download. A fresh verified read (Authority permission, accepted head, integrity, share
-    /// scope and expiry at access time) must still release the admitted document version; a denial, an Authority or verification
-    /// failure and any other error stop the stream. A cancelled request is a client disconnect, not an interruption.
+    /// CONS-23: one re-check of a streaming download. The browser session must still be valid at the Authority (G23), and a fresh
+    /// verified read (Authority permission, accepted head, integrity, share scope and expiry at access time) must still release the
+    /// admitted document version; a denial, an Authority or verification failure and any other error stop the stream. A cancelled
+    /// request is a client disconnect, not an interruption.
     /// </summary>
     private async Task RecheckAsync(RequestContext context, Guid formRecordId, DocumentStreamAdmission admission, CancellationToken cancellationToken)
     {
         VerifiedRecord fresh;
         try
         {
+            await DocumentStreamRechecks.RequireValidSessionAsync(sessions, context, cancellationToken).ConfigureAwait(false);
             fresh = await reader.ReadAsync(context, formRecordId, ProtectedAction.Read, cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (Exception ex) when (DocumentStreamRechecks.Classify(ex, cancellationToken) is { } interrupted && !ReferenceEquals(interrupted, ex))
         {
-            throw;
-        }
-        catch (BusinessException ex)
-        {
-            throw new DocumentStreamInterruptedException(ex.ErrorCode, ex);
-        }
-        catch (AuthorityClientException ex)
-        {
-            throw new DocumentStreamInterruptedException(ex.ErrorCode, ex);
-        }
-        catch (Exception ex)
-        {
-            throw new DocumentStreamInterruptedException("AUTHORITY_UNAVAILABLE", ex);
+            throw interrupted;
         }
 
         if (admission.Evaluate(fresh) is { } reason)

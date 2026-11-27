@@ -113,6 +113,8 @@ public sealed class PausedDownload(HttpRequestMessage request, HttpResponseMessa
 
     public long? DeclaredLength => response.Content.Headers.ContentLength;
 
+    public string? Header(string name) => response.Headers.TryGetValues(name, out var values) ? string.Join(",", values) : null;
+
     public long Received { get; private set; }
 
     /// <summary>True when the body ended with all declared bytes; false when the server stopped it early.</summary>

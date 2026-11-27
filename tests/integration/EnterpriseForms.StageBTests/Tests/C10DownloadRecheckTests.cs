@@ -91,6 +91,7 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
         await download.ReadRestAsync(bytesPerSecond: 3 * 1024 * 1024); // about 13 s: two or more re-checks at the 5 s interval
 
         Assert.True(download.Completed, $"received {download.Received} of {DocumentBytes}, failure '{download.Failure}'");
+        Assert.Equal("no", download.Header("X-Accel-Buffering")); // a buffering proxy must not read ahead of the re-checks
         Assert.True(started.Elapsed > TimeSpan.FromSeconds(10), "the download was not slow enough to cross a re-check");
         Assert.Equal(SHA256.HashData(w.Bytes), download.Sha256);
         Assert.Empty(DownloadFailures(w));
@@ -108,7 +109,35 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
         await w.S.WaitGateReadyAsync(Settle);
         var sinceChange = Stopwatch.StartNew();
 
-        await AssertStoppedAsync(w, download, sinceChange, "revocation", reason => reason.Length > 0 && reason != "AUTHORITY_UNAVAILABLE"); // the Authority's denial code
+        await AssertStoppedAsync(w, download, sinceChange, "revocation", reason => reason.Length > 0 && reason is not ("AUTHORITY_UNAVAILABLE" or "INTEGRITY_VERIFICATION_FAILED")); // the Authority's denial code
+    }
+
+    [Fact]
+    public async Task ARevocationWhileTheClientIsReadingStopsTheStreamWithinABoundedAmountOfPlaintext()
+    {
+        // Independent review finding 8a/8c: the client keeps reading (1 MiB/s) through the revocation, so the stop comes from the
+        // periodic re-check, not from a check on resume; the plaintext received after the revocation took effect is bounded by the
+        // interval plus the check and transport buffers (asserted at 16 MiB, reported exactly).
+        var w = await WorkspaceAsync("cons23-revocation-active", 236);
+        var share = await ShareDocumentAsync(w);
+        using var download = await fixture.StartPausedDownloadAsync(DownloadPath(w.Record, w.Attachment), w.S.Token(w.S.Reader), 64 * 1024);
+        var reading = download.ReadRestAsync(bytesPerSecond: 1024 * 1024);
+        await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+
+        var revoked = await fixture.Api.PostAsync($"/api/v1/form-records/{w.Record:D}/shares/{share:D}/revoke?useDevelopmentStepUp=true", w.S.Token(w.S.Clerk), new { });
+        Assert.True(revoked.IsSuccess, revoked.Body);
+        await w.S.WaitGateReadyAsync(Settle);
+        var receivedAtChange = download.Received;
+        var sinceChange = Stopwatch.StartNew();
+        await reading;
+
+        var after = download.Received - receivedAtChange;
+        var observed = $"active revocation: received {download.Received} of {DocumentBytes} bytes ({after} after the change), ended {sinceChange.Elapsed.TotalSeconds:F1} s after the change, failure '{download.Failure}', reasons [{string.Join(", ", DownloadFailures(w))}]";
+        TestContext.Current.SendDiagnosticMessage("CONS-23 " + observed);
+        Assert.False(download.Completed, "CONS-23: the stream was not stopped. " + observed);
+        Assert.True(after <= 16L * 1024 * 1024, "CONS-23: too much plaintext after the revocation. " + observed);
+        Assert.True(sinceChange.Elapsed <= RecheckBound + DrainAllowance, observed);
+        Assert.Single(DownloadFailures(w));
     }
 
     [Fact]

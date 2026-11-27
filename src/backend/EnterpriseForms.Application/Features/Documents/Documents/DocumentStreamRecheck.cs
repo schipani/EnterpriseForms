@@ -1,3 +1,4 @@
+using EnterpriseForms.Application.Common;
 using EnterpriseForms.Application.Common.Authority;
 using EnterpriseForms.Application.Features.FormRecords.Projection;
 using EnterpriseForms.Domain.Features.Documents;
@@ -29,6 +30,45 @@ public sealed class DocumentStreamOptions
             throw new InvalidOperationException($"Documents:StreamRecheckIntervalSeconds must be between 1 and {MaximumRecheckIntervalSeconds} (CONS-23); refusing to start.");
         }
     }
+}
+
+/// <summary>
+/// CONS-23: the parts of one re-check that do not need the verified reader. The browser session (G23) is re-validated at the
+/// Authority, so a sign-out, an administrative session revocation, a replaced session or session expiry stops the stream; and every
+/// failure of a re-check is classified into the interruption reason (a cancelled request is a disconnect, not an interruption).
+/// </summary>
+public static class DocumentStreamRechecks
+{
+    public const string AuthorityUnavailable = "AUTHORITY_UNAVAILABLE";
+
+    public const string SessionInvalid = "SESSION_INVALID";
+
+    /// <summary>A bearer-token request has no browser session; a cookie session must still be valid at the Authority.</summary>
+    public static async Task RequireValidSessionAsync(IBrowserSessionStateAuthority sessions, RequestContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(sessions);
+        ArgumentNullException.ThrowIfNull(context);
+        if (context.SessionDigestBase64 is not { Length: > 0 } digest)
+        {
+            return;
+        }
+
+        var state = await sessions.ValidateSessionAsync(context.ToDelegatedUser(), digest, cancellationToken).ConfigureAwait(false);
+        if (!state.Valid)
+        {
+            throw new DocumentStreamInterruptedException(SessionInvalid);
+        }
+    }
+
+    /// <summary>The interruption for a failed re-check, or null for a cancellation of the request itself (rethrown unchanged).</summary>
+    public static DocumentStreamInterruptedException? Classify(Exception exception, CancellationToken cancellationToken) => exception switch
+    {
+        OperationCanceledException when cancellationToken.IsCancellationRequested => null,
+        DocumentStreamInterruptedException interrupted => interrupted,
+        BusinessException business => new DocumentStreamInterruptedException(business.ErrorCode, business),
+        AuthorityClientException authority => new DocumentStreamInterruptedException(authority.ErrorCode, authority),
+        _ => new DocumentStreamInterruptedException(AuthorityUnavailable, exception),
+    };
 }
 
 /// <summary>A streaming download stopped because the Authority re-check no longer releases the document (fail closed).</summary>

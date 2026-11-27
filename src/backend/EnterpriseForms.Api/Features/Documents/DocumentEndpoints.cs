@@ -87,6 +87,9 @@ public static class DocumentEndpoints
                 http.Response.Headers.CacheControl = "no-store";
                 http.Response.Headers.ContentDisposition = new System.Net.Mime.ContentDisposition { DispositionType = "attachment", FileName = content.FileName }.ToString();
                 http.Response.Headers.XContentTypeOptions = "nosniff";
+                // CONS-23 (independent review finding 1): a buffering reverse proxy must not take the whole plaintext ahead of the
+                // client and so out of reach of the stream's Authority re-checks (nginx honours this header; Azure ingress: staging).
+                http.Response.Headers["X-Accel-Buffering"] = "no";
                 await content.WriteTo(http.Response.Body, cancellationToken).ConfigureAwait(false);
             })
             .Produces(StatusCodes.Status200OK, contentType: "application/octet-stream")
