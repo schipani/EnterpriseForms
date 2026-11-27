@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "27f6914b1029c94f2bcafb89615a6ef7c423cab9db5192c0a0aa30f5e8c37f6f",
-      "bytes": 36596
+      "sha256": "abade3fa71a492bf2de0ed74231ee953270ccfb032798b67bda608c021352c22",
+      "bytes": 37806
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -44,13 +44,13 @@
     },
     {
       "path": "docs/DASHBOARD_SECURITY_MONITORING_STATUS.md",
-      "sha256": "52d44518e209094350c103ea8c5792ae4a39d170248be7fccd25ad997f185f8a",
-      "bytes": 13753
+      "sha256": "1d76b9302b49dd9a4098dae65f1d5931824365d02113a6db19d48c51800d168e",
+      "bytes": 14082
     },
     {
       "path": "docs/FORM_RENAME_STATUS.md",
-      "sha256": "12705ef974fc7f72257732b0b0950ea332e9cdd5c447d5a9f86d958a5ccc1c18",
-      "bytes": 4176
+      "sha256": "9b4b7130218e42dfd90dce48c3bf8334513beafc3d4025023356db8e47686d9e",
+      "bytes": 4508
     },
     {
       "path": "docs/PHASE0_STATUS.md",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/PHASE_C5_STATUS.md",
-      "sha256": "cd042891eaff5314a04de445ddeb3912ddf3e221562e43c95c953244f8de89d3",
-      "bytes": 34615
+      "sha256": "a85953f5c4848affcb6df270372a2a0ee256c4b8ddb12f02e806fdc5f5d2d214",
+      "bytes": 34704
     },
     {
       "path": "docs/PHASE_C6_STATUS.md",
@@ -89,23 +89,23 @@
     },
     {
       "path": "docs/PHASE_C7_STATUS.md",
-      "sha256": "13a5b3e4abbb718f01a7b6aefc1827d297adaacec5ee04be26980f37c5860284",
-      "bytes": 107933
+      "sha256": "a288ee302295296d44d783f270e25df1b889dda559581e7d9398956aff3b1617",
+      "bytes": 108102
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "c4675d77e2ff58eddde8975de9474d131784c67eaad7a07baecef8cc95ef4bd1",
-      "bytes": 196582
+      "sha256": "2349f2a395169b723deee5a72a4964f7f6cf220c5ff30d35c7ba6986c16ec7eb",
+      "bytes": 197652
     },
     {
       "path": "docs/PHASE_C9_STATUS.md",
-      "sha256": "03c94a128275c6bfd516b36fa46ca5e959da4c8075fb097e2a3733efaa2f48f3",
-      "bytes": 72027
+      "sha256": "bfb2a71eec9ee2e519b1afa87250681b1c48dcfefc55da9ef1673051ec547dbc",
+      "bytes": 81852
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
-      "sha256": "94aed64050704da8ec31a90ad594b98345b719ca94a8fa3dc9dd5093211d1fd9",
-      "bytes": 3799
+      "sha256": "d33863c758a15ad72e5112027f857fa617b57364ed90c3f6e19f6c726f5a446c",
+      "bytes": 4984
     },
     {
       "path": "docs/SHA256SUMS.txt",
@@ -129,8 +129,8 @@
     },
     {
       "path": "docs/STAGE_B_STATUS.md",
-      "sha256": "306e3e7c99855ac659f3ecba03873b66b858a7aa972e1a53c2247d51d0e55991",
-      "bytes": 78952
+      "sha256": "857ad5ca73a232e596c15f13692fb04a2c72cd8096d3cbadb71844f5a44f2c44",
+      "bytes": 79042
     },
     {
       "path": "docs/api/PB06_API_CONTRACT_STANDARD.md",
@@ -144,8 +144,13 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "32d6e004378865ba9e5f352183531c112f026fbb179148bbf3bdac667f7cf434",
-      "bytes": 20199
+      "sha256": "9beca18d8d9e03ab02f9e00a99bddec469c47b2081e99de0b57c2364e09be475",
+      "bytes": 20346
+    },
+    {
+      "path": "docs/architecture/FORWARD_ROADMAP_PROPOSAL.md",
+      "sha256": "b86cb5d3fa38c84b926cfbae153e708f178905e036841377f49caeb047abecbe",
+      "bytes": 18642
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_C149_EVIDENCE.md",
@@ -281,6 +286,11 @@
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
       "sha256": "ba289a52bf305eff68b87a74e690fce323053bfc9a789dd1e935601ba2b25aa7",
       "bytes": 7852
+    },
+    {
+      "path": "docs/architecture/PHASE_C10_WP0_SHARING_OWNERSHIP_PROPOSAL.md",
+      "sha256": "b7f44baac370b036938d3fd47c564b6236a134db77b36096e206f13f5502d1eb",
+      "bytes": 39106
     },
     {
       "path": "docs/architecture/PHASE_C3_REPEATING_GROUPS_AND_DEPENDENT_DROPDOWNS.md",
@@ -479,8 +489,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "a7050be27faf3f1bcebd5aba42761ec148faceb35a6b8b66f6b79873b6e96aff",
-      "bytes": 351839
+      "sha256": "1d5fbb8b0401bffc7cfe717744d0ea76266fc67a3a21d06ad415749997eb6a4b",
+      "bytes": 362443
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -888,6 +898,21 @@
       "bytes": 5272
     },
     {
+      "path": "docs/testing/C195_HOSTED_BASELINE_EVIDENCE.md",
+      "sha256": "24ca162b43df43bb003f76bf22538fa863a0c35652a02a278c2be2936d22a523",
+      "bytes": 4762
+    },
+    {
+      "path": "docs/testing/CLAUDE_MD_S11_REQUIREMENTS_REGISTER.csv",
+      "sha256": "93836a32778718d8f9cba42ea08e9a32d12879df3f9e359e30d920d244d2b26b",
+      "bytes": 56763
+    },
+    {
+      "path": "docs/testing/CLAUDE_MD_S11_REQUIREMENTS_REGISTER.md",
+      "sha256": "f004a7995fdad3d86f780b84fcba44b1bf662622eae0e37b4afd04ba343004a8",
+      "bytes": 3770
+    },
+    {
       "path": "docs/testing/FAST_FEEDBACK_TESTING.md",
       "sha256": "fac8ffc14ecf0971f62f1f8d3a21e51df987b4ef33b204c630114349fffab521",
       "bytes": 12370
@@ -984,8 +1009,8 @@
     },
     {
       "path": "docs/ui/SCREEN_IMPLEMENTATION_MATRIX.md",
-      "sha256": "70db9564d8459cceef30841549670a7e34df1975b6c7dd44a7832a7b0bd3d9bf",
-      "bytes": 7904
+      "sha256": "339c7aabcb91e602613ffd112eb0e76d769a0acbc59da1e0da4db4782056cdaf",
+      "bytes": 12287
     },
     {
       "path": "docs/ui/UI_CONSISTENCY_STANDARD.md",

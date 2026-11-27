@@ -1,6 +1,6 @@
 # Phase C7 — Advanced Field Search: status
 
-- **Branch:** `phase-c7/advanced-field-search` (from `main` 4c00ce7). Not merged; no PR.
+- **Branch:** `phase-c7/advanced-field-search` (from `main` 4c00ce7). Not merged; no PR. *Update 2026-11-25: later squash-merged into `main` as `b1e1b30` (PR #29, 2026-10-30).*
 - **Architecture:** `docs/architecture/PHASE_C7_ADVANCED_FIELD_SEARCH.md`.
 - **Decisions:**
   * C-55: checkpoint;
@@ -24,7 +24,7 @@
   * M2 — AC-6 — implemented and verified (§12).
   * **M1/M2 review corrections and M3 — verified field-value search — implemented and verified (§15); stopped for owner functional acceptance.**
   * **2026-10-29 (later): development incident inventory and remediation plan (no remediation executed), Playwright isolation, missing adversarial tests, DR-C7-4/5/6 designs (C-74, §31–§35); stopped for the owner's approval.**
-  * Field-value search runs only where the fail-closed execution gate is on (isolated Development/Testing); never in staging or production. This branch is not merged to `main`.
+  * Field-value search runs only where the fail-closed execution gate is on (isolated Development/Testing); never in staging or production. This branch is not merged to `main` (later merged as `b1e1b30`, PR #29; the execution-gate restriction is unchanged).
   * **2026-10-29: owner functional acceptance of M3 and the layout (C-72, §26); M4 — encryption migration reconciliation — implemented (§27–§29); stopped for owner functional acceptance.**
 
 ## 1. History
