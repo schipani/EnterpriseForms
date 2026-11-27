@@ -170,6 +170,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         // R-53 (C-148): the complete current snapshot is proven equal to the accepted head on every write path, and the
         // candidate's item identities are checked against it and against the permanent bindings (ContentItemIdentityRules).
         var current = await BindAcceptedSnapshotAsync(scope, state, request, currentLeaves, head, key, bound, correlationId, cancellationToken).ConfigureAwait(false);
+        // C10 (review D-1): the accepted version and content fingerprint of each current attachment, from the verified snapshot.
+        var observedAttachments = ObservedAttachmentEvidence(current);
 
         // E3-M2a remediation: no data-key or nonce reuse against the verified current revision, on every write path (owner,
         // share editor, protection migration; creation has an empty current revision). Commit binds the same head by its
@@ -213,10 +215,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             }
 
             AuthorizeMutations(graph, bound, request.FormRecordId, mutations, replaceable, notLive);
-            // C10 (review D-1, partial): an attachment's version number never decreases (re-derived at Commit).
+            // C10 (review D-1): each attachment is the same version with unchanged content or exactly the next version (re-derived at Commit).
             AttachmentVersionRules.Require(
-                parsed.Where(p => p.Kind == ManifestItemKind.Attachment).Select(p => (p.ItemId, p.Document.Column("version_number")?.AsInt32())),
-                AcceptedAttachmentVersions(currentLeaves));
+                parsed.Where(p => p.Kind == ManifestItemKind.Attachment).Select(p => (p.ItemId, p.Document.Column("version_number")?.AsInt32(), AttachmentVersionRules.Fingerprint(p.Document))),
+                observedAttachments);
             await EnforceProtectionBarrierAsync(scope, state.OrganizationId, resource.ParentResourceEntityId, parsed.Select(p => (p.Kind, (ReadOnlyMemory<byte>)p.CanonicalBytes)), cancellationToken).ConfigureAwait(false);
         }
         else
@@ -308,6 +310,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
                 AttachmentVersionNumber = source.Item.Kind == ManifestItemKind.Attachment
                     ? source.Item.Document.Column("version_number")?.AsInt32() is { } version and > 0 ? version : throw AuthorityException.Invalid("attachment row has no valid version_number")
                     : null,
+                // C10 (review D-1): what this Prepare verified as accepted for the same attachment (Commit's fallback for older heads).
+                AcceptedAttachmentVersionNumber = source.Item.Kind == ManifestItemKind.Attachment && observedAttachments.TryGetValue(source.Item.ItemId, out var observed) ? observed.Version : null,
+                AcceptedAttachmentContentFingerprint = source.Item.Kind == ManifestItemKind.Attachment && observedAttachments.TryGetValue(source.Item.ItemId, out var observedContent) ? observedContent.Fingerprint : null,
             });
         }
 
@@ -571,15 +576,16 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         var newIdentities = await ContentItemIdentityRules.BindAtCommitAsync(scope, state.OrganizationId, request.FormRecordId, operationId, stagedDocuments, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false);
 
-        // C10 (review D-1, partial): the non-decreasing attachment version rule, re-derived from the verified staged rows and the accepted
-        // leaves (protection migration keeps versions and is not subject to it).
+        // C10 (review D-1): the attachment version and content rule, re-derived from the verified staged rows and the accepted evidence
+        // (protection migration keeps versions and is not subject to it).
+        var stagedFingerprints = stagedDocuments.Where(s => s.ItemKind == ManifestItemKind.Attachment).ToDictionary(s => s.ItemId, s => AttachmentVersionRules.Fingerprint(s.Item3));
         if (reprotection is null)
         {
             try
             {
                 AttachmentVersionRules.Require(
-                    stagedDocuments.Where(s => s.ItemKind == ManifestItemKind.Attachment).Select(s => (s.ItemId, s.Item3.Column("version_number")?.AsInt32())),
-                    AcceptedAttachmentVersions(currentLeaves));
+                    stagedDocuments.Where(s => s.ItemKind == ManifestItemKind.Attachment).Select(s => (s.ItemId, s.Item3.Column("version_number")?.AsInt32(), stagedFingerprints[s.ItemId])),
+                    AcceptedAttachmentEvidence(currentLeaves, candidateLeaves));
             }
             catch (AuthorityException)
             {
@@ -593,6 +599,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         // C10 WP8-B: a share editor's attachment replacement, re-derived from the verified staged bytes and the accepted leaves (the
         // next verified version, the same record and organization, a clean scan), and the one authorizing share it extends.
         Domain.Features.Sharing.ShareDocumentBinding? replacingBinding = null;
+        Domain.Features.Sharing.ShareResourceMetadata? replacingShare = null;
         int replacementVersion = 0;
         if (shareEditorOperation && ShareDocumentReplacement.ReplacedItem(mutations) is { } replacedItem)
         {
@@ -601,6 +608,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
                 replacementVersion = ShareDocumentReplacement.RequireAtCommit(replacedItem, stagedDocuments, candidateLeaves.Select(l => (l.ManifestItemId, l.ManifestItemKindCode, l.AttachmentVersionNumber)),
                     currentLeaves.Select(l => (l.ManifestItemId, l.ManifestItemKindCode, l.AttachmentVersionNumber)), state.OrganizationId, request.FormRecordId);
                 replacingBinding = commitReplaceable[replacedItem].Single();
+                // C10 review D-5: the share whose boundary the replacement extends gets a new share revision (its ETag) in this transaction.
+                replacingShare = await scope.FindShareMetadataAsync(state.OrganizationId, replacingBinding.RecordShareId, cancellationToken).ConfigureAwait(false)
+                                 ?? throw AuthorityException.Invalid("the replacing share has no metadata");
             }
             catch (AuthorityException)
             {
@@ -661,13 +671,21 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             RowSignature = l.RowSignature,
             ManifestLeafDigest = l.LeafDigest,
             AttachmentVersionNumber = l.AttachmentVersionNumber,
+            // C10 (review D-1): the content evidence of the verified staged attachment row, persisted with the accepted commit.
+            AttachmentContentFingerprint = l.ManifestItemKindCode == (byte)ManifestItemKind.Attachment ? stagedFingerprints[l.ManifestItemId] : null,
         }));
 
         // C10 WP8-B (WP-0 Section 3.6): the replacing share's boundary advances to the version it created, in the transaction that
-        // accepts it; no other share is extended, and an aborted or rolled-back commit extends nothing.
-        if (replacingBinding is not null && replacementVersion > replacingBinding.SharedThroughVersionNumber)
+        // accepts it; no other share is extended, and an aborted or rolled-back commit extends nothing. C10 review D-5: the extension is an
+        // authorization transition of that share, so its share revision (the share ETag) advances with it and the change is journalled
+        // on the audit stream below, in the same transaction (ShareLifecycleJournal conventions: identifiers, revisions and counts only).
+        (Guid RecordShareId, Guid BindingId, long PreviousShareRevision, long ShareRevision, int PreviousBoundary)? boundaryExtension = null;
+        if (replacingBinding is not null && replacingShare is not null && replacementVersion > replacingBinding.SharedThroughVersionNumber)
         {
+            boundaryExtension = (replacingShare.RecordShareId, replacingBinding.ShareDocumentBindingId, replacingShare.ShareRevision, replacingShare.ShareRevision + 1, replacingBinding.SharedThroughVersionNumber);
             replacingBinding.SharedThroughVersionNumber = replacementVersion;
+            replacingShare.ShareRevision++;
+            replacingShare.ShareMetadataModifiedOn = now;
         }
 
         head.CommittedContentRevision = operation.CandidateContentRevision;
@@ -710,6 +728,24 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             CheckpointCreatedOn = now,
         });
         state.StateModifiedOn = now;
+
+        if (boundaryExtension is { } extension)
+        {
+            AuditJournal.Append(scope, state, ShareDocumentBoundaryExtendedEvent, new
+            {
+                content_change_operation_id = operationId,
+                form_record_id = request.FormRecordId,
+                record_share_id = extension.RecordShareId,
+                share_document_binding_id = extension.BindingId,
+                previous_share_revision = extension.PreviousShareRevision,
+                share_revision = extension.ShareRevision,
+                previous_shared_through_version = extension.PreviousBoundary,
+                shared_through_version = replacementVersion,
+                committed_content_revision = head.CommittedContentRevision,
+                authorization_revision = state.AuthorizationRevision,
+                correlation_id = correlationId,
+            }, clock);
+        }
 
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         faultInjector.CrashIfArmed(FaultNames.CrashAfterContentHeadCommit);
@@ -758,6 +794,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     }
 
     public const int DefaultHistoryPageSize = 50;
+
+    /// <summary>C10 review D-5: the audit-stream entry of a share boundary extended by an accepted replacement through that share.</summary>
+    public const string ShareDocumentBoundaryExtendedEvent = "ShareDocumentBoundaryExtended";
 
     public const int MaximumHistoryPageSize = 100;
 
@@ -1493,9 +1532,40 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         return parsed;
     }
 
-    /// <summary>The accepted version evidence of each attachment leaf of the current head.</summary>
-    private static Dictionary<Guid, int?> AcceptedAttachmentVersions(IReadOnlyList<RecordManifestLeaf> current) =>
-        current.Where(l => l.ManifestItemKindCode == (byte)ManifestItemKind.Attachment).GroupBy(l => l.ManifestItemId).ToDictionary(g => g.Key, g => g.First().AttachmentVersionNumber);
+    /// <summary>C10 (review D-1): the accepted version and content fingerprint of each attachment of the verified current snapshot (Prepare).</summary>
+    private static Dictionary<Guid, AttachmentVersionRules.Evidence> ObservedAttachmentEvidence(IReadOnlyList<ContentDeltaRules.DecodedItem> current) =>
+        current.Where(c => c.Kind == ManifestItemKind.Attachment)
+            .ToDictionary(c => c.ItemId, c => new AttachmentVersionRules.Evidence(c.Document.Column("version_number")?.AsInt32(), AttachmentVersionRules.Fingerprint(c.Document)));
+
+    /// <summary>
+    /// C10 (review D-1): the accepted evidence of each attachment of the current head at Commit: the accepted leaf's own evidence, or (for
+    /// a head accepted before the evidence existed) what this operation's Prepare read from the verified snapshot of the same head. Two
+    /// disagreeing sources, or none, give unknown evidence, which refuses any carried row of that attachment (fail closed).
+    /// </summary>
+    private static Dictionary<Guid, AttachmentVersionRules.Evidence> AcceptedAttachmentEvidence(IReadOnlyList<RecordManifestLeaf> current, IReadOnlyList<ContentCandidateLeaf> candidate)
+    {
+        var observed = candidate.Where(l => l.ManifestItemKindCode == (byte)ManifestItemKind.Attachment && l.AcceptedAttachmentVersionNumber is not null)
+            .GroupBy(l => l.ManifestItemId)
+            .ToDictionary(g => g.Key, g => new AttachmentVersionRules.Evidence(g.First().AcceptedAttachmentVersionNumber, g.First().AcceptedAttachmentContentFingerprint));
+        var result = new Dictionary<Guid, AttachmentVersionRules.Evidence>();
+        foreach (var leaf in current.Where(l => l.ManifestItemKindCode == (byte)ManifestItemKind.Attachment))
+        {
+            AttachmentVersionRules.Evidence? own = leaf.AttachmentVersionNumber is not null && leaf.AttachmentContentFingerprint is { Length: 32 }
+                ? new AttachmentVersionRules.Evidence(leaf.AttachmentVersionNumber, leaf.AttachmentContentFingerprint)
+                : null;
+            AttachmentVersionRules.Evidence? seen = observed.TryGetValue(leaf.ManifestItemId, out var o) ? o : null;
+            if (own is { } a && seen is { } b && (a.Version != b.Version || b.Fingerprint is null || !a.Fingerprint!.AsSpan().SequenceEqual(b.Fingerprint)))
+            {
+                result[leaf.ManifestItemId] = new AttachmentVersionRules.Evidence(null, null);
+            }
+            else
+            {
+                result[leaf.ManifestItemId] = own ?? seen ?? new AttachmentVersionRules.Evidence(leaf.AttachmentVersionNumber, null);
+            }
+        }
+
+        return result;
+    }
 
     private static Dictionary<string, string> ClassifyMutations(IReadOnlyList<ParsedCandidateItem> candidate, IReadOnlyList<RecordManifestLeaf> current)
     {

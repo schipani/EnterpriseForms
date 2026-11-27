@@ -405,6 +405,9 @@ public static partial class AuditEventCatalog
         Add(AuditActions.SecurityIncidentDetected, "Security incident detected", "A verification problem was observed while serving a request.",
             [Code("incidentType", "Incident type"), Code("detectionSource", "Detection source"), Code("verificationErrorCode", "Verification error")], null, IncidentDetectedDescription());
         Add(AuditActions.SecurityIncidentViewed, "Security incident viewed", "A security incident was viewed.", []);
+        Add(AuditActions.RecordOwnershipHistoryViewed, "Ownership history viewed", "A record's ownership history was viewed.", [Count("returnedCount", "Changes shown")]);
+        Add(AuditActions.MemberOwnedRecordsViewed, "Member's owned records listed", "The records a member owns were listed for reassignment.",
+            [Id("memberUserId", "Member"), Count("returnedCount", "Records listed")]);
         Add(AuditActions.SecurityIncidentStatusChanged, "Security incident status changed", "A security incident's status changed.",
             [Status("previousStatus", "Previous status"), Status("incidentStatus", "Status"), Status("explanationProvided", "Explanation provided")], null, IncidentStatusDescription());
         Add(AuditActions.SecurityIncidentAssigned, "Security incident assigned", "A security incident's investigator changed.", [Id("previousAssigneeUserId", "Previous investigator"), Id("assigneeUserId", "Investigator")]);

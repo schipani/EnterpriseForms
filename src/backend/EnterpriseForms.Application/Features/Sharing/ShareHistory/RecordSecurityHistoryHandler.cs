@@ -54,6 +54,13 @@ public sealed class RecordSecurityHistoryHandler(IBusinessStore store, IShareDet
                 item.ActorUserId, item.ActorUserId is { } actor ? users.GetValueOrDefault(actor) : null, changes, item.JournalBacked));
         }
 
+        if (ownershipOnly)
+        {
+            // C10 review N-3: an ownership-history read (owner or Security Auditor) is itself audited, after the Authority allowed it.
+            await Audit.AuditRecorder.RecordAsync(store, context, TimeProvider.System, Audit.AuditCategories.Access, Domain.Features.Audit.AuditActions.RecordOwnershipHistoryViewed,
+                "record ownership history viewed", formRecordId, "Success", new { returnedCount = items.Count }, cancellationToken).ConfigureAwait(false);
+        }
+
         return new RecordSecurityHistoryResponse(formRecordId, items, history.Truncated, history.AuthorizationRevision);
     }
 }

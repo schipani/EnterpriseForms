@@ -75,10 +75,25 @@ public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProv
         }
 
         // C10 D6: every committed command that targeted the record (indexed, so superseded expiry-only updates are kept), plus the
-        // commands that changed the record's edges from elsewhere (team removal, member deactivation).
-        var targeted = await scope.GetRecordTargetedCommandsAsync(organizationId, formRecordId, RecordSecurityHistoryLimits.MaximumCommands + 1, cancellationToken).ConfigureAwait(false);
-        var commands = targeted.Where(c => c.OrganizationId == organizationId).ToDictionary(c => c.SecurityCommandId);
-        var edgeCommandIds = edges.Select(e => e.CreatedBySecurityCommandId).Concat(edges.Where(e => e.RemovedBySecurityCommandId is not null).Select(e => e.RemovedBySecurityCommandId!.Value))
+        // commands that changed the record's edges from elsewhere (team removal, member deactivation). C10 review N-2: the ownership view
+        // reads exactly the commands that added or removed one of the record's owner edges (the complete edge history), and both views
+        // filter before they truncate, so newer share commands never push an owner change out of the ownership view.
+        var commands = new Dictionary<Guid, SecurityCommand>();
+        var readLimitReached = false;
+        if (!ownershipView)
+        {
+            var targeted = await scope.GetRecordTargetedCommandsAsync(organizationId, formRecordId, RecordSecurityHistoryLimits.MaximumCommands + 1, cancellationToken).ConfigureAwait(false);
+            readLimitReached = targeted.Count > RecordSecurityHistoryLimits.MaximumCommands;
+            foreach (var command in targeted.Where(c => c.OrganizationId == organizationId))
+            {
+                commands[command.SecurityCommandId] = command;
+            }
+        }
+
+        var edgeCommandIds = (ownershipView
+                ? edges.Where(e => e.ResourceTypeName == ResourceTypeNames.FormRecord && e.ResourceEntityId == formRecordId && e.RelationshipName == "owner")
+                : edges)
+            .SelectMany(e => e.RemovedBySecurityCommandId is { } removed ? new[] { e.CreatedBySecurityCommandId, removed } : [e.CreatedBySecurityCommandId])
             .Where(id => id != Guid.Empty && !commands.ContainsKey(id)).ToHashSet();
         foreach (var id in edgeCommandIds)
         {
@@ -88,25 +103,30 @@ public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProv
             }
         }
 
-        var newest = commands.Values.OrderByDescending(c => c.CommandCreatedOn).ThenByDescending(c => c.SecurityCommandId).ToList();
-        var truncated = newest.Count > RecordSecurityHistoryLimits.MaximumCommands;
-        var page = newest.Take(RecordSecurityHistoryLimits.MaximumCommands).ToList();
-        var journalled = await scope.GetAuthorizationJournalCommandIdsAsync(organizationId, [.. page.Select(c => c.SecurityCommandId)], cancellationToken).ConfigureAwait(false);
-        var users = new Dictionary<Guid, Guid?>();
-        var items = new List<RecordSecurityHistoryItem>();
-        foreach (var command in page)
+        var visible = new List<(SecurityCommand Command, List<RecordSecurityChange> Changes)>();
+        foreach (var command in commands.Values.OrderByDescending(c => c.CommandCreatedOn).ThenByDescending(c => c.SecurityCommandId))
         {
-            if (!users.TryGetValue(command.ActorIdentityBindingId, out var user))
-            {
-                var binding = await scope.FindIdentityBindingByIdAsync(command.ActorIdentityBindingId, cancellationToken).ConfigureAwait(false);
-                users[command.ActorIdentityBindingId] = user = binding is { } b && b.OrganizationId == organizationId ? b.AuthorityUserId : null;
-            }
-
             var changes = ChangesOf(command, edges, shares, formRecordId, metadata)
                 .Where(c => ownershipView ? IsOwnerChange(c) : isOwner || !IsOwnerChange(c)).ToList();
             if (changes.Count == 0 && (ownershipView || !isOwner))
             {
                 continue; // nothing this reader may see
+            }
+
+            visible.Add((command, changes));
+        }
+
+        var truncated = readLimitReached || visible.Count > RecordSecurityHistoryLimits.MaximumCommands;
+        var page = visible.Take(RecordSecurityHistoryLimits.MaximumCommands).ToList();
+        var journalled = await scope.GetAuthorizationJournalCommandIdsAsync(organizationId, [.. page.Select(p => p.Command.SecurityCommandId)], cancellationToken).ConfigureAwait(false);
+        var users = new Dictionary<Guid, Guid?>();
+        var items = new List<RecordSecurityHistoryItem>();
+        foreach (var (command, changes) in page)
+        {
+            if (!users.TryGetValue(command.ActorIdentityBindingId, out var user))
+            {
+                var binding = await scope.FindIdentityBindingByIdAsync(command.ActorIdentityBindingId, cancellationToken).ConfigureAwait(false);
+                users[command.ActorIdentityBindingId] = user = binding is { } b && b.OrganizationId == organizationId ? b.AuthorityUserId : null;
             }
 
             items.Add(new RecordSecurityHistoryItem(command.SecurityCommandId, command.CommandKindName, command.CommandStateName, command.CommandCreatedOn, command.CommandEffectiveOn,

@@ -242,6 +242,13 @@ public sealed class ContentAcceptanceRuleGuardTests
         Assert.DoesNotContain(migrations, f => File.ReadAllText(f).Contains("ck_content_operation_rule_floor", StringComparison.Ordinal)); // OD-M2-21: M2b-1F is a separate release
         Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix + "1", ContentAcceptanceRuleSql.UpSql, StringComparison.Ordinal);
         var ids = migrations.Select(Path.GetFileNameWithoutExtension).Where(n => n is not null && !n.EndsWith(".Designer", StringComparison.Ordinal) && n != "AuthorityDbContextModelSnapshot").Order(StringComparer.Ordinal).ToList();
+        // C10 review D-1 (owner decision 1): three nullable attachment content evidence columns and two check constraints only.
+        Assert.Equal("20261127084409_AuthorityC10AttachmentContentEvidence", ids[^1]);
+        var contentEvidence = File.ReadAllText(migrations.Single(f => Path.GetFileName(f) == "20261127084409_AuthorityC10AttachmentContentEvidence.cs"));
+        Assert.DoesNotContain(ContentAcceptanceRules.DatabaseObjects.FloorConstraintPrefix, contentEvidence, StringComparison.Ordinal);
+        Assert.DoesNotContain("SECURITY DEFINER", contentEvidence, StringComparison.Ordinal);
+        Assert.DoesNotContain("migrationBuilder.Sql(", contentEvidence, StringComparison.Ordinal);
+        ids = ids.Take(ids.Count - 1).ToList();
         // C10 WP8 (Option A): two nullable attachment version columns only; C10 D6 before it: the record-targeted command column,
         // its immutability trigger (not SECURITY DEFINER) and two indexes. Neither installs a content acceptance floor.
         Assert.Equal("20261126235135_AuthorityC10AttachmentVersionEvidence", ids[^1]);

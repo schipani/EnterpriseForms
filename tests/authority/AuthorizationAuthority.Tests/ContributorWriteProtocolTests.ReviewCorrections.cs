@@ -14,9 +14,9 @@ namespace AuthorizationAuthority.Tests;
 /// C10 independent review corrections through the real Prepare and Commit:
 /// F1 — an expired share (its own expiry or an ancestor's) confers no edit scope, whether or not convergence has run, at Prepare and at Commit;
 /// D-2 — a replacement is refused when the accepted version lies outside the authorizing share's boundary (Prepare and Commit);
-/// the replacement is exactly the next version (owner decision C-196): a number skipped by an unaccepted upload is refused (fail closed;
-/// recorded for an owner decision, WP-0 Section 10.4);
-/// D-1 (partial) — an attachment's version number never decreases;
+/// the replacement is exactly the next version (owner decision C-196): a skipped number is refused (the business now numbers from the
+/// accepted version, owner decision 2 of 2026-11-27);
+/// D-1 — see ContributorWriteProtocolTests.ContentEvidence (same version with unchanged content, or exactly the next version);
 /// E-3/E-4/E-5 — narrowing, team removal between Prepare and Commit, and an attachment without version evidence.
 /// </summary>
 public sealed partial class ContributorWriteProtocolTests
@@ -91,8 +91,8 @@ public sealed partial class ContributorWriteProtocolTests
     [Fact]
     public async Task AVersionNumberSkippedByAnUnacceptedUploadIsRefusedAndMovesNoBoundary()
     {
-        // Fail closed until the owner decides (WP-0 Section 10.4): the business numbers versions from every row, so after an unaccepted
-        // upload its next number skips one, and replacement through the share is refused.
+        // The Authority still refuses a skipped number (exactly the next version); owner decision 2 makes the business number from the
+        // accepted version, so an unaccepted upload no longer causes the skip.
         var h = await new Harness().CreatedAsync();
         var binding = ReplaceShare(h);
 
@@ -169,16 +169,27 @@ public sealed partial class ContributorWriteProtocolTests
     }
 
     [Fact]
-    public void TheAttachmentVersionRuleRefusesALowerOrMissingNumberAndAcceptsEqualOrHigher()
+    public void TheAttachmentVersionRuleAcceptsOnlyUnchangedContentUnderTheAcceptedNumberOrExactlyTheNextNumber()
     {
+        // C10 owner decision 1 (review D-1): same version + unchanged content, or exactly the next version; everything else fails closed.
         var item = Guid.CreateVersion7();
-        var accepted = new Dictionary<Guid, int?> { [item] = 3 };
-        AttachmentVersionRules.Require([(item, 3)], accepted);                // a carried row
-        AttachmentVersionRules.Require([(item, 5)], accepted);                // a new version
-        AttachmentVersionRules.Require([(Guid.CreateVersion7(), 1)], accepted); // a new attachment
-        AttachmentVersionRules.Require([(item, 1)], new Dictionary<Guid, int?> { [item] = null }); // no evidence yet: nothing to compare
-        Assert.Throws<AuthorityException>(() => AttachmentVersionRules.Require([(item, 2)], accepted));
-        Assert.Throws<AuthorityException>(() => AttachmentVersionRules.Require([(item, null)], accepted));
-        Assert.Throws<AuthorityException>(() => AttachmentVersionRules.Require([(item, 0)], accepted));
+        byte[] content = [.. Enumerable.Repeat((byte)7, 32)];
+        byte[] other = [.. Enumerable.Repeat((byte)8, 32)];
+        var accepted = new Dictionary<Guid, AttachmentVersionRules.Evidence> { [item] = new(3, content) };
+        AttachmentVersionRules.Require([(item, 3, content)], accepted);                // a carried, unchanged row
+        AttachmentVersionRules.Require([(item, 4, other)], accepted);                  // exactly the next version
+        AttachmentVersionRules.Require([(Guid.CreateVersion7(), 1, other)], accepted); // a new attachment
+
+        Refused(AttachmentVersionRules.ContentChangedCode, [(item, 3, other)], accepted);  // new bytes under the accepted number
+        Refused(AttachmentVersionRules.RefusalCode, [(item, 2, other)], accepted);         // a lower number
+        Refused(AttachmentVersionRules.NotNextCode, [(item, 5, other)], accepted);         // a skipped number
+        Refused(AttachmentVersionRules.RefusalCode, [(item, null, other)], accepted);
+        Refused(AttachmentVersionRules.RefusalCode, [(item, 0, other)], accepted);
+        Refused(AttachmentVersionRules.EvidenceMissingCode, [(item, 3, content)], new Dictionary<Guid, AttachmentVersionRules.Evidence> { [item] = new(3, null) });
+        Refused(AttachmentVersionRules.EvidenceMissingCode, [(item, 4, content)], new Dictionary<Guid, AttachmentVersionRules.Evidence> { [item] = new(null, null) });
+        AttachmentVersionRules.Require([(item, 4, other)], new Dictionary<Guid, AttachmentVersionRules.Evidence> { [item] = new(3, null) }); // the next version needs no content evidence
     }
+
+    private static void Refused(string code, (Guid, int?, byte[])[] staged, Dictionary<Guid, AttachmentVersionRules.Evidence> accepted) =>
+        Assert.StartsWith(code, Assert.Throws<AuthorityException>(() => AttachmentVersionRules.Require(staged, accepted)).Message, StringComparison.Ordinal);
 }

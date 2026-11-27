@@ -318,6 +318,24 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
 
         FormRecords.Lifecycle.RecordLifecycle.RequireContentEditable(verified);
 
+        // C10 owner decision 2: the processed version must be exactly the next version of the verified accepted one. A version accepted
+        // since this upload was processed (or a local projection that missed one) refuses it here, before anything is staged; the local
+        // projection is corrected from the verified record so the next upload is numbered correctly. The Authority enforces the same rule.
+        if (verified.AllRows.OfType<FileAttachmentVersion>().FirstOrDefault(a => a.FileAttachmentId == processed.FileAttachmentId)?.VersionNumber is { } acceptedVersion
+            && processed.VersionNumber != acceptedVersion + 1)
+        {
+            await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (await scope.FindAttachmentAsync(context.OrganizationId, processed.FileAttachmentId, cancellationToken).ConfigureAwait(false) is { } projected && projected.CurrentVersionNumber < acceptedVersion)
+                {
+                    projected.CurrentVersionNumber = acceptedVersion;
+                    await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            throw new BusinessException("DOCUMENT_VERSION_SUPERSEDED", 409, "another version of this document was accepted after this upload was processed; upload it again");
+        }
+
         var header = CandidateBuilder.CloneHeader(verified.Header);
         var rows = new List<ISignedContentRow>();
         rows.AddRange(verified.AllRows.OfType<FieldValueRowBase>().Select(v => CloneValue(v)));

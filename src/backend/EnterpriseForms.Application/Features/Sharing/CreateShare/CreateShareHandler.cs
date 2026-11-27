@@ -9,7 +9,7 @@ using EnterpriseForms.Domain.Features.Sharing;
 namespace EnterpriseForms.Application.Features.Sharing.CreateShare;
 
 /// <summary>Explicit item-scoped share (CLAUDE.md §4H): field keys map to the accepted manifest's item ids; the authority validates scope, delegation and recipient.</summary>
-public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock)
+public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock, IShareDetailsAuthority? shares = null)
 {
     public async Task<ShareResponse> HandleAsync(RequestContext context, Guid formRecordId, CreateShareRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
@@ -22,7 +22,7 @@ public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAutho
         }
 
         var user = context.ToDelegatedUser();
-        var (head, items) = await ShareFieldItems.ResolveAsync(store, authority, user, context.OrganizationId, formRecordId, fieldKeys, cancellationToken).ConfigureAwait(false);
+        var (head, items) = await ShareFieldItems.ResolveAsync(store, authority, shares, user, context.OrganizationId, formRecordId, fieldKeys, request.ParentRecordShareId, cancellationToken).ConfigureAwait(false);
 
         var recordShareId = CreateFormDefinitionHandler.DeterministicId(idempotencyKey, "share");
         var commandFields = JsonSerializer.SerializeToNode(new

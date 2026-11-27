@@ -5,7 +5,7 @@ using EnterpriseForms.Application.Common.Persistence;
 namespace EnterpriseForms.Application.Features.Sharing;
 
 /// <summary>
-/// The item ids a share of the named fields covers, bound to the record's authority-accepted content (CLAUDE.md §4H): each field
+/// The item ids a share of the named fields covers, bound to the record's authority-accepted content (CLAUDE.md Â§4H): each field
 /// key resolves to the persisted value items of the committed operation the Authority reports as current. The Authority verifies
 /// every item against its accepted manifest again when it plans the command; nothing here grants access.
 /// </summary>
@@ -23,9 +23,37 @@ internal static class ShareFieldItems
             ["can_replace_document"] = d.CanReplaceDocument == true,
         })]);
 
-    public static async Task<Resolved> ResolveAsync(IBusinessStore store, IAuthorizationAuthorityClient authority, DelegatedUserContext user, Guid organizationId,
-        Guid formRecordId, IReadOnlyList<string> fieldKeys, CancellationToken cancellationToken)
+    /// <summary>C10 review F-6: the one answer for a requested field outside a delegating caller's own scope, whatever the field holds.</summary>
+    public const string FieldOutOfScope = "FIELD_NOT_IN_SHAREABLE_SCOPE";
+
+    /// <param name="parentRecordShareId">The share a caller without full read delegates from (the Authority requires it for such callers).</param>
+    /// <param name="shares">The Authority's share reads (the parent share's effective scope); without it a caller without full read is refused.</param>
+    public static async Task<Resolved> ResolveAsync(IBusinessStore store, IAuthorizationAuthorityClient authority, IShareDetailsAuthority? shares, DelegatedUserContext user, Guid organizationId,
+        Guid formRecordId, IReadOnlyList<string> fieldKeys, Guid? parentRecordShareId, CancellationToken cancellationToken)
     {
+        // C10 review F-6: a caller without full read (a delegating Manager) resolves keys only against its own share's current scope, before
+        // any field is inspected, so an unknown field, an empty one, one in a repeating section and one with a value outside that scope all
+        // give the same answer. The Authority still caps the delegated scope when it plans the command.
+        HashSet<Guid>? delegableItems = null;
+        if (fieldKeys.Count > 0 && !(await authority.CheckPermissionAsync(user, new PermissionCheckRequest(organizationId, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), ProtectedAction.Read),
+                cancellationToken).ConfigureAwait(false)).Allowed)
+        {
+            if (parentRecordShareId is not { } parent || shares is null)
+            {
+                throw OutOfScope();
+            }
+
+            try
+            {
+                var scope = await shares.GetShareEffectiveScopeAsync(user, organizationId, formRecordId, parent, cancellationToken).ConfigureAwait(false);
+                delegableItems = scope.RecordShareId == parent && scope.FormRecordId == formRecordId ? scope.FieldItemIds.ToHashSet() : throw OutOfScope();
+            }
+            catch (AuthorityClientException ex) when (ex.HttpStatusCode == 404)
+            {
+                throw OutOfScope();
+            }
+        }
+
         var head = await authority.GetCommittedContentRevisionAsync(user, organizationId, formRecordId, cancellationToken).ConfigureAwait(false);
         if (head.CommittedOperationId is null)
         {
@@ -43,9 +71,15 @@ internal static class ShareFieldItems
         }
 
         var fieldByKey = fields.ToDictionary(f => f.FieldKey, StringComparer.Ordinal);
+        var delegableFields = delegableItems is null ? null : values.Where(v => delegableItems.Contains(v.FieldValueItemId)).Select(v => v.FieldDefinitionId).ToHashSet();
         var items = new List<(Guid FieldDefinitionId, Guid ItemId)>();
         foreach (var key in fieldKeys.Distinct(StringComparer.Ordinal))
         {
+            if (delegableFields is not null && (!fieldByKey.TryGetValue(key, out var scoped) || !delegableFields.Contains(scoped.FieldDefinitionId)))
+            {
+                throw OutOfScope();
+            }
+
             if (!fieldByKey.TryGetValue(key, out var field))
             {
                 throw new BusinessException("INVALID_REQUEST", 422, $"unknown field key '{key}'");
@@ -70,4 +104,6 @@ internal static class ShareFieldItems
 
         return new Resolved(head, items);
     }
+
+    private static BusinessException OutOfScope() => new(FieldOutOfScope, 403, "a requested field is not within the scope you can share");
 }

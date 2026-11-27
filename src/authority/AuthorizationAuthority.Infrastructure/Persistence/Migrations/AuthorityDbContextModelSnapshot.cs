@@ -407,6 +407,14 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("content_candidate_leaf_id");
 
+                    b.Property<byte[]>("AcceptedAttachmentContentFingerprint")
+                        .HasColumnType("bytea")
+                        .HasColumnName("accepted_attachment_content_fingerprint");
+
+                    b.Property<int?>("AcceptedAttachmentVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("accepted_attachment_version_number");
+
                     b.Property<int?>("AttachmentVersionNumber")
                         .HasColumnType("integer")
                         .HasColumnName("attachment_version_number");
@@ -457,6 +465,8 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.ToTable("content_candidate_leaves", "authority", t =>
                         {
+                            t.HasCheckConstraint("ck_candidate_leaf_accepted_attachment_evidence", "(accepted_attachment_version_number IS NULL AND accepted_attachment_content_fingerprint IS NULL) OR (accepted_attachment_version_number > 0 AND octet_length(accepted_attachment_content_fingerprint) = 32)");
+
                             t.HasCheckConstraint("ck_candidate_leaf_digest_lengths", "octet_length(canonical_payload_digest) = 32 AND octet_length(row_signature) = 32 AND octet_length(leaf_digest) = 32");
 
                             t.HasCheckConstraint("ck_candidate_leaf_key_length", "octet_length(manifest_item_key) = 17");
@@ -919,6 +929,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("record_manifest_leaf_id");
 
+                    b.Property<byte[]>("AttachmentContentFingerprint")
+                        .HasColumnType("bytea")
+                        .HasColumnName("attachment_content_fingerprint");
+
                     b.Property<int?>("AttachmentVersionNumber")
                         .HasColumnType("integer")
                         .HasColumnName("attachment_version_number");
@@ -974,6 +988,8 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.ToTable("record_manifest_leaves", "authority", t =>
                         {
+                            t.HasCheckConstraint("ck_manifest_leaf_attachment_fingerprint_length", "attachment_content_fingerprint IS NULL OR octet_length(attachment_content_fingerprint) = 32");
+
                             t.HasCheckConstraint("ck_manifest_leaf_digest_lengths", "octet_length(canonical_payload_digest) = 32 AND octet_length(row_signature) = 32 AND octet_length(manifest_leaf_digest) = 32");
 
                             t.HasCheckConstraint("ck_manifest_leaf_key_length", "octet_length(manifest_item_key) = 17");

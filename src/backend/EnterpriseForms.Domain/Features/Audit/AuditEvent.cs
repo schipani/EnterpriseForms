@@ -105,6 +105,11 @@ public static class AuditActions
     // (AuditAccessAuthorized). Metadata: deliveryOutcome, Authority journal revision, access kind and filter digest only.
     public const string AuditEventsViewed = "AUDIT_EVENTS_VIEWED";
     public const string AuditEventViewed = "AUDIT_EVENT_VIEWED";
+
+    // C10 review N-3 (CLAUDE.md §4D: read operations are captured and access to audit is itself audited): a record's ownership history
+    // (owner or Security Auditor) and a member's owned-record listing (Security Administrator) were served. Identifiers and counts only.
+    public const string RecordOwnershipHistoryViewed = "RECORD_OWNERSHIP_HISTORY_VIEWED";
+    public const string MemberOwnedRecordsViewed = "MEMBER_OWNED_RECORDS_VIEWED";
 }
 
 /// <summary>

@@ -439,7 +439,9 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       memberOwnedRecords: (memberUserId: string, signal?: AbortSignal) => read<MemberOwnedRecordsResponse>("members.ownedRecords", { memberUserId }, undefined, "interactive-read", signal),
       /** C10 M2: one ownership transfer per owned record; per-record outcome. */
       reassignRecords: (memberUserId: string, request: ReassignRecordsRequest) => write<ReassignRecordsResponse>("POST", "members.reassignRecords", { memberUserId }, request, { idempotent: true, resourceKey: `member:${memberUserId}` }),
-      transferOwnership: (formRecordId: string, request: TransferOwnershipRequest) => write<CommandStatusResponse>("POST", "records.transferOwnership", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}` }),
+      /** C10 review F4: pass the same idempotency key to replay a pending transfer (the handler records its projection once, when Effective). */
+      transferOwnership: (formRecordId: string, request: TransferOwnershipRequest, idempotencyKey?: string) =>
+        write<CommandStatusResponse>("POST", "records.transferOwnership", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, ...(idempotencyKey ? { idempotencyKey } : {}) }),
       /** C10 M2: replaces the share's scope. If-Match carries the ETag "{recordShareId}:{shareRevision}" read from `get` (412 when stale). */
       update: (formRecordId: string, recordShareId: string, shareRevision: number | string, request: UpdateShareRequest) =>
         write<UpdateShareResponse>("PATCH", "shares.update", { formRecordId, recordShareId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: `${recordShareId}:${shareRevision}` }),

@@ -23,7 +23,11 @@ export function OwnershipTransferPage() {
   const [reason, setReason] = useState("");
   const [stepUp, setStepUp] = useState(false);
   const transfer = useMutation({
-    mutationFn: () => api.shares.transferOwnership(formRecordId, { newOwnerUserId: newOwner ?? null, newOwnerTeamId: null, transferReason: reason.trim(), useDevelopmentStepUp: stepUp }).then((r) => r.result),
+    // C10 review F4: a pending transfer is replayed under the same idempotency key (bounded) so its audit projection is recorded once it is in effect.
+    mutationFn: () => {
+      const request = { newOwnerUserId: newOwner ?? null, newOwnerTeamId: null, transferReason: reason.trim(), useDevelopmentStepUp: stepUp };
+      return submitUntilEffective((key) => api.shares.transferOwnership(formRecordId, request, key).then((r) => r.result), newTransferIdempotencyKey());
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["ownership", "history", formRecordId] });
     },

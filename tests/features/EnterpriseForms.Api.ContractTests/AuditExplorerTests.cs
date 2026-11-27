@@ -52,7 +52,7 @@ public sealed class AuditExplorerTests
     public void EveryAuditActionHasExactlyOneCatalogEntry()
     {
         var actions = typeof(AuditActions).GetFields(BindingFlags.Public | BindingFlags.Static).Where(f => f.IsLiteral).Select(f => (string)f.GetRawConstantValue()!).ToHashSet(StringComparer.Ordinal);
-        Assert.Equal(82, actions.Count); // C9 M1 (C-179) added FORM_VERSION_BEHAVIOR_CHANGED; C-188 BF-1 added FORM_VERSION_AUTHORITY_PUBLICATION_ABANDONED
+        Assert.Equal(84, actions.Count); // C9 M1 (C-179) added FORM_VERSION_BEHAVIOR_CHANGED; C-188 BF-1 added FORM_VERSION_AUTHORITY_PUBLICATION_ABANDONED; C10 review N-3 added RECORD_OWNERSHIP_HISTORY_VIEWED and MEMBER_OWNED_RECORDS_VIEWED
         var missing = actions.Where(a => AuditEventCatalog.Find(a) is null).ToList();
         Assert.True(missing.Count == 0, "actions without a catalog entry: " + string.Join(", ", missing));
         var stray = AuditEventCatalog.Entries.Keys.Where(k => !actions.Contains(k)).ToList();

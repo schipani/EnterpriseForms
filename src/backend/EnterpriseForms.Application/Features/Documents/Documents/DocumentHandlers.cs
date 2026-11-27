@@ -44,15 +44,23 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
                     current.ScannerName, current.UploadedOn, current.UploadedByUserId, "Current", current.ContentRevision)]);
         }
 
-        // History shows one row per version number; the committed copy wins over the processed copy.
-        var history = versions
-            .GroupBy(v => v.VersionNumber)
-            .Select(g => g.OrderByDescending(v => v.ContentChangeOperationId != Guid.Empty).ThenByDescending(v => v.ContentRevision).First())
+        // History shows one row per version number; the committed copy wins over the processed copy. C10 owner decision 2: a number can
+        // also carry the staged copy of an operation the Authority refused; the current number shows the verified current row, and a tie
+        // between operations at one revision is settled by the Authority's accepted history.
+        var history = new List<FileAttachmentVersion>();
+        foreach (var group in versions.GroupBy(v => v.VersionNumber))
+        {
+            history.Add(group.Key == current.VersionNumber ? current
+                : await AcceptedCopyAsync(context, formRecordId, group.ToList(), cancellationToken).ConfigureAwait(false)
+                  ?? group.OrderByDescending(v => v.ContentChangeOperationId != Guid.Empty).ThenByDescending(v => v.ContentRevision).ThenBy(v => v.FileAttachmentVersionId).First());
+        }
+
+        var listed = history
             .OrderByDescending(v => v.VersionNumber)
             .Select(v => new DocumentVersionResponse(v.FileAttachmentVersionId, v.VersionNumber, v.OriginalFileName, v.DetectedContentType, v.PlaintextSizeBytes, v.ScanVerdict, v.ScannerName, v.UploadedOn, v.UploadedByUserId,
                 v.VersionNumber == current.VersionNumber ? "Current" : v.ContentChangeOperationId == Guid.Empty ? "Processed" : "Superseded", v.ContentChangeOperationId == Guid.Empty ? null : v.ContentRevision))
             .ToList();
-        return new DocumentDetailResponse(Summary(current, "Ready"), history);
+        return new DocumentDetailResponse(Summary(current, "Ready"), listed);
     }
 
     public sealed record DownloadContent(string FileName, string ContentType, long Length, Func<Stream, CancellationToken, Task> WriteTo);
@@ -118,20 +126,17 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
 
     private async Task<FileAttachmentVersion> VerifiedHistoricVersionAsync(RequestContext context, Guid formRecordId, Guid fileAttachmentId, int requested, CancellationToken cancellationToken)
     {
-        List<Guid> candidateOperations;
+        List<FileAttachmentVersion> numbered;
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
             var versions = await scope.GetAttachmentVersionsAsync(fileAttachmentId, cancellationToken).ConfigureAwait(false);
-            candidateOperations = versions.Where(v => v.VersionNumber == requested && v.ContentChangeOperationId != Guid.Empty && v.FormRecordId == formRecordId)
-                .OrderByDescending(v => v.ContentRevision).Select(v => v.ContentChangeOperationId).Distinct().Take(1).ToList();
+            numbered = versions.Where(v => v.VersionNumber == requested && v.ContentChangeOperationId != Guid.Empty && v.FormRecordId == formRecordId).ToList();
         }
 
-        if (candidateOperations.Count == 0)
-        {
-            throw new BusinessException("NOT_FOUND", 404, "document version not found");
-        }
-
-        var operationId = candidateOperations[0];
+        // C10 owner decision 2: the copy of the latest operation that staged this number, the accepted one when two tie at one revision.
+        var chosen = await AcceptedCopyAsync(context, formRecordId, numbered, cancellationToken).ConfigureAwait(false)
+                     ?? throw new BusinessException("NOT_FOUND", 404, "document version not found");
+        var operationId = chosen.ContentChangeOperationId;
         var snapshot = await stager.ReadStagedAsync(formRecordId, operationId, cancellationToken).ConfigureAwait(false);
         VerifyRecordProjectionResult verification;
         try
@@ -156,6 +161,31 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
 
         return snapshot.Rows.OfType<FileAttachmentVersion>().SingleOrDefault(v => v.FileAttachmentId == fileAttachmentId && v.VersionNumber == requested)
                ?? throw new BusinessException("NOT_FOUND", 404, "document version not found");
+    }
+
+    /// <summary>
+    /// C10 owner decision 2: among the operation-bound copies of one version number, the copy of the latest revision. When copies of two
+    /// operations share that revision (one was refused by the Authority, which accepts at most one version per number), the Authority's
+    /// accepted history names the committed operation; without a match there is no accepted copy. Read-only, full readers only.
+    /// </summary>
+    private async Task<FileAttachmentVersion?> AcceptedCopyAsync(RequestContext context, Guid formRecordId, IReadOnlyList<FileAttachmentVersion> copies, CancellationToken cancellationToken)
+    {
+        var bound = copies.Where(v => v.ContentChangeOperationId != Guid.Empty).ToList();
+        if (bound.Count == 0)
+        {
+            return null;
+        }
+
+        var latest = bound.Max(v => v.ContentRevision);
+        var tied = bound.Where(v => v.ContentRevision == latest).ToList();
+        if (tied.Select(v => v.ContentChangeOperationId).Distinct().Count() == 1)
+        {
+            return tied[0];
+        }
+
+        var page = await authority.GetContentHistoryAsync(context.ToDelegatedUser(), context.OrganizationId, formRecordId, latest - 1, 1, cancellationToken).ConfigureAwait(false);
+        var committed = page.Entries.FirstOrDefault(e => e.ContentRevision == latest)?.CommittedOperationId;
+        return tied.FirstOrDefault(v => v.ContentChangeOperationId == committed);
     }
 
     public async Task<FormRecordResponse> RemoveAsync(RequestContext context, Guid formRecordId, Guid fileAttachmentId, RemoveDocumentRequest request, string idempotencyKey, CancellationToken cancellationToken)

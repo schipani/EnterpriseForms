@@ -18,12 +18,23 @@ public sealed partial class ContributorWriteProtocolTests
         var seeded = h.Store.ManifestLeaves.Single(l => l.ManifestItemId == h.Document);
         Assert.Equal(1, seeded.AttachmentVersionNumber); // the creating commit already recorded the verified version
 
-        var rows = Change(h.Rows(), h.Document, r => r.With("version_number", RowValue.Int32(3)).With("storage_object_key", RowValue.Text("objects/three")));
+        Assert.Equal(32, seeded.AttachmentContentFingerprint!.Length); // and its content evidence (review D-1)
+
+        var rows = Change(h.Rows(), h.Document, r => r.With("version_number", RowValue.Int32(2)).With("storage_object_key", RowValue.Text("objects/two")));
         await h.WriteAsync(h.Owner, rows, withCurrent: true);
 
         var commit = h.Store.Heads.Single().CurrentRecordManifestCommitId;
         var leaves = h.Store.ManifestLeaves.Where(l => l.RecordManifestCommitId == commit).ToList();
-        Assert.Equal(3, leaves.Single(l => l.ManifestItemId == h.Document).AttachmentVersionNumber);
+        var document = leaves.Single(l => l.ManifestItemId == h.Document);
+        Assert.Equal(2, document.AttachmentVersionNumber);
+        Assert.False(document.AttachmentContentFingerprint.AsSpan().SequenceEqual(seeded.AttachmentContentFingerprint), "new content, new fingerprint");
         Assert.All(leaves.Where(l => l.ManifestItemKindCode != (byte)ManifestItemKind.Attachment), l => Assert.Null(l.AttachmentVersionNumber));
+        Assert.All(leaves.Where(l => l.ManifestItemKindCode != (byte)ManifestItemKind.Attachment), l => Assert.Null(l.AttachmentContentFingerprint));
+
+        // A carried, unchanged row keeps its fingerprint although its operation binding (and so its canonical digest) changed.
+        await h.WriteAsync(h.Owner, rows, withCurrent: true);
+        var carried = h.Store.ManifestLeaves.Single(l => l.RecordManifestCommitId == h.Store.Heads.Single().CurrentRecordManifestCommitId && l.ManifestItemId == h.Document);
+        Assert.Equal(document.AttachmentContentFingerprint, carried.AttachmentContentFingerprint);
+        Assert.False(document.CanonicalPayloadDigest.AsSpan().SequenceEqual(carried.CanonicalPayloadDigest));
     }
 }

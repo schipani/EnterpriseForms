@@ -3,6 +3,7 @@ using EnterpriseForms.Application.Common;
 using EnterpriseForms.Application.Common.Authority;
 using EnterpriseForms.Application.Common.Persistence;
 using EnterpriseForms.Application.Features.Sharing.ShareHistory;
+using EnterpriseForms.Domain.Features.Audit;
 using EnterpriseForms.Domain.Features.Identity;
 using Xunit;
 
@@ -48,6 +49,11 @@ public sealed class RecordSecurityHistoryHandlerTests
         Assert.Equal("TransferOwnership", transfer.CommandKind);
         Assert.Equal("CommittedAwaitingProjection", transfer.CommandState);
         Assert.All(transfer.Changes, c => Assert.StartsWith("Owner", c.ChangeKind, StringComparison.Ordinal));
+
+        // C10 review N-3: the ownership-history read is audited (identifiers and a count only); the sharing-history read is not.
+        var audited = Assert.Single(store.Audited);
+        Assert.Equal((AuditActions.RecordOwnershipHistoryViewed, (Guid?)Record), (audited.EventAction, audited.FormRecordId));
+        Assert.Contains("\"returnedCount\":1", audited.EventMetadataJson, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -111,6 +117,8 @@ public sealed class RecordSecurityHistoryHandlerTests
                     new() { UserId = NewOwner, TenantId = Organization, DisplayName = "New Owner" },
                 }),
                 nameof(IAsyncDisposable.DisposeAsync) => ValueTask.CompletedTask,
+                nameof(IBusinessScope.AddAuditEvent) => Record((AuditEvent)_![0]!),
+                nameof(IBusinessScope.CommitAsync) => Task.CompletedTask,
                 _ => throw new NotSupportedException(m.Name),
             }));
         });
@@ -118,6 +126,15 @@ public sealed class RecordSecurityHistoryHandlerTests
         public IBusinessStore Proxy { get; }
 
         public int Scopes { get; private set; }
+
+        /// <summary>C10 review N-3: audit rows the handler recorded.</summary>
+        public List<AuditEvent> Audited { get; } = [];
+
+        private object? Record(AuditEvent audit)
+        {
+            Audited.Add(audit);
+            return null;
+        }
     }
 
     private static T Create<T>(Func<MethodInfo, object?[], object?> handler)

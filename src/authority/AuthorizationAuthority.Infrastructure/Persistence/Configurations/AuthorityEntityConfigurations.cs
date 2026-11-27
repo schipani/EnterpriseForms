@@ -307,6 +307,8 @@ public sealed class ContentCandidateLeafConfiguration : IEntityTypeConfiguration
         {
             t.HasCheckConstraint("ck_candidate_leaf_key_length", "octet_length(manifest_item_key) = 17");
             t.HasCheckConstraint("ck_candidate_leaf_digest_lengths", "octet_length(canonical_payload_digest) = 32 AND octet_length(row_signature) = 32 AND octet_length(leaf_digest) = 32");
+            // C10 (review D-1): the accepted evidence Prepare observed, both or neither.
+            t.HasCheckConstraint("ck_candidate_leaf_accepted_attachment_evidence", "(accepted_attachment_version_number IS NULL AND accepted_attachment_content_fingerprint IS NULL) OR (accepted_attachment_version_number > 0 AND octet_length(accepted_attachment_content_fingerprint) = 32)");
         });
     }
 }
@@ -389,6 +391,8 @@ public sealed class RecordManifestLeafConfiguration : IEntityTypeConfiguration<R
         {
             t.HasCheckConstraint("ck_manifest_leaf_key_length", "octet_length(manifest_item_key) = 17");
             t.HasCheckConstraint("ck_manifest_leaf_digest_lengths", "octet_length(canonical_payload_digest) = 32 AND octet_length(row_signature) = 32 AND octet_length(manifest_leaf_digest) = 32");
+            // C10 (review D-1): attachment content evidence is a 32-byte fingerprint when present.
+            t.HasCheckConstraint("ck_manifest_leaf_attachment_fingerprint_length", "attachment_content_fingerprint IS NULL OR octet_length(attachment_content_fingerprint) = 32");
         });
     }
 }

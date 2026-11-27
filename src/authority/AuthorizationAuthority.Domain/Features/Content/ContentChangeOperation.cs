@@ -88,6 +88,16 @@ public sealed class ContentCandidateLeaf
 
     /// <summary>C10 WP8: the verified attachment version number of an attachment candidate (see <see cref="RecordManifestLeaf.AttachmentVersionNumber"/>).</summary>
     public int? AttachmentVersionNumber { get; set; }
+
+    /// <summary>
+    /// C10 (review D-1): for an attachment candidate also present in the accepted head, the accepted version number Prepare read from the
+    /// verified current snapshot (proven equal to the accepted head). Used at Commit only when the accepted leaf carries no evidence (a
+    /// head accepted before this evidence existed); never business-supplied. Null otherwise.
+    /// </summary>
+    public int? AcceptedAttachmentVersionNumber { get; set; }
+
+    /// <summary>C10 (review D-1): the accepted content fingerprint Prepare derived from the same verified current row (see <see cref="AcceptedAttachmentVersionNumber"/>).</summary>
+    public byte[]? AcceptedAttachmentContentFingerprint { get; set; }
 }
 
 public static class ContentMutationKinds

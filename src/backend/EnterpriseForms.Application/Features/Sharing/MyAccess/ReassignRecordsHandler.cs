@@ -12,12 +12,15 @@ namespace EnterpriseForms.Application.Features.Sharing.MyAccess;
 /// idempotency key per record, and its own outcome. Nothing is transferred in bulk and a refusal of one record does not hide the
 /// others' outcomes. A pending command is reported as pending, never as transferred.
 /// </summary>
-public sealed class ReassignRecordsHandler(IShareDetailsAuthority authority, TransferOwnershipHandler transfer)
+public sealed class ReassignRecordsHandler(IShareDetailsAuthority authority, TransferOwnershipHandler transfer, Common.Persistence.IBusinessStore store, TimeProvider clock)
 {
     public async Task<MemberOwnedRecordsResponse> ListAsync(RequestContext context, Guid memberUserId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         var owned = await OwnedAsync(context, memberUserId, cancellationToken).ConfigureAwait(false);
+        // C10 review N-3: the administrator's listing of a member's records is audited after the Authority allowed it.
+        await Audit.AuditRecorder.RecordAsync(store, context, clock, Audit.AuditCategories.Access, Domain.Features.Audit.AuditActions.MemberOwnedRecordsViewed,
+            "member owned records listed", null, "Success", new { memberUserId, returnedCount = owned.FormRecordIds.Count }, cancellationToken).ConfigureAwait(false);
         return new MemberOwnedRecordsResponse(memberUserId, owned.FormRecordIds, owned.Truncated, owned.AuthorizationRevision);
     }
 

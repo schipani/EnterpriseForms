@@ -167,6 +167,12 @@ public static partial class SecurityCommandTimelineCatalog
         ["ShareExpired"] = Rule(Id("security_command_id"), Code("command_kind"), Id("form_record_id"), Id("record_share_id"), Time("evaluated_on"), Count("share_revision"),
             Id("expiry_source_security_command_id"), Code("workload_name"), Ids("invalidated_descendant_share_ids"), Count("authorization_revision"),
             Code("command_state_at_commit"), Id("correlation_id")),
+
+        // C10 review D-5: a share boundary extended by an accepted replacement through that share (in the content commit's transaction).
+        // Version numbers and revisions only; never the document id, its name or its content.
+        ["ShareDocumentBoundaryExtended"] = Rule(Id("content_change_operation_id"), Id("form_record_id"), Id("record_share_id"), Id("share_document_binding_id"),
+            Count("previous_share_revision"), Count("share_revision"), Count("previous_shared_through_version"), Count("shared_through_version"), Count("committed_content_revision"),
+            Count("authorization_revision"), Id("correlation_id")),
     };
 
     /// <summary>Audit-stream rejection entries: the journal evidence of their rejected command row, never items of their own.</summary>

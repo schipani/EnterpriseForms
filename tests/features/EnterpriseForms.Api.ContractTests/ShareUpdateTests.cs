@@ -44,6 +44,7 @@ public sealed class ShareUpdateTests
     private static readonly Guid SecondField = Guid.CreateVersion7();
     private static readonly Guid FirstItem = Guid.CreateVersion7();
     private static readonly Guid SecondItem = Guid.CreateVersion7();
+    private static readonly Guid EmptyField = Guid.CreateVersion7();
     private static readonly Guid Operation = Guid.CreateVersion7();
     private static readonly RequestContext Context = new(Organization, LocalUser, "https://issuer.invalid", "subject", "Tester", "assertion", Guid.CreateVersion7());
     private const string Key = "share-update-key-1";
@@ -124,7 +125,8 @@ public sealed class ShareUpdateTests
         Assert.Equal(parent, payload.GetProperty("parent_record_share_id").GetGuid());
         Assert.Equal(expiry.ToUniversalTime(), payload.GetProperty("share_expires_on").GetDateTimeOffset());
         Assert.False(payload.TryGetProperty("step_up_evidence", out _));
-        Assert.Equal(new[] { ProtectedAction.ManageAccess }, authority.Checks);
+        // C10 review F-6: the field keys are resolved only after the caller's full-read check (the owner here, so no scope narrowing).
+        Assert.Equal(new[] { ProtectedAction.ManageAccess, ProtectedAction.Read }, authority.Checks);
     }
 
     [Fact]
@@ -308,6 +310,35 @@ public sealed class ShareUpdateTests
         Assert.Empty(authority.Submitted);
     }
 
+    [Fact]
+    public async Task ADelegatingManagerGetsOneAnswerForEveryFieldOutsideItsOwnShareScope()
+    {
+        // C10 review F-6: a field with a value, a field without one and an unknown key outside the parent share's scope are
+        // indistinguishable; nothing reaches the Authority. The parent share's own field is accepted.
+        var parent = Guid.CreateVersion7();
+        var shares = Stub.Create<IShareDetailsAuthority>((method, args) => method.Name == nameof(IShareDetailsAuthority.GetShareEffectiveScopeAsync)
+            ? Task.FromResult(new AuthorityShareEffectiveScope((Guid)args[3]!, Record, "Active", "User", "Manager", null, [FirstItem], [], true, [], 7))
+            : throw new NotSupportedException(method.Name));
+        var authority = new FakeAuthority { FullRead = false };
+        var handler = new UpdateShareHandler(new FakeStore().Proxy, authority.Proxy, new AuthorityCommandAwaiter(authority.Proxy, TimeProvider.System), TimeProvider.System, shares);
+
+        var answers = new List<(string Code, int Status, string Message)>();
+        foreach (var keys in new[] { new[] { "second" }, ["empty"], ["unknown"], ["first", "second"] })
+        {
+            var refused = await Assert.ThrowsAsync<BusinessException>(() => handler.HandleAsync(Context, Record, Share, 1, new UpdateShareRequest("Reader", keys, null, true, parent), Key, Ct));
+            answers.Add((refused.ErrorCode, refused.HttpStatusCode, refused.Message));
+        }
+
+        Assert.Single(answers.Distinct());
+        Assert.Equal(("FIELD_NOT_IN_SHAREABLE_SCOPE", 403), (answers[0].Code, answers[0].Status));
+        var withoutParent = await Assert.ThrowsAsync<BusinessException>(() => handler.HandleAsync(Context, Record, Share, 1, new UpdateShareRequest("Reader", ["first"], null, true), Key, Ct));
+        Assert.Equal(answers[0], (withoutParent.ErrorCode, withoutParent.HttpStatusCode, withoutParent.Message));
+        Assert.Empty(authority.Submitted);
+
+        await handler.HandleAsync(Context, Record, Share, 1, new UpdateShareRequest("Reader", ["first"], null, true, parent), Key, Ct);
+        Assert.Equal(new[] { FirstItem }, Assert.Single(authority.Submitted).Request.CommandPayload.GetProperty("field_item_ids").EnumerateArray().Select(i => i.GetGuid()));
+    }
+
     // ---- fixtures ----
 
     private static UpdateShareRequest Valid() => new("Contributor", ["first"], null, true);
@@ -385,6 +416,9 @@ public sealed class ShareUpdateTests
 
         public bool ManageAccess { get; init; } = true;
 
+        /// <summary>C10 review F-6: false makes the caller a delegating Manager (ManageAccess without full read).</summary>
+        public bool FullRead { get; init; } = true;
+
         public AuthorityClientException? Refusal { get; init; }
 
         public SecurityCommandStatus Status { get; init; } = SecurityCommandStatus.Effective;
@@ -406,7 +440,8 @@ public sealed class ShareUpdateTests
         private Task<PermissionDecision> Check(PermissionCheckRequest request)
         {
             Checks.Add(request.RequestedAction);
-            return Task.FromResult(new PermissionDecision(ManageAccess, ManageAccess ? null : "DENIED", 7, 7, null, Guid.CreateVersion7()));
+            var allowed = request.RequestedAction == ProtectedAction.Read ? ManageAccess && FullRead : ManageAccess;
+            return Task.FromResult(new PermissionDecision(allowed, allowed ? null : "DENIED", 7, 7, null, Guid.CreateVersion7()));
         }
 
         private Task<SecurityCommandResult> Submit(SecurityCommandRequest request, string key)
@@ -457,6 +492,7 @@ public sealed class ShareUpdateTests
                 {
                     new() { FieldDefinitionId = FirstField, FormDefinitionId = Form, FieldKey = "first" },
                     new() { FieldDefinitionId = SecondField, FormDefinitionId = Form, FieldKey = "second" },
+                    new() { FieldDefinitionId = EmptyField, FormDefinitionId = Form, FieldKey = "empty" }, // no persisted value
                 }),
                 nameof(IBusinessScope.FindShareProjectionAsync) => Task.FromResult(Projection),
                 nameof(IBusinessScope.GetShareFieldsOfShareAsync) => Task.FromResult(ExistingFields.ToList()),

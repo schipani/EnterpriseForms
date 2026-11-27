@@ -16,7 +16,7 @@ namespace EnterpriseForms.Application.Features.Sharing.UpdateShare;
 /// (moved: 409, never retried under the same key). Step-up is carried only through <see cref="HumanCommandPayload"/> and is never
 /// stored here. The local projection changes only after the command is Effective; it confers nothing.
 /// </summary>
-public sealed class UpdateShareHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock)
+public sealed class UpdateShareHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock, IShareDetailsAuthority? shares = null)
 {
     public const string StaleShareRevision = "STALE_SHARE_REVISION";
     public const string StaleAuthorizationRevision = "STALE_AUTHORIZATION_REVISION";
@@ -51,7 +51,7 @@ public sealed class UpdateShareHandler(IBusinessStore store, IAuthorizationAutho
             throw new BusinessException("RECORD_NOT_FOUND", 404, "record not found");
         }
 
-        var (_, items) = await ShareFieldItems.ResolveAsync(store, authority, user, context.OrganizationId, formRecordId, fieldKeys, cancellationToken).ConfigureAwait(false);
+        var (_, items) = await ShareFieldItems.ResolveAsync(store, authority, shares, user, context.OrganizationId, formRecordId, fieldKeys, request.ParentRecordShareId, cancellationToken).ConfigureAwait(false);
         var commandFields = JsonSerializer.SerializeToNode(new
         {
             record_share_id = recordShareId,

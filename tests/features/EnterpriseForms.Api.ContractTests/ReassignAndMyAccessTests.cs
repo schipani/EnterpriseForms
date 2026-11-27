@@ -92,7 +92,7 @@ public sealed class ReassignAndMyAccessTests
     }
 
     private static ReassignRecordsHandler Handler(IAuthorizationAuthorityClient authority, IShareDetailsAuthority details) =>
-        new(details, new TransferOwnershipHandler(Store(), authority, new AuthorityCommandAwaiter(authority, new JumpingClock()), TimeProvider.System));
+        new(details, new TransferOwnershipHandler(Store(), authority, new AuthorityCommandAwaiter(authority, new JumpingClock()), TimeProvider.System), Store(), TimeProvider.System);
 
     [Fact]
     public async Task EachRecordIsItsOwnTransferWithItsOwnKeyAndOutcome()
