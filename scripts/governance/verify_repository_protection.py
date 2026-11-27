@@ -29,6 +29,12 @@ REQUIRED_CHECKS = {
 }
 PASS, FAIL, DEFERRED = "PASS", "FAIL", "DEFERRED"
 
+# Amendment A-24 (ADR-PB-011, decision C-199, 2026-11-27): Development/Test integration on the sole-owner public repository is the
+# owner's recorded authorization; no human GitHub approval is required (there is no second eligible reviewer). It ends at the Azure
+# DevOps migration or when a second eligible reviewer exists; then set this to False and the ruleset back to one approval with
+# last-push approval. Production review requirements are unchanged.
+A24_SOLE_OWNER_DEVELOPMENT_REVIEW = True
+
 
 def token() -> str:
     env = os.environ.get("GITHUB_TOKEN")
@@ -84,11 +90,14 @@ def main() -> int:
             tags_ok = True
         contexts = {c["context"] for c in rules.get("required_status_checks", {}).get("parameters", {}).get("required_status_checks", [])}
         pr = rules.get("pull_request", {}).get("parameters", {})
-        if REQUIRED_CHECKS <= contexts and {"pull_request", "non_fast_forward", "deletion"} <= set(rules) and pr.get("required_approving_review_count", 0) >= 1:
+        approvals_ok = pr.get("required_approving_review_count", 0) >= (0 if A24_SOLE_OWNER_DEVELOPMENT_REVIEW else 1)
+        if REQUIRED_CHECKS <= contexts and {"pull_request", "non_fast_forward", "deletion"} <= set(rules) and approvals_ok:
             checks_ok = True
             bypass_ok = not detail.get("bypass_actors")
             signatures_ok = "required_signatures" in rules
-    add("3.3 main ruleset: PR + 1 approval + required status checks + no force-push/deletion", checks_ok, "matches .github/rulesets/main-branch-protection.json" if checks_ok else "missing")
+    add("3.3 main ruleset: PR + required status checks + no force-push/deletion (approvals per A-24)", checks_ok, "matches .github/rulesets/main-branch-protection.json" if checks_ok else "missing")
+    add("3.3 independent human approval of the last push", not A24_SOLE_OWNER_DEVELOPMENT_REVIEW,
+        "A-24: owner authorization is the Development/Test integration decision until the Azure DevOps migration or a second eligible reviewer; AI review is technical evidence, not approval", deferred=True)
     add("3.3 main ruleset has no bypass actors", bypass_ok, "")
     add("3.3 main ruleset requires signed commits", signatures_ok, "")
     add("3.3 release tag ruleset (v*) exists", tags_ok, "")

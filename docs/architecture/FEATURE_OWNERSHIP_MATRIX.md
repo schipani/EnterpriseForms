@@ -13,9 +13,9 @@ entry points permitted by ADR-ARCH-001.
 **Stage B (2026-10-18) shipped the Accused vertical slice** — real pages now exist for: `identity` (PG-001 development
 sign-in, session expiry), `dashboard` (PG-006 independent cards), `form-catalog` (forms list, new form), `form-designer`
 (PG-029/033/037 field catalog, 4-column canvas with spans/row breaks/preview, relationships, draft save, publish, versions,
-restore), `form-records` (PG-010/014/016/017 list, create, verified view, edit with If-Match), `related-forms`
+restore), `form-records` (PG-014/016/017 create, verified view, edit with If-Match; the records list is PG-015, owned by `search`; id corrected 2026-11-25, previously written as PG-010), `related-forms`
 (PG-018/019 child list add/view/edit/unlink, child creation page), `documents` (PG-020 collection: concurrent uploads,
-progress, Ready only after server commit, download, versions, remove), `jobs` (PG-021 Upload Center), `audit` (PG-025
+progress, Ready only after server commit, download, versions, remove), `jobs` (PG-010 Upload Center; id corrected 2026-11-25, previously written as PG-021), `audit` (PG-025
 record activity, my activity), `organizations` (branding + logo), `user-preferences` (text size), `support` (PG-069
 gallery, not-found, no-permission, error panel). Backend slices added: `FormDesigner` (form_drafts, field_options,
 relationships, publish/restore), `FormRecords` typed value tables + projection, `RelatedForms`, `Documents`

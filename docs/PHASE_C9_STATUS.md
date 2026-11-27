@@ -1,8 +1,9 @@
 # Phase C9 — Form Version Management: status
 
-- **Branches:** C-188 `c188/retained-field-search` (from `9903844`; pushed, PR #76 open, not merged, §11). M3 `phase-c9/m3-acceptance` (from `fc9e404`, the authorized baseline; tests and documentation only), squash-merged to `main` as `9903844` (PR #75). M1 `phase-c9/form-version-management` (from `198aeae`), squash-merged to `main` as `cd48e13` (PR #70; branch kept, tag `archive/c9-m1-form-version-management-9395ec5`). M2 `phase-c9/m2-version-comparison` (from `cd48e13`), squash-merged to `main` as `491fa9a` (PR #71; the branch was deleted automatically on merge; its commits are kept by tag `archive/c9-m2-version-comparison-03b5169`).
+- **Branches:** C-188 `c188/retained-field-search` (from `9903844`; pushed as PR #76, §11), squash-merged to `main` as `fbf18bc` (PR #76, 2026-11-25 02:02 UTC, merged by the owner's account; tree identical to the branch head `b43168e`; the remote branch was deleted automatically on merge, no archive tag; the PR title's "do not merge" wording is obsolete, §12). M3 `phase-c9/m3-acceptance` (from `fc9e404`, the authorized baseline; tests and documentation only), squash-merged to `main` as `9903844` (PR #75). M1 `phase-c9/form-version-management` (from `198aeae`), squash-merged to `main` as `cd48e13` (PR #70; branch kept, tag `archive/c9-m1-form-version-management-9395ec5`). M2 `phase-c9/m2-version-comparison` (from `cd48e13`), squash-merged to `main` as `491fa9a` (PR #71; the branch was deleted automatically on merge; its commits are kept by tag `archive/c9-m2-version-comparison-03b5169`).
 - **Architecture:** `docs/architecture/PHASE_C9_FORM_VERSION_MANAGEMENT.md`.
-- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6); C-184 (PR #71 merge record, §7); C-185 (PR #73 merge record and failed post-merge CI, §8); C-186 (test-host startup race, PR #74 and CI recovery, §9); C-187 (M3 authorized and implemented; awaiting owner review, §10); C-188 (§11 #2 searchability of off-layout historical values recorded as UNMET — deferred, §10.4); C-189 (Option B authorized and implemented in Development/Test; awaiting owner review, §11); C-190 (BF-1 remediation, §11.6).
+- **Decisions:** C-178 (PR #69 merge record, C8); C-179 (owner decisions D9-1…D9-9; WP-0 and M1 authorized); C-180 (M1 implemented; awaiting owner review); C-181 (D9-5 reconciliation and correction, §4); C-182 (M2 implemented; awaiting owner review, §5); C-183 (corrective review of PR #71, §6); C-184 (PR #71 merge record, §7); C-185 (PR #73 merge record and failed post-merge CI, §8); C-186 (test-host startup race, PR #74 and CI recovery, §9); C-187 (M3 authorized and implemented; awaiting owner review, §10); C-188 (§11 #2 searchability of off-layout historical values recorded as UNMET — deferred, §10.4); C-189 (Option B authorized and implemented in Development/Test; awaiting owner review, §11); C-190 (BF-1 remediation, §11.6); C-191 (BF-1 final check and final resolution, §11.8–§11.9); C-192 (PR #76 merge record, confirmed as code integration, §12); C-193 (owner decisions: C9-A accepted for Development/Test only, BH-1, BH-2, RM-1…RM-5, SRC-1, Phase C10 direction, §12.5); C-194 (Phase C10 WP-0 final decisions, register governance, integration authorizations; outside C9 scope, recorded for traceability); C-195 (one-time hosted Stage B baseline run, §12.4).
+- **State (2026-11-25, §12):** C-188 Option B, BF-1 and C-191 squash-merged to `main` as `fbf18bc` (PR #76; code integration, C-192). Post-merge `ci` 45530030839, CodeQL 45530030754 and `security-gate-a` 45539957784 passed. The merge itself was not acceptance. **C-193 C9-A:** C9 M1–M3 and C-188 (C-189…C-191, BF-1) accepted for continued development and Development/Test only, within the documented limitations; not production acceptance, independent validation or authorization of persistent activation. §11 #2 is recorded in five parts (§12.5); its original criterion is unchanged and is not fully met. Manual screen-reader review OPEN; nothing deployed or enabled (`FieldSearch:RetainedFieldApprovals` Disabled outside the disposable security-test overlay). The state paragraph below is kept as written on 2026-11-24.
 - **State (2026-11-24):** M1 and M2 merged to `main` (code integration only: `cd48e13`, `491fa9a`). Post-merge CI on `main` failed at `491fa9a` (§7) and at `7d0c879` (§8), each time on a test defect, and has been green since `3d930f6` (§9). M3 (WP-7, WP-8; §10) squash-merged to `main` as `9903844` (PR #75); post-merge CI and CodeQL green. **C-188 Option B implemented in Development/Test on `c188/retained-field-search` (§11, C-189), pushed with PR #76 (owner-authorized); BF-1 remediated on the same branch (§11.6, C-190); not reviewed, not merged.** Manual screen-reader review OPEN. CLAUDE.md §11 #2 searchability of off-layout historical values remains UNMET until the owner accepts the C-189 evidence. Not final C9 acceptance, not independently reviewed, no production or Level 2 claim. G21 OPEN.
 
 ## 1. What M1 delivers
@@ -328,7 +329,8 @@ the C8 status); the six Dependabot alerts; independent third-party assessment an
 Authorized by the owner on 2026-11-24 (owner decisions D-H1…D-H18; H1–H6 in Development/Test only). Implemented on the
 branch `c188/retained-field-search` from `9903844` (the PR #75 squash merge), pushed and opened as PR #76 with owner
 authorization; BF-1 remediated on the same branch (§11.6), the final BF-1 check corrected (§11.8, C-191), and its final resolution implemented (§11.9: fail-closed abandonment, recovery-blocked state). **Not merged, not deployed; not owner-accepted and not independently
-reviewed.** CLAUDE.md §11 #2 searchability stays
+reviewed.** (Update 2026-11-25: merged to `main` as `fbf18bc` without a recorded review or acceptance decision, §12; still not
+deployed, not owner-accepted and not independently reviewed.) CLAUDE.md §11 #2 searchability stays
 **UNMET** in the requirement register until the owner accepts the evidence below.
 
 ### 11.1 Delivered
@@ -401,7 +403,7 @@ Order of events in this session: a first regression batch on a two-hour-old stac
 ### 11.5 Outstanding obligations
 
 Owner review and acceptance of this implementation and of the BF-1 remediation; merge and any deployment (each separately
-authorized); recording §11 #2 as met only after acceptance; the BF-1 rollout prerequisites (§11.7); PB-08 provider step-up; manual
+authorized; the merge has since happened, PR #76 `fbf18bc`, §12; acceptance and deployment remain open); recording §11 #2 as met only after acceptance; the BF-1 rollout prerequisites (§11.7); PB-08 provider step-up; manual
 NVDA/VoiceOver review (PB14-47, PB14-48); an independent security review; the obligations of §10.7.
 
 ### 11.6 BF-1 remediation — publication registration barrier (C-190)
@@ -543,3 +545,94 @@ staged manifest and the business layout are reconciled without trusting the tamp
 **Unchanged by design:** the designer's Retry registration requirement; no automatic retries; no other lifecycle change.
 
 **Verification (local, 2026-11-24; nothing on a persistent environment):** Authority unit FormVersionPublicationTests 15/15 (4 new; the three attestation tests fail with the Authority check removed); contract FormVersionLifecycleContractTests 20/20 (2 new, 2 extended); Vitest AuthorityRegistrationNotice 6/6 (2 new); Stage B on a freshly recreated security-test stack: FormVersionPublicationBarrierTests 8/8 (run 20261124-203350-29924db6, 2 new; the first run 20261124-195607-0259a19f failed 7/8 on a wrong assertion in the new recovery-blocked test - it counted V1's own registration - corrected and rerun), RetainedFieldSearchTests 5/5, FieldSearchApprovalTests 5/5, FieldSearchExecutionTests 14/14, DesignerTests 3/3, FormVersion* 15/16 with the same assertion failure (run 20261124-202849-11ff4eaf; the corrected class then passed 8/8); Playwright form-publication-registration 4/4 (run 20261124-203918-6b67bc96); Release build; full .NET CI-equivalent set 3,356/3,356 with 223 authorized skips.
+
+## 12. PR #76 merge record and C9 close-out reconciliation (C-192 confirmed, C-193 decisions, 2026-11-25)
+
+Recorded from repository and GitHub evidence during the C9 close-out work package (read-only investigation; no code,
+environment or deployment change). This section records facts; it is not an acceptance decision.
+
+### 12.1 Merge record
+
+| Item | Evidence |
+|---|---|
+| Merge | PR #76 squash-merged into `main` as `fbf18bc734f9b6d9563a94a66721af49a7177003` on 2026-11-25 02:02 UTC by the owner's GitHub account; single parent `990384413b8f` (PR #75) |
+| Content | Tree `2be91ac` identical to the reviewed branch head `b43168e` (nine commits `e29518a` … `b43168e`, §11) |
+| Review | No GitHub review, review comment or recorded owner decision on PR #76. The PR title ("owner review; do not merge") and its body ("Do not merge without separate authorization") are obsolete wording, kept unchanged (compare C-178) |
+| Branch | The remote branch was deleted automatically on merge; the local branch `c188/retained-field-search` still points to `b43168e`; no archive tag was created |
+| Post-merge checks | `ci` 45530030839, CodeQL 45530030754 and `security-gate-a` 45539957784 passed on `fbf18bc` |
+| Not run | Hosted Stage B (release-only, C-131); deployment; any persistent-environment migration |
+
+### 12.2 C9 status after the merge (code-complete ≠ merged ≠ accepted)
+
+| Level | C9 M1 (WP-0/1/2/6) | C9 M2 (WP-3/4/5) | C9 M3 (WP-7/8) | C-188 Option B + BF-1 + C-191 |
+|---|---|---|---|---|
+| Code-complete (Development/Test) | yes | yes | yes (tests and documentation) | yes |
+| Merged to `main` | `cd48e13` (#70) | `491fa9a` (#71) | `9903844` (#75) | `fbf18bc` (#76) |
+| Owner development acceptance | **accepted for Development/Test only (C-193 C9-A, 2026-11-25)**; before that, none was recorded (the merges were code integration only) | same | same | same (C-193 C9-A; the merge itself was not acceptance) |
+| Independently validated | no | no | no | no |
+| Manual accessibility (PB-14) | OPEN (PB14-44) | OPEN (PB14-45) | OPEN (PB14-46) | OPEN (PB14-47, PB14-48; not yet in the C9 checklist) |
+| Production-ready | no | no | no | no |
+
+*(Written before C-193; superseded by §12.5 for the current disposition.)* CLAUDE.md §11 #2 (searchability of historical values while the field is outside the current version) stays **UNMET**: C-188
+Option B implements the capability in Development/Test behind `FieldSearch:RetainedFieldApprovals` (default Disabled), but
+the owner has not accepted the C-189…C-191 evidence, the capability is unavailable in staging and production until PB-08
+provider step-up exists (D-H5), and it is not enabled in any persistent environment.
+
+### 12.3 Outstanding before any persistent rollout of C-188 (unchanged from §11.4, §11.5, §11.7, §11.9)
+
+1. Owner acceptance of the C-189…C-191 evidence.
+2. Read-only business inventory of forms whose current version has a `FORM_VERSION_AUTHORITY_REGISTRATION_FAILED` audit
+   event without a later `FORM_VERSION_AUTHORITY_REGISTERED` event (§11.7); not run on any persistent environment.
+3. Release order: Authority before business, as one release; single Authority instance during rollout (D-H12).
+4. Production custody and rotation of `FormPublication:AbandonmentAttestationKeyBase64` (Key Vault/Managed HSM; not designed).
+5. A separately authorized repair procedure for `RecoveryBlocked` (not designed, not implemented).
+6. PB-08 provider step-up (retained and ordinary approvals unavailable in staging/production until then).
+7. The persistent development Authority is at migration `20261101221445_OwnerRecovery` (§11.2); applying the newer
+   migrations to it needs separate authorization.
+8. Manual NVDA/VoiceOver review (PB14-44…48); an independent security review; G21; the D9-9 deferrals.
+
+### 12.4 Baseline-health observations recorded during the close-out (no fix made)
+
+- **Search benchmark "regression" not confirmed.** The 0.59 s (50 records) reference is the C7 measurement on a
+  GitHub-hosted runner (`docs/evidence/phase-c7/c7-m1-benchmark-b146907.json`); the 1.5 s figure of §11.4 is a laptop
+  measurement. Comparable laptop measurements were 1.99 s (pre-S1 `70894d2`), 1.33 s (S1) and 1.56 s (S1 + M1) in C8
+  §39.4; the last hosted measurement (Stage B run 44012820545, `c2452004`, 2026-11-17) was 0.66 s / 2.00 s / 6.62 s for 50 /
+  150 / 480 records, passing. No hosted measurement exists for code after `c2452004`. The benchmark's report hard-codes
+  `environment = "GitHub-hosted isolated Docker stack"`, so local artifacts are mislabelled (test defect, not fixed).
+- **Stack-age load.** On an idle security-test stack about eight hours old (68 organizations, 45 indexed), the Authority used
+  about 76 % CPU and its database about 45 % while no test ran, from the search-index cheap sweep (about 4 sweeps per second:
+  45 organizations at the overlay's 10 s interval; the production default is 900 s). This load grows with every organization
+  a stack accumulates and is a likely, not proven, contributor to the stale-stack failures of §11.3 and §11.6.
+- **P-S1-1** (480-record refusal on the laptop) and the RB-13 shard mitigation (PR #68) are unchanged; see C8 status §40 and §45.5.
+- **Follow-up (C-193 BH-1/BH-2, C-195):** BH-1 is a separate test-only package (benchmark environment reporting; sweep-quiet
+  disposable stacks with 10 s retained for sweep-dependent groups). C-195 authorizes exactly one hosted Stage B run of
+  `search-catalogue` and `projection-integrity-restore` on `main` `fbf18bc` for a comparable baseline; its results are
+  reported to the owner and recorded in a later documentation change. P-S1-1 O-1/O-2 are deferred to PRD-4 (BH-2).
+
+### 12.5 C9 development acceptance and close-out disposition (C-193, owner, 2026-11-25)
+
+**C9-A:** C9 M1–M3 and C-188, including the C-189…C-191 corrections and BF-1, are **accepted for continued development and
+Development/Test purposes only**, within the limitations documented in §1–§11. This is not production acceptance, not an
+independent validation and not authorization of persistent activation. C-192 records the PR #76 merge as code integration;
+the merge did not constitute acceptance.
+
+**CLAUDE.md §11 #2** ("Publish V2 removing phone and adding email; verify old phone values remain in storage and searchable
+with authorization") — the criterion is unchanged:
+
+| Part | Status | Evidence / obligation |
+|---|---|---|
+| Implementation | **Complete** (Development/Test) | C-188 Option B behind `FieldSearch:RetainedFieldApprovals` (default Disabled); BF-1 barrier; C-191 (§11) |
+| Disposable Development/Test evidence | **Accepted** by the owner (C-193 C9-A) | §11.3, §11.6, §11.8, §11.9 runs on the isolated security-test stack |
+| Persistent activation | **Not authorized** | ACT-1 prerequisites (§12.3) |
+| Staging and production validation | **Outstanding** | PRD-1 (provider step-up; D-H5), PRD-4 (staging) |
+| Full acceptance of the criterion | **Outstanding** | The criterion requires searchability in the environments where the product runs; it is not met until activation and staging/production validation pass |
+
+**Carried forward (no obligation closed):** manual NVDA/VoiceOver review PB14-44…48 → Phase C19 (and PRD-7 independent
+accessibility validation); independent security review of C-188/BF-1 → PRD-7; the C-188 rollout prerequisites → ACT-1,
+PRD-3 (attestation-key custody), PRD-5 (`RecoveryBlocked` repair); D9-9 deferrals → Phase C14 / Phase C10; D9-3 → Phase C10
+(RM-4); P-S1-1 → PRD-4 (BH-2); G21 → Phase C14 (design) and PRD-7 (review); production certification → PRD-8.
+
+**C9 close-out:** C9 is closed for development. The close-out deliverables are the corrected status documents, the approved
+roadmap (`docs/architecture/FORWARD_ROADMAP_PROPOSAL.md`), the §11 register
+(`docs/testing/CLAUDE_MD_S11_REQUIREMENTS_REGISTER.csv`) and the Phase C10 WP-0 refinement; the BH-1 test-only package is
+prepared separately (not part of the documentation change).
