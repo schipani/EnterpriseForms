@@ -38,7 +38,7 @@ const operand = z
 const comparisonSchema = z
   .object({
     op: z.enum([...VALUE_OPERATORS, ...SET_OPERATORS, ...PRESENCE_OPERATORS]),
-    fieldDefinitionId: z.string().uuid(),
+    fieldDefinitionId: z.guid(),
     value: operand.optional(),
     values: z.array(operand).min(1).max(RULE_MAX_SET_VALUES).optional(),
   })

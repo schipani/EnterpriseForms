@@ -15,9 +15,15 @@ const placement = z
   .object({ columnSpan: z.number().int().min(1).max(4), startOnNewRow: z.boolean(), columnStart: z.number().int().min(1).max(4).optional() })
   .strict()
   .refine((value) => value.columnStart === undefined || value.columnStart + value.columnSpan - 1 <= 4, "The field extends beyond the four-column grid");
+/**
+ * Zod v4 compatibility: int() now rejects unsafe integers (> MAX_SAFE_INTEGER). The designer's transient layout state
+ * may hold large digits the user typed before finishing, so the two client-unbounded integer fields (minLength,
+ * sortOrder) must accept any finite integer representation for client parsing. The server enforces 32-bit persistence.
+ */
+const jsInteger = () => z.number().refine((n) => Number.isInteger(n), "Expected integer");
 const validation = z
   .object({
-    minLength: z.number().int().min(0).optional(),
+    minLength: jsInteger().refine((n) => n >= 0, "Expected nonnegative integer").optional(),
     maxLength: z.number().int().min(1).max(4000).optional(),
     pattern: z.string().max(200).optional(),
     minimum: z.number().optional(),
@@ -39,7 +45,7 @@ const upload = z
 const protection = z.object({ classification: z.enum(["Public", "Internal", "Confidential", "Restricted"]), protectionMode: z.enum(["Standard", "ApplicationEncrypted"]) }).strict();
 
 /** Option as published (snapshot): stable id and key, the label and order shown at publish time, and whether it was selectable. */
-const optionSnapshot = z.object({ fieldOptionId: z.string().uuid(), optionKey: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), label: z.string().max(200), sortOrder: z.number().int(), isActive: z.boolean() }).strict();
+const optionSnapshot = z.object({ fieldOptionId: z.guid(), optionKey: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), label: z.string().max(200), sortOrder: jsInteger(), isActive: z.boolean() }).strict();
 
 const ruleSchema = ruleConditionSchema.refine((condition) => ruleShapeProblem(condition) === null, "The rule is nested too deeply or has too many conditions");
 
@@ -53,7 +59,7 @@ const optionKey = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
  */
 const optionFilter = z
   .object({
-    parentFieldDefinitionId: z.string().uuid(),
+    parentFieldDefinitionId: z.guid(),
     parentOptionKeysByOption: z.record(optionKey, z.array(optionKey).max(500)).refine((map) => Object.keys(map).length <= 500, "At most 500 options can be mapped"),
   })
   .strict();
@@ -61,7 +67,7 @@ const optionFilter = z
 /** "Allow multiple entries" (Phase C3): the section places a repeating group; its fields have one value per entry. */
 const repeat = z
   .object({
-    groupDefinitionId: z.string().uuid(),
+    groupDefinitionId: z.guid(),
     minOccurrences: z.number().int().min(0).max(50),
     maxOccurrences: z.number().int().min(1).max(50),
     allowAdd: z.boolean(),
@@ -77,7 +83,7 @@ export const REPEAT_CEILING = 50;
 const fieldElement = z
   .object({
     kind: z.literal("field"),
-    fieldDefinitionId: z.string().uuid(),
+    fieldDefinitionId: z.guid(),
     control: z.enum(["text", "textarea", "number", "decimal", "date", "dateTime", "guid", "checkbox", "select", "multiselect"]).default("text"),
     label: safeText(200).default(""),
     helpText: safeText(1000).optional(),
@@ -106,7 +112,7 @@ const fieldElement = z
 const documentElement = z
   .object({
     kind: z.literal("documentCollection"),
-    fieldDefinitionId: z.string().uuid(),
+    fieldDefinitionId: z.guid(),
     /** The server serializes the File control name; it is implied by the kind. */
     control: z.literal("fileUpload").optional(),
     label: safeText(200).default(""),
@@ -121,7 +127,7 @@ const documentElement = z
 const relatedElement = z
   .object({
     kind: z.literal("relatedFormList"),
-    formRelationshipDefinitionId: z.string().uuid(),
+    formRelationshipDefinitionId: z.guid(),
     label: safeText(200).default(""),
     helpText: safeText(1000).optional(),
     layout: placement.default({ columnSpan: 4, startOnNewRow: true }),
