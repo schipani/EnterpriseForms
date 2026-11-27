@@ -63,7 +63,9 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
 
         // C10 (independent review F-7): a share replacement is validated under the replaced attachment's own field and its upload policy;
         // any other declared field gets the same answer as an attachment outside the record (no policy of another field is evaluated).
-        if (shareReplacement && verified.AuthorizedAttachments.FirstOrDefault(a => a.FileAttachmentId == request.ReplacesFileAttachmentId)?.FieldDefinitionId != request.FieldDefinitionId)
+        // Stage B (C-200): the replaced attachment is looked up among the verified rows; an edit read authorizes a share recipient's editable
+        // field items only, never documents, so AuthorizedAttachments never holds it. The Authority listed it as replaceable (viewable).
+        if (shareReplacement && verified.AllRows.OfType<FileAttachmentVersion>().FirstOrDefault(a => a.FileAttachmentId == request.ReplacesFileAttachmentId)?.FieldDefinitionId != request.FieldDefinitionId)
         {
             throw new BusinessException("NOT_FOUND", 404, "attachment to replace is not part of the accepted record content");
         }

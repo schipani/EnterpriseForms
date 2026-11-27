@@ -47,15 +47,22 @@ public sealed class C10DatabaseVerificationTests(StageBFixture fixture)
         Assert.Contains("WHERE (content_change_operation_id <> '00000000-0000-0000-0000-000000000000'::uuid)",
             fixture.Stack.AttackerSql("SELECT indexdef FROM pg_indexes WHERE indexname = 'uq_file_attachment_versions_number_operation';"), StringComparison.Ordinal);
 
-        // Triggers: a terminal share never returns to Active; a command's target record is immutable (C10 D6). Refused even to the
-        // AuthorityDb administrator; nothing is changed (ROLLBACK).
-        var share = await s.Fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
-        Assert.True(share.IsSuccess, share.Body);
-        var shareId = share.Root.GetProperty("recordShareId").GetGuid();
+        // Triggers: a terminal (Expired or Invalidated, WP-0 §4 test 6) share never returns to Active; a command's target record is
+        // immutable (C10 D6). Refused even to the AuthorityDb administrator; nothing is changed (ROLLBACK). The terminal share here is a
+        // delegated share invalidated by the revocation of its parent Manager share.
+        var manager = await s.Fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Manager", fieldKeys = new[] { "given_name" } });
+        Assert.True(manager.IsSuccess, manager.Body);
+        var managerId = manager.Root.GetProperty("recordShareId").GetGuid();
         await s.WaitGateReadyAsync(Settle);
-        var revoke = await s.Fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{shareId:D}/revoke?useDevelopmentStepUp=true", s.Token(s.Clerk), new { });
+        await s.WaitProjectionAsync(s.Reader, record, Settle);
+        var delegated = await s.Fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Reader), new { useDevelopmentStepUp = true, recipientUserId = s.DesignerOnly.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" }, parentRecordShareId = managerId });
+        Assert.True(delegated.IsSuccess, delegated.Body);
+        var shareId = delegated.Root.GetProperty("recordShareId").GetGuid();
+        await s.WaitGateReadyAsync(Settle);
+        var revoke = await s.Fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{managerId:D}/revoke?useDevelopmentStepUp=true", s.Token(s.Clerk), new { });
         Assert.True(revoke.IsSuccess, revoke.Body);
         await s.WaitGateReadyAsync(Settle);
+        Assert.Equal("Invalidated", Authority($"SELECT resource_lifecycle_state FROM authority_resources WHERE resource_type_name = 'record_share' AND resource_entity_id = '{shareId:D}';"));
         var reactivate = fixture.Stack.AuthorityAdministratorSql($"BEGIN; UPDATE authority_resources SET resource_lifecycle_state = 'Active' WHERE resource_type_name = 'record_share' AND resource_entity_id = '{shareId:D}'; ROLLBACK;", throwOnError: false);
         Assert.Contains("is terminal and cannot change state", reactivate, StringComparison.Ordinal);
         var retarget = fixture.Stack.AuthorityAdministratorSql($"BEGIN; UPDATE security_commands SET target_form_record_id = gen_random_uuid() WHERE target_form_record_id = '{record:D}'; ROLLBACK;", throwOnError: false);

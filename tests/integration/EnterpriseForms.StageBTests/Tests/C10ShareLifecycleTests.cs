@@ -130,6 +130,20 @@ public sealed class C10ShareLifecycleTests(StageBFixture fixture)
         return (s, await s.CreateAccusedAsync(s.Clerk));
     }
 
+    /// <summary>
+    /// The Authority accepts only expiries one hour to 365 days ahead. To reach an expiry instant inside a test, the test grants the share
+    /// with a valid expiry and then, on this disposable stack only, moves that committed expiry a few seconds ahead as the AuthorityDb
+    /// administrator (the pattern of the restore simulations). Access-time enforcement and convergence then run unchanged.
+    /// </summary>
+    private DateTimeOffset MoveExpirySoon(Guid share, int seconds = 8)
+    {
+        var at = fixture.Stack.AuthorityAdministratorSql($"UPDATE share_resource_metadata SET share_expires_on = now() + interval '{seconds} seconds' WHERE record_share_id = '{share:D}' RETURNING to_char(share_expires_on AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)[0];
+        return DateTimeOffset.Parse(at, CultureInfo.InvariantCulture);
+    }
+
+    private static DateTimeOffset ValidExpiry => DateTimeOffset.UtcNow.AddHours(2);
+
     private static object Document(Guid attachment, bool download = true, bool replace = false) => new { fileAttachmentId = attachment, canDownloadDocument = download, canReplaceDocument = replace };
 
     private static string DownloadPath(Guid record, Guid attachment) => $"/api/v1/form-records/{record:D}/documents/{attachment:D}/download";
@@ -172,9 +186,11 @@ public sealed class C10ShareLifecycleTests(StageBFixture fixture)
         var (s, record) = await AccusedAsync("c10-expiry-instant");
         var document = await s.UploadAsync(s.Clerk, record, "c10-expiry.txt", "text/plain", StageBScenario.SyntheticBytes(1024, 91));
         var attachment = document.GetProperty("fileAttachmentId").GetGuid();
-        var expiresOn = DateTimeOffset.UtcNow.AddSeconds(20);
-        var share = await ShareAsync(s, s.Clerk, record, s.Reader, "Reader", ["given_name"], [Document(attachment)], expiresOn);
+        var tooSoon = await CreateShareAsync(s, s.Clerk, record, s.Reader, "Reader", ["given_name"], expiresOn: DateTimeOffset.UtcNow.AddMinutes(5));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, tooSoon.Status); // expiry must lie one hour to 365 days ahead
+        var share = await ShareAsync(s, s.Clerk, record, s.Reader, "Reader", ["given_name"], [Document(attachment)], ValidExpiry);
         await s.WaitProjectionAsync(s.Reader, record, Settle);
+        var expiresOn = MoveExpirySoon(share);
         Assert.Equal(HttpStatusCode.OK, (await fixture.DownloadAsync(DownloadPath(record, attachment), s.Token(s.Reader))).Status);
 
         await WaitUntilAsync(expiresOn.AddMilliseconds(500));
@@ -201,13 +217,13 @@ public sealed class C10ShareLifecycleTests(StageBFixture fixture)
     {
         // §4 test 10 and the set-based descendant read (FindShareMetadataByParentsAsync) on real PostgreSQL.
         var (s, record) = await AccusedAsync("c10-inherited-expiry");
-        var expiresOn = DateTimeOffset.UtcNow.AddSeconds(25);
-        var manager = await ShareAsync(s, s.Clerk, record, s.Reader, "Manager", ["given_name", "family_name"], expiresOn: expiresOn);
+        var manager = await ShareAsync(s, s.Clerk, record, s.Reader, "Manager", ["given_name", "family_name"], expiresOn: ValidExpiry);
         await s.WaitProjectionAsync(s.Reader, record, Settle);
         var delegated = await ShareAsync(s, s.Reader, record, s.DesignerOnly, "Reader", ["given_name"], parent: manager);
         await ShareAsync(s, s.Clerk, record, s.DesignerOnly, "Reader", ["family_name"]); // independent grant
         Assert.Equal(["family_name", "given_name"], VisibleKeys(await s.WaitProjectionAsync(s.DesignerOnly, record, Settle)));
 
+        var expiresOn = MoveExpirySoon(manager);
         await WaitUntilAsync(expiresOn.AddMilliseconds(500));
         Assert.True(ShareResourceState(delegated) == "Active", "convergence ran before the access check; rerun");
         Assert.Equal(["family_name"], VisibleKeys(await s.WaitProjectionAsync(s.DesignerOnly, record, Settle)));
@@ -223,11 +239,13 @@ public sealed class C10ShareLifecycleTests(StageBFixture fixture)
         // §4 test 8: after the expiry instant but before convergence, a revoke wins (no ShareExpired), an update is refused and the
         // share converges to Expired once, and a transfer leaves the durable share to converge once. No double journal entry.
         var (s, record) = await AccusedAsync("c10-expiry-races");
-        var expiresOn = DateTimeOffset.UtcNow.AddSeconds(20);
-        var revoked = await ShareAsync(s, s.Clerk, record, s.Reader, "Reader", ["given_name"], expiresOn: expiresOn);
-        var updated = await ShareAsync(s, s.Clerk, record, s.DesignerOnly, "Reader", ["given_name"], expiresOn: expiresOn);
-        var transferred = await ShareAsync(s, s.Clerk, record, s.Administrator, "Reader", ["family_name"], expiresOn: expiresOn);
+        var revoked = await ShareAsync(s, s.Clerk, record, s.Reader, "Reader", ["given_name"], expiresOn: ValidExpiry);
+        var updated = await ShareAsync(s, s.Clerk, record, s.DesignerOnly, "Reader", ["given_name"], expiresOn: ValidExpiry);
+        var transferred = await ShareAsync(s, s.Clerk, record, s.Administrator, "Reader", ["family_name"], expiresOn: ValidExpiry);
         var revision = await ShareRevisionAsync(s, record, updated);
+        MoveExpirySoon(revoked);
+        MoveExpirySoon(updated);
+        var expiresOn = MoveExpirySoon(transferred);
 
         await WaitUntilAsync(expiresOn.AddMilliseconds(500));
         Assert.True(ShareResourceState(revoked) == "Active", "convergence ran before the race; rerun");

@@ -36,11 +36,12 @@ public sealed class C10ShareExpiryRestoreTests(StageBFixture fixture)
         await s.BootstrapAsync();
         await s.BuildAccusedWorkspaceAsync();
         var record = await s.CreateAccusedAsync(s.Clerk);
-        var expiresOn = DateTimeOffset.UtcNow.AddSeconds(15);
-        var created = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" }, shareExpiresOn = expiresOn });
+        // A valid expiry (one hour to 365 days), then moved a few seconds ahead on this disposable stack (see C10ShareLifecycleTests).
+        var created = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" }, shareExpiresOn = DateTimeOffset.UtcNow.AddHours(2) });
         Assert.True(created.IsSuccess, created.Body);
         var share = created.Root.GetProperty("recordShareId").GetGuid();
         await s.WaitGateReadyAsync(Settle);
+        fixture.Stack.AuthorityAdministratorSql($"UPDATE share_resource_metadata SET share_expires_on = now() + interval '8 seconds' WHERE record_share_id = '{share:D}';");
         await WaitStateAsync(share, "Expired", TimeSpan.FromSeconds(120));
 
         // Restore simulation: the share resource as it was before convergence.

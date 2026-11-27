@@ -219,12 +219,14 @@ public sealed class FieldSearchExecutionTests(StageBFixture fixture)
     {
         var w = await WorkspaceAsync("c10-search-expiry");
         var a = await CreateAsync(w, Values("CR-9001", 1, "2026-03-03", "open", false));
-        var expiresOn = DateTimeOffset.UtcNow.AddSeconds(20);
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{a:D}/shares", w.S.Token(w.S.Clerk), new { useDevelopmentStepUp = true, recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" }, shareExpiresOn = expiresOn });
+        // A valid expiry (one hour to 365 days), then moved a few seconds ahead on this disposable stack (see C10ShareLifecycleTests).
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{a:D}/shares", w.S.Token(w.S.Clerk), new { useDevelopmentStepUp = true, recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" }, shareExpiresOn = DateTimeOffset.UtcNow.AddHours(2) });
         Assert.True(share.IsSuccess, share.Body);
         var shareId = share.Root.GetProperty("recordShareId").GetGuid();
         await w.S.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
         Assert.Equal([a], Ids(await SearchAsync(w, w.S.Reader, [Cond(w.Reference, "equals", "String", "CR-9001")])));
+        fixture.Stack.AuthorityAdministratorSql($"UPDATE share_resource_metadata SET share_expires_on = now() + interval '8 seconds' WHERE record_share_id = '{shareId:D}';");
+        var expiresOn = DateTimeOffset.UtcNow.AddSeconds(8);
 
         var wait = expiresOn.AddMilliseconds(500) - DateTimeOffset.UtcNow;
         if (wait > TimeSpan.Zero)
