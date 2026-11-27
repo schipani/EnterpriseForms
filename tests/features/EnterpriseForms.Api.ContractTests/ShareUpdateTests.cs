@@ -275,7 +275,8 @@ public sealed class ShareUpdateTests
         Assert.Equal(2, response.ShareRevision);
         Assert.Equal(2, store.Projection!.ShareRevision);
         Assert.Equal("Contributor", store.Projection.RecipientRole);
-        Assert.Equal(new[] { dropped }, store.Removed);
+        Assert.Empty(store.Removed); // G08: the runtime role never deletes (Stage B C-200 found the delete refused by PostgreSQL)
+        Assert.Equal((false, false), (dropped.CanViewField, dropped.CanEditField)); // the narrowed field is marked unshared instead
         Assert.Equal(new[] { SecondItem }, store.Added.Select(f => f.FieldValueItemId));
         Assert.True(kept.CanEditField);
         Assert.All(store.Added, f => Assert.True(f.CanEditField));

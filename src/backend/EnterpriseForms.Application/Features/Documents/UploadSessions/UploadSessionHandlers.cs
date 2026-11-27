@@ -150,11 +150,7 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
         }
 
         // Re-check live authorization per chunk (revocation mid-upload stops the transfer, CLAUDE-DESIGN §6.1).
-        var edit = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, session.FormRecordId), ProtectedAction.Edit), cancellationToken).ConfigureAwait(false);
-        if (!edit.Allowed)
-        {
-            throw new BusinessException("FORBIDDEN", 403, "edit permission on the record was revoked");
-        }
+        await RequireUploadAuthorityAsync(context, session, cancellationToken).ConfigureAwait(false);
 
         var expectedLength = chunkIndex == session.ExpectedChunkCount - 1 ? session.DeclaredSizeBytes - (long)chunkIndex * session.ChunkSizeBytes : session.ChunkSizeBytes;
         if (declaredLength is { } declared && declared != expectedLength)
@@ -206,11 +202,7 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
             throw new BusinessException("UPLOAD_INCOMPLETE", 409, "not every chunk has been received");
         }
 
-        var edit = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, session.FormRecordId), ProtectedAction.Edit), cancellationToken).ConfigureAwait(false);
-        if (!edit.Allowed)
-        {
-            throw new BusinessException("FORBIDDEN", 403, "edit permission on the record was revoked");
-        }
+        await RequireUploadAuthorityAsync(context, session, cancellationToken).ConfigureAwait(false);
 
         await storage.CommitStagedChunksAsync(session.StagingObjectKey, session.ExpectedChunkCount, cancellationToken).ConfigureAwait(false);
         var now = clock.GetUtcNow();
@@ -274,6 +266,27 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
         }
 
         return await ToResponseAsync(scope, session, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The live re-check of every chunk and of completion (revocation mid-upload stops the transfer). Edit permission on the record, or,
+    /// for a C10 WP8-B share-replacement session, the Authority still listing the replaced attachment as replaceable for the caller
+    /// (Stage B C-200: the edit check alone refused every recipient's replacement after it had been admitted).
+    /// </summary>
+    private async Task RequireUploadAuthorityAsync(RequestContext context, UploadSession session, CancellationToken cancellationToken)
+    {
+        var edit = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, session.FormRecordId), ProtectedAction.Edit), cancellationToken).ConfigureAwait(false);
+        if (edit.Allowed)
+        {
+            return;
+        }
+
+        if (session.ReplacesFileAttachmentId is { } replaces && Replaceable(await reader.ReadAsync(context, session.FormRecordId, ProtectedAction.Edit, cancellationToken).ConfigureAwait(false), replaces))
+        {
+            return;
+        }
+
+        throw new BusinessException("FORBIDDEN", 403, "edit permission on the record was revoked");
     }
 
     /// <summary>

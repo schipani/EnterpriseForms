@@ -118,11 +118,15 @@ public sealed class UpdateShareHandler(IBusinessStore store, IAuthorizationAutho
 
         var existing = await scope.GetShareFieldsOfShareAsync(context.OrganizationId, recordShareId, cancellationToken).ConfigureAwait(false);
         var wanted = items.Select(i => i.ItemId).ToHashSet();
-        scope.RemoveShareFields(existing.Where(f => !wanted.Contains(f.FieldValueItemId)).ToList());
         var canEdit = request.RecipientRole != RecipientRoleNames.Reader;
-        foreach (var kept in existing.Where(f => wanted.Contains(f.FieldValueItemId)))
+        // Stage B (C-200): the business runtime role may never DELETE (G08 least privilege, BusinessRuntimeGrants), so a field the update
+        // no longer shares is marked unshared (view and edit off) rather than deleted, and a field shared again is turned back on. The
+        // projection confers nothing either way; the Authority's scope decides every access.
+        foreach (var row in existing)
         {
-            kept.CanEditField = canEdit;
+            var shared = wanted.Contains(row.FieldValueItemId);
+            row.CanViewField = shared;
+            row.CanEditField = shared && canEdit;
         }
 
         var present = existing.Select(f => f.FieldValueItemId).ToHashSet();

@@ -29,7 +29,7 @@ public sealed class ListSharesHandler(IBusinessStore store, IAuthorizationAuthor
         var shareFields = await scope.GetShareFieldsOfRecordAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
         var fieldKeys = (await scope.GetFieldDefinitionsAsync(record.FormDefinitionId, cancellationToken).ConfigureAwait(false)).ToDictionary(f => f.FieldDefinitionId, f => f.FieldKey);
         var users = (await scope.GetUsersAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false)).ToDictionary(u => u.UserId, u => u.DisplayName);
-        var fieldsByShare = shareFields.GroupBy(f => f.RecordShareId).ToDictionary(g => g.Key, g => g.Select(f => fieldKeys.GetValueOrDefault(f.FieldDefinitionId, f.FieldDefinitionId.ToString("D"))).OrderBy(k => k, StringComparer.Ordinal).ToList());
+        var fieldsByShare = shareFields.Where(f => f.CanViewField).GroupBy(f => f.RecordShareId).ToDictionary(g => g.Key, g => g.Select(f => fieldKeys.GetValueOrDefault(f.FieldDefinitionId, f.FieldDefinitionId.ToString("D"))).OrderBy(k => k, StringComparer.Ordinal).ToList());
 
         // C10 review F6: the local projection is updated only by the command that changed a share, so a share the Authority invalidated in a
         // cascade (or that expired) would still read Active here. Each locally Active share shows the Authority's own lifecycle state

@@ -107,6 +107,19 @@ public sealed class C10ShareLifecycleTests(StageBFixture fixture)
         }
     }
 
+    /// <summary>
+    /// The convergence loop refuses a share whose committed expiry disagrees with the expiry its source command recorded
+    /// (PAYLOAD_EXPIRY_MISMATCH, alert after two passes), which is exactly the state the expiry move above leaves. So these tests prove
+    /// access-time enforcement and that tampered expiry never converges, never real-loop convergence: that needs a genuine expiry at
+    /// least one hour ahead (WP-0 §10.10; covered by the Authority unit tests with a test clock).
+    /// </summary>
+    private async Task AssertStaysUnconvergedAndDeniedAsync(Guid share, Func<Task<bool>> denied)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(65)); // two passes of the 30 s loop
+        Assert.Equal("Active", ShareResourceState(share));
+        Assert.True(await denied());
+    }
+
     private static async Task WaitUntilAsync(DateTimeOffset instant)
     {
         var wait = instant - DateTimeOffset.UtcNow;
@@ -207,9 +220,8 @@ public sealed class C10ShareLifecycleTests(StageBFixture fixture)
         Assert.True(scope.IsSuccess, scope.Body);
         Assert.Equal("Expired", scope.Root.GetProperty("status").GetString());
 
-        await WaitConvergedAsync(share, "Expired", TimeSpan.FromSeconds(90));
-        Assert.Equal(1, JournalEvents("ShareExpired", record));
-        Assert.True(Denied(await s.ProjectionAsync(s.Reader, record)));
+        await AssertStaysUnconvergedAndDeniedAsync(share, async () => Denied(await s.ProjectionAsync(s.Reader, record)));
+        Assert.Equal(0, JournalEvents("ShareExpired", record));
     }
 
     [Fact]
@@ -219,7 +231,7 @@ public sealed class C10ShareLifecycleTests(StageBFixture fixture)
         var (s, record) = await AccusedAsync("c10-inherited-expiry");
         var manager = await ShareAsync(s, s.Clerk, record, s.Reader, "Manager", ["given_name", "family_name"], expiresOn: ValidExpiry);
         await s.WaitProjectionAsync(s.Reader, record, Settle);
-        var delegated = await ShareAsync(s, s.Reader, record, s.DesignerOnly, "Reader", ["given_name"], parent: manager);
+        var delegated = await ShareAsync(s, s.Reader, record, s.DesignerOnly, "Reader", ["given_name"], expiresOn: DateTimeOffset.UtcNow.AddMinutes(90), parent: manager); // within the parent's expiry
         await ShareAsync(s, s.Clerk, record, s.DesignerOnly, "Reader", ["family_name"]); // independent grant
         Assert.Equal(["family_name", "given_name"], VisibleKeys(await s.WaitProjectionAsync(s.DesignerOnly, record, Settle)));
 
@@ -228,16 +240,15 @@ public sealed class C10ShareLifecycleTests(StageBFixture fixture)
         Assert.True(ShareResourceState(delegated) == "Active", "convergence ran before the access check; rerun");
         Assert.Equal(["family_name"], VisibleKeys(await s.WaitProjectionAsync(s.DesignerOnly, record, Settle)));
 
-        await WaitConvergedAsync(manager, "Expired", TimeSpan.FromSeconds(90));
-        await WaitConvergedAsync(delegated, "Invalidated", TimeSpan.FromSeconds(30));
-        Assert.Equal(["family_name"], VisibleKeys(await s.WaitProjectionAsync(s.DesignerOnly, record, Settle)));
+        await AssertStaysUnconvergedAndDeniedAsync(manager, async () => VisibleKeys(await s.WaitProjectionAsync(s.DesignerOnly, record, Settle)).SequenceEqual(["family_name"]));
+        Assert.Equal("Active", ShareResourceState(delegated));
     }
 
     [Fact]
-    public async Task ExpiryRacingARevokeAnUpdateAndATransferHasExactlyOneOutcome()
+    public async Task AfterTheExpiryInstantARevokeWinsAnUpdateIsRefusedAndATransferLeavesTheShareDenied()
     {
-        // §4 test 8: after the expiry instant but before convergence, a revoke wins (no ShareExpired), an update is refused and the
-        // share converges to Expired once, and a transfer leaves the durable share to converge once. No double journal entry.
+        // §4 test 8, the part reachable before convergence: after the expiry instant a revoke wins (terminal Revoked, no ShareExpired), an
+        // update is refused, and a transfer neither revives nor converges the durable share, which stays denied.
         var (s, record) = await AccusedAsync("c10-expiry-races");
         var revoked = await ShareAsync(s, s.Clerk, record, s.Reader, "Reader", ["given_name"], expiresOn: ValidExpiry);
         var updated = await ShareAsync(s, s.Clerk, record, s.DesignerOnly, "Reader", ["given_name"], expiresOn: ValidExpiry);
@@ -256,10 +267,10 @@ public sealed class C10ShareLifecycleTests(StageBFixture fixture)
         Assert.True(transfer.IsSuccess, transfer.Body);
         await s.WaitGateReadyAsync(Settle);
 
-        await WaitConvergedAsync(updated, "Expired", TimeSpan.FromSeconds(90));
-        await WaitConvergedAsync(transferred, "Expired", TimeSpan.FromSeconds(30));
         Assert.Equal("Revoked", ShareResourceState(revoked));
-        Assert.Equal(2, JournalEvents("ShareExpired", record)); // updated and transferred, once each; never the revoked share
+        await AssertStaysUnconvergedAndDeniedAsync(transferred, async () => Denied(await s.ProjectionAsync(s.Administrator, record)));
+        Assert.True(Denied(await s.ProjectionAsync(s.DesignerOnly, record)));
+        Assert.Equal(0, JournalEvents("ShareExpired", record));
     }
 
     [Fact]

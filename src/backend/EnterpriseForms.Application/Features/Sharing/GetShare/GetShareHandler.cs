@@ -40,7 +40,7 @@ public sealed class GetShareHandler(IBusinessStore store, IShareDetailsAuthority
             var fieldKeys = (await scope.GetFieldDefinitionsAsync(record.FormDefinitionId, cancellationToken).ConfigureAwait(false)).ToDictionary(f => f.FieldDefinitionId, f => f.FieldKey);
             var authoritative = details.FieldItemIds.ToHashSet();
             keys = (await scope.GetShareFieldsOfShareAsync(context.OrganizationId, recordShareId, cancellationToken).ConfigureAwait(false))
-                .Where(f => authoritative.Contains(f.FieldValueItemId) && fieldKeys.ContainsKey(f.FieldDefinitionId))
+                .Where(f => f.CanViewField && authoritative.Contains(f.FieldValueItemId) && fieldKeys.ContainsKey(f.FieldDefinitionId))
                 .Select(f => fieldKeys[f.FieldDefinitionId]).Distinct().Order(StringComparer.Ordinal).ToList();
         }
 

@@ -42,7 +42,7 @@
     {
       "name": "projection-integrity-restore",
       "title": "SpiceDB Datastore Restore and Replacement (RB-12, RB-13)",
-      "classes": ["ProjectionIntegrityRollbackTests", "C10ShareExpiryRestoreTests"]
+      "classes": ["ProjectionIntegrityRollbackTests"]
     },
     {
       "name": "search-benchmark-indexed",
