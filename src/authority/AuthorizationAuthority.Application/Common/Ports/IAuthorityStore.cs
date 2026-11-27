@@ -136,6 +136,13 @@ public interface IAuthorityScope : IAsyncDisposable
     Task<List<AuthorityRelationshipEdge>> GetRecordSecurityEdgeHistoryAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken) =>
         throw new NotSupportedException("record security edge history is not available from this store");
 
+    /// <summary>C10 WP8: the document bindings of the given shares.</summary>
+    Task<List<ShareDocumentBinding>> GetShareDocumentBindingsAsync(Guid organizationId, IReadOnlyCollection<Guid> recordShareIds, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("share document bindings are not available from this store");
+
+    /// <summary>C10 WP8: stages a new document binding in the command transaction.</summary>
+    void AddShareDocumentBinding(ShareDocumentBinding binding) => throw new NotSupportedException("share document bindings are not available from this store");
+
     /// <summary>C10 D6: the committed (not Rejected) commands that targeted the record, newest first, at most <paramref name="limit"/>.</summary>
     Task<List<SecurityCommand>> GetRecordTargetedCommandsAsync(Guid organizationId, Guid formRecordId, int limit, CancellationToken cancellationToken) =>
         throw new NotSupportedException("record-targeted commands are not available from this store");

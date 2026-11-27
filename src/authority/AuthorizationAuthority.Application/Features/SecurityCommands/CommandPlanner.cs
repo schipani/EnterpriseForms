@@ -95,6 +95,9 @@ public sealed class CommandPlan
     /// <summary>C10 M1-WP3: share metadata persisted alongside the resource registration (depth, parent, revision).</summary>
     public Domain.Features.Sharing.ShareResourceMetadata? ShareMetadata { get; set; }
 
+    /// <summary>C10 WP8: document bindings staged with the command (attributed to it when applied).</summary>
+    internal List<Domain.Features.Sharing.ShareDocumentBinding> AddDocumentBindings { get; } = [];
+
     internal (Domain.Features.Sharing.ShareResourceMetadata Metadata, long Revision, DateTimeOffset? ExpiresOn)? ShareMetadataUpdate { get; set; }
     /// <summary>C10 M1-WP5: descendant shares invalidated by this command (revoke, expiry, narrowing, path loss), with reason.</summary>
     internal List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata, string Reason)> InvalidatedDescendantShares { get; } = [];
@@ -958,9 +961,12 @@ public static partial class CommandPlanner
             _ => throw AuthorityException.Invalid("unknown recipient role"),
         };
 
-        if (payload.FieldItemIds.Count == 0 || payload.FieldItemIds.Count > 500 || payload.FieldItemIds.Distinct().Count() != payload.FieldItemIds.Count)
+        // C10 WP8: a share names fields, documents or both (document-only shares are allowed); an empty scope is refused.
+        var fieldItemIds = payload.FieldItemIds ?? [];
+        var documents = payload.Documents ?? [];
+        if (fieldItemIds.Count + documents.Count == 0 || fieldItemIds.Count > 500 || fieldItemIds.Distinct().Count() != fieldItemIds.Count)
         {
-            throw AuthorityException.Invalid("field_item_ids must be a non-empty distinct list (explicit allow-list, no wildcard)");
+            throw AuthorityException.Invalid("a share needs a distinct explicit allow-list of field items or documents (no wildcard)");
         }
 
         if (await scope.FindResourceAsync(organizationId, ResourceTypeNames.RecordShare, payload.RecordShareId, cancellationToken).ConfigureAwait(false) is not null)
@@ -978,11 +984,13 @@ public static partial class CommandPlanner
         var leaves = await scope.GetManifestLeavesAsync(head.CurrentRecordManifestCommitId.Value, cancellationToken).ConfigureAwait(false);
         // A field's committed items are its value leaves and — for plaintext dropdowns / multi-selects — its selection leaves (one per selected option).
         var committedFieldItems = leaves.Where(l => l.ManifestItemKindCode is (byte)MerkleItemKind.FieldValue or (byte)MerkleItemKind.FieldSelection).Select(l => l.ManifestItemId).ToHashSet();
-        var unknown = payload.FieldItemIds.Where(id => !committedFieldItems.Contains(id)).ToList();
+        var unknown = fieldItemIds.Where(id => !committedFieldItems.Contains(id)).ToList();
         if (unknown.Count > 0)
         {
             throw AuthorityException.Invalid("field_item_ids must reference items in the accepted manifest");
         }
+
+        var documentVersions = ShareDocuments.Resolve(documents, leaves);
 
         var isOwner = graph.IsRecordOwner(actor.AuthorityUserId, payload.FormRecordId);
 
@@ -1004,6 +1012,7 @@ public static partial class CommandPlanner
         {
             delegationDepth = await RequireShareDelegationAsync(scope, graph, organizationId, actor.AuthorityUserId,
                 payload, expiresOn, at, cancellationToken).ConfigureAwait(false);
+            await ShareDocuments.RequireWithinParentAsync(scope, organizationId, payload.ParentRecordShareId!.Value, documents, documentVersions, cancellationToken).ConfigureAwait(false);
         }
 
         if (payload.RecipientUserId is { } userId)
@@ -1018,18 +1027,41 @@ public static partial class CommandPlanner
         // The committed share payload includes the effective grant parameters and no step-up evidence.
         var plan = new CommandPlan
         {
-            NormalizedPayloadJson = CanonicalJson.Serialize(new
-            {
-                payload.RecordShareId,
-                payload.FormRecordId,
-                payload.RecipientUserId,
-                payload.RecipientTeamId,
-                payload.RecipientRole,
-                payload.FieldItemIds,
-                payload.ParentRecordShareId,
-                DelegationDepth = delegationDepth,
-                ShareExpiresOn = expiresOn,
-            }),
+            // C10 WP8: documents (with the Authority-derived version boundary) are journalled only when present, so a field-only
+            // share's committed payload is unchanged.
+            NormalizedPayloadJson = documents.Count == 0
+                ? CanonicalJson.Serialize(new
+                {
+                    payload.RecordShareId,
+                    payload.FormRecordId,
+                    payload.RecipientUserId,
+                    payload.RecipientTeamId,
+                    payload.RecipientRole,
+                    FieldItemIds = fieldItemIds,
+                    payload.ParentRecordShareId,
+                    DelegationDepth = delegationDepth,
+                    ShareExpiresOn = expiresOn,
+                })
+                : CanonicalJson.Serialize(new
+                {
+                    payload.RecordShareId,
+                    payload.FormRecordId,
+                    payload.RecipientUserId,
+                    payload.RecipientTeamId,
+                    payload.RecipientRole,
+                    FieldItemIds = fieldItemIds,
+                    payload.ParentRecordShareId,
+                    DelegationDepth = delegationDepth,
+                    ShareExpiresOn = expiresOn,
+                    Documents = documents.OrderBy(d => d.FileAttachmentId).Select(d => new
+                    {
+                        d.FileAttachmentId,
+                        d.CanViewDocument,
+                        d.CanDownloadDocument,
+                        d.CanReplaceDocument,
+                        SharedThroughVersionNumber = documentVersions[d.FileAttachmentId],
+                    }).ToArray(),
+                }),
         };
         plan.RegisterResources.Add(NewResource(organizationId, ResourceTypeNames.RecordShare, payload.RecordShareId, payload.FormRecordId));
         plan.AddEdges.Add((ResourceTypeNames.FormRecord, payload.FormRecordId, "shared_via", ResourceTypeNames.RecordShare, payload.RecordShareId, string.Empty));
@@ -1042,9 +1074,25 @@ public static partial class CommandPlanner
             plan.AddEdges.Add((ResourceTypeNames.RecordShare, payload.RecordShareId, role, ResourceTypeNames.Team, payload.RecipientTeamId!.Value, "participant"));
         }
 
-        foreach (var fieldItemId in payload.FieldItemIds)
+        foreach (var fieldItemId in fieldItemIds)
         {
             plan.AddEdges.Add((ResourceTypeNames.FieldItem, fieldItemId, "shared_via", ResourceTypeNames.RecordShare, payload.RecordShareId, string.Empty));
+        }
+
+        foreach (var document in documents)
+        {
+            plan.AddEdges.Add((ResourceTypeNames.DocumentItem, document.FileAttachmentId, "shared_via", ResourceTypeNames.RecordShare, payload.RecordShareId, string.Empty));
+            plan.AddDocumentBindings.Add(new Domain.Features.Sharing.ShareDocumentBinding
+            {
+                ShareDocumentBindingId = Guid.CreateVersion7(),
+                OrganizationId = organizationId,
+                RecordShareId = payload.RecordShareId,
+                FileAttachmentId = document.FileAttachmentId,
+                CanViewDocument = document.CanViewDocument,
+                CanDownloadDocument = document.CanDownloadDocument,
+                CanReplaceDocument = document.CanReplaceDocument,
+                SharedThroughVersionNumber = documentVersions[document.FileAttachmentId],
+            });
         }
 
         // C10 M1-WP3: persist share metadata in the same command transaction.

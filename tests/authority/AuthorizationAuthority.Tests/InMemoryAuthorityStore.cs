@@ -59,6 +59,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public Exception? DataKeyBindingExistenceFailure { get; set; }
     public List<SecurityJournalEntry> Journal { get; } = [];
 
+    /// <summary>C10 WP8: committed share document bindings.</summary>
+    public List<ShareDocumentBinding> DocumentBindings { get; } = [];
+
     /// <summary>E3-M2f-3b: whether the evidence index is reported usable (T2-8).</summary>
     public bool EvidenceIndexUsable { get; set; } = true;
 
@@ -326,6 +329,11 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
             Task.FromResult(s.Edges.Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null &&
                 ((e.ResourceTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.ResourceEntityId)) ||
                  (e.SubjectTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.SubjectEntityId)))).ToList());
+
+        public Task<List<ShareDocumentBinding>> GetShareDocumentBindingsAsync(Guid organizationId, IReadOnlyCollection<Guid> recordShareIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.DocumentBindings.Where(b => b.OrganizationId == organizationId && recordShareIds.Contains(b.RecordShareId)).ToList());
+
+        public void AddShareDocumentBinding(ShareDocumentBinding binding) => s.DocumentBindings.Add(binding);
 
         public Task<List<SecurityCommand>> GetRecordTargetedCommandsAsync(Guid organizationId, Guid formRecordId, int limit, CancellationToken cancellationToken) =>
             Task.FromResult(s.Commands.Where(c => c.OrganizationId == organizationId && c.TargetFormRecordId == formRecordId && c.CommandStateName != SecurityCommandStates.Rejected)

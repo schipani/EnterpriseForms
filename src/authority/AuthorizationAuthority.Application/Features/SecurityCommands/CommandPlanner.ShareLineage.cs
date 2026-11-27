@@ -59,7 +59,7 @@ public static partial class CommandPlanner
 
         foreach (var shareId in chain.Keys)
         {
-            if (!payload.FieldItemIds.All(graph.FieldItemsOfShare(shareId).Contains))
+            if (!(payload.FieldItemIds ?? []).All(graph.FieldItemsOfShare(shareId).Contains))
             {
                 throw AuthorityException.Invalid("delegation exceeds the named parent's effective field scope");
             }

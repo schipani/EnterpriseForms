@@ -477,6 +477,11 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
                              (e.SubjectTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.SubjectEntityId))))
                 .ToListAsync(cancellationToken);
 
+        public Task<List<ShareDocumentBinding>> GetShareDocumentBindingsAsync(Guid organizationId, IReadOnlyCollection<Guid> recordShareIds, CancellationToken cancellationToken) =>
+            context.ShareDocumentBindings.Where(b => b.OrganizationId == organizationId && recordShareIds.Contains(b.RecordShareId)).ToListAsync(cancellationToken);
+
+        public void AddShareDocumentBinding(ShareDocumentBinding binding) => context.ShareDocumentBindings.Add(binding);
+
         public Task<List<SecurityCommand>> GetRecordTargetedCommandsAsync(Guid organizationId, Guid formRecordId, int limit, CancellationToken cancellationToken) =>
             context.SecurityCommands.AsNoTracking()
                 .Where(c => c.OrganizationId == organizationId && c.TargetFormRecordId == formRecordId && c.CommandStateName != SecurityCommandStates.Rejected)

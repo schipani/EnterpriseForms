@@ -212,7 +212,13 @@ public sealed record TransferOwnershipPayload(Guid FormRecordId, Guid? NewOwnerU
 /// </summary>
 public sealed record CreateSharePayload(Guid RecordShareId, Guid FormRecordId, Guid? RecipientUserId, Guid? RecipientTeamId,
     string RecipientRole, IReadOnlyList<Guid> FieldItemIds, string? StepUpEvidence = null, Guid? ParentRecordShareId = null,
-    DateTimeOffset? ShareExpiresOn = null);
+    DateTimeOffset? ShareExpiresOn = null, IReadOnlyList<ShareDocumentEntry>? Documents = null);
+
+/// <summary>
+/// C10 WP8 (WP-0 Section 3.6): one shared document. View is required; download and replace each imply view. The share covers the
+/// attachment's versions up to the one the Authority recorded as current when the share is granted.
+/// </summary>
+public sealed record ShareDocumentEntry(Guid FileAttachmentId, bool CanViewDocument, bool CanDownloadDocument, bool CanReplaceDocument);
 
 /// <summary>
 /// C10 M1-WP4: Updates the scope (fields, role, expiry) of an existing Active share with step-up and expected share

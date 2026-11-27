@@ -138,6 +138,12 @@ public static class AuthorityErrorCodes
     public const string RoleNotHeld = "ROLE_NOT_HELD";
     public const string MembershipStateConflict = "MEMBERSHIP_STATE_CONFLICT";
     public const string OwnsRecords = "OWNS_RECORDS";
+
+    /// <summary>C10 WP8: the attachment has no Authority-verified version evidence yet (accepted before WP8); not shareable until its next commit.</summary>
+    public const string DocumentVersionEvidenceUnavailable = "DOCUMENT_VERSION_EVIDENCE_UNAVAILABLE";
+
+    /// <summary>C10 WP8-A: replacement through a share is not available yet (WP8-B).</summary>
+    public const string DocumentReplaceNotSupported = "DOCUMENT_REPLACE_NOT_SUPPORTED";
     public const string IdentityAlreadyBound = "IDENTITY_ALREADY_BOUND";
     public const string IdentityNotAllowed = "IDENTITY_NOT_ALLOWED";
     public const string MembershipRequestExists = "MEMBERSHIP_REQUEST_EXISTS";
