@@ -156,3 +156,7 @@ Candidate coord/c10-m1-candidate-r2 at 2b0887c1 (clean tree, signed). CI-equival
 | M3 | 9d0b3f5f, 2b0887c1 | PG-023, PG-053 (transfer and reassignment), PG-066; disable dialog text per D2 | Playwright axe and manual NVDA/VoiceOver not run |
 
 Consolidation check: every C10 worktree head is in the candidate except feat/c10-m2-share-etags 0ac77c3c, whose two files are byte-identical in the candidate (4f8ad734); other worktrees hold only untracked test logs.
+
+## Direct development checkpoint 5 — 2026-11-27 (WP8-B)
+
+Candidate coord/c10-m1-candidate-r2 at 695ee7b3 (signed, clean). CI-equivalent .NET gate 3,643 passed, 0 failed, 223 authorized skips, 0 rejected; strict specification validation; frontend lint, typecheck, build and 79 files / 660 tests. WP8-B implemented under the existing CARV per owner decisions C-196 (replacement only through owner-granted Contributor/Manager shares; delegated requests rejected; only the replacing share boundary advances, in the accepting commit; every check re-derived at Commit). Closeout record: WP-0 Sections 3.6.1 and 10 (22082f2f, 695ee7b3). Independent review must confirm that no CARV increment is required. Business upload admission for share replacement has no contract test (no upload-handler harness exists); it is covered by the planned focused Stage B. No review, merge, push, Stage B or persistent change.
