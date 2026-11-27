@@ -15,7 +15,7 @@ claims an external protection is active unless the verifier prints PASS for it.
 | Control | How it is enforced | Verified |
 |---|---|---|
 | `main` cannot be deleted or force-pushed; linear history | Ruleset "main — Level 2 protected branch" (`.github/rulesets/main-branch-protection.json`), enforcement `active`, **no bypass actors** | PASS |
-| Pull request required: 1 approval, stale reviews dismissed on push, last-push approval, all threads resolved | same ruleset | PASS |
+| Pull request required: stale reviews dismissed on push, all threads resolved; **zero human approvals, no last-push approval (amendment A-24, 2026-11-27, Development/Test only; production unchanged)** | same ruleset | PASS |
 | Required status checks (strict, up to date with `main`): the four `ci.yml` jobs | same ruleset | PASS |
 | Signed commits required on `main` | same ruleset (`required_signatures`) | PASS |
 | Release tags `v*` cannot be deleted, moved or updated; signed | Ruleset `.github/rulesets/release-tags-protection.json` | PASS |
@@ -59,9 +59,10 @@ BUILD-00 (public-repository scope) is COMPLETE; deferred controls are NOT implem
 
 ### Consequences to be aware of
 
-- With one human contributor, the 1-approval rule means **no pull request can be merged by its author alone**, including
-  PR #9. That is the intended control; a second maintainer account (or the Azure DevOps migration) is the remedy, not a
-  bypass actor.
+- With one human contributor, the 1-approval rule meant **no pull request could be merged by its author alone**. Amendment
+  A-24 (ADR-PB-011, C-199) replaces it for Development/Test with the owner's recorded integration authorization and AI review as
+  technical evidence only (never a GitHub approval); a second maintainer account or the Azure DevOps migration ends A-24 and
+  restores the 1-approval, last-push-approval rule. No bypass actor is added.
 - `required_signatures` applies to commits reaching `main`. Branch commits made so far are unsigned; a **squash merge
   through the GitHub UI** produces a GitHub-signed commit and satisfies the rule. Maintainers should register signing
   keys and enable vigilant mode (§6, item 3.4) so that rebase merges also pass.
