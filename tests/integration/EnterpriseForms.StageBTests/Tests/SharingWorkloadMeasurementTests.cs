@@ -206,7 +206,7 @@ public sealed class SharingWorkloadMeasurementTests(StageBFixture fixture)
 
         async Task<Share> ShareAsync(Guid record, Guid? user, Guid? team, string[] fields)
         {
-            var id = await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = user, recipientTeamId = team, recipientRole = "Reader", fieldKeys = fields }), r => r.Root.GetProperty("recordShareId").GetGuid(), "share");
+            var id = await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = user, recipientTeamId = team, recipientRole = "Reader", fieldKeys = fields }), r => r.Root.GetProperty("recordShareId").GetGuid(), "share");
             var share = new Share(record, id, user, team, fields);
             shares.Add(share);
             return share;
@@ -301,7 +301,7 @@ public sealed class SharingWorkloadMeasurementTests(StageBFixture fixture)
                 {
                     kind = "revoke";
                     var share = shares[random.Next(shares.Count)];
-                    await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{share.Record:D}/shares/{share.ShareId:D}/revoke", s.Token(s.Clerk), new { }), _ => true, "revoke");
+                    await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{share.Record:D}/shares/{share.ShareId:D}/revoke?useDevelopmentStepUp=true", s.Token(s.Clerk), new { }), _ => true, "revoke");
                     shares.Remove(share);
                 }
                 else if (roll < 88 || team.Members.Count <= 1)

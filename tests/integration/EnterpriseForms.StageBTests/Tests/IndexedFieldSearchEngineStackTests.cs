@@ -363,7 +363,7 @@ public sealed class IndexedFieldSearchEngineStackTests(StageBFixture fixture)
         Assert.Equal(12, first.Root.GetProperty("totalCount").GetInt32());
         for (var attempt = 0; ; attempt++)
         {
-            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{records[0]:D}/shares", w.S.Token(w.S.Clerk), new { recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" } });
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{records[0]:D}/shares", w.S.Token(w.S.Clerk), new { useDevelopmentStepUp = true, recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" } });
             if (share.IsSuccess || attempt >= 30)
             {
                 Assert.True(share.IsSuccess, share.Body);

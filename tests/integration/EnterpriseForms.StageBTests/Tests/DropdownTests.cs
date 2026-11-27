@@ -217,7 +217,7 @@ public sealed class DropdownTests(StageBFixture fixture)
         await s.WaitProjectionAsync(s.Clerk, record);
 
         // Sharing a multi-select field shares every current selection of it; the plaintext dropdown and the encrypted one behave alike.
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "topic_tags", "sealed_tags", "priority_level" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "topic_tags", "sealed_tags", "priority_level" } });
         Assert.True(share.IsSuccess, share.Body);
         var shared = await s.WaitProjectionAsync(s.Reader, record, TimeSpan.FromSeconds(40));
         Assert.False(shared.Root.GetProperty("permissions").GetProperty("isCompleteProjection").GetBoolean());
@@ -230,7 +230,7 @@ public sealed class DropdownTests(StageBFixture fixture)
 
         // A shared reader cannot change anything; a field-scoped contributor cannot change a multi-selection (adding and removing rows needs record ownership).
         Assert.Contains((await fixture.Api.PatchAsync($"/api/v1/form-records/{record:D}", s.Token(s.Reader), new { expectedContentRevision = shared.Root.GetProperty("record").GetProperty("contentRevision").GetInt64(), values = new Dictionary<string, string> { ["topic_tags"] = "green" } })).Status, Denied);
-        var contributor = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "topic_tags" } });
+        var contributor = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "topic_tags" } });
         Assert.True(contributor.IsSuccess, contributor.Body);
         var forContributor = await s.WaitProjectionAsync(s.Designer, record, TimeSpan.FromSeconds(40));
         var change = await fixture.Api.PatchAsync($"/api/v1/form-records/{record:D}", s.Token(s.Designer), new { expectedContentRevision = forContributor.Root.GetProperty("record").GetProperty("contentRevision").GetInt64(), values = new Dictionary<string, string> { ["topic_tags"] = "green" } });
@@ -239,7 +239,7 @@ public sealed class DropdownTests(StageBFixture fixture)
 
         // Revocation removes the reader's access to every selection at once.
         var shareId = share.Root.GetProperty("recordShareId").GetGuid();
-        var revoked = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{shareId:D}/revoke", s.Token(s.Clerk), new { });
+        var revoked = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{shareId:D}/revoke?useDevelopmentStepUp=true", s.Token(s.Clerk), new { });
         Assert.True(revoked.IsSuccess, revoked.Body);
         var deadline = DateTime.UtcNow.AddSeconds(40);
         HttpResult after;

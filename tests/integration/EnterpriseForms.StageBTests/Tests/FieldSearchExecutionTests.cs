@@ -198,7 +198,7 @@ public sealed class FieldSearchExecutionTests(StageBFixture fixture)
         Assert.Equal(0, none.Root.GetProperty("totalCount").GetInt32());
 
         // Share record a with only case_reference: matching on that field finds it; on exhibit_count it is not evaluated.
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{a:D}/shares", w.S.Token(w.S.Clerk), new { recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{a:D}/shares", w.S.Token(w.S.Clerk), new { useDevelopmentStepUp = true, recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" } });
         Assert.True(share.IsSuccess, share.Body);
         Assert.Equal([a], Ids(await SearchAsync(w, w.S.Reader, [Cond(w.Reference, "equals", "String", "CR-3001")])));
         Assert.Empty(Ids(await SearchAsync(w, w.S.Reader, [Cond(w.Count, "equals", "Integer", "5")])));

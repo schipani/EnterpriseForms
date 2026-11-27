@@ -113,11 +113,11 @@ public sealed class SecurityCommandTimelineTests(StageBFixture fixture)
         Assert.True((await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members", s.Token(s.Designer), new { userId = s.Clerk.AuthorityUserId })).IsSuccess);
 
         var record = await s.CreateAccusedAsync(s.Clerk, new Dictionary<string, string> { ["given_name"] = "SENT-CONFIDENTIAL-VALUE", ["family_name"] = "Doe" });
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
         Assert.True(share.IsSuccess, share.Body);
         var shareId = share.Root.GetProperty("recordShareId").GetGuid();
-        Assert.True((await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{shareId:D}/revoke", s.Token(s.Clerk), new { })).IsSuccess);
-        var transfer = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/transfer-ownership", s.Token(s.Clerk), new { newOwnerUserId = (Guid?)null, newOwnerTeamId = teamId, transferReason = "SENT-TRANSFER-REASON" });
+        Assert.True((await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{shareId:D}/revoke?useDevelopmentStepUp=true", s.Token(s.Clerk), new { })).IsSuccess);
+        var transfer = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/transfer-ownership", s.Token(s.Clerk), new { useDevelopmentStepUp = true, newOwnerUserId = (Guid?)null, newOwnerTeamId = teamId, transferReason = "SENT-TRANSFER-REASON" });
         Assert.True(transfer.IsSuccess, transfer.Body);
 
         // A command row with no journal entry, inserted by the AuthorityDb administrator: raw payload with a scope, reason text.

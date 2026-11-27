@@ -285,7 +285,7 @@ public sealed class SearchIndexBuilderStackTests(StageBFixture fixture)
             var clock = System.Diagnostics.Stopwatch.StartNew();
             for (var attempt = 0; ; attempt++)
             {
-                var share = await fixture.Api.PostAsync($"/api/v1/form-records/{honest:D}/shares", w.S.Token(w.S.Clerk), new { recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" } });
+                var share = await fixture.Api.PostAsync($"/api/v1/form-records/{honest:D}/shares", w.S.Token(w.S.Clerk), new { useDevelopmentStepUp = true, recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" } });
                 if (share.IsSuccess)
                 {
                     break;

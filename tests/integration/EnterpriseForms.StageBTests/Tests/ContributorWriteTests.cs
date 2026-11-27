@@ -47,7 +47,7 @@ public sealed class ContributorWriteTests(StageBFixture fixture)
 
     private static async Task<Guid> ShareAsync(StageBScenario s, Guid record, TestUser recipient, string role, params string[] fieldKeys)
     {
-        var share = await s.Fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = recipient.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = role, fieldKeys });
+        var share = await s.Fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = recipient.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = role, fieldKeys });
         Assert.True(share.IsSuccess, share.Body);
         await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
         return share.Root.GetProperty("recordShareId").GetGuid();
@@ -191,7 +191,7 @@ public sealed class ContributorWriteTests(StageBFixture fixture)
             await ArmPauseAsync(true);
             var write = EditAsync(s, record, s.Designer, new() { ["given_name"] = "After-Revocation" }, revision);
             await WaitPausedAsync(1);
-            var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{shareId:D}/revoke", s.Token(s.Clerk), new { });
+            var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{shareId:D}/revoke?useDevelopmentStepUp=true", s.Token(s.Clerk), new { });
             Assert.True(revoke.IsSuccess, revoke.Body);
             await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
             await ArmPauseAsync(false); // release the held commit: it now re-authorizes against the current edges
@@ -314,7 +314,7 @@ public sealed class ContributorWriteTests(StageBFixture fixture)
                 await Task.Delay(100, cancellation);
             }
 
-            var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{shareId:D}/revoke", s.Token(s.Clerk), new { });
+            var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{shareId:D}/revoke?useDevelopmentStepUp=true", s.Token(s.Clerk), new { });
             Assert.True(revoke.IsSuccess, revoke.Body);
             var gate = await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
             var revocationRevision = gate.GetProperty("authorization_revision").GetInt64();

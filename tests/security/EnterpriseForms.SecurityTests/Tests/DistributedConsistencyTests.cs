@@ -29,7 +29,7 @@ public sealed class DistributedConsistencyTests(StageAFixture fixture)
                 Assert.DoesNotContain("protected note", duringOutage.Body, StringComparison.Ordinal);
 
                 // Grant committed while the projection cannot advance: the recipient must not become allowed and the gate must close.
-                var share = await s.SubmitAuthorityCommandAsync(s.Owner, "CreateShare", "FormRecord", s.FormRecordId, new { record_share_id = Guid.CreateVersion7(), form_record_id = s.FormRecordId, recipient_user_id = s.Reader.AuthorityUserId, recipient_team_id = (Guid?)null, recipient_role = "Reader", field_item_ids = new[] { s.FieldItemIds["given_name"] } });
+                var share = await s.SubmitAuthorityCommandAsync(s.Owner, "CreateShare", "FormRecord", s.FormRecordId, new { record_share_id = Guid.CreateVersion7(), form_record_id = s.FormRecordId, recipient_user_id = s.Reader.AuthorityUserId, recipient_team_id = (Guid?)null, recipient_role = "Reader", field_item_ids = new[] { s.FieldItemIds["given_name"] }, step_up_evidence = "synthetic-development-step-up" });
                 Assert.Equal(HttpStatusCode.Accepted, share.Status);
                 Assert.Equal("CommittedAwaitingProjection", share.Root.GetProperty("command_status").GetString());
                 // The archive receipt lands within a few hundred milliseconds; the projection stays blocked while SpiceDB is paused.
@@ -144,7 +144,7 @@ public sealed class DistributedConsistencyTests(StageAFixture fixture)
             var arm = await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/fault-injection", new { fault_name = "CrashAfterJournalCommit" });
             Assert.True(arm.IsSuccess, arm.Body);
             var shareKey = "sec-p09-share-" + Guid.NewGuid().ToString("N");
-            var crashed = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Owner), new { recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "given_name" } }, shareKey);
+            var crashed = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Owner), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "given_name" } }, shareKey);
             s.Evidence.ObserveHttp("share request during CrashAfterJournalCommit", crashed, "title", "command_status");
             Assert.NotEqual(HttpStatusCode.Created, crashed.Status);
             await fixture.Authority.WaitReadyAsync(TimeSpan.FromSeconds(90));
@@ -152,7 +152,7 @@ public sealed class DistributedConsistencyTests(StageAFixture fixture)
             s.Evidence.Observe("authority restarted and recovered the committed command on its own (journal -> archive -> projection)", recovered.GetRawText());
             Assert.Equal(baseRevision + 1, recovered.GetProperty("authorization_revision").GetInt64());
 
-            var retried = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Owner), new { recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "given_name" } }, shareKey);
+            var retried = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Owner), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "given_name" } }, shareKey);
             s.Evidence.ObserveHttp("same-key retry after restart", retried, "recordShareId", "shareStatus");
             Assert.Equal(HttpStatusCode.Created, retried.Status);
             var shareId = retried.Root.GetProperty("recordShareId").GetGuid();
@@ -166,7 +166,7 @@ public sealed class DistributedConsistencyTests(StageAFixture fixture)
             var arm2 = await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/fault-injection", new { fault_name = "CrashAfterProjectionWrite" });
             Assert.True(arm2.IsSuccess, arm2.Body);
             var revokeKey = "sec-p09-revoke-" + Guid.NewGuid().ToString("N");
-            var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares/{shareId:D}/revoke", s.Token(s.Owner), new { }, revokeKey);
+            var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares/{shareId:D}/revoke?useDevelopmentStepUp=true", s.Token(s.Owner), new { }, revokeKey);
             s.Evidence.ObserveHttp("revoke during CrashAfterProjectionWrite", revoke, "title", "command");
             await fixture.Authority.WaitReadyAsync(TimeSpan.FromSeconds(90));
             var gateAfter = await s.WaitGateReadyAsync(TimeSpan.FromSeconds(60));
@@ -175,7 +175,7 @@ public sealed class DistributedConsistencyTests(StageAFixture fixture)
             Assert.Equal(baseRevision + 2, gateAfter.GetProperty("projection_applied_revision").GetInt64());
             s.Evidence.AuthorityRevision = gateAfter.GetProperty("authorization_revision").GetInt64();
 
-            var revokeRetry = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares/{shareId:D}/revoke", s.Token(s.Owner), new { }, revokeKey);
+            var revokeRetry = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares/{shareId:D}/revoke?useDevelopmentStepUp=true", s.Token(s.Owner), new { }, revokeKey);
             s.Evidence.ObserveHttp("revoke retry with same key", revokeRetry, "command");
             Assert.Equal(HttpStatusCode.OK, revokeRetry.Status);
             Assert.Equal("Effective", revokeRetry.Root.GetProperty("command").GetProperty("commandStatus").GetString());
@@ -204,7 +204,7 @@ public sealed class DistributedConsistencyTests(StageAFixture fixture)
             // (AUTHORITY_NOT_READY) instead of being accepted on stale evidence. Before A-9 the cached receipt kept the gate open and the share was
             // accepted (202, CommittedAwaitingProjection, not effective). Either outcome is non-effective; the test records which one occurred and,
             // when refused, re-issues the share after the archive is back. The protected-byte assertions are unchanged.
-            var shareBody = new { recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "given_name" } };
+            var shareBody = new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "given_name" } };
             var shareRefused = false;
             fixture.Stack.Pause("archive-store");
             try

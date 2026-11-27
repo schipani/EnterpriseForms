@@ -50,7 +50,7 @@ public sealed class SecurityHomeTests(StageBFixture fixture)
         var s = await ScenarioAsync("sh-sections", reasonNote: "SENT-AUDITOR-NOTE");
         await s.BuildAccusedWorkspaceAsync();
         var record = await s.CreateAccusedAsync(s.Clerk, new Dictionary<string, string> { ["given_name"] = "SENT-CONFIDENTIAL-VALUE", ["family_name"] = "Doe" });
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
         Assert.True(share.IsSuccess, share.Body);
         await s.WaitGateReadyAsync();
 

@@ -165,7 +165,7 @@ public sealed class RecordRestoreTests(StageBFixture fixture)
         await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/testing/contributor-writes", new { enabled = true });
         try
         {
-            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "given_name" } });
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "given_name" } });
             Assert.True(share.IsSuccess, share.Body);
             await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
             Assert.Equal(HttpStatusCode.NotFound, (await PreviewAsync(s, s.Reader, record, 1)).Status);
@@ -275,7 +275,7 @@ public sealed class RecordRestoreTests(StageBFixture fixture)
     public async Task ARestoredValueIsANewItemThatAnOldShareDoesNotCover()
     {
         var (s, record) = await AccusedAsync("c6-restore-shares");
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "family_name", "date_of_birth" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "family_name", "date_of_birth" } });
         Assert.True(share.IsSuccess, share.Body);
         await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
         Assert.Equal("1990-02-28", Values(await ViewAsync(s, s.Reader, record))["date_of_birth"]);

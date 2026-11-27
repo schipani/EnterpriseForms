@@ -31,7 +31,7 @@ public sealed class SharingTests(StageBFixture fixture)
         var empty = await fixture.Api.GetAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Clerk));
         Assert.True(empty.IsSuccess, empty.Body);
         Assert.Empty(empty.Root.GetProperty("items").EnumerateArray());
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name", "family_name" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name", "family_name" } });
         Assert.True(share.IsSuccess, share.Body);
         var shareId = share.Root.GetProperty("recordShareId").GetGuid();
 
@@ -85,11 +85,11 @@ public sealed class SharingTests(StageBFixture fixture)
 
         var download = await fixture.DownloadAsync($"/api/v1/form-records/{accused:D}/documents/{attachmentId:D}/download", s.Token(s.Reader));
         Assert.True(download.Status is HttpStatusCode.Forbidden or HttpStatusCode.NotFound, download.Status.ToString());
-        var readerShare = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Reader), new { recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
+        var readerShare = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Reader), new { useDevelopmentStepUp = true, recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
         Assert.True(readerShare.Status is HttpStatusCode.Forbidden or HttpStatusCode.NotFound or HttpStatusCode.Conflict or HttpStatusCode.UnprocessableEntity, readerShare.Body);
 
         // Revocation: the owner revokes; the reader loses discovery and reading without any projection catch-up window.
-        var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares/{shareId:D}/revoke", s.Token(s.Clerk), new { });
+        var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares/{shareId:D}/revoke?useDevelopmentStepUp=true", s.Token(s.Clerk), new { });
         Assert.True(revoke.IsSuccess, revoke.Body);
         var afterRevoke = await fixture.Api.GetAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Clerk));
         Assert.Equal("Revoked", Assert.Single(afterRevoke.Root.GetProperty("items").EnumerateArray()).GetProperty("shareStatus").GetString());

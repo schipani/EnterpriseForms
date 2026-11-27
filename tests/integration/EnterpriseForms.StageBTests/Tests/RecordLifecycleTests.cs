@@ -194,7 +194,7 @@ public sealed class RecordLifecycleTests(StageBFixture fixture)
         Assert.Contains(cross.Status, new[] { HttpStatusCode.NotFound, HttpStatusCode.Forbidden });
 
         // Shared recipients (reader and contributor) can see the record exists but cannot change its status.
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "given_name" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "given_name" } });
         Assert.True(share.IsSuccess, share.Body);
         await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
         var shared = await s.WaitProjectionAsync(s.Designer, record, TimeSpan.FromSeconds(40));
@@ -222,7 +222,7 @@ public sealed class RecordLifecycleTests(StageBFixture fixture)
         try
         {
             await SetContributorWritesAsync(true);
-            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "given_name" } });
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "given_name" } });
             Assert.True(share.IsSuccess, share.Body);
             await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
 
@@ -463,7 +463,7 @@ public sealed class RecordLifecycleTests(StageBFixture fixture)
         try
         {
             await SetContributorWritesAsync(true);
-            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "given_name" } });
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "given_name" } });
             Assert.True(share.IsSuccess, share.Body);
             await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
             SetBusinessContributorLockBypass(true);

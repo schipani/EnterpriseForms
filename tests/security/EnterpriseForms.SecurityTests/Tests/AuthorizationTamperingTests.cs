@@ -33,7 +33,7 @@ public sealed class AuthorizationTamperingTests(StageAFixture fixture)
             Assert.Equal(HttpStatusCode.NotFound, after.Status);
             Assert.DoesNotContain("protected note", after.Body, StringComparison.Ordinal);
 
-            var transfer = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/transfer-ownership", s.Token(s.Attacker), new { newOwnerUserId = s.Attacker.AuthorityUserId, transferReason = "forged" });
+            var transfer = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/transfer-ownership", s.Token(s.Attacker), new { useDevelopmentStepUp = true, newOwnerUserId = s.Attacker.AuthorityUserId, transferReason = "forged" });
             s.Evidence.ObserveHttp("attacker transfer-ownership attempt", transfer);
             Assert.True(transfer.Status is HttpStatusCode.Forbidden or HttpStatusCode.UnprocessableEntity or HttpStatusCode.NotFound, transfer.Body);
 
@@ -76,7 +76,7 @@ public sealed class AuthorizationTamperingTests(StageAFixture fixture)
             Assert.Equal(HttpStatusCode.NotFound, attackerRead.Status);
             Assert.DoesNotContain("protected note", attackerRead.Body, StringComparison.Ordinal);
 
-            var attackerShare = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Attacker), new { recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "case_note" } });
+            var attackerShare = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Attacker), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "case_note" } });
             s.Evidence.ObserveHttp("attacker (forged Manager) tries to delegate", attackerShare);
             Assert.True(attackerShare.Status is HttpStatusCode.Forbidden or HttpStatusCode.NotFound or HttpStatusCode.UnprocessableEntity, attackerShare.Body);
 
@@ -84,7 +84,7 @@ public sealed class AuthorizationTamperingTests(StageAFixture fixture)
             Assert.Equal(gateBefore.GetProperty("authorization_revision").GetInt64(), gateMid.GetProperty("authorization_revision").GetInt64());
 
             // Legitimate scoped share: the reader sees exactly the shared item, nothing else.
-            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Owner), new { recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Owner), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
             s.Evidence.ObserveHttp("owner shares given_name with reader", share, "recordShareId", "shareStatus");
             Assert.Equal(HttpStatusCode.Created, share.Status);
             var readerRead = await s.WaitReadableAsync(s.Reader);
@@ -160,7 +160,7 @@ public sealed class AuthorizationTamperingTests(StageAFixture fixture)
             await s.BootstrapAsync();
             await s.CreateFormAndRecordAsync();
             var readerToken = s.Token(s.Reader); // one long-lived "session" token reused across the revocation
-            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Owner), new { recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "given_name", "case_note" } });
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Owner), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "given_name", "case_note" } });
             Assert.Equal(HttpStatusCode.Created, share.Status);
             var shareId = share.Root.GetProperty("recordShareId").GetGuid();
             var allowed = await s.WaitReadableAsync(s.Reader);
@@ -174,7 +174,7 @@ public sealed class AuthorizationTamperingTests(StageAFixture fixture)
             {
                 // The business API's own pre-check needs SpiceDB, so the revocation is committed through the authority command
                 // endpoint exactly as the API would (workload credential + owner assertion); the authority commits it without SpiceDB.
-                var revoke = await s.SubmitAuthorityCommandAsync(s.Owner, "RevokeShare", "FormRecord", s.FormRecordId, new { record_share_id = shareId, form_record_id = s.FormRecordId });
+                var revoke = await s.SubmitAuthorityCommandAsync(s.Owner, "RevokeShare", "FormRecord", s.FormRecordId, new { record_share_id = shareId, form_record_id = s.FormRecordId, step_up_evidence = "synthetic-development-step-up" });
                 Assert.Equal(HttpStatusCode.Accepted, revoke.Status);
                 Assert.Equal("CommittedAwaitingProjection", revoke.Root.GetProperty("command_status").GetString());
                 var duringBarrier = await fixture.Api.GetAsync($"/api/v1/form-records/{s.FormRecordId:D}", readerToken);

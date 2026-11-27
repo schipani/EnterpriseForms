@@ -264,7 +264,7 @@ public sealed class RulesTests(StageBFixture fixture)
 
         // A user with no grant sees nothing; a Reader share of one field releases only that field â€” never the hidden/not-in-form ones.
         Assert.Contains((await s.ProjectionAsync(s.Reader, record)).Status, Denied);
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "applicant_kind" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "applicant_kind" } });
         Assert.True(share.IsSuccess, share.Body);
         var shared = await s.WaitProjectionAsync(s.Reader, record, TimeSpan.FromSeconds(40));
         Assert.Equal(["applicant_kind"], shared.Root.GetProperty("record").GetProperty("values").EnumerateArray().Select(v => v.GetProperty("fieldKey").GetString()).ToArray());
@@ -274,7 +274,7 @@ public sealed class RulesTests(StageBFixture fixture)
         Assert.DoesNotContain("Company name", reduced, StringComparison.Ordinal);
 
         // A field-scoped contributor: read-only and out-of-scope fields are refused before the authority is asked.
-        var contributor = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "intake_status", "reference_note" } });
+        var contributor = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "intake_status", "reference_note" } });
         Assert.True(contributor.IsSuccess, contributor.Body);
         await s.WaitProjectionAsync(s.Designer, record, TimeSpan.FromSeconds(40));
         // Phase C5: contributor writes are off by default (D10) — refused before any candidate is built.

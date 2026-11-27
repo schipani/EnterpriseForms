@@ -129,7 +129,7 @@ public sealed class SearchAvailabilityUnderPermissionChurnTests(StageBFixture fi
         var toggles = new ConcurrentBag<Toggle>();
         async Task<Guid> ShareAsync(Guid record, Guid user)
         {
-            var r = await Retrying(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = user, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "exhibit_count" } }));
+            var r = await Retrying(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = user, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "exhibit_count" } }));
             Assert.True(r.IsSuccess, r.Body);
             return r.Root.GetProperty("recordShareId").GetGuid();
         }
@@ -139,7 +139,7 @@ public sealed class SearchAvailabilityUnderPermissionChurnTests(StageBFixture fi
             var requested = DateTimeOffset.UtcNow;
             if (shareOf.TryGetValue(record, out var share) && share is { } id)
             {
-                var r = await Retrying(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{id:D}/revoke", s.Token(s.Clerk), new { }));
+                var r = await Retrying(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{id:D}/revoke?useDevelopmentStepUp=true", s.Token(s.Clerk), new { }));
                 Assert.True(r.IsSuccess, r.Body);
                 shareOf[record] = null;
                 toggles.Add(new Toggle(record, false, requested, DateTimeOffset.UtcNow));

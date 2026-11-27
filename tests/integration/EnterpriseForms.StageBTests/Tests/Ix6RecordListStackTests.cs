@@ -224,7 +224,7 @@ public sealed class Ix6RecordListStackTests(StageBFixture fixture)
         var shares = new List<Guid>();
         foreach (var record in new[] { first, second })
         {
-            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", w.S.Token(w.S.Clerk), new { recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" } });
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", w.S.Token(w.S.Clerk), new { useDevelopmentStepUp = true, recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" } });
             Assert.True(share.IsSuccess, share.Body);
             shares.Add(share.Root.GetProperty("recordShareId").GetGuid());
             await w.S.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
@@ -238,7 +238,7 @@ public sealed class Ix6RecordListStackTests(StageBFixture fixture)
         var page = await ListAsync(w.S, w.S.Reader, Indexed, "pageSize=1");
         Assert.True(page.IsSuccess, page.Body);
         Assert.NotNull(page.Next);
-        var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{first:D}/shares/{shares[0]:D}/revoke", w.S.Token(w.S.Clerk), new { });
+        var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{first:D}/shares/{shares[0]:D}/revoke?useDevelopmentStepUp=true", w.S.Token(w.S.Clerk), new { });
         Assert.True(revoke.IsSuccess, revoke.Body);
         await w.S.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
 

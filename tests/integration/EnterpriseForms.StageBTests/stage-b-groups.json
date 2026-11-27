@@ -16,7 +16,7 @@
     {
       "name": "records-lifecycle",
       "title": "Records, Sharing and Lifecycle",
-      "classes": ["RecordCreationIdempotencyTests", "RecordLifecycleTests", "RecordRestoreTests", "RecordHistoryTests", "RecordLookupTests", "RecordWorkspaceTests", "SharingTests", "ContributorWriteTests", "Ix6RecordListStackTests", "SharingWorkloadMeasurementTests"]
+      "classes": ["RecordCreationIdempotencyTests", "RecordLifecycleTests", "RecordRestoreTests", "RecordHistoryTests", "RecordLookupTests", "RecordWorkspaceTests", "SharingTests", "ContributorWriteTests", "Ix6RecordListStackTests", "SharingWorkloadMeasurementTests", "C10ShareLifecycleTests", "C10DatabaseVerificationTests"]
     },
     {
       "name": "administration-membership",
@@ -42,7 +42,7 @@
     {
       "name": "projection-integrity-restore",
       "title": "SpiceDB Datastore Restore and Replacement (RB-12, RB-13)",
-      "classes": ["ProjectionIntegrityRollbackTests"]
+      "classes": ["ProjectionIntegrityRollbackTests", "C10ShareExpiryRestoreTests"]
     },
     {
       "name": "search-benchmark-indexed",

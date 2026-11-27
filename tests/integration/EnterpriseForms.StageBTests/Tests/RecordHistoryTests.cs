@@ -153,7 +153,7 @@ public sealed class RecordHistoryTests(StageBFixture fixture)
         Assert.Equal(HttpStatusCode.NotFound, (await VersionsAsync(s, s.Clerk, Guid.CreateVersion7())).Status);
 
         // A field-share reader sees the shared field of the current version, but no history (V1: history needs full read).
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
         Assert.True(share.IsSuccess, share.Body);
         await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
         Assert.True((await s.WaitProjectionAsync(s.Reader, record, TimeSpan.FromSeconds(40))).IsSuccess);
@@ -161,7 +161,7 @@ public sealed class RecordHistoryTests(StageBFixture fixture)
         Assert.Equal(HttpStatusCode.NotFound, (await VersionAsync(s, s.Reader, record, 1)).Status);
 
         // Ownership moves to the reader: the former owner loses history at once (stale authority), the new owner sees all of it.
-        var transfer = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/transfer-ownership", s.Token(s.Clerk), new { newOwnerUserId = s.Reader.AuthorityUserId, newOwnerTeamId = (Guid?)null, transferReason = "handover for history test" });
+        var transfer = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/transfer-ownership", s.Token(s.Clerk), new { useDevelopmentStepUp = true, newOwnerUserId = s.Reader.AuthorityUserId, newOwnerTeamId = (Guid?)null, transferReason = "handover for history test" });
         Assert.True(transfer.IsSuccess, transfer.Body);
         await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
         Assert.Equal(HttpStatusCode.NotFound, (await VersionsAsync(s, s.Clerk, record)).Status);

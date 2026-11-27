@@ -318,7 +318,7 @@ public sealed class RetainedFieldSearchTests(StageBFixture fixture)
 
         // T7/T12: query permission without record access finds nothing; a partial share without phone excludes the record.
         Assert.Empty(Matches(await SearchAsync(w, w.S.Reader, w.Phone, "startsWith", "555-01")));
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{r2:D}/shares", w.S.Token(w.S.Clerk), new { recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "first_name" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{r2:D}/shares", w.S.Token(w.S.Clerk), new { useDevelopmentStepUp = true, recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "first_name" } });
         Assert.True(share.IsSuccess, share.Body);
         await w.S.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
         Assert.Empty(Matches(await SearchAsync(w, w.S.Reader, w.Phone, "startsWith", "555-01")));

@@ -23,7 +23,7 @@ public sealed class OwnerTeamJoinStackTests(StageBFixture fixture)
         var team = await fixture.Api.PostAsync("/api/v1/teams", s.Token(s.SecondOwner), new { teamName = "Records team " + s.Name });
         Assert.Equal(HttpStatusCode.Created, team.Status);
         var teamId = team.Root.GetProperty("teamId").GetGuid();
-        var transfer = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/transfer-ownership", s.Token(s.Clerk), new { newOwnerUserId = (Guid?)null, newOwnerTeamId = teamId, transferReason = "the records team owns it" });
+        var transfer = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/transfer-ownership", s.Token(s.Clerk), new { useDevelopmentStepUp = true, newOwnerUserId = (Guid?)null, newOwnerTeamId = teamId, transferReason = "the records team owns it" });
         Assert.True(transfer.IsSuccess, transfer.Body);
         await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
 
