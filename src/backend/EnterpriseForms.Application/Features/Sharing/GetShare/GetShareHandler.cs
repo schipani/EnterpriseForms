@@ -65,6 +65,7 @@ public sealed class GetShareHandler(IBusinessStore store, IShareDetailsAuthority
             details.InvalidationReasonCode,
             details.GrantorUserId,
             details.GrantorUserId is { } g ? users.GetValueOrDefault(g) : null,
-            details.AuthorizationRevision);
+            details.AuthorizationRevision,
+            (details.Documents ?? []).Select(d => new ShareDocumentDetailResponse(d.FileAttachmentId, d.CanViewDocument, d.CanDownloadDocument, d.CanReplaceDocument, d.SharedThroughVersionNumber)).ToList());
     }
 }

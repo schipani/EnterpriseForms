@@ -7835,6 +7835,15 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "documents": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ShareDocumentRequest"
+            }
           }
         }
       },
@@ -15481,7 +15490,8 @@
           "invalidationReasonCode",
           "grantorUserId",
           "grantorDisplayName",
-          "authorizationRevision"
+          "authorizationRevision",
+          "documents"
         ],
         "type": "object",
         "properties": {
@@ -15601,6 +15611,12 @@
               "string"
             ],
             "format": "int64"
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShareDocumentDetailResponse"
+            }
           }
         }
       },
@@ -15622,6 +15638,61 @@
             "type": [
               "null",
               "string"
+            ]
+          }
+        }
+      },
+      "ShareDocumentDetailResponse": {
+        "required": [
+          "fileAttachmentId",
+          "canViewDocument",
+          "canDownloadDocument",
+          "canReplaceDocument",
+          "sharedThroughVersionNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "fileAttachmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "canViewDocument": {
+            "type": "boolean"
+          },
+          "canDownloadDocument": {
+            "type": "boolean"
+          },
+          "canReplaceDocument": {
+            "type": "boolean"
+          },
+          "sharedThroughVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "ShareDocumentRequest": {
+        "required": [
+          "fileAttachmentId",
+          "canDownloadDocument"
+        ],
+        "type": "object",
+        "properties": {
+          "fileAttachmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "canDownloadDocument": {
+            "type": "boolean"
+          },
+          "canReplaceDocument": {
+            "type": [
+              "null",
+              "boolean"
             ]
           }
         }
@@ -16571,6 +16642,15 @@
               "null",
               "boolean"
             ]
+          },
+          "documents": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ShareDocumentRequest"
+            }
           }
         }
       },

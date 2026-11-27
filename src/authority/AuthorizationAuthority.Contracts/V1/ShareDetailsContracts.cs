@@ -28,4 +28,8 @@ public sealed record ShareDetails(
     bool LegacyLineageUnresolved,
     string? InvalidationReasonCode,
     Guid? GrantorUserId,
-    long AuthorizationRevision);
+    long AuthorizationRevision,
+    IReadOnlyList<ShareDocumentDetail>? Documents = null);
+
+/// <summary>C10 WP8: one document of a share: its flags and the version boundary the Authority bound from verified evidence.</summary>
+public sealed record ShareDocumentDetail(Guid FileAttachmentId, bool CanViewDocument, bool CanDownloadDocument, bool CanReplaceDocument, int SharedThroughVersionNumber);

@@ -173,6 +173,21 @@ public sealed class ShareDetailsServiceTests
     }
 
     [Fact]
+    public async Task DocumentsWithALiveEdgeAppearWithTheirFlagsAndBoundary()
+    {
+        var share = Share(owner, "reader", recipient, [first]);
+        var shared = Guid.NewGuid();
+        var dropped = Guid.NewGuid();
+        Edge(ResourceTypeNames.DocumentItem, shared, "shared_via", ResourceTypeNames.RecordShare, share);
+        store.DocumentBindings.Add(new ShareDocumentBinding { ShareDocumentBindingId = Guid.NewGuid(), OrganizationId = org, RecordShareId = share, FileAttachmentId = shared, CanViewDocument = true, CanDownloadDocument = true, SharedThroughVersionNumber = 4 });
+        store.DocumentBindings.Add(new ShareDocumentBinding { ShareDocumentBindingId = Guid.NewGuid(), OrganizationId = org, RecordShareId = share, FileAttachmentId = dropped, CanViewDocument = true, SharedThroughVersionNumber = 1 }); // no live edge
+
+        var document = Assert.Single((await ReadAsync(owner, share)).Documents!);
+
+        Assert.Equal((shared, true, true, false, 4), (document.FileAttachmentId, document.CanViewDocument, document.CanDownloadDocument, document.CanReplaceDocument, document.SharedThroughVersionNumber));
+    }
+
+    [Fact]
     public async Task AClosedGateFailsClosed()
     {
         var share = Share(owner, "reader", recipient, [first]);

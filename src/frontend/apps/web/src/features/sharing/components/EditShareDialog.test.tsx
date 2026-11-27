@@ -134,6 +134,27 @@ describe("EditShareDialog", () => {
     expect(api.shares.update).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the share's documents and saves a document-only scope with the chosen download flag", async () => {
+    api.shares.get.mockResolvedValue({ result: { ...details(5), fieldKeys: [], fieldValueItemIds: [], documents: [{ fileAttachmentId: "doc-1", canViewDocument: true, canDownloadDocument: false, canReplaceDocument: false, sharedThroughVersionNumber: 2 }] } });
+    api.shares.update.mockResolvedValue({ result: { shareRevision: 6 } });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const withDocuments = { ...projection, documents: [{ fileAttachmentId: "doc-1", originalFileName: "statement.pdf" }] };
+    render(
+      <QueryClientProvider client={client}>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- partial projection fixture */}
+        <EditShareDialog formRecordId={recordId} share={listRow as any} projection={withDocuments as any} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    );
+
+    expect(((await screen.findByRole("checkbox", { name: "statement.pdf" })) as HTMLButtonElement).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Allow download of statement.pdf" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /development-only step-up/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Save share" }));
+
+    await waitFor(() => expect(api.shares.update).toHaveBeenCalledTimes(1));
+    expect(api.shares.update.mock.calls[0]![3]).toMatchObject({ fieldKeys: [], documents: [{ fileAttachmentId: "doc-1", canDownloadDocument: true }] });
+  });
+
   it("shows an inactive share as not editable", async () => {
     api.shares.get.mockResolvedValue({ result: { ...details(3), shareStatus: "Invalidated", recipientRole: null, fieldKeys: [], fieldValueItemIds: [] } });
     renderDialog();

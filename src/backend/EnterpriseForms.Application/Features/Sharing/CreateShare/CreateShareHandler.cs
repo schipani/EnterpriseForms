@@ -15,13 +15,14 @@ public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAutho
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(request);
-        if ((request.RecipientUserId is null) == (request.RecipientTeamId is null) || request.FieldKeys.Count == 0 || request.RecipientRole is not ("Reader" or "Contributor" or "Manager"))
+        var fieldKeys = request.FieldKeys ?? [];
+        if ((request.RecipientUserId is null) == (request.RecipientTeamId is null) || fieldKeys.Count + (request.Documents?.Count ?? 0) == 0 || request.RecipientRole is not ("Reader" or "Contributor" or "Manager"))
         {
-            throw new BusinessException("INVALID_REQUEST", 422, "one recipient, a valid role and at least one field key are required");
+            throw new BusinessException("INVALID_REQUEST", 422, "one recipient, a valid role and at least one field key or document are required");
         }
 
         var user = context.ToDelegatedUser();
-        var (head, items) = await ShareFieldItems.ResolveAsync(store, authority, user, context.OrganizationId, formRecordId, request.FieldKeys, cancellationToken).ConfigureAwait(false);
+        var (head, items) = await ShareFieldItems.ResolveAsync(store, authority, user, context.OrganizationId, formRecordId, fieldKeys, cancellationToken).ConfigureAwait(false);
 
         var recordShareId = CreateFormDefinitionHandler.DeterministicId(idempotencyKey, "share");
         var commandFields = JsonSerializer.SerializeToNode(new
@@ -41,6 +42,11 @@ public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAutho
         if (request.ShareExpiresOn is { } expiry)
         {
             commandFields["share_expires_on"] = expiry.ToUniversalTime();
+        }
+
+        if (ShareFieldItems.Documents(request.Documents) is { } documents)
+        {
+            commandFields["documents"] = documents;
         }
 
         var payload = HumanCommandPayload.Serialize(commandFields, request.UseDevelopmentStepUp == true);

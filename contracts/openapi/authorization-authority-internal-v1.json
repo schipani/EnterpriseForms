@@ -13278,6 +13278,48 @@
               "string"
             ],
             "format": "int64"
+          },
+          "documents": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ShareDocumentDetail"
+            }
+          }
+        }
+      },
+      "ShareDocumentDetail": {
+        "required": [
+          "file_attachment_id",
+          "can_view_document",
+          "can_download_document",
+          "can_replace_document",
+          "shared_through_version_number"
+        ],
+        "type": "object",
+        "properties": {
+          "file_attachment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "can_view_document": {
+            "type": "boolean"
+          },
+          "can_download_document": {
+            "type": "boolean"
+          },
+          "can_replace_document": {
+            "type": "boolean"
+          },
+          "shared_through_version_number": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },

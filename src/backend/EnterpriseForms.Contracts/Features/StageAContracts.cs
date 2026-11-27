@@ -56,7 +56,14 @@ public sealed record FieldValueResponse(Guid FieldDefinitionId, string FieldKey,
 /// accepts it only where that path is enabled (never production or staging).
 /// </summary>
 public sealed record CreateShareRequest(Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole,
-    IReadOnlyList<string> FieldKeys, bool? UseDevelopmentStepUp = null, Guid? ParentRecordShareId = null, DateTimeOffset? ShareExpiresOn = null);
+    IReadOnlyList<string> FieldKeys, bool? UseDevelopmentStepUp = null, Guid? ParentRecordShareId = null, DateTimeOffset? ShareExpiresOn = null,
+    IReadOnlyList<ShareDocumentRequest>? Documents = null);
+
+/// <summary>
+/// C10 WP8 (WP-0 Section 3.6): one document of a share; viewing is always included. The Authority binds the share to the attachment's
+/// verified current version, and refuses documents without version evidence and replacement until it is available.
+/// </summary>
+public sealed record ShareDocumentRequest(Guid FileAttachmentId, bool CanDownloadDocument, bool? CanReplaceDocument = null);
 
 public sealed record ShareResponse(Guid RecordShareId, Guid FormRecordId, string RecipientRole, IReadOnlyList<Guid> FieldValueItemIds, string ShareStatus, CommandOutcome Command);
 
@@ -66,7 +73,7 @@ public sealed record ShareResponse(Guid RecordShareId, Guid FormRecordId, string
 /// caller is not the owner; the share keeps its committed parent. <c>UseDevelopmentStepUp</c> as for share creation (G27).
 /// </summary>
 public sealed record UpdateShareRequest(string RecipientRole, IReadOnlyList<string> FieldKeys, DateTimeOffset? ShareExpiresOn = null, bool? NoExpiry = null,
-    Guid? ParentRecordShareId = null, bool? UseDevelopmentStepUp = null);
+    Guid? ParentRecordShareId = null, bool? UseDevelopmentStepUp = null, IReadOnlyList<ShareDocumentRequest>? Documents = null);
 
 /// <summary>
 /// C10 M2 (WP-0 Section 3.5): one share as the Authority committed it. <c>ShareRevision</c> is the authoritative share revision and
@@ -77,7 +84,10 @@ public sealed record UpdateShareRequest(string RecipientRole, IReadOnlyList<stri
 public sealed record ShareDetailsResponse(Guid RecordShareId, Guid FormRecordId, string ShareStatus, Guid? RecipientUserId, Guid? RecipientTeamId, string? RecipientDisplayName,
     string? RecipientRole, IReadOnlyList<Guid> FieldValueItemIds, IReadOnlyList<string> FieldKeys, DateTimeOffset? ShareExpiresOn, DateTimeOffset? EffectiveExpiresOn,
     long ShareRevision, Guid? ParentRecordShareId, int DelegationDepth, bool LegacyLineageUnresolved, string? InvalidationReasonCode, Guid? GrantorUserId,
-    string? GrantorDisplayName, long AuthorizationRevision);
+    string? GrantorDisplayName, long AuthorizationRevision, IReadOnlyList<ShareDocumentDetailResponse> Documents);
+
+/// <summary>C10 WP8: one shared document as the Authority committed it (the version boundary comes from verified evidence).</summary>
+public sealed record ShareDocumentDetailResponse(Guid FileAttachmentId, bool CanViewDocument, bool CanDownloadDocument, bool CanReplaceDocument, int SharedThroughVersionNumber);
 
 /// <summary>
 /// C10 M2 (WP-0 Section 3.5): one change in the record's sharing or ownership history. <c>CommandState</c> is the Authority command's

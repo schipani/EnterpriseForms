@@ -128,6 +128,28 @@ public sealed class ShareUpdateTests
     }
 
     [Fact]
+    public async Task ADocumentOnlyScopeSendsTheDocumentsWithViewAndNoFieldsAndAnEmptyScopeIsRefused()
+    {
+        var authority = new FakeAuthority();
+        var handler = Handler(authority, new FakeStore());
+        var attachment = Guid.CreateVersion7();
+
+        await handler.HandleAsync(Context, Record, Share, 1, new UpdateShareRequest("Reader", [], null, true, Documents: [new ShareDocumentRequest(attachment, CanDownloadDocument: true)]), Key, Ct);
+
+        var payload = Assert.Single(authority.Submitted).Request.CommandPayload;
+        Assert.Empty(payload.GetProperty("field_item_ids").EnumerateArray());
+        var document = Assert.Single(payload.GetProperty("documents").EnumerateArray());
+        Assert.Equal(attachment, document.GetProperty("file_attachment_id").GetGuid());
+        Assert.True(document.GetProperty("can_view_document").GetBoolean());
+        Assert.True(document.GetProperty("can_download_document").GetBoolean());
+        Assert.False(document.GetProperty("can_replace_document").GetBoolean());
+
+        var refused = await Assert.ThrowsAsync<BusinessException>(() => handler.HandleAsync(Context, Record, Share, 1, new UpdateShareRequest("Reader", [], null, true), Key, Ct));
+        Assert.Equal(422, refused.HttpStatusCode);
+        Assert.Single(authority.Submitted);
+    }
+
+    [Fact]
     public async Task NoExpiryOmitsTheExpiryAndAnAbsentDecisionIsRefusedBeforeTheAuthority()
     {
         var authority = new FakeAuthority();

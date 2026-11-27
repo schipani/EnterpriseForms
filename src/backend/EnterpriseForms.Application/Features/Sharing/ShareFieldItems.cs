@@ -13,6 +13,16 @@ internal static class ShareFieldItems
 {
     public sealed record Resolved(AcceptedContentRevision Head, IReadOnlyList<(Guid FieldDefinitionId, Guid ItemId)> Items);
 
+    /// <summary>C10 WP8: the command form of the requested documents (view always; the Authority validates them against verified content).</summary>
+    public static System.Text.Json.Nodes.JsonArray? Documents(IReadOnlyList<EnterpriseForms.Contracts.Features.ShareDocumentRequest>? documents) =>
+        documents is not { Count: > 0 } ? null : new System.Text.Json.Nodes.JsonArray([.. documents.Select(d => (System.Text.Json.Nodes.JsonNode)new System.Text.Json.Nodes.JsonObject
+        {
+            ["file_attachment_id"] = d.FileAttachmentId,
+            ["can_view_document"] = true,
+            ["can_download_document"] = d.CanDownloadDocument,
+            ["can_replace_document"] = d.CanReplaceDocument == true,
+        })]);
+
     public static async Task<Resolved> ResolveAsync(IBusinessStore store, IAuthorizationAuthorityClient authority, DelegatedUserContext user, Guid organizationId,
         Guid formRecordId, IReadOnlyList<string> fieldKeys, CancellationToken cancellationToken)
     {

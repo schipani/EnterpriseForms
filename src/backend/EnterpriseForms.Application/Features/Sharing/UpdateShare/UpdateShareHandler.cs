@@ -27,10 +27,11 @@ public sealed class UpdateShareHandler(IBusinessStore store, IAuthorizationAutho
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(request);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(expectedShareRevision);
-        if (request.FieldKeys is not { Count: > 0 } || request.FieldKeys.Any(string.IsNullOrWhiteSpace) ||
+        var fieldKeys = request.FieldKeys ?? [];
+        if (fieldKeys.Count + (request.Documents?.Count ?? 0) == 0 || fieldKeys.Any(string.IsNullOrWhiteSpace) ||
             request.RecipientRole is not (RecipientRoleNames.Reader or RecipientRoleNames.Contributor or RecipientRoleNames.Manager))
         {
-            throw new BusinessException("INVALID_REQUEST", 422, "a valid role and at least one field key are required");
+            throw new BusinessException("INVALID_REQUEST", 422, "a valid role and at least one field key or document are required");
         }
 
         // The Authority replaces the expiry with what is sent (none means no expiry), so the caller must decide it explicitly:
@@ -50,7 +51,7 @@ public sealed class UpdateShareHandler(IBusinessStore store, IAuthorizationAutho
             throw new BusinessException("RECORD_NOT_FOUND", 404, "record not found");
         }
 
-        var (_, items) = await ShareFieldItems.ResolveAsync(store, authority, user, context.OrganizationId, formRecordId, request.FieldKeys, cancellationToken).ConfigureAwait(false);
+        var (_, items) = await ShareFieldItems.ResolveAsync(store, authority, user, context.OrganizationId, formRecordId, fieldKeys, cancellationToken).ConfigureAwait(false);
         var commandFields = JsonSerializer.SerializeToNode(new
         {
             record_share_id = recordShareId,
@@ -67,6 +68,11 @@ public sealed class UpdateShareHandler(IBusinessStore store, IAuthorizationAutho
         if (request.ShareExpiresOn is { } expiry)
         {
             commandFields["share_expires_on"] = expiry.ToUniversalTime();
+        }
+
+        if (ShareFieldItems.Documents(request.Documents) is { } documents)
+        {
+            commandFields["documents"] = documents;
         }
 
         var payload = HumanCommandPayload.Serialize(commandFields, request.UseDevelopmentStepUp == true);

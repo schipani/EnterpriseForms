@@ -2659,6 +2659,7 @@ export interface components {
             parentRecordShareId?: null | string;
             /** Format: date-time */
             shareExpiresOn?: null | string;
+            documents?: null | components["schemas"]["ShareDocumentRequest"][];
         };
         CreateTeamRequest: {
             teamName: string;
@@ -4593,11 +4594,27 @@ export interface components {
             grantorDisplayName: null | string;
             /** Format: int64 */
             authorizationRevision: number | string;
+            documents: components["schemas"]["ShareDocumentDetailResponse"][];
         };
         SharedFieldAccessResponse: {
             fieldKey: string;
             editable: boolean;
             notEditableReason: null | string;
+        };
+        ShareDocumentDetailResponse: {
+            /** Format: uuid */
+            fileAttachmentId: string;
+            canViewDocument: boolean;
+            canDownloadDocument: boolean;
+            canReplaceDocument: boolean;
+            /** Format: int32 */
+            sharedThroughVersionNumber: number | string;
+        };
+        ShareDocumentRequest: {
+            /** Format: uuid */
+            fileAttachmentId: string;
+            canDownloadDocument: boolean;
+            canReplaceDocument?: null | boolean;
         };
         ShareResponse: {
             /** Format: uuid */
@@ -4825,6 +4842,7 @@ export interface components {
             /** Format: uuid */
             parentRecordShareId?: null | string;
             useDevelopmentStepUp?: null | boolean;
+            documents?: null | components["schemas"]["ShareDocumentRequest"][];
         };
         UpdateShareResponse: {
             /** Format: uuid */

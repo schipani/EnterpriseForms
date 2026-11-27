@@ -48,6 +48,13 @@ public sealed class ShareDetailsService(IAuthorityStore store, TimeProvider cloc
         var roleEdge = graph.EdgesOf(ResourceTypeNames.RecordShare, recordShareId).Where(e => e.RelationshipName is "reader" or "contributor" or "manager").Take(2).ToArray();
         var holder = share.ResourceLifecycleState == ResourceLifecycleStates.Active && roleEdge.Length == 1 ? roleEdge[0] : null;
         var effective = metadata.LegacyLineageUnresolved ? null : ShareLineageExpiry.Evaluate(chain, organizationId, formRecordId, recordShareId, now).EffectiveExpiry;
+        // C10 WP8: documents with a live edge and a binding (an inactive share holds none).
+        var documents = holder is null ? [] : (await scope.GetShareDocumentBindingsAsync(organizationId, [recordShareId], cancellationToken).ConfigureAwait(false))
+            .Where(b => b.OrganizationId == organizationId && b.RecordShareId == recordShareId &&
+                        graph.EdgesOf(ResourceTypeNames.DocumentItem, b.FileAttachmentId, "shared_via").Any(e => e.SubjectTypeName == ResourceTypeNames.RecordShare && e.SubjectEntityId == recordShareId))
+            .OrderBy(b => b.FileAttachmentId)
+            .Select(b => new ShareDocumentDetail(b.FileAttachmentId, b.CanViewDocument, b.CanDownloadDocument, b.CanReplaceDocument, b.SharedThroughVersionNumber))
+            .ToList();
         var creator = await scope.FindCommandAsync(share.RegisteredBySecurityCommandId, cancellationToken).ConfigureAwait(false);
         var grantor = creator is { } command && command.OrganizationId == organizationId
             ? (await scope.FindIdentityBindingByIdAsync(command.ActorIdentityBindingId, cancellationToken).ConfigureAwait(false)) is { } binding && binding.OrganizationId == organizationId ? binding.AuthorityUserId : (Guid?)null
@@ -69,7 +76,8 @@ public sealed class ShareDetailsService(IAuthorityStore store, TimeProvider cloc
             metadata.LegacyLineageUnresolved,
             metadata.ShareInvalidationReasonCode,
             grantor,
-            state.AuthorizationRevision);
+            state.AuthorizationRevision,
+            documents);
     }
 
     private static AuthorityException Unavailable() => AuthorityException.NotRegistered("share is not available to this actor");

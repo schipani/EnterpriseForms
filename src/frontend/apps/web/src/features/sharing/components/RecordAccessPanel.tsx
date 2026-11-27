@@ -9,6 +9,7 @@ import { ErrorPanel } from "../../support";
 import { contributorViewOnlyReasons } from "./contributorPreview";
 import { EditShareDialog } from "./EditShareDialog";
 import { RecordSecurityHistoryCard } from "./RecordSecurityHistoryCard";
+import { ShareDocumentSelection, toDocumentRequests, type DocumentSelection } from "./ShareDocumentSelection";
 
 /** Role copy follows the Authority's contributor-write switch (Phase C5, D10): never promise an edit that cannot happen. */
 const rolesFor = (contributorWritesEnabled: boolean) => [
@@ -221,6 +222,7 @@ function CreateShareDialog({ formRecordId, projection, contributorWritesEnabled,
   const [recipientUserId, setRecipientUserId] = useState<string | undefined>(undefined);
   const [role, setRole] = useState("Reader");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [documents, setDocuments] = useState<DocumentSelection>(new Map());
   const displayNames = new Map(projection.fields.map((field) => [field.fieldKey, field.fieldDisplayName]));
   // Only fields with a persisted value can be shared (the share binds to accepted manifest items). Fields of sections that
   // allow multiple entries are not shareable on their own in this version (the server refuses them: FIELD_IN_REPEATING_GROUP).
@@ -230,7 +232,10 @@ function CreateShareDialog({ formRecordId, projection, contributorWritesEnabled,
   const canChange = role !== "Reader" && contributorWritesEnabled;
   const viewOnly = canChange ? contributorViewOnlyReasons(projection.layoutVersion.layoutJson, projection.fields, selected) : new Map<string, string>();
   const create = useMutation({
-    mutationFn: () => api.shares.create(formRecordId, { recipientUserId: recipientUserId ?? null, recipientTeamId: null, recipientRole: role, fieldKeys: [...selected] }).then((r) => r.result),
+    mutationFn: () =>
+      api.shares
+        .create(formRecordId, { recipientUserId: recipientUserId ?? null, recipientTeamId: null, recipientRole: role, fieldKeys: [...selected], ...(documents.size > 0 ? { documents: toDocumentRequests(documents) } : {}) })
+        .then((r) => r.result),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["shares", formRecordId] });
       onClose();
@@ -251,14 +256,14 @@ function CreateShareDialog({ formRecordId, projection, contributorWritesEnabled,
       open
       onOpenChange={(next) => (next ? undefined : onClose())}
       title="Share fields of this record"
-      description="Choose one person, a role and the exact fields. The authority commits the share; nothing outside the selected fields is exposed."
+      description="Choose one person, a role and the exact fields or documents. The authority commits the share; nothing outside the selection is exposed."
       locked={create.isPending}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={create.isPending}>
             Cancel
           </Button>
-          <Button busy={create.isPending} disabled={!recipientUserId || selected.size === 0} onClick={() => create.mutate()}>
+          <Button busy={create.isPending} disabled={!recipientUserId || selected.size + documents.size === 0} onClick={() => create.mutate()}>
             Share
           </Button>
         </>
@@ -289,6 +294,7 @@ function CreateShareDialog({ formRecordId, projection, contributorWritesEnabled,
           {hasEntries ? <p className="text-sm text-muted">Fields in sections that allow multiple entries cannot be shared on their own.</p> : null}
           {canChange ? <p className="text-sm text-muted">A person with this role can change the values of the selected fields, except those marked View only. They cannot clear values, change multiple choices, entries, documents or related records.</p> : null}
         </fieldset>
+        <ShareDocumentSelection documents={projection.documents} selection={documents} onChange={setDocuments} />
         {create.isError ? <ErrorPanel error={create.error} /> : null}
       </div>
     </Dialog>

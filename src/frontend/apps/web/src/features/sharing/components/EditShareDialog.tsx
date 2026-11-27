@@ -4,6 +4,7 @@ import { Button, Checkbox, DescriptionList, Dialog, legendClass, LoadingBlock, S
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
+import { ShareDocumentSelection, toDocumentRequests, type DocumentSelection } from "./ShareDocumentSelection";
 
 const ROLE_OPTIONS = [
   { value: "Reader", label: "Reader" },
@@ -55,10 +56,11 @@ export function EditShareDialog({ formRecordId, share, projection, onClose }: { 
   });
   const shareable = projection.record.values.filter((value) => !value.formRecordGroupId).map((value) => value.fieldKey).filter((key, index, all) => all.indexOf(key) === index).sort();
   const displayNames = new Map(projection.fields.map((field) => [field.fieldKey, field.fieldDisplayName]));
-  const [edits, setEdits] = useState<{ role?: string; selected?: Set<string>; noExpiry?: boolean; expiry?: string; stepUp: boolean }>({ stepUp: false });
+  const [edits, setEdits] = useState<{ role?: string; selected?: Set<string>; documents?: DocumentSelection; noExpiry?: boolean; expiry?: string; stepUp: boolean }>({ stepUp: false });
   const loaded = details.data;
   const role = edits.role ?? loaded?.recipientRole ?? share.recipientRole;
   const selected = edits.selected ?? new Set((loaded?.fieldKeys ?? []).filter((key) => shareable.includes(key)));
+  const documents: DocumentSelection = edits.documents ?? new Map((loaded?.documents ?? []).map((d) => [d.fileAttachmentId, { download: d.canDownloadDocument }]));
   const noExpiry = edits.noExpiry ?? !loaded?.shareExpiresOn;
   const expiry = edits.expiry ?? (loaded?.shareExpiresOn ? toLocalInput(loaded.shareExpiresOn, timeZone) : "");
   const parsedExpiry = noExpiry ? undefined : fromLocalInput(expiry, timeZone);
@@ -73,6 +75,7 @@ export function EditShareDialog({ formRecordId, share, projection, onClose }: { 
         .update(formRecordId, share.recordShareId, loaded.shareRevision, {
           recipientRole: role,
           fieldKeys: [...selected],
+          ...(documents.size > 0 ? { documents: toDocumentRequests(documents) } : {}),
           shareExpiresOn: noExpiry ? null : (parsedExpiry?.instant ?? null),
           noExpiry: noExpiry ? true : null,
           parentRecordShareId: loaded.parentRecordShareId ?? null,
@@ -104,7 +107,7 @@ export function EditShareDialog({ formRecordId, share, projection, onClose }: { 
       }
       return { ...current, selected: next };
     });
-  const canSave = !!loaded && loaded.shareStatus === "Active" && selected.size > 0 && (noExpiry || !!parsedExpiry?.instant) && edits.stepUp && !stale;
+  const canSave = !!loaded && loaded.shareStatus === "Active" && selected.size + documents.size > 0 && (noExpiry || !!parsedExpiry?.instant) && edits.stepUp && !stale;
 
   return (
     <Dialog
@@ -147,6 +150,7 @@ export function EditShareDialog({ formRecordId, share, projection, onClose }: { 
               ))}
               {unnamedItems > 0 ? <p className="text-sm text-muted">This share also covers {unnamedItems} earlier value(s) the record no longer holds; saving keeps only the fields selected here.</p> : null}
             </fieldset>
+            <ShareDocumentSelection documents={projection.documents ?? []} selection={documents} onChange={(next) => setEdits((current) => ({ ...current, documents: next }))} />
             <Checkbox label="No expiry" checked={noExpiry} onCheckedChange={(checked) => setEdits((current) => ({ ...current, noExpiry: checked === true }))} />
             {!noExpiry ? (
               <TextInput

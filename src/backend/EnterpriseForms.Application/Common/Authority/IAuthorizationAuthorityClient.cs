@@ -464,7 +464,10 @@ public sealed record AuthorityShareDetails(
     bool LegacyLineageUnresolved,
     string? InvalidationReasonCode,
     Guid? GrantorUserId,
-    long AuthorizationRevision);
+    long AuthorizationRevision,
+    IReadOnlyList<AuthorityShareDocumentDetail>? Documents = null);
+
+public sealed record AuthorityShareDocumentDetail(Guid FileAttachmentId, bool CanViewDocument, bool CanDownloadDocument, bool CanReplaceDocument, int SharedThroughVersionNumber);
 
 /// <summary>C10 M2 (WP-0 Section 3.5): the authoritative share-details read; the Authority decides who may read it.</summary>
 public interface IShareDetailsAuthority
