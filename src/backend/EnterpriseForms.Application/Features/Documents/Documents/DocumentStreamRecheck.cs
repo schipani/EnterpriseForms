@@ -65,9 +65,9 @@ public static class DocumentStreamRechecks
     {
         OperationCanceledException when cancellationToken.IsCancellationRequested => null,
         DocumentStreamInterruptedException interrupted => interrupted,
-        BusinessException business => new DocumentStreamInterruptedException(business.ErrorCode, business),
-        AuthorityClientException authority => new DocumentStreamInterruptedException(authority.ErrorCode, authority),
-        _ => new DocumentStreamInterruptedException(AuthorityUnavailable, exception),
+        BusinessException business => new DocumentStreamInterruptedException(business.ErrorCode, business) { AuthorityFailure = business.HttpStatusCode >= 500 },
+        AuthorityClientException authority => new DocumentStreamInterruptedException(authority.ErrorCode, authority) { AuthorityFailure = authority.Retryable || authority.HttpStatusCode >= 500 },
+        _ => new DocumentStreamInterruptedException(AuthorityUnavailable, exception) { AuthorityFailure = true },
     };
 }
 
@@ -76,6 +76,9 @@ public sealed class DocumentStreamInterruptedException(string reasonCode, Except
     : Exception("document download interrupted: " + reasonCode, inner)
 {
     public string ReasonCode { get; } = reasonCode;
+
+    /// <summary>True when the Authority (or a dependency) failed to decide, rather than deciding to deny; audited as Failed.</summary>
+    public bool AuthorityFailure { get; init; }
 }
 
 /// <summary>

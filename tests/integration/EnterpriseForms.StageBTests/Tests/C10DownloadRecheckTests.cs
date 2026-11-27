@@ -126,9 +126,9 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
 
         var revoked = await fixture.Api.PostAsync($"/api/v1/form-records/{w.Record:D}/shares/{share:D}/revoke?useDevelopmentStepUp=true", w.S.Token(w.S.Clerk), new { });
         Assert.True(revoked.IsSuccess, revoked.Body);
-        await w.S.WaitGateReadyAsync(Settle);
-        var receivedAtChange = download.Received;
+        var receivedAtChange = download.Received; // measured from the revoke's return, not from the gate reopening (re-review)
         var sinceChange = Stopwatch.StartNew();
+        await w.S.WaitGateReadyAsync(Settle);
         await reading;
 
         var after = download.Received - receivedAtChange;
@@ -137,7 +137,8 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
         Assert.False(download.Completed, "CONS-23: the stream was not stopped. " + observed);
         Assert.True(after <= 16L * 1024 * 1024, "CONS-23: too much plaintext after the revocation. " + observed);
         Assert.True(sinceChange.Elapsed <= RecheckBound + DrainAllowance, observed);
-        Assert.Single(DownloadFailures(w));
+        var failures = DownloadFailures(w);
+        Assert.True(failures.Length == 1 && failures[0] is not ("AUTHORITY_UNAVAILABLE" or "INTEGRITY_VERIFICATION_FAILED"), observed);
     }
 
     [Fact]

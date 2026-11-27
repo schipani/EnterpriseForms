@@ -236,6 +236,10 @@ public sealed class Cons23DownloadRecheckTests
         Assert.Equal("INTEGRITY_VERIFICATION_FAILED", DocumentStreamRechecks.Classify(new BusinessException("INTEGRITY_VERIFICATION_FAILED", 423), CancellationToken.None)!.ReasonCode);
         Assert.Equal("PERMISSION_DENIED", DocumentStreamRechecks.Classify(new AuthorityClientException("PERMISSION_DENIED", 403, retryable: false), CancellationToken.None)!.ReasonCode);
         Assert.Equal(DocumentStreamRechecks.AuthorityUnavailable, DocumentStreamRechecks.Classify(new HttpRequestException("down"), CancellationToken.None)!.ReasonCode);
+        Assert.True(DocumentStreamRechecks.Classify(new HttpRequestException("down"), CancellationToken.None)!.AuthorityFailure);
+        Assert.True(DocumentStreamRechecks.Classify(new AuthorityClientException("AUTHORIZATION_PROJECTION_PENDING", 503, retryable: true), CancellationToken.None)!.AuthorityFailure);
+        Assert.False(DocumentStreamRechecks.Classify(new AuthorityClientException("PERMISSION_DENIED", 403, retryable: false), CancellationToken.None)!.AuthorityFailure);
+        Assert.False(DocumentStreamRechecks.Classify(new BusinessException("INTEGRITY_VERIFICATION_FAILED", 423), CancellationToken.None)!.AuthorityFailure);
         var already = new DocumentStreamInterruptedException(DocumentStreamRechecks.SessionInvalid);
         Assert.Same(already, DocumentStreamRechecks.Classify(already, CancellationToken.None));
     }

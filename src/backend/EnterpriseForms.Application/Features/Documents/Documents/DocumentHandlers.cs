@@ -122,7 +122,7 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             {
                 // CONS-23: no further plaintext is written; the response is aborted (incomplete body) and the stop is audited.
                 // An unavailable Authority is a failure to decide, not a denial (independent review finding 7).
-                var outcome = interrupted.ReasonCode == DocumentStreamRechecks.AuthorityUnavailable ? "Failed" : "Denied";
+                var outcome = interrupted.AuthorityFailure ? "Failed" : "Denied";
                 await AuditRecorder.RecordAsync(store, context, clock, AuditCategories.Document, AuditActions.DocumentDownloadFailed, "document download stopped by the Authority re-check", formRecordId, outcome,
                     new { fileAttachmentId, versionNumber = captured.VersionNumber, reasonCode = interrupted.ReasonCode }, CancellationToken.None).ConfigureAwait(false);
                 throw;
