@@ -87,10 +87,12 @@ public static partial class CommandPlanner
             throw new AuthorityException(AuthorityErrorCodes.ManagerAtMaximumDepth, 422, false, "Manager shares cannot be granted at depth three");
         }
 
-        var requestedFields = payload.FieldItemIds;
-        if (requestedFields is not { Count: > 0 and <= 500 } || requestedFields.Distinct().Count() != requestedFields.Count)
+        // C10 WP8: the complete new scope names fields, documents or both; an empty scope is refused.
+        var requestedFields = payload.FieldItemIds ?? [];
+        var documents = payload.Documents ?? [];
+        if (requestedFields.Count + documents.Count == 0 || requestedFields.Count > 500 || requestedFields.Distinct().Count() != requestedFields.Count)
         {
-            throw AuthorityException.Invalid("field_item_ids must be a non-empty distinct list");
+            throw AuthorityException.Invalid("the new scope needs a distinct explicit allow-list of field items or documents");
         }
 
         var head = await scope.FindContentHeadAsync(organizationId, payload.FormRecordId, lockForUpdate: false, cancellationToken).ConfigureAwait(false);
@@ -106,6 +108,17 @@ public static partial class CommandPlanner
         {
             throw AuthorityException.Invalid("field_item_ids must reference items in the accepted manifest");
         }
+
+        // Each kept or added document's boundary becomes its current verified version (WP-0 Section 3.6: an update extends it).
+        var documentVersions = ShareDocuments.Resolve(documents, leaves);
+        if (metadata.ParentRecordShareId is { } documentParent)
+        {
+            await ShareDocuments.RequireWithinParentAsync(scope, organizationId, documentParent, documents, documentVersions, cancellationToken).ConfigureAwait(false);
+        }
+
+        var currentBindings = (await scope.GetShareDocumentBindingsAsync(organizationId, [payload.RecordShareId], cancellationToken).ConfigureAwait(false))
+            .Where(b => b.OrganizationId == organizationId && b.RecordShareId == payload.RecordShareId).ToList();
+        var documentsNarrowed = ShareDocuments.Narrows(currentBindings, documents, documentVersions);
 
         var expiresOn = payload.ShareExpiresOn?.ToUniversalTime();
         if (expiresOn is { } expiry && expiresOn != metadata.ShareExpiresOn &&
@@ -142,10 +155,12 @@ public static partial class CommandPlanner
         // whose scope is no longer within its parent's new scope (and everything below it). Widening invalidates nothing; an earlier
         // expiry needs no invalidation because a descendant's effective expiry is the lineage minimum (enforced at access time).
         List<(Domain.Features.Organizations.AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata)> narrowed = [];
-        if (role != recipient.RelationshipName || !fields.SetEquals(currentFields.Select(e => e.ResourceEntityId)))
+        if (role != recipient.RelationshipName || !fields.SetEquals(currentFields.Select(e => e.ResourceEntityId)) || documentsNarrowed)
         {
             var descendants = await ReadRevokedShareDescendantsAsync(scope, organizationId, payload.FormRecordId, payload.RecordShareId, cancellationToken).ConfigureAwait(false);
-            narrowed = NarrowedDescendants(graph, payload.RecordShareId, role, fields, descendants);
+            var descendantBindings = descendants.Count == 0 ? [] : await scope.GetShareDocumentBindingsAsync(organizationId, [.. descendants.Select(d => d.Metadata.RecordShareId)], cancellationToken).ConfigureAwait(false);
+            narrowed = NarrowedDescendants(graph, payload.RecordShareId, role, fields, descendants,
+                ShareDocuments.Scopes(payload.RecordShareId, documents, documentVersions, descendantBindings.Where(b => b.OrganizationId == organizationId)));
         }
 
         var nextRevision = metadata.ShareRevision + 1;
@@ -196,6 +211,12 @@ public static partial class CommandPlanner
             plan.AddEdges.Add((ResourceTypeNames.FieldItem, itemId, "shared_via", ResourceTypeNames.RecordShare, payload.RecordShareId, string.Empty));
         }
 
+        ShareDocuments.PlanDiff(plan, graph, organizationId, payload.RecordShareId, currentBindings, documents, documentVersions);
+        if (documents.Count > 0)
+        {
+            plan.NormalizedPayloadJson = ShareDocuments.WithDocuments(plan.NormalizedPayloadJson, documents, documentVersions);
+        }
+
         if (recipient.RelationshipName != role)
         {
             plan.RemoveEdges.Add(recipient);
@@ -215,7 +236,8 @@ public static partial class CommandPlanner
     /// </summary>
     private static List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata)> NarrowedDescendants(
         DesiredStateGraph graph, Guid updatedShareId, string updatedRole, IReadOnlySet<Guid> updatedFields,
-        List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata)> descendants)
+        List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata)> descendants,
+        IReadOnlyDictionary<Guid, IReadOnlyDictionary<Guid, Domain.Features.Sharing.ShareDocumentBinding>> documentScopes)
     {
         var scopes = new Dictionary<Guid, (string Role, IReadOnlySet<Guid> Fields)> { [updatedShareId] = (updatedRole, updatedFields) };
         var invalid = new HashSet<Guid>();
@@ -225,7 +247,8 @@ public static partial class CommandPlanner
             var id = metadata.RecordShareId;
             var roles = graph.EdgesOf(ResourceTypeNames.RecordShare, id).Where(e => e.RelationshipName is "reader" or "contributor" or "manager").Select(e => e.RelationshipName).Distinct().ToList();
             var covered = metadata.ParentRecordShareId is { } parent && !invalid.Contains(parent) && scopes.TryGetValue(parent, out var parentScope) &&
-                          parentScope.Role == "manager" && roles.Count == 1 && graph.FieldItemsOfShare(id).All(parentScope.Fields.Contains);
+                          parentScope.Role == "manager" && roles.Count == 1 && graph.FieldItemsOfShare(id).All(parentScope.Fields.Contains) &&
+                          ShareDocuments.Covers(documentScopes.GetValueOrDefault(parent), documentScopes.GetValueOrDefault(id));
             if (covered)
             {
                 scopes[id] = (roles[0], graph.FieldItemsOfShare(id));

@@ -335,6 +335,8 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
         public void AddShareDocumentBinding(ShareDocumentBinding binding) => s.DocumentBindings.Add(binding);
 
+        public void RemoveShareDocumentBinding(ShareDocumentBinding binding) => s.DocumentBindings.Remove(binding);
+
         public Task<List<SecurityCommand>> GetRecordTargetedCommandsAsync(Guid organizationId, Guid formRecordId, int limit, CancellationToken cancellationToken) =>
             Task.FromResult(s.Commands.Where(c => c.OrganizationId == organizationId && c.TargetFormRecordId == formRecordId && c.CommandStateName != SecurityCommandStates.Rejected)
                 .OrderByDescending(c => c.CommandCreatedOn).ThenByDescending(c => c.SecurityCommandId).Take(limit).ToList());

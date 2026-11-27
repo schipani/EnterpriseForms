@@ -85,6 +85,7 @@ internal static class ExpireSharePlanGuard
                                          !(e.SubjectTypeName == ResourceTypeNames.RecordShare && allowed.Contains(e.SubjectEntityId))), "removal of an edge of another resource");
         Refuse(plan.RemoveEdges.Any(e => e.RelationshipName is "owner" or "member"), "an owner or team membership edge");
         Refuse(plan.ShareMetadata is not null || plan.ShareMetadataUpdate is not null || plan.ShareScopeChange is not null, "a share scope, role or revision change");
+        Refuse(plan.AddDocumentBindings.Count > 0 || plan.UpdatedDocumentBindings.Count > 0 || plan.RemovedDocumentBindings.Count > 0, "a document binding change");
         Refuse(plan.ProtectionPolicy is not null || plan.SearchPolicyToAdvance is not null, "a policy change");
         Refuse(plan.PublishedVersion is not null || plan.NewPublication is not null || plan.ResolvedPublications.Count > 0 || plan.NewFieldFormBindings.Count > 0, "a form publication change");
         Refuse(plan.NewApprovals.Count > 0 || plan.ChangedApprovals.Count > 0, "a search approval change");

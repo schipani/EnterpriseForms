@@ -266,6 +266,21 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             scope.AddShareDocumentBinding(binding);
         }
 
+        foreach (var (binding, entry, version) in plan.UpdatedDocumentBindings)
+        {
+            binding.CanViewDocument = entry.CanViewDocument;
+            binding.CanDownloadDocument = entry.CanDownloadDocument;
+            binding.CanReplaceDocument = entry.CanReplaceDocument;
+            binding.SharedThroughVersionNumber = version;
+            binding.BoundBySecurityCommandId = command.SecurityCommandId;
+            binding.DocumentBoundOn = now;
+        }
+
+        foreach (var binding in plan.RemovedDocumentBindings)
+        {
+            scope.RemoveShareDocumentBinding(binding);
+        }
+
         if (plan.ShareMetadataUpdate is { } update)
         {
             // The planner checked the share revision while the organization row was locked.

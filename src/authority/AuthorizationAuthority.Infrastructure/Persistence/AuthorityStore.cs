@@ -482,6 +482,8 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public void AddShareDocumentBinding(ShareDocumentBinding binding) => context.ShareDocumentBindings.Add(binding);
 
+        public void RemoveShareDocumentBinding(ShareDocumentBinding binding) => context.ShareDocumentBindings.Remove(binding);
+
         public Task<List<SecurityCommand>> GetRecordTargetedCommandsAsync(Guid organizationId, Guid formRecordId, int limit, CancellationToken cancellationToken) =>
             context.SecurityCommands.AsNoTracking()
                 .Where(c => c.OrganizationId == organizationId && c.TargetFormRecordId == formRecordId && c.CommandStateName != SecurityCommandStates.Rejected)

@@ -227,7 +227,7 @@ public sealed record ShareDocumentEntry(Guid FileAttachmentId, bool CanViewDocum
 /// </summary>
 public sealed record UpdateShareScopePayload(Guid RecordShareId, Guid FormRecordId, string RecipientRole,
     IReadOnlyList<Guid> FieldItemIds, long ExpectedShareRevision, string? StepUpEvidence = null,
-    Guid? ParentRecordShareId = null, DateTimeOffset? ShareExpiresOn = null);
+    Guid? ParentRecordShareId = null, DateTimeOffset? ShareExpiresOn = null, IReadOnlyList<ShareDocumentEntry>? Documents = null);
 
 /// <summary>
 /// G27: Revoking a share requires step-up assurance. <c>StepUpEvidence</c> is the development-only synthetic marker

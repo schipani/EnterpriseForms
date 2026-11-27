@@ -98,6 +98,12 @@ public sealed class CommandPlan
     /// <summary>C10 WP8: document bindings staged with the command (attributed to it when applied).</summary>
     internal List<Domain.Features.Sharing.ShareDocumentBinding> AddDocumentBindings { get; } = [];
 
+    /// <summary>C10 WP8: existing bindings whose flags or version boundary this command replaces (re-attributed when applied).</summary>
+    internal List<(Domain.Features.Sharing.ShareDocumentBinding Binding, ShareDocumentEntry Entry, int Version)> UpdatedDocumentBindings { get; } = [];
+
+    /// <summary>C10 WP8: bindings of documents this command removes from the share.</summary>
+    internal List<Domain.Features.Sharing.ShareDocumentBinding> RemovedDocumentBindings { get; } = [];
+
     internal (Domain.Features.Sharing.ShareResourceMetadata Metadata, long Revision, DateTimeOffset? ExpiresOn)? ShareMetadataUpdate { get; set; }
     /// <summary>C10 M1-WP5: descendant shares invalidated by this command (revoke, expiry, narrowing, path loss), with reason.</summary>
     internal List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata, string Reason)> InvalidatedDescendantShares { get; } = [];
