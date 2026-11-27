@@ -71,9 +71,12 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
     {
         ArgumentNullException.ThrowIfNull(context);
         var verified = await reader.ReadAsync(context, formRecordId, ProtectedAction.Read, cancellationToken).ConfigureAwait(false);
-        var current = verified.AuthorizedAttachments.FirstOrDefault(a => a.FileAttachmentId == fileAttachmentId);
+        // B-05: a document that is not in the accepted current content (removed, or not released to this caller) releases no version at
+        // all, current or historic (Stage B C-200: the C10 nullable form let a full reader download an earlier version of a removed one).
+        var current = verified.AuthorizedAttachments.FirstOrDefault(a => a.FileAttachmentId == fileAttachmentId)
+                      ?? throw new BusinessException("NOT_FOUND", 404, "document not found");
         FileAttachmentVersion target;
-        if (versionNumber is { } requested && requested != current?.VersionNumber)
+        if (versionNumber is { } requested && requested != current.VersionNumber)
         {
             // C10 WP8-A (independent review D-4): a share recipient downloads only the current version the Authority released to them;
             // historic verification needs full read at the Authority, so an earlier version is not offered. A full reader may download
@@ -87,7 +90,7 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
         }
         else
         {
-            target = current ?? throw new BusinessException("NOT_FOUND", 404, "document not found");
+            target = current;
             // C10 WP8-A: a share recipient may view a shared document but download it only when the Authority says its binding allows it.
             if (!verified.IsComplete && !Downloadable(verified.Verification, fileAttachmentId))
             {

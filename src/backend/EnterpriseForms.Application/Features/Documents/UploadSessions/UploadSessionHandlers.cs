@@ -144,13 +144,13 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
         }
 
         RequireUnexpired(session);
+        // Re-check live authorization per chunk (revocation mid-upload stops the transfer, CLAUDE-DESIGN §6.1), before any
+        // caller-supplied value is examined (CodeQL cs/user-controlled-bypass, alert 8 on PR #88).
+        await RequireUploadAuthorityAsync(context, session, cancellationToken).ConfigureAwait(false);
         if (chunkIndex < 0 || chunkIndex >= session.ExpectedChunkCount)
         {
             throw new BusinessException("INVALID_REQUEST", 422, "chunk index out of range");
         }
-
-        // Re-check live authorization per chunk (revocation mid-upload stops the transfer, CLAUDE-DESIGN §6.1).
-        await RequireUploadAuthorityAsync(context, session, cancellationToken).ConfigureAwait(false);
 
         var expectedLength = chunkIndex == session.ExpectedChunkCount - 1 ? session.DeclaredSizeBytes - (long)chunkIndex * session.ChunkSizeBytes : session.ChunkSizeBytes;
         if (declaredLength is { } declared && declared != expectedLength)
