@@ -52,7 +52,7 @@ internal static class AttachmentVersionRules
 
             if (!accepted.TryGetValue(itemId, out var current))
             {
-                continue; // not in the accepted head: a new attachment (or one restored after removal)
+                continue; // not in the accepted head: a new attachment (a removed item id can never return, ContentItemIdentityRules I-2)
             }
 
             if (current.Version is not { } was)

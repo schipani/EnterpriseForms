@@ -8,6 +8,7 @@ using EnterpriseForms.Application.Common;
 using EnterpriseForms.Application.Common.Authority;
 using EnterpriseForms.Application.Common.Persistence;
 using EnterpriseForms.Application.Features.FormDefinitions.CreateFormDefinition;
+using EnterpriseForms.Application.Features.Sharing;
 using EnterpriseForms.Application.Features.Sharing.UpdateShare;
 using EnterpriseForms.Contracts.Features;
 using EnterpriseForms.Domain.Features.Audit;
@@ -311,32 +312,41 @@ public sealed class ShareUpdateTests
     }
 
     [Fact]
-    public async Task ADelegatingManagerGetsOneAnswerForEveryFieldOutsideItsOwnShareScope()
+    public async Task ADelegatingManagerGetsOneAnswerForEveryFieldOutsideWhatItCanRead()
     {
-        // C10 review F-6: a field with a value, a field without one and an unknown key outside the parent share's scope are
-        // indistinguishable; nothing reaches the Authority. The parent share's own field is accepted.
+        // C10 review F-6: keys are resolved against the values the caller can read itself (one verified read, whatever keys were asked),
+        // so a field holding values it cannot read, an empty field and an unknown key are indistinguishable; nothing reaches the Authority.
         var parent = Guid.CreateVersion7();
-        var shares = Stub.Create<IShareDetailsAuthority>((method, args) => method.Name == nameof(IShareDetailsAuthority.GetShareEffectiveScopeAsync)
-            ? Task.FromResult(new AuthorityShareEffectiveScope((Guid)args[3]!, Record, "Active", "User", "Manager", null, [FirstItem], [], true, [], 7))
-            : throw new NotSupportedException(method.Name));
         var authority = new FakeAuthority { FullRead = false };
-        var handler = new UpdateShareHandler(new FakeStore().Proxy, authority.Proxy, new AuthorityCommandAwaiter(authority.Proxy, TimeProvider.System), TimeProvider.System, shares);
+        var reads = 0;
+        Task<IReadOnlyCollection<Guid>> Readable(CancellationToken _)
+        {
+            reads++;
+            return Task.FromResult<IReadOnlyCollection<Guid>>([FirstItem]);
+        }
+
+        Task<ShareFieldItems.Resolved> Resolve(string[] keys, Guid? named = null, Func<CancellationToken, Task<IReadOnlyCollection<Guid>>>? readable = null) =>
+            ShareFieldItems.ResolveAsync(new FakeStore().Proxy, authority.Proxy, readable ?? Readable, Context.ToDelegatedUser(), Organization, Record, keys, named ?? parent, Ct);
 
         var answers = new List<(string Code, int Status, string Message)>();
         foreach (var keys in new[] { new[] { "second" }, ["empty"], ["unknown"], ["first", "second"] })
         {
-            var refused = await Assert.ThrowsAsync<BusinessException>(() => handler.HandleAsync(Context, Record, Share, 1, new UpdateShareRequest("Reader", keys, null, true, parent), Key, Ct));
+            var refused = await Assert.ThrowsAsync<BusinessException>(() => Resolve(keys));
             answers.Add((refused.ErrorCode, refused.HttpStatusCode, refused.Message));
         }
 
+        Assert.Equal(4, reads); // the same single read for every request
         Assert.Single(answers.Distinct());
-        Assert.Equal(("FIELD_NOT_IN_SHAREABLE_SCOPE", 403), (answers[0].Code, answers[0].Status));
-        var withoutParent = await Assert.ThrowsAsync<BusinessException>(() => handler.HandleAsync(Context, Record, Share, 1, new UpdateShareRequest("Reader", ["first"], null, true), Key, Ct));
-        Assert.Equal(answers[0], (withoutParent.ErrorCode, withoutParent.HttpStatusCode, withoutParent.Message));
-        Assert.Empty(authority.Submitted);
+        Assert.Equal((ShareFieldItems.FieldOutOfScope, 403), (answers[0].Code, answers[0].Status));
+        var unavailable = await Assert.ThrowsAsync<BusinessException>(() => Resolve(["first"], readable: _ => Task.FromException<IReadOnlyCollection<Guid>>(new BusinessException("NOT_FOUND", 404, "record not found"))));
+        Assert.Equal(answers[0], (unavailable.ErrorCode, unavailable.HttpStatusCode, unavailable.Message));
 
-        await handler.HandleAsync(Context, Record, Share, 1, new UpdateShareRequest("Reader", ["first"], null, true, parent), Key, Ct);
-        Assert.Equal(new[] { FirstItem }, Assert.Single(authority.Submitted).Request.CommandPayload.GetProperty("field_item_ids").EnumerateArray().Select(i => i.GetGuid()));
+        Assert.Equal(new[] { FirstItem }, (await Resolve(["first"])).Items.Select(i => i.ItemId));
+
+        // Without a parent share or a verified reader, a caller without full read is refused the same way (the handler test host has no reader).
+        var withoutReader = await Assert.ThrowsAsync<BusinessException>(() => Handler(authority, new FakeStore()).HandleAsync(Context, Record, Share, 1, new UpdateShareRequest("Reader", ["first"], null, true, parent), Key, Ct));
+        Assert.Equal(answers[0], (withoutReader.ErrorCode, withoutReader.HttpStatusCode, withoutReader.Message));
+        Assert.Empty(authority.Submitted);
     }
 
     // ---- fixtures ----

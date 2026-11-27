@@ -1,9 +1,11 @@
 import { useApi } from "@enterpriseforms/app-runtime";
+import type { TransferOwnershipRequest } from "@enterpriseforms/api-client";
 import { Badge, Button, buttonClass, Card, Checkbox, LoadingBlock, PageHeader, Select, StatusMessage, TextArea, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ErrorPanel } from "../../support";
+import { newTransferIdempotencyKey, submitUntilEffective } from "./ownershipTransferReplay";
 
 /**
  * PG-053 Ownership transfer workflow (C10 M3, WP-0 Section 3.7): the owner (or a Security Administrator's audited override) moves the
@@ -22,11 +24,18 @@ export function OwnershipTransferPage() {
   const [newOwner, setNewOwner] = useState<string | undefined>(undefined);
   const [reason, setReason] = useState("");
   const [stepUp, setStepUp] = useState(false);
+  // C10 review F4: a transfer still pending after the bounded replays keeps its request and idempotency key, so "Check again" replays the
+  // same command (never a second one) and the projection is recorded once it is in effect.
+  const pendingAttempt = useRef<{ key: string; request: TransferOwnershipRequest } | null>(null);
   const transfer = useMutation({
-    // C10 review F4: a pending transfer is replayed under the same idempotency key (bounded) so its audit projection is recorded once it is in effect.
-    mutationFn: () => {
-      const request = { newOwnerUserId: newOwner ?? null, newOwnerTeamId: null, transferReason: reason.trim(), useDevelopmentStepUp: stepUp };
-      return submitUntilEffective((key) => api.shares.transferOwnership(formRecordId, request, key).then((r) => r.result), newTransferIdempotencyKey());
+    mutationFn: async () => {
+      const attempt = pendingAttempt.current ?? {
+        key: newTransferIdempotencyKey(),
+        request: { newOwnerUserId: newOwner ?? null, newOwnerTeamId: null, transferReason: reason.trim(), useDevelopmentStepUp: stepUp },
+      };
+      const result = await submitUntilEffective((key) => api.shares.transferOwnership(formRecordId, attempt.request, key).then((r) => r.result), attempt.key);
+      pendingAttempt.current = result.command.effective ? null : attempt;
+      return result;
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["ownership", "history", formRecordId] });
@@ -84,8 +93,8 @@ export function OwnershipTransferPage() {
               The new owner gets full control of the record. Shares you granted stay in place; you keep only access someone else granted you. The record's form design is not affected.
             </StatusMessage>
             <div>
-              <Button busy={transfer.isPending} disabled={!newOwner || reason.trim().length < 3 || !stepUp || outcome?.effective === true} onClick={() => transfer.mutate()}>
-                Transfer ownership
+              <Button busy={transfer.isPending} disabled={outcome?.effective === true || (outcome === undefined && (!newOwner || reason.trim().length < 3 || !stepUp))} onClick={() => transfer.mutate()}>
+                {outcome && !outcome.effective ? "Check again" : "Transfer ownership"}
               </Button>
             </div>
             {outcome ? (

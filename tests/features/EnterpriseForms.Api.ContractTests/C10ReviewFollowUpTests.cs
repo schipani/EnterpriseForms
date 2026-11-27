@@ -2,6 +2,8 @@ using System.Reflection;
 using EnterpriseForms.Application.Common;
 using EnterpriseForms.Application.Common.Authority;
 using EnterpriseForms.Application.Common.Persistence;
+using EnterpriseForms.Application.Features.Documents.Documents;
+using EnterpriseForms.Domain.Features.Documents;
 using EnterpriseForms.Application.Features.FormRecords.TransferOwnership;
 using EnterpriseForms.Application.Features.Sharing.ListShares;
 using EnterpriseForms.Application.Features.Sharing.MyAccess;
@@ -84,6 +86,40 @@ public sealed class C10ReviewFollowUpTests
         Assert.Equal(AuditActions.MemberOwnedRecordsViewed, entry.EventAction);
         Assert.Contains(member.ToString(), entry.EventMetadataJson, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("\"returnedCount\":2", entry.EventMetadataJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheAcceptedCopyOfAVersionNumberIsTheOneTheAuthorityCommittedNotTheNewestStagedCopy()
+    {
+        // C10 owner decision 2 (re-review defect 1): version 1 is accepted at revision 5 (operation A). An edit that carried it was aborted
+        // at revision 6 (operation B) because the owner's replacement (operation C, version 2) committed revision 6 first. The newest copy
+        // of version 1 is B's, untied, and must not be chosen; a tie at one revision is settled the same way.
+        Guid a = Guid.CreateVersion7(), b = Guid.CreateVersion7(), c = Guid.CreateVersion7(), d = Guid.CreateVersion7();
+        var committed = new Dictionary<long, Guid> { [5] = a, [6] = c, [7] = d };
+        var asked = new List<long>();
+        var authority = Create<IAuthorizationAuthorityClient>((method, args) =>
+        {
+            if (method.Name != nameof(IAuthorizationAuthorityClient.GetContentHistoryAsync))
+            {
+                throw new NotSupportedException(method.Name);
+            }
+
+            var revision = (long)args[3]! + 1;
+            asked.Add(revision);
+            return Task.FromResult(new ContentHistoryPage(Organization, Record, 7,
+                committed.TryGetValue(revision, out var op) ? [new ContentHistoryEntry(revision, op, DateTimeOffset.UtcNow, "User", null, null, 3, 1, true, revision == 7)] : [], null, 9, Guid.CreateVersion7()));
+        });
+        FileAttachmentVersion Copy(Guid operation, long revision, int number = 1) =>
+            new() { FileAttachmentVersionId = Guid.CreateVersion7(), FormRecordId = Record, VersionNumber = number, ContentChangeOperationId = operation, ContentRevision = revision };
+
+        var accepted = Copy(a, 5);
+        var chosen = await DocumentHandlers.AcceptedCopyAsync(authority, Context, Record, [accepted, Copy(b, 6), Copy(Guid.Empty, 0)], [], Ct);
+        Assert.Same(accepted, chosen);
+        Assert.Equal(new long[] { 6, 5 }, asked);
+
+        var tiedAccepted = Copy(d, 7);
+        Assert.Same(tiedAccepted, await DocumentHandlers.AcceptedCopyAsync(authority, Context, Record, [Copy(Guid.CreateVersion7(), 7), tiedAccepted], [], Ct));
+        Assert.Null(await DocumentHandlers.AcceptedCopyAsync(authority, Context, Record, [Copy(b, 6)], [], Ct)); // never accepted: no copy
     }
 
     private static IBusinessStore ShareStore() => Create<IBusinessStore>((method, _) => method.Name == nameof(IBusinessStore.BeginScopeAsync)

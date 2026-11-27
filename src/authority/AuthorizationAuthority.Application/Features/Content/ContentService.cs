@@ -684,7 +684,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         {
             boundaryExtension = (replacingShare.RecordShareId, replacingBinding.ShareDocumentBindingId, replacingShare.ShareRevision, replacingShare.ShareRevision + 1, replacingBinding.SharedThroughVersionNumber);
             replacingBinding.SharedThroughVersionNumber = replacementVersion;
-            replacingShare.ShareRevision++;
+            replacingShare.ShareRevision = checked(replacingShare.ShareRevision + 1);
             replacingShare.ShareMetadataModifiedOn = now;
         }
 

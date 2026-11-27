@@ -253,6 +253,29 @@ public sealed class RecordSecurityHistoryTests
     }
 
     [Fact]
+    public async Task AnOwnerChangeOlderThanTheCommandLimitStaysInTheOwnershipView()
+    {
+        // C10 review N-2: the ownership view reads the commands of the record's owner edges, so newer commands never push an owner change out.
+        var transfer = await SubmitAsync(owner, SecurityCommandKind.TransferOwnership, new TransferOwnershipPayload(record, newOwner, null, HumanCommandStepUpGate.SyntheticStepUpEvidence));
+        MakeEffective(transfer);
+        var binding = store.Bindings.First(b => b.AuthorityUserId == owner).IdentityBindingId;
+        for (var i = 0; i < RecordSecurityHistoryLimits.MaximumCommands + 1; i++)
+        {
+            clock.Advance(TimeSpan.FromSeconds(1));
+            store.Commands.Add(new SecurityCommand
+            {
+                SecurityCommandId = Guid.NewGuid(), OrganizationId = org, TargetFormRecordId = record, CommandKindName = "UpdateShareScope", ActorIdentityBindingId = binding,
+                CommandStateName = SecurityCommandStates.Effective, CommandCreatedOn = clock.GetUtcNow(), CommandEffectiveOn = clock.GetUtcNow(),
+            });
+        }
+
+        var history = await new RecordSecurityHistoryService(store, clock).GetAsync(new VerifiedActor("https://idp", newOwner.ToString("N"), "test"), org, record, ownershipView: true, Ct);
+
+        Assert.False(history.Truncated);
+        Assert.Equal(transfer, Assert.Single(history.Items).SecurityCommandId);
+    }
+
+    [Fact]
     public async Task TheHistoryIsRefusedWhileTheOrganizationIsQuarantined()
     {
         store.Organizations.Single().IntegrityQuarantineEnabled = true;

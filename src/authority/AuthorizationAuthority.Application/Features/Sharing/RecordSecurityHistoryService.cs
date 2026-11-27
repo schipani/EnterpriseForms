@@ -80,10 +80,12 @@ public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProv
         // filter before they truncate, so newer share commands never push an owner change out of the ownership view.
         var commands = new Dictionary<Guid, SecurityCommand>();
         var readLimitReached = false;
+        SecurityCommand? oldestTargeted = null;
         if (!ownershipView)
         {
             var targeted = await scope.GetRecordTargetedCommandsAsync(organizationId, formRecordId, RecordSecurityHistoryLimits.MaximumCommands + 1, cancellationToken).ConfigureAwait(false);
             readLimitReached = targeted.Count > RecordSecurityHistoryLimits.MaximumCommands;
+            oldestTargeted = targeted.Where(c => c.OrganizationId == organizationId).OrderBy(c => c.CommandCreatedOn).ThenBy(c => c.SecurityCommandId).FirstOrDefault();
             foreach (var command in targeted.Where(c => c.OrganizationId == organizationId))
             {
                 commands[command.SecurityCommandId] = command;
@@ -106,6 +108,14 @@ public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProv
         var visible = new List<(SecurityCommand Command, List<RecordSecurityChange> Changes)>();
         foreach (var command in commands.Values.OrderByDescending(c => c.CommandCreatedOn).ThenByDescending(c => c.SecurityCommandId))
         {
+            // When the targeted read was capped, a command older than the oldest one read may have newer unread peers: stop there, so the
+            // page stays a newest-first prefix (re-review of N-2).
+            if (readLimitReached && oldestTargeted is not null &&
+                (command.CommandCreatedOn < oldestTargeted.CommandCreatedOn || (command.CommandCreatedOn == oldestTargeted.CommandCreatedOn && command.SecurityCommandId.CompareTo(oldestTargeted.SecurityCommandId) < 0)))
+            {
+                break;
+            }
+
             var changes = ChangesOf(command, edges, shares, formRecordId, metadata)
                 .Where(c => ownershipView ? IsOwnerChange(c) : isOwner || !IsOwnerChange(c)).ToList();
             if (changes.Count == 0 && (ownershipView || !isOwner))

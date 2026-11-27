@@ -232,7 +232,8 @@ public sealed class DocumentProcessingService(IBusinessStore store, IFileStorage
         }
 
         // C10 owner decision 2: a version number can now be processed by more than one upload, so the object key also names the upload
-        // session (stable across retries of this session's processing). Existing objects keep their keys; the row records the key.
+        // session, so uploads never share an object (a retry of the same session meets its own create-only key, as before). Existing
+        // objects keep their keys; the row records the key.
         var objectKey = $"documents/{session.TenantId:N}/{session.FormRecordId:N}/{attachmentId:N}/v{versionNumber}-{session.UploadSessionId:N}";
         var context = new FileEncryptionContext(session.TenantId, session.FormRecordId, attachmentId, versionNumber);
         EncryptionOutcome outcome;

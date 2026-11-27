@@ -45,9 +45,9 @@ public sealed class ListSharesHandler(IBusinessStore store, IAuthorizationAuthor
                     lifecycle[share.RecordShareId] = details.LifecycleState;
                 }
             }
-            catch (AuthorityClientException ex) when (ex.HttpStatusCode == 404)
+            catch (AuthorityClientException)
             {
-                // not visible to this caller at the Authority: the local status stands
+                // not visible to this caller at the Authority, or the Authority is unavailable: display only, so the local status stands
             }
         }
 
