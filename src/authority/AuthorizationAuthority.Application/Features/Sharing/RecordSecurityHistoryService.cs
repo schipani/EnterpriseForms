@@ -14,21 +14,32 @@ namespace AuthorizationAuthority.Application.Features.Sharing;
 /// record's owners or shares — and what each changed — are derived without trusting the business database or scanning the journal.
 /// Each item carries its command's actual state (A11). C10 D6: commands are also found through their indexed target record, so every
 /// committed expiry-only update is listed with the expiry it committed, including ones a later update superseded; an item is
-/// journal-backed only when its authorization-journal entry exists. Readers: the record's current owner (or an owning-team member) and a holder of
-/// an Active Manager share on the record with Active lineage (ManageAccess); everyone else gets the answer for an unknown record.
-/// The read uses committed desired state, which is never behind the projection, so a revoked manager is refused at once.
+/// journal-backed only when its authorization-journal entry exists. Readers (WP-0 Section 3.5, independent review F-4/F3): for share history, the
+/// record's current owner (or an owning-team member) and a holder of an Active Manager share on the record with Active lineage (ManageAccess),
+/// a non-owner seeing no owner changes; for ownership history, the current owner and a Security Auditor of the organization, seeing owner
+/// changes only. Everyone else gets the answer for an unknown record. The read uses committed desired state, which is never behind the
+/// projection, so a revoked manager is refused at once; pending commands are listed with their own state (Section 3.5), so only an
+/// integrity quarantine refuses the read (review F-5).
 /// </summary>
 public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProvider clock)
 {
     private static readonly HashSet<string> Roles = ["reader", "contributor", "manager"];
 
-    public async Task<RecordSecurityHistory> GetAsync(VerifiedActor actor, Guid organizationId, Guid formRecordId, CancellationToken cancellationToken)
+    public Task<RecordSecurityHistory> GetAsync(VerifiedActor actor, Guid organizationId, Guid formRecordId, CancellationToken cancellationToken) =>
+        GetAsync(actor, organizationId, formRecordId, ownershipView: false, cancellationToken);
+
+    public async Task<RecordSecurityHistory> GetAsync(VerifiedActor actor, Guid organizationId, Guid formRecordId, bool ownershipView, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(actor);
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var bound = await ActorResolver.BindAsync(scope, organizationId, actor, cancellationToken).ConfigureAwait(false);
         var state = await scope.ReadOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        if (state.IntegrityQuarantineEnabled)
+        {
+            throw AuthorityException.Quarantined("organization quarantined");
+        }
+
         var record = await scope.FindResourceAsync(organizationId, ResourceTypeNames.FormRecord, formRecordId, cancellationToken).ConfigureAwait(false);
         if (record is not { ResourceLifecycleState: ResourceLifecycleStates.Active } || record.OrganizationId != organizationId)
         {
@@ -36,7 +47,11 @@ public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProv
         }
 
         var graph = new DesiredStateGraph(await scope.GetActiveEdgesAsync(organizationId, cancellationToken).ConfigureAwait(false));
-        if (!graph.IsRecordOwner(bound.AuthorityUserId, formRecordId) && !await ManagesAccessAsync(scope, graph, organizationId, formRecordId, bound.AuthorityUserId, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false))
+        var isOwner = graph.IsRecordOwner(bound.AuthorityUserId, formRecordId);
+        var permitted = isOwner || (ownershipView
+            ? graph.HasOrganizationRole(organizationId, bound.AuthorityUserId, OrganizationRoleNames.SecurityAuditor)
+            : await ManagesAccessAsync(scope, graph, organizationId, formRecordId, bound.AuthorityUserId, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false));
+        if (!permitted)
         {
             throw Unavailable();
         }
@@ -84,12 +99,21 @@ public sealed class RecordSecurityHistoryService(IAuthorityStore store, TimeProv
                 users[command.ActorIdentityBindingId] = user = binding is { } b && b.OrganizationId == organizationId ? b.AuthorityUserId : null;
             }
 
+            var changes = ChangesOf(command, edges, shares, formRecordId, metadata)
+                .Where(c => ownershipView ? IsOwnerChange(c) : isOwner || !IsOwnerChange(c)).ToList();
+            if (changes.Count == 0 && (ownershipView || !isOwner))
+            {
+                continue; // nothing this reader may see
+            }
+
             items.Add(new RecordSecurityHistoryItem(command.SecurityCommandId, command.CommandKindName, command.CommandStateName, command.CommandCreatedOn, command.CommandEffectiveOn,
-                command.CommittedAuthorizationRevision, user, ChangesOf(command, edges, shares, formRecordId, metadata), journalled.Contains(command.SecurityCommandId)));
+                command.CommittedAuthorizationRevision, user, changes, journalled.Contains(command.SecurityCommandId)));
         }
 
         return new RecordSecurityHistory(formRecordId, items, truncated, state.AuthorizationRevision);
     }
+
+    private static bool IsOwnerChange(RecordSecurityChange change) => change.ChangeKind is "OwnerAdded" or "OwnerRemoved";
 
     /// <summary>What one command changed, from the edges it created and removed. Deterministic order: owner changes, then shares by id.</summary>
     internal static IReadOnlyList<RecordSecurityChange> ChangesOf(SecurityCommand command, IReadOnlyList<AuthorityRelationshipEdge> edges,

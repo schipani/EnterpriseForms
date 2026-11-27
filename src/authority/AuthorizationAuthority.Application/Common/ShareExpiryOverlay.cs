@@ -76,18 +76,28 @@ internal sealed class ShareExpiryOverlay
             return new ShareExpiryOverlay([], [], instant);
         }
 
-        // Expired: the share's own expiry has passed, or it descends (depth <= 3) from such a share.
-        var expired = withExpiry.Where(m => m.ShareExpiresOn <= instant).Select(m => m.RecordShareId).ToHashSet();
-        var frontier = expired.ToList();
+        // Effective expiry: the lineage minimum — the share's own expiry or any ancestor's (depth <= 3). It is propagated from every share
+        // with an expiry to its descendants, so a descendant without its own expiry (or with a later one) is bounded by its ancestor:
+        // expired once that has passed (D10-1), and the D10-10 snapshot bound below uses it (independent review F-1).
+        var effective = withExpiry.Where(m => m.ShareExpiresOn is not null).ToDictionary(m => m.RecordShareId, m => m.ShareExpiresOn!.Value);
+        var frontier = effective.Keys.ToList();
         for (var level = 0; level < 3 && frontier.Count > 0; level++)
         {
             var next = new List<Guid>();
             foreach (var parent in frontier)
             {
+                var bound = effective[parent];
                 foreach (var child in await scope.FindShareMetadataByParentAsync(organizationId, parent, cancellationToken).ConfigureAwait(false))
                 {
-                    if (child.OrganizationId == organizationId && expired.Add(child.RecordShareId))
+                    if (child.OrganizationId != organizationId)
                     {
+                        continue;
+                    }
+
+                    var childBound = child.ShareExpiresOn is { } own && own < bound ? own : bound;
+                    if (!effective.TryGetValue(child.RecordShareId, out var known) || childBound < known)
+                    {
+                        effective[child.RecordShareId] = childBound;
                         next.Add(child.RecordShareId);
                     }
                 }
@@ -96,8 +106,8 @@ internal sealed class ShareExpiryOverlay
             frontier = next;
         }
 
-        var ownExpiry = withExpiry.ToDictionary(m => m.RecordShareId, m => m.ShareExpiresOn);
-        var resources = (await scope.GetResourcesAsync(organizationId, ResourceTypeNames.RecordShare, [.. ownExpiry.Keys.Union(expired)], cancellationToken).ConfigureAwait(false))
+        var expired = effective.Where(e => e.Value <= instant).Select(e => e.Key).ToHashSet();
+        var resources = (await scope.GetResourcesAsync(organizationId, ResourceTypeNames.RecordShare, [.. effective.Keys], cancellationToken).ConfigureAwait(false))
             .Where(r => r.ResourceLifecycleState == ResourceLifecycleStates.Active && r.ParentResourceEntityId is not null)
             .ToDictionary(r => r.ResourceEntityId);
 
@@ -111,7 +121,7 @@ internal sealed class ShareExpiryOverlay
         }
 
         var facts = resources.Values.ToDictionary(r => r.ResourceEntityId,
-            r => new ShareFacts(r.ResourceEntityId, r.ParentResourceEntityId!.Value, expired.Contains(r.ResourceEntityId), ownExpiry.GetValueOrDefault(r.ResourceEntityId)));
+            r => new ShareFacts(r.ResourceEntityId, r.ParentResourceEntityId!.Value, expired.Contains(r.ResourceEntityId), effective.TryGetValue(r.ResourceEntityId, out var at) ? at : null));
         var edges = await scope.GetActiveShareEdgesAsync(organizationId, [.. facts.Keys], cancellationToken).ConfigureAwait(false);
         foreach (var edge in edges.Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null))
         {
@@ -167,8 +177,8 @@ internal sealed class ShareExpiryOverlay
     }
 
     /// <summary>
-    /// D10-10: the earliest future expiry among the live shares the user holds (directly or through a team), or null. A set the
-    /// decision enumerated through those shares is valid only before it.
+    /// D10-10: the earliest future effective expiry (the lineage minimum) among the live shares the user holds (directly or through a
+    /// team), or null. A set the decision enumerated through those shares is valid only before it.
     /// </summary>
     public DateTimeOffset? NextExpiryFor(Guid userId) =>
         shares.Values.Where(s => !s.Expired && s.ExpiresOn > Instant && s.Holders.Any(h => Holds(h, ResourceTypeNames.User, userId, string.Empty)))

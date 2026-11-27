@@ -61,6 +61,13 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
             throw new BusinessException("FORBIDDEN", 403, "uploading documents requires edit permission on the record");
         }
 
+        // C10 (independent review F-7): a share replacement is validated under the replaced attachment's own field and its upload policy;
+        // any other declared field gets the same answer as an attachment outside the record (no policy of another field is evaluated).
+        if (shareReplacement && verified.AuthorizedAttachments.FirstOrDefault(a => a.FileAttachmentId == request.ReplacesFileAttachmentId)?.FieldDefinitionId != request.FieldDefinitionId)
+        {
+            throw new BusinessException("NOT_FOUND", 404, "attachment to replace is not part of the accepted record content");
+        }
+
         var element = verified.Layout.Elements.FirstOrDefault(e => e.Kind == LayoutElementKinds.DocumentCollection && e.FieldDefinitionId == request.FieldDefinitionId)
                       ?? throw new BusinessException("INVALID_REQUEST", 422, "field is not a document collection of this form version");
         var policy = element.Upload!;

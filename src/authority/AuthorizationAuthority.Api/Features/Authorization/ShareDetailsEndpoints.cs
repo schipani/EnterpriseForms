@@ -43,15 +43,15 @@ public static class ShareDetailsEndpoints
                 return TypedResults.Ok(await service.GetAsync(actor, organizationId, memberUserId, cancellationToken).ConfigureAwait(false));
             })
             .WithName("GetMemberOwnedRecords")
-            .WithSummary("Active records a member directly owns (ids only) for administrator reassignment; Security Administrators and organization owners only.");
+            .WithSummary("Active records a member directly owns (ids only) for administrator reassignment; Security Administrators only.");
 
-        group.MapGet("/{organizationId:guid}/{formRecordId:guid}/security-history", static async Task<Ok<RecordSecurityHistory>> (Guid organizationId, Guid formRecordId, HttpContext context, RecordSecurityHistoryService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
+        group.MapGet("/{organizationId:guid}/{formRecordId:guid}/security-history", static async Task<Ok<RecordSecurityHistory>> (Guid organizationId, Guid formRecordId, string? view, HttpContext context, RecordSecurityHistoryService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
             {
                 var actor = InternalAuthentication.RequireActor(context, validator);
-                return TypedResults.Ok(await service.GetAsync(actor, organizationId, formRecordId, cancellationToken).ConfigureAwait(false));
+                return TypedResults.Ok(await service.GetAsync(actor, organizationId, formRecordId, string.Equals(view, "ownership", StringComparison.Ordinal), cancellationToken).ConfigureAwait(false));
             })
             .WithName("GetRecordSecurityHistory")
-            .WithSummary("Record-scoped sharing and ownership history from committed Authority edges, each command with its own state (owner or ManageAccess; others 404).");
+            .WithSummary("Record-scoped history from committed Authority edges, each command with its own state: sharing (owner or ManageAccess; a non-owner sees no owner changes) or, with view=ownership, ownership changes (owner or Security Auditor); others 404; refused while the organization is quarantined.");
 
         return endpoints;
     }

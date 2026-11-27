@@ -321,4 +321,26 @@ public sealed class ShareAccessExpiryTests
         Assert.Contains(descendant, expired); // the lineage minimum: a descendant confers nothing once its ancestor expired
         Assert.DoesNotContain(live, expired);
     }
+
+    [Fact]
+    public async Task TheNextExpiryIsTheLineageMinimumSoADelegatedShareIsBoundedByItsAncestor()
+    {
+        // C10 independent review F-1 (D10-10): a delegated share without its own expiry, or with a later one, ends when its ancestor does.
+        var w = new World();
+        var manager = Guid.CreateVersion7();
+        var parent = w.Share("manager", Now.AddHours(1), recipient: manager);
+        var noOwnExpiry = w.Share("reader", null, parent: parent);
+        var laterOwnExpiry = w.Share("reader", Now.AddHours(5), parent: parent);
+        await using var scope = await w.Store.BeginScopeAsync(TestContext.Current.CancellationToken);
+
+        var before = await ShareExpiryOverlay.LoadAsync(scope, w.Org, Now, TestContext.Current.CancellationToken);
+        Assert.Equal(Now.AddHours(1), before.NextExpiryFor(w.User));
+        Assert.False(before.UserHoldsExpiredShare(w.User));
+
+        var after = await ShareExpiryOverlay.LoadAsync(scope, w.Org, Now.AddHours(2), TestContext.Current.CancellationToken);
+        Assert.True(after.UserHoldsExpiredShare(w.User));
+        Assert.Contains(noOwnExpiry, after.ExpiredShareIds);
+        Assert.Contains(laterOwnExpiry, after.ExpiredShareIds);
+        Assert.Null(after.NextExpiryFor(w.User));
+    }
 }

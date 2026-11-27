@@ -7,9 +7,11 @@ namespace AuthorizationAuthority.Application.Features.Content;
 
 /// <summary>
 /// C10 WP8-B (WP-0 Sections 3.6 and 3.6.1, owner decision 2026-11-27): a share editor's replacement of exactly one attachment with its
-/// next version, under the existing content acceptance rule version. Every check is either derived at Prepare and re-derived at Commit
-/// from the verified staged bytes and the accepted leaves, or is the owner path's own (identity binding, registered schema, envelope
-/// and data-key rules, which Commit already re-derives) — so no check is Prepare-only and the CARV fence is unchanged
+/// next accepted version (a number above the accepted one), under the existing content acceptance rule version. The version, record,
+/// organization and scan are re-derived here at Commit from the verified staged bytes and the accepted leaves; the field and the other
+/// identity columns are re-derived at Commit by the item identity binding (<c>ContentItemIdentityRules.BindAtCommitAsync</c>), and the
+/// staged bytes are digest-bound to the candidate recorded at Prepare; the schema, envelope and data-key rules are the owner path's own,
+/// which Commit already re-derives — so no check is Prepare-only and the CARV fence is unchanged
 /// (docs/security/E3_M2B_IMPLEMENTATION_CONTRACT.md §3, §19). A build without WP8-B refuses such an operation at Commit
 /// (<c>AuthorizeMutations</c> rejects non-owner attachment mutations), so a rolling deployment fails closed.
 /// </summary>
@@ -31,7 +33,7 @@ internal static class ShareDocumentReplacement
         var document = staged.Single(s => s.Kind == ManifestItemKind.Attachment && s.ItemId == item).Document;
         var current = currentLeaves.SingleOrDefault(l => l.KindCode == (byte)ManifestItemKind.Attachment && l.ItemId == item).Version;
         var candidate = candidateLeaves.SingleOrDefault(l => l.KindCode == (byte)ManifestItemKind.Attachment && l.ItemId == item).Version;
-        RequireReplacement(document, null, item, current, organizationId, formRecordId);
+        RequireReplacement(document, item, current, organizationId, formRecordId);
         if (candidate != document.Column(VersionColumn)?.AsInt32())
         {
             throw Refused("the recorded candidate version differs from the staged row");
@@ -40,23 +42,22 @@ internal static class ShareDocumentReplacement
         return candidate!.Value;
     }
 
-    private static void RequireReplacement(RowCanonicalDocument candidate, RowCanonicalDocument? current, Guid item, int? currentVersion, Guid organizationId, Guid formRecordId)
+    private static void RequireReplacement(RowCanonicalDocument candidate, Guid item, int? currentVersion, Guid organizationId, Guid formRecordId)
     {
         if (currentVersion is not { } trusted)
         {
             throw Refused("the attachment has no verified version evidence yet");
         }
 
-        if (candidate.Column(VersionColumn)?.AsInt32() != trusted + 1)
+        if (candidate.Column(VersionColumn)?.AsInt32() is not { } next || next <= trusted)
         {
-            throw Refused("a replacement must be exactly the next version");
+            throw Refused("a replacement must carry a version above the accepted one");
         }
 
         if (candidate.Column("file_attachment_id")?.AsUuid() != item || candidate.Column("form_record_id")?.AsUuid() != formRecordId ||
-            candidate.Column("tenant_id")?.AsUuid() != organizationId ||
-            (current is not null && candidate.Column("field_definition_id")?.AsUuid() != current.Column("field_definition_id")?.AsUuid()))
+            candidate.Column("tenant_id")?.AsUuid() != organizationId)
         {
-            throw Refused("a replacement keeps the attachment, record, organization and field");
+            throw Refused("a replacement keeps the attachment, record and organization");
         }
 
         if (candidate.Column("scan_verdict")?.AsText() != "Clean")

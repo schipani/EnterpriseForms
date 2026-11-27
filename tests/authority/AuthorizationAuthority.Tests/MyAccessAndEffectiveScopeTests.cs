@@ -133,15 +133,20 @@ public sealed class MyAccessAndEffectiveScopeTests
     }
 
     [Fact]
-    public async Task OnlyAdministratorsListAMembersDirectlyOwnedActiveRecords()
+    public async Task OnlySecurityAdministratorsListAMembersDirectlyOwnedActiveRecords()
     {
         var mine = Record(ownedBy: user);
         var archived = Record(ownedBy: user);
         store.Resources.Single(r => r.ResourceEntityId == archived).ResourceLifecycleState = "Archived";
         Record(ownedByTeam: team); // team-owned records are not the member's to reassign
-        Edge(ResourceTypeNames.Organization, org, OrganizationRoleNames.OrganizationOwner, ResourceTypeNames.User, owner);
         var service = new OwnedRecordsService(store);
 
+        // C10 independent review F-3: the Organization Owner role confers no record discovery; only the transfer override's role does.
+        Edge(ResourceTypeNames.Organization, org, OrganizationRoleNames.OrganizationOwner, ResourceTypeNames.User, owner);
+        Assert.Equal(AuthorityErrorCodes.ResourceNotRegistered, (await Assert.ThrowsAsync<AuthorityException>(() =>
+            service.GetAsync(new VerifiedActor("https://idp", owner.ToString("N"), "test"), org, user, Ct))).ErrorCode);
+
+        Edge(ResourceTypeNames.Organization, org, OrganizationRoleNames.SystemAdministrator, ResourceTypeNames.User, owner);
         var owned = await service.GetAsync(new VerifiedActor("https://idp", owner.ToString("N"), "test"), org, user, Ct);
 
         Assert.Equal([mine], owned.FormRecordIds);

@@ -8,8 +8,9 @@ namespace EnterpriseForms.Application.Features.Sharing.ShareHistory;
 /// <summary>
 /// C10 M2 (WP-0 Section 3.5, D10-11): the record's sharing history (<c>shares/history</c>) and ownership history
 /// (<c>ownership-history</c>), both from the Authority's committed state; each change keeps its command's own state, so a pending
-/// change is never shown as completed. The Authority decides who may read it (owner or ManageAccess); everyone else gets the same
-/// concealing 404 as the share list. Local rows contribute display names only.
+/// change is never shown as completed. The Authority decides who may read it (sharing: owner or ManageAccess, a non-owner seeing no owner
+/// changes; ownership: owner or Security Auditor); everyone else gets the same concealing 404 as the share list. Local rows contribute
+/// display names only.
 /// </summary>
 public sealed class RecordSecurityHistoryHandler(IBusinessStore store, IShareDetailsAuthority authority)
 {
@@ -19,7 +20,7 @@ public sealed class RecordSecurityHistoryHandler(IBusinessStore store, IShareDet
         AuthorityRecordSecurityHistory history;
         try
         {
-            history = await authority.GetRecordSecurityHistoryAsync(context.ToDelegatedUser(), context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
+            history = await authority.GetRecordSecurityHistoryAsync(context.ToDelegatedUser(), context.OrganizationId, formRecordId, ownershipOnly, cancellationToken).ConfigureAwait(false);
         }
         catch (AuthorityClientException ex) when (ex.HttpStatusCode == 404)
         {

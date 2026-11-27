@@ -337,4 +337,27 @@ public sealed class ShareExpiryConvergenceTests
 
         Assert.Throws<InvalidOperationException>(() => ExpireSharePlanGuard.Require(injected, share.ResourceEntityId, record));
     }
+
+    [Fact]
+    public async Task AShareWhoseConvergenceFailsNeverStopsThePassAndAlertsAfterTwoPasses()
+    {
+        // C10 independent review F5: one share that cannot converge (here an inconsistent lineage below it) is counted as unconverged;
+        // the other expired shares still converge in the same pass.
+        var (share, _) = await ExpiringShareAsync();
+        var (broken, _) = await ExpiringShareAsync(key: "update-expiry-4");
+        var child = AddShare(broken);
+        Metadata(child).DelegationDepth = 3; // not parent depth + 1: the descendant walk refuses it
+        clock.Now = expiry.AddMinutes(1);
+        var alerts = new Alerts();
+        var loop = new ShareExpiryLoop(store, Convergence, alerts, clock, NullLogger<ShareExpiryLoop>.Instance);
+
+        await loop.RunPassAsync(Ct);
+        Assert.Equal(ResourceLifecycleStates.Expired, Resource(share).ResourceLifecycleState);
+        Assert.Equal(ResourceLifecycleStates.Active, Resource(broken).ResourceLifecycleState);
+        Project();
+        await loop.RunPassAsync(Ct);
+        await loop.RunPassAsync(Ct);
+        Assert.Contains(alerts.Raised, a => a.AlertKind == ShareExpiryLoop.StuckAlertKind);
+        Assert.False(loop.Stopped);
+    }
 }

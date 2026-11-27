@@ -70,6 +70,24 @@ public sealed class RecordSecurityHistoryHandlerTests
         Assert.Equal(404, (await Assert.ThrowsAsync<BusinessException>(() => handler.HandleAsync(Context, Record, ownershipOnly: false, Ct))).HttpStatusCode);
     }
 
+    [Fact]
+    public async Task EachHistoryAsksTheAuthorityForItsOwnView()
+    {
+        // C10 independent review F-4: the Authority decides the readers per view (sharing: owner or ManageAccess; ownership: owner or Security Auditor).
+        var views = new List<bool>();
+        var authority = Create<IShareDetailsAuthority>((method, args) =>
+        {
+            views.Add((bool)args![3]!);
+            return Task.FromResult(History());
+        });
+        var handler = new RecordSecurityHistoryHandler(new FakeStore().Proxy, authority);
+
+        await handler.HandleAsync(Context, Record, ownershipOnly: false, Ct);
+        await handler.HandleAsync(Context, Record, ownershipOnly: true, Ct);
+
+        Assert.Equal([false, true], views);
+    }
+
     private static IShareDetailsAuthority Authority(AuthorityRecordSecurityHistory? answer = null, AuthorityClientException? refusal = null) =>
         Create<IShareDetailsAuthority>((method, _) => method.Name == nameof(IShareDetailsAuthority.GetRecordSecurityHistoryAsync)
             ? refusal is null ? Task.FromResult(answer!) : Task.FromException<AuthorityRecordSecurityHistory>(refusal)

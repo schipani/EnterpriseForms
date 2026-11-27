@@ -69,8 +69,22 @@ public sealed partial class ShareExpiryLoop(IAuthorityStore store, ShareExpiryCo
             foreach (var (share, revision) in candidates)
             {
                 seen.Add(share);
-                var outcome = await convergence.ConvergeAsync(organization, share, revision, cancellationToken).ConfigureAwait(false);
-                switch (outcome.Result)
+                ShareExpiryConvergenceService.Result result;
+                string reason;
+                try
+                {
+                    var outcome = await convergence.ConvergeAsync(organization, share, revision, cancellationToken).ConfigureAwait(false);
+                    (result, reason) = (outcome.Result, outcome.ReasonCode);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // C10 (independent review F5): one share that cannot converge never stops the pass for the others; it counts as
+                    // unconverged, so it is retried next pass and alerts after two. Access to it stays denied at access time.
+                    LogShareFailed(logger, share, ex.GetType().Name);
+                    (result, reason) = (ShareExpiryConvergenceService.Result.Ineligible, "CONVERGENCE_FAILED:" + ex.GetType().Name);
+                }
+
+                switch (result)
                 {
                     case ShareExpiryConvergenceService.Result.Converged:
                     case ShareExpiryConvergenceService.Result.Replayed:
@@ -86,7 +100,7 @@ public sealed partial class ShareExpiryLoop(IAuthorityStore store, ShareExpiryCo
                         var passes = passesUnconverged[share] = passesUnconverged.GetValueOrDefault(share) + 1;
                         if (passes == 3)
                         {
-                            alerts.Raise(new SecurityAlert(StuckAlertKind, "Medium", organization, Guid.CreateVersion7(), null, "an expired share has not converged for more than two passes (" + outcome.ReasonCode + "); access to it is still denied", Guid.CreateVersion7()));
+                            alerts.Raise(new SecurityAlert(StuckAlertKind, "Medium", organization, Guid.CreateVersion7(), null, "an expired share has not converged for more than two passes (" + reason + "); access to it is still denied", Guid.CreateVersion7()));
                         }
 
                         break;
@@ -104,6 +118,9 @@ public sealed partial class ShareExpiryLoop(IAuthorityStore store, ShareExpiryCo
 
     [LoggerMessage(EventId = 9310, Level = LogLevel.Warning, Message = "Share expiry convergence pass failed ({Failure}); access-time enforcement is unaffected; retrying")]
     private static partial void LogPassFailed(ILogger logger, string failure);
+
+    [LoggerMessage(EventId = 9312, Level = LogLevel.Warning, Message = "Share expiry convergence of share {RecordShareId} failed ({Failure}); access-time enforcement is unaffected; the other shares continue")]
+    private static partial void LogShareFailed(ILogger logger, Guid recordShareId, string failure);
 
     [LoggerMessage(EventId = 9311, Level = LogLevel.Critical, Message = "Share expiry convergence stopped: the clock is earlier than the latest journal entry of organization {OrganizationId}")]
     private static partial void LogClockUnsafe(ILogger logger, Guid organizationId);

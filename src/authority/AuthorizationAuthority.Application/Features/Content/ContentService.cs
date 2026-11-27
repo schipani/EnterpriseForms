@@ -195,6 +195,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             // Desired-state edges read under the organization lock (A6): the same lock every security command takes.
             var graph = new DesiredStateGraph(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false));
             Dictionary<Guid, List<Domain.Features.Sharing.ShareDocumentBinding>> replaceable = new Dictionary<Guid, List<Domain.Features.Sharing.ShareDocumentBinding>>();
+            IReadOnlySet<Guid> notLive = new HashSet<Guid>();
+            var decisionInstant = clock.GetUtcNow();
             if (graph.IsRecordOwner(bound.AuthorityUserId, request.FormRecordId))
             {
                 mutations = ClassifyMutations(parsed, currentLeaves);
@@ -203,12 +205,18 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             {
                 // Phase C5 share editor: switch, scope, current-snapshot proof (D4) and column-class classification (D14/D15).
                 // C10 WP8-B: or the replacement of exactly one attachment through an owner-granted share (re-derived at Commit).
-                replaceable = await ShareDocumentReadability.ReplaceableAsync(scope, state.OrganizationId, request.FormRecordId, bound.AuthorityUserId, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false);
-                RequireShareEditor(graph, bound, request.FormRecordId, replaceable.Count > 0);
-                mutations = ClassifyShareScoped(request, parsed, current, head, state.OrganizationId, graph, bound, operationId, candidateRevision, replaceable.Keys.ToHashSet());
+                // C10 (review F1): an expired share, or one whose lineage is broken, confers no edit scope (re-derived at Commit).
+                notLive = await ShareDocumentReadability.ExpiredSharesAsync(scope, state.OrganizationId, request.FormRecordId, graph.EditorSharesOf(bound.AuthorityUserId, request.FormRecordId), decisionInstant, cancellationToken).ConfigureAwait(false);
+                replaceable = await ShareDocumentReadability.ReplaceableAsync(scope, state.OrganizationId, request.FormRecordId, bound.AuthorityUserId, decisionInstant, currentLeaves, cancellationToken).ConfigureAwait(false);
+                RequireShareEditor(graph, bound, request.FormRecordId, replaceable.Count > 0, notLive);
+                mutations = ClassifyShareScoped(request, parsed, current, head, state.OrganizationId, graph, bound, operationId, candidateRevision, replaceable.Keys.ToHashSet(), notLive);
             }
 
-            AuthorizeMutations(graph, bound, request.FormRecordId, mutations, replaceable);
+            AuthorizeMutations(graph, bound, request.FormRecordId, mutations, replaceable, notLive);
+            // C10 (review D-1, partial): an attachment's version number never decreases (re-derived at Commit).
+            AttachmentVersionRules.Require(
+                parsed.Where(p => p.Kind == ManifestItemKind.Attachment).Select(p => (p.ItemId, p.Document.Column("version_number")?.AsInt32())),
+                AcceptedAttachmentVersions(currentLeaves));
             await EnforceProtectionBarrierAsync(scope, state.OrganizationId, resource.ParentResourceEntityId, parsed.Select(p => (p.Kind, (ReadOnlyMemory<byte>)p.CanonicalBytes)), cancellationToken).ConfigureAwait(false);
         }
         else
@@ -437,13 +445,17 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
                 // organization lock and advances the head: a revocation committed before this point aborts the write.
                 var commitGraph = new DesiredStateGraph(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false));
                 shareEditorOperation = !commitGraph.IsRecordOwner(bound.AuthorityUserId, request.FormRecordId);
+                IReadOnlySet<Guid> commitNotLive = new HashSet<Guid>();
                 if (shareEditorOperation)
                 {
                     // C10 WP8-B: the replace authority is re-derived here from the current committed state (expiry, revocation, narrowing).
-                    commitReplaceable = await ShareDocumentReadability.ReplaceableAsync(scope, state.OrganizationId, request.FormRecordId, bound.AuthorityUserId, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false);
+                    // C10 (review F1): so is the exclusion of expired and broken-lineage shares from the edit scope.
+                    var commitInstant = clock.GetUtcNow();
+                    commitNotLive = await ShareDocumentReadability.ExpiredSharesAsync(scope, state.OrganizationId, request.FormRecordId, commitGraph.EditorSharesOf(bound.AuthorityUserId, request.FormRecordId), commitInstant, cancellationToken).ConfigureAwait(false);
+                    commitReplaceable = await ShareDocumentReadability.ReplaceableAsync(scope, state.OrganizationId, request.FormRecordId, bound.AuthorityUserId, commitInstant, currentLeaves, cancellationToken).ConfigureAwait(false);
                 }
 
-                AuthorizeMutations(commitGraph, bound, request.FormRecordId, mutations, commitReplaceable);
+                AuthorizeMutations(commitGraph, bound, request.FormRecordId, mutations, commitReplaceable, commitNotLive);
             }
             catch (AuthorityException)
             {
@@ -559,8 +571,27 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         var newIdentities = await ContentItemIdentityRules.BindAtCommitAsync(scope, state.OrganizationId, request.FormRecordId, operationId, stagedDocuments, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false);
 
-        // C10 WP8-B: a share editor's attachment replacement, re-derived from the verified staged bytes and the accepted leaves (the
-        // next verified version, the same record and organization, a clean scan), and the one authorizing share it extends.
+        // C10 (review D-1, partial): the non-decreasing attachment version rule, re-derived from the verified staged rows and the accepted
+        // leaves (protection migration keeps versions and is not subject to it).
+        if (reprotection is null)
+        {
+            try
+            {
+                AttachmentVersionRules.Require(
+                    stagedDocuments.Where(s => s.ItemKind == ManifestItemKind.Attachment).Select(s => (s.ItemId, s.Item3.Column("version_number")?.AsInt32())),
+                    AcceptedAttachmentVersions(currentLeaves));
+            }
+            catch (AuthorityException)
+            {
+                operation.OperationStateName = ContentOperationStates.Aborted;
+                operation.OperationQuarantineReasonCode = "ATTACHMENT_VERSION_INVALID_AT_COMMIT";
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                throw;
+            }
+        }
+
+        // C10 WP8-B: a share editor's attachment replacement, re-derived from the verified staged bytes and the accepted leaves (a
+        // version above the accepted one, the same record and organization, a clean scan), and the one authorizing share it extends.
         Domain.Features.Sharing.ShareDocumentBinding? replacingBinding = null;
         int replacementVersion = 0;
         if (shareEditorOperation && ShareDocumentReplacement.ReplacedItem(mutations) is { } replacedItem)
@@ -1259,7 +1290,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             // while contributor writes are enabled; Prepare and Commit decide.
             if (contributorWrites.Enabled)
             {
-                replaceableItems = [.. (await ShareDocumentReadability.ReplaceableAsync(scope, state.OrganizationId, formRecordId, bound.AuthorityUserId, snapshot.DecisionInstant, cancellationToken).ConfigureAwait(false))
+                replaceableItems = [.. (await ShareDocumentReadability.ReplaceableAsync(scope, state.OrganizationId, formRecordId, bound.AuthorityUserId, snapshot.DecisionInstant, expected, cancellationToken).ConfigureAwait(false))
                     .Where(r => r.Value.Count == 1 && documentsViewable.Any(v => v.ItemId == r.Key)).Select(r => new VerifiedProjectionItem(ManifestItemKind.Attachment, r.Key))];
             }
             authorized = requestedAction == RequestedAction.Edit ? editable : readable;
@@ -1462,6 +1493,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         return parsed;
     }
 
+    /// <summary>The accepted version evidence of each attachment leaf of the current head.</summary>
+    private static Dictionary<Guid, int?> AcceptedAttachmentVersions(IReadOnlyList<RecordManifestLeaf> current) =>
+        current.Where(l => l.ManifestItemKindCode == (byte)ManifestItemKind.Attachment).GroupBy(l => l.ManifestItemId).ToDictionary(g => g.Key, g => g.First().AttachmentVersionNumber);
+
     private static Dictionary<string, string> ClassifyMutations(IReadOnlyList<ParsedCandidateItem> candidate, IReadOnlyList<RecordManifestLeaf> current)
     {
         var currentByKey = current.ToDictionary(l => Convert.ToHexStringLower(l.ManifestItemKey), StringComparer.Ordinal);
@@ -1491,14 +1526,14 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     /// Called at prepare (after classification) and again at commit against the current desired edges.
     /// </summary>
     private void AuthorizeMutations(DesiredStateGraph graph, BoundActor actor, Guid formRecordId, IReadOnlyDictionary<string, string> mutations,
-        Dictionary<Guid, List<Domain.Features.Sharing.ShareDocumentBinding>> replaceable)
+        Dictionary<Guid, List<Domain.Features.Sharing.ShareDocumentBinding>> replaceable, IReadOnlySet<Guid> notLiveShares)
     {
         if (graph.IsRecordOwner(actor.AuthorityUserId, formRecordId))
         {
             return;
         }
 
-        var editable = RequireShareEditor(graph, actor, formRecordId, replaceable.Count > 0);
+        var editable = RequireShareEditor(graph, actor, formRecordId, replaceable.Count > 0, notLiveShares);
         var changed = mutations.Count(m => m.Value != ContentMutationKinds.Unchanged);
         foreach (var (keyHex, mutation) in mutations)
         {
@@ -1549,9 +1584,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     }
 
     /// <summary>A non-owner may write only through an explicit contributor/manager share, and only while the switch is enabled (fail closed).</summary>
-    private IReadOnlySet<Guid> RequireShareEditor(DesiredStateGraph graph, BoundActor actor, Guid formRecordId, bool mayReplaceDocument = false)
+    private IReadOnlySet<Guid> RequireShareEditor(DesiredStateGraph graph, BoundActor actor, Guid formRecordId, bool mayReplaceDocument, IReadOnlySet<Guid> notLiveShares)
     {
-        var editable = graph.EditableFieldItemsViaShares(actor.AuthorityUserId, formRecordId);
+        var editable = graph.EditableFieldItemsViaShares(actor.AuthorityUserId, formRecordId, notLiveShares);
         if (editable.Count == 0 && !mayReplaceDocument)
         {
             throw AuthorityException.Forbidden("actor may not change this record");
@@ -1627,7 +1662,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     }
 
     private static Dictionary<string, string> ClassifyShareScoped(PrepareContentChangeRequest request, IReadOnlyList<ParsedCandidateItem> parsed, List<ContentDeltaRules.DecodedItem> current,
-        RecordContentHead head, Guid organizationId, DesiredStateGraph graph, BoundActor bound, Guid operationId, long candidateRevision, IReadOnlySet<Guid> replaceableAttachmentIds)
+        RecordContentHead head, Guid organizationId, DesiredStateGraph graph, BoundActor bound, Guid operationId, long candidateRevision, IReadOnlySet<Guid> replaceableAttachmentIds,
+        IReadOnlySet<Guid> notLiveShares)
     {
         if (current.Count == 0 || head.CommittedOperationId is not { } headOperation)
         {
@@ -1639,7 +1675,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         var candidate = parsed.Select(p => new ContentDeltaRules.DecodedItem(p.Kind, p.ItemId, p.Key, p.Document, p.Digest)).ToList();
         var shareScope = new ContentDeltaRules.ShareScope(organizationId, request.FormRecordId, head.CommittedContentRevision, headOperation, candidateRevision, operationId,
-            graph.EditableFieldItemsViaShares(bound.AuthorityUserId, request.FormRecordId), replaceableAttachmentIds);
+            graph.EditableFieldItemsViaShares(bound.AuthorityUserId, request.FormRecordId, notLiveShares), replaceableAttachmentIds);
         return ContentDeltaRules.ClassifyShareScoped(current, candidate, shareScope);
     }
 

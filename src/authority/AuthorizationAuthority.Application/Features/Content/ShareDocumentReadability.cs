@@ -65,14 +65,43 @@ internal static class ShareDocumentReadability
     /// C10 WP8-B (owner decision 2026-11-27, WP-0 Section 3.6.1): for each attachment the user may replace through a share, the shares that
     /// authorize it: held by the user (directly or through an active team) as Contributor or Manager, Active with Active lineage at the
     /// instant, granted directly by the owner (depth 1, no parent, resolved lineage), with a live document edge and a binding that allows
-    /// viewing and replacing. Desired committed state only; the content service applies it at Prepare and again at Commit.
+    /// viewing and replacing, and whose version boundary covers the attachment's accepted version (a version the share does not cover,
+    /// such as a later one by the owner, can neither be seen nor superseded through it). Desired committed state and the accepted leaves
+    /// only; the content service applies it at Prepare and again at Commit.
     /// </summary>
     public static async Task<Dictionary<Guid, List<Domain.Features.Sharing.ShareDocumentBinding>>> ReplaceableAsync(IAuthorityScope scope, Guid organizationId, Guid formRecordId, Guid userId,
-        DateTimeOffset instant, CancellationToken cancellationToken) =>
-        (await LiveHeldBindingsAsync(scope, organizationId, formRecordId, userId, instant, cancellationToken).ConfigureAwait(false))
-            .Where(h => h.OwnerGranted && h.Role is "contributor" or "manager" && h.Binding.CanViewDocument && h.Binding.CanReplaceDocument)
+        DateTimeOffset instant, IReadOnlyList<RecordManifestLeaf> acceptedLeaves, CancellationToken cancellationToken)
+    {
+        var accepted = acceptedLeaves.Where(l => l.ManifestItemKindCode == (byte)ManifestItemKind.Attachment && l.AttachmentVersionNumber is > 0)
+            .ToDictionary(l => l.ManifestItemId, l => l.AttachmentVersionNumber!.Value);
+        return (await LiveHeldBindingsAsync(scope, organizationId, formRecordId, userId, instant, cancellationToken).ConfigureAwait(false))
+            .Where(h => h.OwnerGranted && h.Role is "contributor" or "manager" && h.Binding.CanViewDocument && h.Binding.CanReplaceDocument &&
+                        accepted.TryGetValue(h.Binding.FileAttachmentId, out var version) && version <= h.Binding.SharedThroughVersionNumber)
             .GroupBy(h => h.Binding.FileAttachmentId)
             .ToDictionary(g => g.Key, g => g.Select(h => h.Binding).ToList());
+    }
+
+    /// <summary>
+    /// C10 (review F1, WP-0 Section 3.1): the shares among <paramref name="shareIds"/> that have expired at the instant — their own
+    /// expiry or an ancestor's (the lineage minimum) — whether or not convergence has removed their edges yet. Revoked and invalidated
+    /// shares lose their edges in the committing command; unresolved legacy lineage predates expiry and has none.
+    /// </summary>
+    public static async Task<IReadOnlySet<Guid>> ExpiredSharesAsync(IAuthorityScope scope, Guid organizationId, Guid formRecordId, IEnumerable<Guid> shareIds, DateTimeOffset instant,
+        CancellationToken cancellationToken)
+    {
+        var excluded = new HashSet<Guid>();
+        foreach (var shareId in shareIds.Distinct())
+        {
+            var chain = await LineageAsync(scope, organizationId, shareId, cancellationToken).ConfigureAwait(false);
+            if (ShareLineageExpiry.Evaluate(chain, organizationId, formRecordId, shareId, instant).Status == ShareLineageStatus.Expired)
+            {
+                excluded.Add(shareId);
+            }
+        }
+
+        return excluded;
+    }
+
 
     /// <summary>The live document bindings of the shares the user holds on the record, with the held role and whether the owner granted the share directly.</summary>
     private static async Task<List<(Domain.Features.Sharing.ShareDocumentBinding Binding, string Role, bool OwnerGranted)>> LiveHeldBindingsAsync(IAuthorityScope scope, Guid organizationId, Guid formRecordId,

@@ -475,7 +475,7 @@ public interface IShareDetailsAuthority
     Task<AuthorityShareDetails> GetShareDetailsAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken);
 
     /// <summary>C10 M1-WP9: the record's sharing and ownership history from committed Authority edges (owner or ManageAccess).</summary>
-    Task<AuthorityRecordSecurityHistory> GetRecordSecurityHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, CancellationToken cancellationToken);
+    Task<AuthorityRecordSecurityHistory> GetRecordSecurityHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, bool ownershipView, CancellationToken cancellationToken);
 
     /// <summary>C10 M2: what a share's recipient can do through it now and why (same readers as the details).</summary>
     Task<AuthorityShareEffectiveScope> GetShareEffectiveScopeAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken);

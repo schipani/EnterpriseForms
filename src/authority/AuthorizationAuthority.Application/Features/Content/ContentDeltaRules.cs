@@ -318,12 +318,13 @@ public static class ContentDeltaRules
             }
 
             // C10 WP8-B (WP-0 Section 3.6.1): the replacement of an attachment the Authority lists as replaceable for the actor — its
-            // next version with every other identity column unchanged and a clean scan. The rule table is unchanged; Commit re-derives
+            // next accepted version (a number above the accepted one; numbers consumed by uploads never accepted are skipped) with every
+            // other identity column unchanged and a clean scan. The rule table is unchanged; Commit re-derives
             // the version, record, organization, scan and authorization (ShareDocumentReplacement.RequireAtCommit, AuthorizeMutations).
             if (cand.Kind == ManifestItemKind.Attachment && scope.ReplaceableAttachmentIds?.Contains(cand.ItemId) == true &&
                 ReadInt32(cand.Document.Column(VersionNumberColumn)) != ReadInt32(cur.Document.Column(VersionNumberColumn)))
             {
-                if (ReadInt32(cur.Document.Column(VersionNumberColumn)) is not { } was || ReadInt32(cand.Document.Column(VersionNumberColumn)) != was + 1 ||
+                if (ReadInt32(cur.Document.Column(VersionNumberColumn)) is not { } was || ReadInt32(cand.Document.Column(VersionNumberColumn)) is not { } next || next <= was ||
                     rule.Columns.Any(c => c.Value == SignedColumnClass.Identity && c.Key != VersionNumberColumn &&
                                           !cur.Document.Column(c.Key)!.FramedValueEquals(cand.Document.Column(c.Key)!)) ||
                     cand.Document.Column("scan_verdict")?.AsText() != "Clean")

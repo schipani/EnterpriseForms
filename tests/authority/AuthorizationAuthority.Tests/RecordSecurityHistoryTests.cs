@@ -192,4 +192,45 @@ public sealed class RecordSecurityHistoryTests
         Assert.Empty(history.Items);
         Assert.Equal(5, history.AuthorizationRevision);
     }
+
+    [Fact]
+    public async Task OwnershipHistoryIsForTheOwnerAndSecurityAuditorsAndManagersSeeNoOwnerChanges()
+    {
+        // C10 independent review F-4/F3 (WP-0 Section 3.5).
+        var auditor = Guid.NewGuid();
+        store.Bindings.Add(new IdentityBinding { IdentityBindingId = Guid.NewGuid(), OrganizationId = org, AuthorityUserId = auditor, IdentityIssuerUri = "https://idp", IdentitySubjectIdentifier = auditor.ToString("N"), IdentityBindingEnabled = true });
+        store.Edges.Add(new AuthorityRelationshipEdge { AuthorityRelationshipEdgeId = Guid.NewGuid(), OrganizationId = org, ResourceTypeName = ResourceTypeNames.Organization, ResourceEntityId = org, RelationshipName = OrganizationRoleNames.SecurityAuditor, SubjectTypeName = ResourceTypeNames.User, SubjectEntityId = auditor });
+        var step = HumanCommandStepUpGate.SyntheticStepUpEvidence;
+        await SubmitAsync(owner, SecurityCommandKind.CreateShare, new CreateSharePayload(Guid.NewGuid(), record, manager, null, RecipientRoles.Manager, [first], step));
+        var transfer = await SubmitAsync(owner, SecurityCommandKind.TransferOwnership, new TransferOwnershipPayload(record, newOwner, null, step));
+
+        var asManager = await ReadAsync(manager); // the owner-granted manager share survives the transfer
+        Assert.NotEmpty(asManager.Items);
+        Assert.DoesNotContain(asManager.Items, i => i.SecurityCommandId == transfer);
+        Assert.All(asManager.Items, i => Assert.DoesNotContain(i.Changes, c => c.ChangeKind is "OwnerAdded" or "OwnerRemoved"));
+        Assert.Equal(AuthorityErrorCodes.ResourceNotRegistered, (await Assert.ThrowsAsync<AuthorityException>(() => ReadOwnershipAsync(manager))).ErrorCode);
+
+        foreach (var reader in new[] { newOwner, auditor })
+        {
+            var ownership = await ReadOwnershipAsync(reader);
+            var item = Assert.Single(ownership.Items);
+            Assert.Equal(transfer, item.SecurityCommandId);
+            Assert.All(item.Changes, c => Assert.True(c.ChangeKind is "OwnerAdded" or "OwnerRemoved"));
+        }
+
+        Assert.Equal(AuthorityErrorCodes.ResourceNotRegistered, (await Assert.ThrowsAsync<AuthorityException>(() => ReadAsync(auditor))).ErrorCode); // share history: not an auditor read
+        Assert.Contains((await ReadAsync(newOwner)).Items, i => i.SecurityCommandId == transfer); // the owner sees every change
+    }
+
+    [Fact]
+    public async Task TheHistoryIsRefusedWhileTheOrganizationIsQuarantined()
+    {
+        store.Organizations.Single().IntegrityQuarantineEnabled = true;
+
+        Assert.Equal(AuthorityErrorCodes.IntegrityQuarantine, (await Assert.ThrowsAsync<AuthorityException>(() => ReadAsync(owner))).ErrorCode);
+        Assert.Equal(AuthorityErrorCodes.IntegrityQuarantine, (await Assert.ThrowsAsync<AuthorityException>(() => ReadOwnershipAsync(owner))).ErrorCode);
+    }
+
+    private Task<RecordSecurityHistory> ReadOwnershipAsync(Guid actor) =>
+        new RecordSecurityHistoryService(store, clock).GetAsync(new VerifiedActor("https://idp", actor.ToString("N"), "test"), org, record, ownershipView: true, Ct);
 }

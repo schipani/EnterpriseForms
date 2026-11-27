@@ -56,8 +56,8 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
     public Task<AuthorityShareDetails> GetShareDetailsAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken) =>
         SendAsync<AuthorityShareDetails>(HttpMethod.Get, $"internal/v1/records/{organizationId:D}/{formRecordId:D}/shares/{recordShareId:D}", user, null, null, cancellationToken);
 
-    public Task<AuthorityRecordSecurityHistory> GetRecordSecurityHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, CancellationToken cancellationToken) =>
-        SendAsync<AuthorityRecordSecurityHistory>(HttpMethod.Get, $"internal/v1/records/{organizationId:D}/{formRecordId:D}/security-history", user, null, null, cancellationToken);
+    public Task<AuthorityRecordSecurityHistory> GetRecordSecurityHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, bool ownershipView, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityRecordSecurityHistory>(HttpMethod.Get, $"internal/v1/records/{organizationId:D}/{formRecordId:D}/security-history" + (ownershipView ? "?view=ownership" : string.Empty), user, null, null, cancellationToken);
 
     public Task<AuthorityShareEffectiveScope> GetShareEffectiveScopeAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken) =>
         SendAsync<AuthorityShareEffectiveScope>(HttpMethod.Get, $"internal/v1/records/{organizationId:D}/{formRecordId:D}/shares/{recordShareId:D}/effective-scope", user, null, null, cancellationToken);

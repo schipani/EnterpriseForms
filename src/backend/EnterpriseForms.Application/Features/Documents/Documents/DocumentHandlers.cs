@@ -35,6 +35,15 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             versions = await scope.GetAttachmentVersionsAsync(fileAttachmentId, cancellationToken).ConfigureAwait(false);
         }
 
+        // C10 (independent review D-3, WP-0 Section 3.6): a share recipient sees only the version the Authority released to them — never
+        // other versions, uploads still processing or versions of aborted operations (their names, sizes and uploaders included).
+        if (!verified.IsComplete)
+        {
+            return new DocumentDetailResponse(Summary(current, "Ready"),
+                [new DocumentVersionResponse(current.FileAttachmentVersionId, current.VersionNumber, current.OriginalFileName, current.DetectedContentType, current.PlaintextSizeBytes, current.ScanVerdict,
+                    current.ScannerName, current.UploadedOn, current.UploadedByUserId, "Current", current.ContentRevision)]);
+        }
+
         // History shows one row per version number; the committed copy wins over the processed copy.
         var history = versions
             .GroupBy(v => v.VersionNumber)
@@ -57,9 +66,15 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
         FileAttachmentVersion target;
         if (versionNumber is { } requested && requested != current?.VersionNumber)
         {
-            // C10 WP8-A: a share recipient may download an earlier version only within its document binding; the historic commit's own
-            // verified evidence decides (a full reader may download any accepted version, as before).
-            target = await VerifiedHistoricVersionAsync(context, formRecordId, fileAttachmentId, requested, partial: !verified.IsComplete, cancellationToken).ConfigureAwait(false);
+            // C10 WP8-A (independent review D-4): a share recipient downloads only the current version the Authority released to them;
+            // historic verification needs full read at the Authority, so an earlier version is not offered. A full reader may download
+            // any accepted version, as before.
+            if (!verified.IsComplete)
+            {
+                throw new BusinessException("NOT_FOUND", 404, "document version not found");
+            }
+
+            target = await VerifiedHistoricVersionAsync(context, formRecordId, fileAttachmentId, requested, cancellationToken).ConfigureAwait(false);
         }
         else
         {
@@ -101,7 +116,7 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
     private static bool Downloadable(VerifyRecordProjectionResult verification, Guid fileAttachmentId) =>
         verification.DownloadableItems?.Any(i => i.ItemKind == ManifestItemKind.Attachment && i.ItemId == fileAttachmentId) == true;
 
-    private async Task<FileAttachmentVersion> VerifiedHistoricVersionAsync(RequestContext context, Guid formRecordId, Guid fileAttachmentId, int requested, bool partial, CancellationToken cancellationToken)
+    private async Task<FileAttachmentVersion> VerifiedHistoricVersionAsync(RequestContext context, Guid formRecordId, Guid fileAttachmentId, int requested, CancellationToken cancellationToken)
     {
         List<Guid> candidateOperations;
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
@@ -134,14 +149,9 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             await incidents.RecordAsync(SecurityIncidentObservation.For(context, incidentType, formRecordId, SecurityIncidentDetectionSources.DocumentVersionDownload, verification.FailureReasonCode ?? string.Empty, verification.CommittedContentRevision), cancellationToken).ConfigureAwait(false);
         }
 
-        if (!verification.Verified || verification.CommittedOperationId != operationId || (!partial && !verification.IsCompleteProjection))
+        if (!verification.Verified || verification.CommittedOperationId != operationId || !verification.IsCompleteProjection)
         {
             throw new BusinessException("INTEGRITY_VERIFICATION_FAILED", 423, "historic document version failed integrity verification: " + verification.FailureReasonCode);
-        }
-
-        if (partial && !verification.IsCompleteProjection && !Downloadable(verification, fileAttachmentId))
-        {
-            throw new BusinessException("NOT_FOUND", 404, "document version not found"); // outside the recipient's document binding
         }
 
         return snapshot.Rows.OfType<FileAttachmentVersion>().SingleOrDefault(v => v.FileAttachmentId == fileAttachmentId && v.VersionNumber == requested)

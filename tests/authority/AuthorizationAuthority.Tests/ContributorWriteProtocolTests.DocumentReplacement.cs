@@ -11,9 +11,9 @@ namespace AuthorizationAuthority.Tests;
 
 /// <summary>
 /// C10 WP8-B (WP-0 Sections 3.6 and 3.6.1, owner decisions 2026-11-27) through the real Prepare and Commit: a contributor holding a
-/// live share granted directly by the owner with replace for one attachment may commit exactly its next version, and only that share's
-/// boundary advances, in the accepted commit. Everything else is refused or aborted without moving any boundary: a skipped version, a
-/// mixed change, another attachment, a delegated share, an unclean scan, the switch off, revocation or expiry between Prepare and Commit,
+/// live share granted directly by the owner with replace for one attachment may commit its next accepted version, and only that share's
+/// boundary advances, in the accepted commit. Everything else is refused or aborted without moving any boundary: a version not above
+/// the accepted one (ReviewCorrections), a mixed change, another attachment, a delegated share, an unclean scan, the switch off, revocation or expiry between Prepare and Commit,
 /// and two authorizing shares. An ownership transfer between Prepare and Commit leaves the durable grant valid.
 /// </summary>
 public sealed partial class ContributorWriteProtocolTests
@@ -57,20 +57,6 @@ public sealed partial class ContributorWriteProtocolTests
         var head = h.Store.Heads.Single().CurrentRecordManifestCommitId;
         Assert.Equal(2, h.Store.ManifestLeaves.Single(l => l.RecordManifestCommitId == head && l.ManifestItemId == h.Document).AttachmentVersionNumber);
         Assert.Equal(1, h.Store.ManifestLeaves.Where(l => l.RecordManifestCommitId != head && l.ManifestItemId == h.Document).Max(l => l.AttachmentVersionNumber)); // the earlier accepted version is untouched
-    }
-
-    [Fact]
-    public async Task OnlyTheExactNextCleanVersionOfTheSharedDocumentAloneIsAccepted()
-    {
-        var h = await new Harness().CreatedAsync();
-        var binding = ReplaceShare(h);
-
-        await Assert.ThrowsAsync<AuthorityException>(() => PrepareReplacementAsync(h, NextVersion(h, version: 3)));          // skipped version
-        await Assert.ThrowsAsync<AuthorityException>(() => PrepareReplacementAsync(h, NextVersion(h, verdict: "Infected")));  // not clean
-        var mixed = Change(NextVersion(h), h.Other, r => r.With("string_value", RowValue.Text("also changed")));
-        await Assert.ThrowsAsync<AuthorityException>(() => PrepareReplacementAsync(h, mixed));                               // another change in the same operation
-        Assert.Equal(1, binding.SharedThroughVersionNumber);
-        Assert.Equal(1, h.Head.CommittedContentRevision);
     }
 
     [Fact]

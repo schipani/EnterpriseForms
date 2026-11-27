@@ -47,6 +47,8 @@ export function RecordAccessPanel({ formRecordId, projection, verifiedScope }: {
   });
   const [open, setOpen] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<RecordShareSummaryResponse | null>(null);
+  // C10 (independent review F-2): revocation is a human share command and needs the step-up, as edits and transfers do.
+  const [revokeStepUp, setRevokeStepUp] = useState(false);
   const [editTarget, setEditTarget] = useState<RecordShareSummaryResponse | null>(null);
   const [revokedNotice, setRevokedNotice] = useState<string | null>(null);
   const writesEnabled = projection.permissions.contributorWritesEnabled;
@@ -63,9 +65,10 @@ export function RecordAccessPanel({ formRecordId, projection, verifiedScope }: {
   const historyData = !readOnly || (history.isSuccess && history.isFetchedAfterMount && history.fetchStatus === "idle") ? history.data : undefined;
   const collaboration = (historyData?.events ?? []).filter((event) => event.eventAction === "RECORD_ACCESS_GRANTED" || event.eventAction === "RECORD_ACCESS_REVOKED" || (event.eventAction === "RECORD_UPDATED" && event.eventDescription === SHARED_EDIT_DESCRIPTION));
   const revoke = useMutation({
-    mutationFn: (share: RecordShareSummaryResponse) => api.shares.revoke(formRecordId, share.recordShareId).then((r) => r.result),
+    mutationFn: (share: RecordShareSummaryResponse) => api.shares.revoke(formRecordId, share.recordShareId, revokeStepUp).then((r) => r.result),
     onSuccess: async (_result, share) => {
       setRevokeTarget(null);
+      setRevokeStepUp(false);
       setRevokedNotice(share.recipientDisplayName ?? share.recipientUserId ?? share.recipientTeamId ?? "the recipient");
       await queryClient.invalidateQueries({ queryKey: ["shares", formRecordId] });
       await queryClient.invalidateQueries({ queryKey: ["audit", "record", formRecordId] });
@@ -200,16 +203,21 @@ export function RecordAccessPanel({ formRecordId, projection, verifiedScope }: {
       {!readOnly && open ? <CreateShareDialog formRecordId={formRecordId} projection={projection} contributorWritesEnabled={writesEnabled} onClose={() => setOpen(false)} /> : null}
       <Dialog
         open={!readOnly && revokeTarget !== null}
-        onOpenChange={(next) => (next ? undefined : setRevokeTarget(null))}
+        onOpenChange={(next) => {
+          if (!next) {
+            setRevokeTarget(null);
+            setRevokeStepUp(false);
+          }
+        }}
         title="Revoke this share?"
         description="The authority removes the grant immediately; the recipient loses discovery, reading and editing of the shared fields on their next request. Changes they already saved stay in the record history."
         locked={revoke.isPending}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setRevokeTarget(null)} disabled={revoke.isPending}>
+            <Button variant="secondary" onClick={() => { setRevokeTarget(null); setRevokeStepUp(false); }} disabled={revoke.isPending}>
               Keep
             </Button>
-            <Button variant="danger" busy={revoke.isPending} onClick={() => revokeTarget && revoke.mutate(revokeTarget)}>
+            <Button variant="danger" busy={revoke.isPending} disabled={!revokeStepUp} onClick={() => revokeTarget && revoke.mutate(revokeTarget)}>
               Revoke share
             </Button>
           </>
@@ -220,6 +228,7 @@ export function RecordAccessPanel({ formRecordId, projection, verifiedScope }: {
             {revokeTarget.recipientDisplayName ?? revokeTarget.recipientUserId ?? revokeTarget.recipientTeamId} ({revokeTarget.recipientRole}): {revokeTarget.fieldKeys.join(", ")}
           </p>
         ) : null}
+        <Checkbox label="Confirm with the development-only step-up" checked={revokeStepUp} onCheckedChange={(checked) => setRevokeStepUp(checked === true)} helpText="Sharing changes need a fresh passkey confirmation. This synthetic stand-in exists only in local development and test; elsewhere the authority refuses the change until passkey step-up is available." />
         {revoke.isError ? <ErrorPanel error={revoke.error} /> : null}
       </Dialog>
     </div>
@@ -235,6 +244,8 @@ function CreateShareDialog({ formRecordId, projection, contributorWritesEnabled,
   const [role, setRole] = useState("Reader");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [documents, setDocuments] = useState<DocumentSelection>(new Map());
+  // C10 (independent review F-2): creating a share is a human share command and needs the step-up.
+  const [stepUp, setStepUp] = useState(false);
   const displayNames = new Map(projection.fields.map((field) => [field.fieldKey, field.fieldDisplayName]));
   // Only fields with a persisted value can be shared (the share binds to accepted manifest items). Fields of sections that
   // allow multiple entries are not shareable on their own in this version (the server refuses them: FIELD_IN_REPEATING_GROUP).
@@ -246,7 +257,7 @@ function CreateShareDialog({ formRecordId, projection, contributorWritesEnabled,
   const create = useMutation({
     mutationFn: () =>
       api.shares
-        .create(formRecordId, { recipientUserId: recipientUserId ?? null, recipientTeamId: null, recipientRole: role, fieldKeys: [...selected], ...(documents.size > 0 ? { documents: toDocumentRequests(documents) } : {}) })
+        .create(formRecordId, { recipientUserId: recipientUserId ?? null, recipientTeamId: null, recipientRole: role, fieldKeys: [...selected], useDevelopmentStepUp: stepUp, ...(documents.size > 0 ? { documents: toDocumentRequests(documents) } : {}) })
         .then((r) => r.result),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["shares", formRecordId] });
@@ -275,7 +286,7 @@ function CreateShareDialog({ formRecordId, projection, contributorWritesEnabled,
           <Button variant="secondary" onClick={onClose} disabled={create.isPending}>
             Cancel
           </Button>
-          <Button busy={create.isPending} disabled={!recipientUserId || selected.size + documents.size === 0} onClick={() => create.mutate()}>
+          <Button busy={create.isPending} disabled={!recipientUserId || selected.size + documents.size === 0 || !stepUp} onClick={() => create.mutate()}>
             Share
           </Button>
         </>
@@ -307,6 +318,7 @@ function CreateShareDialog({ formRecordId, projection, contributorWritesEnabled,
           {canChange ? <p className="text-sm text-muted">A person with this role can change the values of the selected fields, except those marked View only. They cannot clear values, change multiple choices, entries, documents or related records.</p> : null}
         </fieldset>
         <ShareDocumentSelection documents={projection.documents} selection={documents} onChange={setDocuments} allowReplace={projection.permissions.canTransferOwnership && role !== "Reader"} />
+        <Checkbox label="Confirm with the development-only step-up" checked={stepUp} onCheckedChange={(checked) => setStepUp(checked === true)} helpText="Sharing changes need a fresh passkey confirmation. This synthetic stand-in exists only in local development and test; elsewhere the authority refuses the change until passkey step-up is available." />
         {create.isError ? <ErrorPanel error={create.error} /> : null}
       </div>
     </Dialog>

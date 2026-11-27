@@ -44,7 +44,7 @@ export function MemberReassignPage() {
         <PageHeader title="Reassign records" actions={back} />
         {presentError(owned.error).status === 404 ? (
           <StatusMessage tone="info" title="Reassignment is not available">
-            Only a Security Administrator or an organization owner can reassign a member's records.
+            Only a Security Administrator can reassign a member's records.
           </StatusMessage>
         ) : (
           <ErrorPanel error={owned.error} onRetry={() => void owned.refetch()} />

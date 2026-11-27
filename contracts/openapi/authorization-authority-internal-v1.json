@@ -285,7 +285,7 @@
         "tags": [
           "Authorization"
         ],
-        "summary": "Record-scoped sharing and ownership history from committed Authority edges, each command with its own state (owner or ManageAccess; others 404).",
+        "summary": "Record-scoped history from committed Authority edges, each command with its own state: sharing (owner or ManageAccess; a non-owner sees no owner changes) or, with view=ownership, ownership changes (owner or Security Auditor); others 404; refused while the organization is quarantined.",
         "operationId": "GetRecordSecurityHistory",
         "parameters": [
           {
@@ -304,6 +304,13 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -358,7 +365,7 @@
         "tags": [
           "Authorization"
         ],
-        "summary": "Active records a member directly owns (ids only) for administrator reassignment; Security Administrators and organization owners only.",
+        "summary": "Active records a member directly owns (ids only) for administrator reassignment; Security Administrators only.",
         "operationId": "GetMemberOwnedRecords",
         "parameters": [
           {
