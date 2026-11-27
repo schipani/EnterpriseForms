@@ -1113,6 +1113,11 @@
       "bytes": 15916
     },
     {
+      "path": "scripts/dev/c10-d5-share-only-pg-gate.ps1",
+      "sha256": "55a3fd1a31071c6498e3f9009ee52e4fbc44f59ee5f88d8e34602cf3e63e7231",
+      "bytes": 4003
+    },
+    {
       "path": "scripts/dev/c10-wp10-lineage-pg-gate.ps1",
       "sha256": "eae803a917b509823e4105e17ecc72168169ef499cbe1982fdd8ad85425af576",
       "bytes": 6879

@@ -81,7 +81,9 @@ public sealed partial class IndexedSearchService(
             await RequireServableProjectionAsync(scope, organizationId, cancellationToken).ConfigureAwait(false);
 
             var pin = await verifier.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
-            await RequireNoExpiredShareAsync(pin, bound.AuthorityUserId, null, cancellationToken).ConfigureAwait(false);
+            // C10 D5: expired shares are excluded from every candidate set below instead of refusing the search; the snapshot ends at
+            // the earliest expiry among the caller's live shares, so a later page or continuation is refused from that instant (D10-10).
+            var shareExpiry = await ProjectionIntegrityVerifier.ShareExpiryAsync(pin, cancellationToken).ConfigureAwait(false);
             var subject = bound.AuthorityUserId.ToString("D");
             var mayQuery = (await verifier.CheckBulkStrictAsync(pin, [new SpiceDbCheck(ResourceTypeNames.FormDefinition, query.FormDefinitionId.ToString("D"), "query_fields", ResourceTypeNames.User, subject)], cancellationToken).ConfigureAwait(false))[0] == SpiceDbCheckOutcome.Allowed;
             var policy = await scope.FindProtectionPolicyAsync(organizationId, cancellationToken).ConfigureAwait(false);
@@ -228,7 +230,9 @@ public sealed partial class IndexedSearchService(
                 QueryDigest = QueryDigest(nonce, query),
                 ResultEntryCount = matches.Count,
                 SnapshotCreatedOn = now,
-                SnapshotExpiresOn = now.AddSeconds(options.SnapshotLifetimeSeconds),
+                SnapshotExpiresOn = shareExpiry.NextExpiryFor(bound.AuthorityUserId) is { } nextExpiry && nextExpiry < now.AddSeconds(options.SnapshotLifetimeSeconds)
+                    ? nextExpiry
+                    : now.AddSeconds(options.SnapshotLifetimeSeconds),
                 CreatingInstanceName = InstanceName,
             };
             var entries = matches.Select((m, position) => new SearchResultSnapshotEntry
@@ -306,7 +310,6 @@ public sealed partial class IndexedSearchService(
 
             await RequireServableProjectionAsync(scope, organizationId, cancellationToken, snapshot.SearchResultSnapshotId).ConfigureAwait(false);
             var pin = await verifier.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
-            await RequireNoExpiredShareAsync(pin, bound.AuthorityUserId, snapshot.SearchResultSnapshotId, cancellationToken).ConfigureAwait(false);
             var subject = bound.AuthorityUserId.ToString("D");
             var mayQuery = (await verifier.CheckBulkStrictAsync(pin, [new SpiceDbCheck(ResourceTypeNames.FormDefinition, query.FormDefinitionId.ToString("D"), "query_fields", ResourceTypeNames.User, subject)], cancellationToken).ConfigureAwait(false))[0] == SpiceDbCheckOutcome.Allowed;
             var policy = await scope.FindProtectionPolicyAsync(organizationId, cancellationToken).ConfigureAwait(false);
@@ -559,7 +562,8 @@ public sealed partial class IndexedSearchService(
                 : await QuarantineIndexAsync(organizationId, refused.FindingCode!, cancellationToken).ConfigureAwait(false);
         }
 
-        var candidates = await read.ReadShareReadableItemsAsync(authorityUserId, counts.Select(c => c.FormRecordId).ToList(), predicateFields, options.MaximumShareOnlyItems, cancellationToken).ConfigureAwait(false);
+        var excluded = (await ProjectionIntegrityVerifier.ShareExpiryAsync(pin, cancellationToken).ConfigureAwait(false)).ExpiredShareIds;
+        var candidates = await read.ReadShareReadableItemsAsync(authorityUserId, counts.Select(c => c.FormRecordId).ToList(), predicateFields, options.MaximumShareOnlyItems, excluded, cancellationToken).ConfigureAwait(false);
         if (enforceLimit && candidates.Count > options.MaximumShareOnlyItems)
         {
             probe?.ShareOnlyStep(correlationId, new ShareOnlyProbeObservation(path, counts.Count, candidates.Count, 0, 0, "LIMIT_ITEMS"));
@@ -977,19 +981,16 @@ public sealed partial class IndexedSearchService(
     /// applies the expiry overlay); a later page of an existing result snapshot is invalidated, since it was computed before the
     /// expiry was observed.
     /// </summary>
-    private async Task RequireNoExpiredShareAsync(VerifiedProjectionSnapshot pin, Guid userId, Guid? resultSnapshotId, CancellationToken cancellationToken)
+    /// <summary>
+    /// C10 D5 (record list, stateless offset paging): a first page simply excludes expired shares (the lookup applies the overlay); a
+    /// continuation is refused while the caller holds an expired, unconverged share, since its earlier pages may have relied on it.
+    /// </summary>
+    private static async Task RequireNoExpiredShareForContinuationAsync(VerifiedProjectionSnapshot pin, Guid userId, bool continuation, CancellationToken cancellationToken)
     {
-        if (!(await ProjectionIntegrityVerifier.ShareExpiryAsync(pin, cancellationToken).ConfigureAwait(false)).UserHoldsExpiredShare(userId))
+        if (continuation && (await ProjectionIntegrityVerifier.ShareExpiryAsync(pin, cancellationToken).ConfigureAwait(false)).UserHoldsExpiredShare(userId))
         {
-            return;
+            throw Changed("a share expired since the first page");
         }
-
-        if (resultSnapshotId is { } id)
-        {
-            throw await InvalidateAsync(id, Changed("a share the search relied on has expired"), cancellationToken).ConfigureAwait(false);
-        }
-
-        throw NotReady("an expired share of the caller is not yet converged; the search index cannot answer for this caller");
     }
 
     private static AuthorityException NotFound() => new(IndexedSearchErrorCodes.SnapshotNotFound, 404, false, "no such search result");

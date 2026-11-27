@@ -303,4 +303,22 @@ public sealed class ShareAccessExpiryTests
         var revoked = await ShareExpiryOverlay.LoadAsync(scope, Guid.CreateVersion7(), Now, TestContext.Current.CancellationToken);
         Assert.True(revoked.IsEmpty); // another organization's shares are never read
     }
+
+    [Fact]
+    public async Task TheOverlayNamesExpiredSharesAndTheirDescendantsButNoLiveShare()
+    {
+        var w = new World();
+        var expiredParent = w.Share("manager", Now.AddMinutes(-5));
+        var descendant = w.Share("reader", Now.AddDays(5), parent: expiredParent);
+        var live = w.Share("reader", Now.AddDays(5));
+        await using var scope = await w.Store.BeginScopeAsync(TestContext.Current.CancellationToken);
+        var state = (await scope.ReadOrganizationAsync(w.Org, TestContext.Current.CancellationToken))!;
+        var pin = await w.Verifier.PinAsync(scope, state, organizationLocked: false, Guid.CreateVersion7(), TestContext.Current.CancellationToken);
+
+        var expired = (await ProjectionIntegrityVerifier.ShareExpiryAsync(pin, TestContext.Current.CancellationToken)).ExpiredShareIds;
+
+        Assert.Contains(expiredParent, expired);
+        Assert.Contains(descendant, expired); // the lineage minimum: a descendant confers nothing once its ancestor expired
+        Assert.DoesNotContain(live, expired);
+    }
 }

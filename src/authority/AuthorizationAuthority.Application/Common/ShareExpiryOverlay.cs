@@ -54,6 +54,12 @@ internal sealed class ShareExpiryOverlay
     /// <summary>True when no share of the organization has expired by the instant.</summary>
     public bool IsEmpty => !shares.Values.Any(s => s.Expired);
 
+    /// <summary>
+    /// C10 D5: every Active share that confers nothing at the instant — its own expiry passed, or an ancestor's (the lineage minimum).
+    /// Excluding these from a candidate set leaves exactly the shares a decision at the same instant can allow through.
+    /// </summary>
+    public IReadOnlyCollection<Guid> ExpiredShareIds => [.. shares.Values.Where(s => s.Expired).Select(s => s.ShareId).Order()];
+
     private sealed record ShareFacts(Guid ShareId, Guid RecordId, bool Expired, DateTimeOffset? ExpiresOn)
     {
         public List<(string Role, string SubjectType, Guid SubjectId)> Holders { get; } = [];

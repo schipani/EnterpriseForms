@@ -36,7 +36,8 @@ public interface ISearchQuerySession : IAsyncDisposable
     /// read is keyed by the caller's own grants, so no item the caller cannot read is touched. Distinct (record, field, item) rows;
     /// at most <paramref name="limit"/> + 1 rows per posting table. Ids only, never values.
     /// </summary>
-    Task<IReadOnlyList<ShareReadableItem>> ReadShareReadableItemsAsync(Guid authorityUserId, IReadOnlyCollection<Guid> formRecordIds, IReadOnlyCollection<PredicateFieldApproval> predicateFields, int limit, CancellationToken cancellationToken);
+    /// <param name="excludedShareIds">C10 D5: shares that confer nothing at the pinned decision instant (expired, own or lineage); never candidates.</param>
+    Task<IReadOnlyList<ShareReadableItem>> ReadShareReadableItemsAsync(Guid authorityUserId, IReadOnlyCollection<Guid> formRecordIds, IReadOnlyCollection<PredicateFieldApproval> predicateFields, int limit, IReadOnlyCollection<Guid> excludedShareIds, CancellationToken cancellationToken);
 
     /// <summary>
     /// The candidate statement (§8.2): driven from <paramref name="scope"/> by a per-record probe on the posting-by-record index,
