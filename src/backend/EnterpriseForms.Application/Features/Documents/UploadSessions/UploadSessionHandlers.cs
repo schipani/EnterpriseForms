@@ -54,7 +54,9 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
         // Phase C9 (D9-5): the upload policy comes from the record's edit layout; the one the client showed must still be it.
         FormRecords.Projection.EditLayoutGuard.Require(verified, request.ExpectedLayoutVersionId);
         var edit = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, request.FormRecordId), ProtectedAction.Edit), cancellationToken).ConfigureAwait(false);
-        if (!edit.Allowed)
+        // C10 WP8-B: a share recipient may only replace the one attachment the Authority lists as replaceable for them.
+        var shareReplacement = !edit.Allowed && request.ReplacesFileAttachmentId is { } shared && Replaceable(verified, shared);
+        if (!edit.Allowed && !shareReplacement)
         {
             throw new BusinessException("FORBIDDEN", 403, "uploading documents requires edit permission on the record");
         }
@@ -78,7 +80,7 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
             throw new BusinessException("FILE_COUNT_EXCEEDED", 422, $"this field accepts at most {policy.MaxFiles} documents");
         }
 
-        if (request.ReplacesFileAttachmentId is { } replaces && verified.AuthorizedAttachments.All(a => a.FileAttachmentId != replaces))
+        if (request.ReplacesFileAttachmentId is { } replaces && !shareReplacement && verified.AuthorizedAttachments.All(a => a.FileAttachmentId != replaces))
         {
             throw new BusinessException("NOT_FOUND", 404, "attachment to replace is not part of the accepted record content");
         }
@@ -269,6 +271,9 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
     /// Final step (B-05): binds the processed version into the record manifest through the caller's authenticated
     /// context (full candidate = current rows + the new attachment leaf, replacing a prior version of the same attachment).
     /// </summary>
+    private static bool Replaceable(FormRecords.Projection.VerifiedRecord verified, Guid fileAttachmentId) =>
+        verified.Verification.ReplaceableItems?.Any(i => i.ItemKind == ManifestItemKind.Attachment && i.ItemId == fileAttachmentId) == true;
+
     public async Task<UploadSessionResponse> CommitAsync(RequestContext context, Guid uploadSessionId, string idempotencyKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -297,7 +302,9 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
         }
 
         var verified = await reader.ReadAsync(context, session.FormRecordId, ProtectedAction.Edit, cancellationToken).ConfigureAwait(false);
-        if (!verified.IsComplete)
+        // C10 WP8-B: a share recipient commits only the replacement of the one attachment their owner-granted share allows replacing; the
+        // candidate is built exactly as for the owner, and the Authority re-derives every rule at Prepare and Commit.
+        if (!verified.IsComplete && !(session.ReplacesFileAttachmentId == processed.FileAttachmentId && Replaceable(verified, processed.FileAttachmentId)))
         {
             throw new BusinessException("FORBIDDEN", 403, "committing documents requires record ownership");
         }

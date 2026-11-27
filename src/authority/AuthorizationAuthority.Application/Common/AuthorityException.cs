@@ -142,8 +142,11 @@ public static class AuthorityErrorCodes
     /// <summary>C10 WP8: the attachment has no Authority-verified version evidence yet (accepted before WP8); not shareable until its next commit.</summary>
     public const string DocumentVersionEvidenceUnavailable = "DOCUMENT_VERSION_EVIDENCE_UNAVAILABLE";
 
-    /// <summary>C10 WP8-A: replacement through a share is not available yet (WP8-B).</summary>
-    public const string DocumentReplaceNotSupported = "DOCUMENT_REPLACE_NOT_SUPPORTED";
+    /// <summary>C10 WP8-B (owner decision 2026-11-27): only a share the record owner grants directly may allow document replacement.</summary>
+    public const string DocumentReplaceRequiresOwnerGrant = "DOCUMENT_REPLACE_REQUIRES_OWNER_GRANT";
+
+    /// <summary>C10 WP8-B: more than one of the actor's shares could authorize the replacement; the share it extends must be unique.</summary>
+    public const string DocumentReplaceShareAmbiguous = "DOCUMENT_REPLACE_SHARE_AMBIGUOUS";
     public const string IdentityAlreadyBound = "IDENTITY_ALREADY_BOUND";
     public const string IdentityNotAllowed = "IDENTITY_NOT_ALLOWED";
     public const string MembershipRequestExists = "MEMBERSHIP_REQUEST_EXISTS";

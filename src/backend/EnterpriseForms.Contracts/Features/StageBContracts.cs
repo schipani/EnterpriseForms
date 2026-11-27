@@ -274,7 +274,8 @@ public sealed record RecordProjectionResponse(
     string LayoutPurpose = "View",
     int? CreatedFormVersionNumber = null,
     Guid? EditLayoutVersionId = null,
-    int? EditLayoutVersionNumber = null);
+    int? EditLayoutVersionNumber = null,
+    IReadOnlyList<Guid>? ReplaceableDocumentIds = null);
 
 /// <summary>
 /// Phase C5: for a share editor's partial projection, whether each readable field can be changed and, if not, why

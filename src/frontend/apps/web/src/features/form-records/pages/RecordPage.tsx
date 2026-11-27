@@ -60,7 +60,7 @@ export function RecordPage() {
 
   const renderDocuments = (element: DocumentElement) => {
     const field = data.fields.find((candidate) => candidate.fieldDefinitionId === element.fieldDefinitionId);
-    return <DocumentCollection key={element.fieldDefinitionId} formRecordId={formRecordId} fieldDefinitionId={element.fieldDefinitionId} label={element.label || field?.fieldDisplayName || "Documents"} documents={data.documents.filter((document) => document.fieldDefinitionId === element.fieldDefinitionId)} policy={element.upload} canEdit={data.permissions.canEdit && contentEditable} contentRevision={Number(data.record.contentRevision)} editLayoutVersionId={data.editLayoutVersionId ?? null} onChanged={() => void projection.refetch()} />;
+    return <DocumentCollection key={element.fieldDefinitionId} formRecordId={formRecordId} fieldDefinitionId={element.fieldDefinitionId} label={element.label || field?.fieldDisplayName || "Documents"} documents={data.documents.filter((document) => document.fieldDefinitionId === element.fieldDefinitionId)} policy={element.upload} canEdit={data.permissions.canEdit && contentEditable} contentRevision={Number(data.record.contentRevision)} editLayoutVersionId={data.editLayoutVersionId ?? null} onChanged={() => void projection.refetch()} replaceableIds={data.replaceableDocumentIds ?? []} />;
   };
 
   return (

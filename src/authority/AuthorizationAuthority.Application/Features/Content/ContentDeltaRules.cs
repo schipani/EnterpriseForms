@@ -230,7 +230,8 @@ public static class ContentDeltaRules
         Guid CurrentOperationId,
         long CandidateRevision,
         Guid CandidateOperationId,
-        IReadOnlySet<Guid> EditableItemIds);
+        IReadOnlySet<Guid> EditableItemIds,
+        IReadOnlySet<Guid>? ReplaceableAttachmentIds = null);
 
     /// <summary>
     /// Classifies every item of a share editor's candidate against the bound current snapshot (proposal §5–§7). Returns the
@@ -314,6 +315,25 @@ public static class ContentDeltaRules
             else if (cur.Document.Header.PrimaryKeyId != cand.Document.Header.PrimaryKeyId)
             {
                 throw Out("SHARE_ITEM_IDENTITY_CHANGED");
+            }
+
+            // C10 WP8-B (WP-0 Section 3.6.1): the replacement of an attachment the Authority lists as replaceable for the actor — its
+            // next version with every other identity column unchanged and a clean scan. The rule table is unchanged; Commit re-derives
+            // the version, record, organization, scan and authorization (ShareDocumentReplacement.RequireAtCommit, AuthorizeMutations).
+            if (cand.Kind == ManifestItemKind.Attachment && scope.ReplaceableAttachmentIds?.Contains(cand.ItemId) == true &&
+                ReadInt32(cand.Document.Column(VersionNumberColumn)) != ReadInt32(cur.Document.Column(VersionNumberColumn)))
+            {
+                if (ReadInt32(cur.Document.Column(VersionNumberColumn)) is not { } was || ReadInt32(cand.Document.Column(VersionNumberColumn)) != was + 1 ||
+                    rule.Columns.Any(c => c.Value == SignedColumnClass.Identity && c.Key != VersionNumberColumn &&
+                                          !cur.Document.Column(c.Key)!.FramedValueEquals(cand.Document.Column(c.Key)!)) ||
+                    cand.Document.Column("scan_verdict")?.AsText() != "Clean")
+                {
+                    throw Out("SHARE_DOCUMENT_REPLACEMENT_INVALID");
+                }
+
+                mutations[keyHex] = ContentMutationKinds.Update;
+                updates++;
+                continue;
             }
 
             if (!ColumnsEqual(cur.Document, cand.Document, rule, SignedColumnClass.Identity))
@@ -449,6 +469,8 @@ public static class ContentDeltaRules
 
         return true;
     }
+
+    private const string VersionNumberColumn = "version_number";
 
     private static int? ReadInt32(RowCanonicalColumn? column)
     {

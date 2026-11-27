@@ -155,6 +155,17 @@ Evidence: `OwnershipTransferShareTests` (11), `ShareMemberDeactivationTests` (4)
   only if its parent holds it. Negative tests: replace-then-read another attachment, replace-then-read a later version by
   the owner, replace on an unshared attachment id, replace after parent narrowing, cross-record and cross-tenant ids.
 - Downloads stay backend-mediated with per-document authorization, encryption and audit (§4C.4).
+
+### 3.6.1 Replacement through a share (owner decision 2026-11-27, C-196)
+
+The extension "bounded by the parent share's effective scope" above cannot hold for a delegated share: its parent covers only the
+earlier version, and extending the parent would show the new version to the upstream manager. Resolution: `canReplaceDocument` may be
+set only on a share the record owner grants directly (depth 1, no parent, resolved lineage) with the Contributor or Manager role; a
+delegated share never carries it, and a request for it is rejected (`DOCUMENT_REPLACE_REQUIRES_OWNER_GRANT`), never silently
+reduced. Viewing and downloading still delegate. A replacement is exactly the next verified version of the one shared attachment,
+with no other content change, behind the contributor-write switch; only the replacing share's boundary advances, in the content
+commit that accepts the version; no other share is extended; if more than one of the actor's shares could authorize it, it is refused
+(`DOCUMENT_REPLACE_SHARE_AMBIGUOUS`).
 - Entry (repeating-group instance) shares stay refused in C10 (`FIELD_IN_REPEATING_GROUP`); their design is deferred.
 
 ### 3.7 Ownership transfer (approved, C-194: single step with mandatory step-up)
@@ -412,7 +423,7 @@ rejected; strict specification validation; frontend lint, typecheck, build and 6
 | WP6 ExpireShare | Done | §4 tests 8, 9, 13, 16 need real infrastructure |
 | WP7 step-up | Done | Staging and production refuse the development substitute |
 | WP8-A documents | Done | Version boundary from Authority-verified attachment rows (Option A); attachments accepted before it are refused until their record's next accepted commit (production-readiness obligation; backfill deferred) |
-| WP8-B replacement through a share | **Not implemented** | §10.2 |
+| WP8-B replacement through a share | Done (Development/Test) | §3.6.1, §10.2; under the existing CARV; independent review must confirm no increment is needed |
 | WP9 journal and history | Done | Every committed expiry change listed (D6) |
 | WP10 lineage dry run | Done | Execution remains unauthorized |
 | WP11 business adapters | Done | M2: PATCH, details, effective scope, histories, `/me/access`, member reassignment |
@@ -449,8 +460,11 @@ M3 pages: PG-022 (edit, history), PG-023, PG-053 (transfer, member reassignment)
   rule (`ShareDocuments.Covers`) would later invalidate the child. Extending the parent too would show the new version to the
   upstream manager, contradicting "versions added by anyone else stay invisible". Recommended reading: replacement through a share
   only on owner-granted (depth 1) shares; a delegated share is refused `canReplaceDocument`.
-- **Estimate (observed Claude Code speed):** best 1 h, expected 2 h, worst 3.5 h including tests. Requires: owner choice of the
-  delegation reading, and independent confirmation that no CARV increment is needed.
+- **Implemented (owner decision 2026-11-27, §3.6.1):** the share-scoped classification (`ContentDeltaRules.ClassifyShareScoped`) admits
+  the replaceable attachment through one narrow branch (rule table unchanged); `AuthorizeMutations` (Prepare and Commit) allows it
+  as the only change of the operation; `ShareDocumentReplacement.RequireAtCommit` re-derives the next verified version, record,
+  organization and clean scan from the staged bytes and accepted leaves; `ShareDocumentReadability.ReplaceableAsync` derives the
+  authorizing share from committed state at Prepare and again at Commit; the boundary advances in the commit transaction.
 - **If CARV 4 were nevertheless chosen** (e.g. a Prepare-only envelope-freshness check is required): `CurrentVersion = 4`, a fourth
   floor migration with its exact definition added to the recognized set, and the existing guard tests; owner authorization required.
 

@@ -13287,6 +13287,16 @@
               "string"
             ],
             "format": "int32"
+          },
+          "replaceableDocumentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },

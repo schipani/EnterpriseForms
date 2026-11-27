@@ -13864,6 +13864,15 @@
             "items": {
               "$ref": "#/components/schemas/VerifiedProjectionItem"
             }
+          },
+          "replaceable_items": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/VerifiedProjectionItem"
+            }
           }
         }
       },

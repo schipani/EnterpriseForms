@@ -113,7 +113,9 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
             verified.LayoutPurpose.ToString(),
             verified.CreatedFormVersionNumber,
             verified.EditLayoutVersion?.FormVersionId,
-            verified.EditLayoutVersion?.VersionNumber);
+            verified.EditLayoutVersion?.VersionNumber,
+            // C10 WP8-B (advisory for the UI): documents the share recipient may replace; the Authority decides at Prepare and Commit.
+            verified.IsComplete || !Lifecycle.RecordLifecycle.IsContentEditable(verified.Header.RecordStatus) ? null : verified.Verification.ReplaceableItems?.Select(i => i.ItemId).ToList());
     }
 
     /// <summary>

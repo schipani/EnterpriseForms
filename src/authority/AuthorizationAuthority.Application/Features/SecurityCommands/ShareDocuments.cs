@@ -17,7 +17,9 @@ internal static class ShareDocuments
     public const int MaximumDocuments = 100;
 
     /// <summary>The verified current version of each named attachment, after the entry rules; refuses anything else.</summary>
-    public static Dictionary<Guid, int> Resolve(IReadOnlyList<ShareDocumentEntry> documents, IReadOnlyList<RecordManifestLeaf> acceptedLeaves)
+    /// <param name="ownerGranted">True only for a share the record owner grants directly (depth 1, no parent, resolved lineage).</param>
+    /// <param name="role">The share's recipient role relation (reader, contributor, manager).</param>
+    public static Dictionary<Guid, int> Resolve(IReadOnlyList<ShareDocumentEntry> documents, IReadOnlyList<RecordManifestLeaf> acceptedLeaves, bool ownerGranted, string role)
     {
         if (documents.Count > MaximumDocuments || documents.Select(d => d.FileAttachmentId).Distinct().Count() != documents.Count)
         {
@@ -33,9 +35,16 @@ internal static class ShareDocuments
                 throw AuthorityException.Invalid("a shared document must allow viewing; downloading and replacing each require viewing");
             }
 
-            if (document.CanReplaceDocument)
+            // C10 WP8-B (owner decision 2026-11-27, WP-0 Section 3.6.1): replacement only through a share the owner grants directly, and
+            // only with a role that can edit. A request that asks for more is refused, never silently reduced.
+            if (document.CanReplaceDocument && !ownerGranted)
             {
-                throw new AuthorityException(AuthorityErrorCodes.DocumentReplaceNotSupported, 422, false, "replacing a document through a share is not available");
+                throw new AuthorityException(AuthorityErrorCodes.DocumentReplaceRequiresOwnerGrant, 422, false, "only a share granted directly by the record owner may allow replacing a document");
+            }
+
+            if (document.CanReplaceDocument && role is not ("contributor" or "manager"))
+            {
+                throw AuthorityException.Invalid("replacing a document needs the Contributor or Manager role");
             }
 
             if (!attachments.TryGetValue(document.FileAttachmentId, out var leaf))

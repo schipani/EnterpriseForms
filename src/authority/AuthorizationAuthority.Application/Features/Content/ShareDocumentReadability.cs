@@ -38,33 +38,7 @@ internal static class ShareDocumentReadability
             return ([], []);
         }
 
-        var shares = (await scope.GetActiveResourcesByParentAsync(organizationId, formRecordId, [ResourceTypeNames.RecordShare], cancellationToken).ConfigureAwait(false))
-            .Where(r => r.OrganizationId == organizationId && r.ResourceLifecycleState == ResourceLifecycleStates.Active).ToDictionary(r => r.ResourceEntityId);
-        var edges = (await scope.GetActiveShareEdgesAsync(organizationId, [.. shares.Keys], cancellationToken).ConfigureAwait(false))
-            .Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null).ToList();
-        var teams = edges.Where(e => e.ResourceTypeName == ResourceTypeNames.RecordShare && e.SubjectTypeName == ResourceTypeNames.Team).Select(e => e.SubjectEntityId).Distinct().ToList();
-        var memberOf = teams.Count == 0 ? [] : (await scope.GetActiveTeamMemberEdgesAsync(organizationId, teams, cancellationToken).ConfigureAwait(false))
-            .Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null && e.SubjectTypeName == ResourceTypeNames.User && e.SubjectEntityId == userId)
-            .Select(e => e.ResourceEntityId).ToHashSet();
-        var held = edges.Where(e => e.ResourceTypeName == ResourceTypeNames.RecordShare && e.RelationshipName is "reader" or "contributor" or "manager" &&
-                                    ((e.SubjectTypeName == ResourceTypeNames.User && e.SubjectRelationName.Length == 0 && e.SubjectEntityId == userId) ||
-                                     (e.SubjectTypeName == ResourceTypeNames.Team && e.SubjectRelationName == "participant" && memberOf.Contains(e.SubjectEntityId))))
-            .Select(e => e.ResourceEntityId).Where(shares.ContainsKey).ToHashSet();
-
-        var live = new HashSet<Guid>();
-        foreach (var shareId in held)
-        {
-            if (ShareLineageExpiry.Evaluate(await LineageAsync(scope, organizationId, shareId, cancellationToken).ConfigureAwait(false), organizationId, formRecordId, shareId, decisionInstant).Status == ShareLineageStatus.Active)
-            {
-                live.Add(shareId);
-            }
-        }
-
-        var bindings = live.Count == 0 ? [] : (await scope.GetShareDocumentBindingsAsync(organizationId, [.. live], cancellationToken).ConfigureAwait(false))
-            .Where(b => b.OrganizationId == organizationId && live.Contains(b.RecordShareId) &&
-                        edges.Any(e => e.ResourceTypeName == ResourceTypeNames.DocumentItem && e.ResourceEntityId == b.FileAttachmentId && e.RelationshipName == "shared_via" &&
-                                       e.SubjectTypeName == ResourceTypeNames.RecordShare && e.SubjectEntityId == b.RecordShareId))
-            .ToList();
+        var bindings = (await LiveHeldBindingsAsync(scope, organizationId, formRecordId, userId, decisionInstant, cancellationToken).ConfigureAwait(false)).Select(h => h.Binding).ToList();
 
         var viewable = new List<VerifiedProjectionItem>();
         var downloadable = new List<VerifiedProjectionItem>();
@@ -85,6 +59,59 @@ internal static class ShareDocumentReadability
         }
 
         return (viewable, downloadable);
+    }
+
+    /// <summary>
+    /// C10 WP8-B (owner decision 2026-11-27, WP-0 Section 3.6.1): for each attachment the user may replace through a share, the shares that
+    /// authorize it: held by the user (directly or through an active team) as Contributor or Manager, Active with Active lineage at the
+    /// instant, granted directly by the owner (depth 1, no parent, resolved lineage), with a live document edge and a binding that allows
+    /// viewing and replacing. Desired committed state only; the content service applies it at Prepare and again at Commit.
+    /// </summary>
+    public static async Task<Dictionary<Guid, List<Domain.Features.Sharing.ShareDocumentBinding>>> ReplaceableAsync(IAuthorityScope scope, Guid organizationId, Guid formRecordId, Guid userId,
+        DateTimeOffset instant, CancellationToken cancellationToken) =>
+        (await LiveHeldBindingsAsync(scope, organizationId, formRecordId, userId, instant, cancellationToken).ConfigureAwait(false))
+            .Where(h => h.OwnerGranted && h.Role is "contributor" or "manager" && h.Binding.CanViewDocument && h.Binding.CanReplaceDocument)
+            .GroupBy(h => h.Binding.FileAttachmentId)
+            .ToDictionary(g => g.Key, g => g.Select(h => h.Binding).ToList());
+
+    /// <summary>The live document bindings of the shares the user holds on the record, with the held role and whether the owner granted the share directly.</summary>
+    private static async Task<List<(Domain.Features.Sharing.ShareDocumentBinding Binding, string Role, bool OwnerGranted)>> LiveHeldBindingsAsync(IAuthorityScope scope, Guid organizationId, Guid formRecordId,
+        Guid userId, DateTimeOffset instant, CancellationToken cancellationToken)
+    {
+        var shares = (await scope.GetActiveResourcesByParentAsync(organizationId, formRecordId, [ResourceTypeNames.RecordShare], cancellationToken).ConfigureAwait(false))
+            .Where(r => r.OrganizationId == organizationId && r.ResourceLifecycleState == ResourceLifecycleStates.Active).ToDictionary(r => r.ResourceEntityId);
+        var edges = (await scope.GetActiveShareEdgesAsync(organizationId, [.. shares.Keys], cancellationToken).ConfigureAwait(false))
+            .Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null).ToList();
+        var teams = edges.Where(e => e.ResourceTypeName == ResourceTypeNames.RecordShare && e.SubjectTypeName == ResourceTypeNames.Team).Select(e => e.SubjectEntityId).Distinct().ToList();
+        var memberOf = teams.Count == 0 ? [] : (await scope.GetActiveTeamMemberEdgesAsync(organizationId, teams, cancellationToken).ConfigureAwait(false))
+            .Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null && e.SubjectTypeName == ResourceTypeNames.User && e.SubjectEntityId == userId)
+            .Select(e => e.ResourceEntityId).ToHashSet();
+        var held = edges.Where(e => e.ResourceTypeName == ResourceTypeNames.RecordShare && e.RelationshipName is "reader" or "contributor" or "manager" && shares.ContainsKey(e.ResourceEntityId) &&
+                                    ((e.SubjectTypeName == ResourceTypeNames.User && e.SubjectRelationName.Length == 0 && e.SubjectEntityId == userId) ||
+                                     (e.SubjectTypeName == ResourceTypeNames.Team && e.SubjectRelationName == "participant" && memberOf.Contains(e.SubjectEntityId))))
+            .GroupBy(e => e.ResourceEntityId)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.RelationshipName).Distinct().Order(StringComparer.Ordinal).First());
+
+        var live = new Dictionary<Guid, (string Role, bool OwnerGranted)>();
+        foreach (var (shareId, role) in held)
+        {
+            var chain = await LineageAsync(scope, organizationId, shareId, cancellationToken).ConfigureAwait(false);
+            if (ShareLineageExpiry.Evaluate(chain, organizationId, formRecordId, shareId, instant).Status == ShareLineageStatus.Active)
+            {
+                live[shareId] = (role, chain[shareId].Metadata is { ParentRecordShareId: null, DelegationDepth: 1, LegacyLineageUnresolved: false });
+            }
+        }
+
+        if (live.Count == 0)
+        {
+            return [];
+        }
+
+        return [.. (await scope.GetShareDocumentBindingsAsync(organizationId, [.. live.Keys], cancellationToken).ConfigureAwait(false))
+            .Where(b => b.OrganizationId == organizationId && live.ContainsKey(b.RecordShareId) &&
+                        edges.Any(e => e.ResourceTypeName == ResourceTypeNames.DocumentItem && e.ResourceEntityId == b.FileAttachmentId && e.RelationshipName == "shared_via" &&
+                                       e.SubjectTypeName == ResourceTypeNames.RecordShare && e.SubjectEntityId == b.RecordShareId))
+            .Select(b => (b, live[b.RecordShareId].Role, live[b.RecordShareId].OwnerGranted))];
     }
 
     private static async Task<Dictionary<Guid, ShareLineageNode>> LineageAsync(IAuthorityScope scope, Guid organizationId, Guid shareId, CancellationToken cancellationToken)

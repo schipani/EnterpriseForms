@@ -136,4 +136,5 @@ public sealed record VerifyRecordProjectionResult(
     IReadOnlyList<VerifiedProjectionItem>? ReadableItems = null,
     IReadOnlyList<VerifiedProjectionItem>? EditableItems = null,
     bool ContributorWritesEnabled = false,
-    IReadOnlyList<VerifiedProjectionItem>? DownloadableItems = null);
+    IReadOnlyList<VerifiedProjectionItem>? DownloadableItems = null,
+    IReadOnlyList<VerifiedProjectionItem>? ReplaceableItems = null);

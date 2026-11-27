@@ -289,8 +289,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C10_WP0_SHARING_OWNERSHIP_PROPOSAL.md",
-      "sha256": "7940dd75d138260f1c2fd94ebc1a34991f76a7a5f2b38e9ebe50bca085c05672",
-      "bytes": 49378
+      "sha256": "2c7617f795ec8667db35aafc06897eabb8eb3678aa322698c9b7dead30df3b1f",
+      "bytes": 50932
     },
     {
       "path": "docs/architecture/PHASE_C3_REPEATING_GROUPS_AND_DEPENDENT_DROPDOWNS.md",
@@ -489,8 +489,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "38460bbbad1e929ce470f6a3b67d400986f59c0bbbdbcc31e55edccbfbcb3e6d",
-      "bytes": 361266
+      "sha256": "ebbef786cd9c1c47c93559b89693f3dd534f5e82f229de4d50886baa2511e7dd",
+      "bytes": 362969
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

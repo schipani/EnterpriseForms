@@ -306,7 +306,7 @@ function CreateShareDialog({ formRecordId, projection, contributorWritesEnabled,
           {hasEntries ? <p className="text-sm text-muted">Fields in sections that allow multiple entries cannot be shared on their own.</p> : null}
           {canChange ? <p className="text-sm text-muted">A person with this role can change the values of the selected fields, except those marked View only. They cannot clear values, change multiple choices, entries, documents or related records.</p> : null}
         </fieldset>
-        <ShareDocumentSelection documents={projection.documents} selection={documents} onChange={setDocuments} />
+        <ShareDocumentSelection documents={projection.documents} selection={documents} onChange={setDocuments} allowReplace={projection.permissions.canTransferOwnership && role !== "Reader"} />
         {create.isError ? <ErrorPanel error={create.error} /> : null}
       </div>
     </Dialog>

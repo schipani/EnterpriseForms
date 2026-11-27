@@ -13,7 +13,7 @@ namespace AuthorizationAuthority.Tests;
 /// <summary>
 /// C10 WP8-A (WP-0 Section 3.6): document entries of a share. Document-only, field-only and mixed shares are accepted and an empty
 /// scope is refused; each document must be an attachment of the accepted content with Authority-verified version evidence, whose
-/// version becomes the share's boundary; view is required; replacement is refused until WP8-B; a delegated share stays within the
+/// version becomes the share's boundary; view is required; replacement needs an editing role (WP8-B); a delegated share stays within the
 /// parent's documents, flags and version boundary; revocation removes document edges through the existing cascade.
 /// </summary>
 public sealed class ShareDocumentCreationTests
@@ -107,7 +107,7 @@ public sealed class ShareDocumentCreationTests
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => CreateAsync(owner, reader, RecipientRoles.Reader, [], [View(field)]))); // a field item is not a document
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => CreateAsync(owner, reader, RecipientRoles.Reader, [], [new(statement, false, true, false)])));
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => CreateAsync(owner, reader, RecipientRoles.Reader, [], [View(statement), View(statement)])));
-        Assert.Equal(AuthorityErrorCodes.DocumentReplaceNotSupported, await RefusedAsync(() => CreateAsync(owner, reader, RecipientRoles.Contributor, [], [new(statement, true, false, true)])));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => CreateAsync(owner, reader, RecipientRoles.Reader, [], [new(statement, true, false, true)]))); // replace needs an editing role
         Assert.Equal(AuthorityErrorCodes.DocumentVersionEvidenceUnavailable, await RefusedAsync(() => CreateAsync(owner, reader, RecipientRoles.Reader, [], [View(legacy)])));
         Assert.Empty(store.DocumentBindings);
         Assert.DoesNotContain(store.Edges, e => e.ResourceTypeName == ResourceTypeNames.DocumentItem);
@@ -146,5 +146,25 @@ public sealed class ShareDocumentCreationTests
         Assert.False(HasDocumentEdge(parent, statement));
         Assert.False(HasDocumentEdge(child, statement));
         Assert.Equal(ResourceLifecycleStates.Invalidated, store.Resources.Single(r => r.ResourceEntityId == child).ResourceLifecycleState);
+    }
+
+    [Fact]
+    public async Task OnlyAnOwnerGrantedEditingShareMayAllowReplacementAndADelegatedRequestIsRejectedNotStripped()
+    {
+        var direct = await CreateAsync(owner, manager, RecipientRoles.Manager, [], [new(statement, true, true, true)]);
+        Assert.True(store.DocumentBindings.Single(b => b.RecordShareId == direct).CanReplaceDocument);
+
+        var refused = await RefusedAsync(() => CreateAsync(manager, reader, RecipientRoles.Contributor, [], [new(statement, true, false, true)], direct));
+        Assert.Equal(AuthorityErrorCodes.DocumentReplaceRequiresOwnerGrant, refused);
+        var viewOnlyChild = await CreateAsync(manager, reader, RecipientRoles.Reader, [], [View(statement)], direct); // view and download still delegate
+        Assert.False(store.DocumentBindings.Single(b => b.RecordShareId == viewOnlyChild).CanReplaceDocument);
+
+        var update = new UpdateShareScopePayload(viewOnlyChild, record, RecipientRoles.Contributor, [], store.ShareMetadata.Single(m => m.RecordShareId == viewOnlyChild).ShareRevision,
+            HumanCommandStepUpGate.SyntheticStepUpEvidence, direct, null, [new(statement, true, false, true)]);
+        Assert.Equal(AuthorityErrorCodes.DocumentReplaceRequiresOwnerGrant, await RefusedAsync(() => new SecurityCommandService(store, new NoOpFaultInjector(), TimeProvider.System, FieldSearchApprovalGate.Unavailable, humanCommandGate: Gate).SubmitAsync(
+            new VerifiedActor("https://idp", owner.ToString("N"), "test"),
+            new SecurityCommandRequest(org, SecurityCommandKind.UpdateShareScope, new ResourceRef(ResourceKind.FormRecord, record), store.Organizations.Single().AuthorizationRevision, JsonSerializer.SerializeToElement(update, CanonicalJson.Options)),
+            "doc-update-replace-1", Guid.NewGuid(), Ct)));
+        Assert.False(store.DocumentBindings.Single(b => b.RecordShareId == viewOnlyChild).CanReplaceDocument);
     }
 }

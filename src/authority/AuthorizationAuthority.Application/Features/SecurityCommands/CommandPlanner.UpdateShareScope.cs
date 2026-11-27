@@ -110,7 +110,8 @@ public static partial class CommandPlanner
         }
 
         // Each kept or added document's boundary becomes its current verified version (WP-0 Section 3.6: an update extends it).
-        var documentVersions = ShareDocuments.Resolve(documents, leaves);
+        var documentVersions = ShareDocuments.Resolve(documents, leaves,
+            ownerGranted: metadata is { ParentRecordShareId: null, DelegationDepth: 1, LegacyLineageUnresolved: false }, role);
         if (metadata.ParentRecordShareId is { } documentParent)
         {
             await ShareDocuments.RequireWithinParentAsync(scope, organizationId, documentParent, documents, documentVersions, cancellationToken).ConfigureAwait(false);

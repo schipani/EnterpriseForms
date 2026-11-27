@@ -60,7 +60,7 @@ export function EditShareDialog({ formRecordId, share, projection, onClose }: { 
   const loaded = details.data;
   const role = edits.role ?? loaded?.recipientRole ?? share.recipientRole;
   const selected = edits.selected ?? new Set((loaded?.fieldKeys ?? []).filter((key) => shareable.includes(key)));
-  const documents: DocumentSelection = edits.documents ?? new Map((loaded?.documents ?? []).map((d) => [d.fileAttachmentId, { download: d.canDownloadDocument }]));
+  const documents: DocumentSelection = edits.documents ?? new Map((loaded?.documents ?? []).map((d) => [d.fileAttachmentId, { download: d.canDownloadDocument, replace: d.canReplaceDocument }]));
   const noExpiry = edits.noExpiry ?? !loaded?.shareExpiresOn;
   const expiry = edits.expiry ?? (loaded?.shareExpiresOn ? toLocalInput(loaded.shareExpiresOn, timeZone) : "");
   const parsedExpiry = noExpiry ? undefined : fromLocalInput(expiry, timeZone);
@@ -150,7 +150,8 @@ export function EditShareDialog({ formRecordId, share, projection, onClose }: { 
               ))}
               {unnamedItems > 0 ? <p className="text-sm text-muted">This share also covers {unnamedItems} earlier value(s) the record no longer holds; saving keeps only the fields selected here.</p> : null}
             </fieldset>
-            <ShareDocumentSelection documents={projection.documents ?? []} selection={documents} onChange={(next) => setEdits((current) => ({ ...current, documents: next }))} />
+            <ShareDocumentSelection documents={projection.documents ?? []} selection={documents} onChange={(next) => setEdits((current) => ({ ...current, documents: next }))}
+              allowReplace={!loaded.parentRecordShareId && !loaded.legacyLineageUnresolved && role !== "Reader"} />
             <Checkbox label="No expiry" checked={noExpiry} onCheckedChange={(checked) => setEdits((current) => ({ ...current, noExpiry: checked === true }))} />
             {!noExpiry ? (
               <TextInput

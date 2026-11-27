@@ -4086,6 +4086,7 @@ export interface components {
             editLayoutVersionId?: null | string;
             /** Format: int32 */
             editLayoutVersionNumber?: null | number | string;
+            replaceableDocumentIds?: null | string[];
         };
         RecordProjectionSummaryResponse: {
             recordReference: string;

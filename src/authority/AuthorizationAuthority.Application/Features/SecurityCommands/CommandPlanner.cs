@@ -996,7 +996,7 @@ public static partial class CommandPlanner
             throw AuthorityException.Invalid("field_item_ids must reference items in the accepted manifest");
         }
 
-        var documentVersions = ShareDocuments.Resolve(documents, leaves);
+        var documentVersions = ShareDocuments.Resolve(documents, leaves, ownerGranted: graph.IsRecordOwner(actor.AuthorityUserId, payload.FormRecordId) && payload.ParentRecordShareId is null, role);
 
         var isOwner = graph.IsRecordOwner(actor.AuthorityUserId, payload.FormRecordId);
 
