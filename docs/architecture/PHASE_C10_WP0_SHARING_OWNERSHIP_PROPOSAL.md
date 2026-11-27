@@ -167,6 +167,11 @@ no other content change, behind the contributor-write switch, and only while the
 boundary (a later version by the owner can neither be seen nor superseded through the share; independent review D-2, §10.4); only the replacing share's
 boundary advances, in the content commit that accepts the version; no other share is extended; if more than one of the actor's shares
 could authorize it, it is refused (`DOCUMENT_REPLACE_SHARE_AMBIGUOUS`).
+- **Version and content rule on every content path (owner decisions 1 and 2, 2026-11-27, §10.5).** An attachment that stays in the
+  record is either the same version with unchanged verified content or exactly the next version; a lower number, a skipped number or
+  new content under the accepted number is refused, at Prepare and at Commit, owner path included (protection migration exempt).
+  The business numbers a new version from the attachment's accepted version. A boundary extended by a replacement advances the share
+  revision (its ETag) and is journalled as `ShareDocumentBoundaryExtended`.
 - Entry (repeating-group instance) shares stay refused in C10 (`FIELD_IN_REPEATING_GROUP`); their design is deferred.
 
 ### 3.7 Ownership transfer (approved, C-194: single step with mandatory step-up)
@@ -382,7 +387,7 @@ flows working, plus the SRC-1 page-id comment corrections (C-193: with the first
 | M1-WP6 ExpireShare | Internal kind, `ShareExpiryLoop`, plan-shape guard, derived attribution, deterministic key, clock sanity stop, metrics | §4 tests 1–20 |
 | M1-WP7 Step-up (G27) | `RequireStepUp` on human-initiated `TransferOwnership`, `CreateShare`, `UpdateShareScope`, `RevokeShare`; development substitute only in Development/Testing; staging/production fail closed (`PB08_STEP_UP_NOT_AVAILABLE`) | Each command refused without step-up; deterministic enforcement unaffected (§4 test 20); a production configuration refuses the substitute at startup |
 | M1-WP8 Document items | `document_item` resources; view/download/replace flags; version binding; replacement-through-share extension | §3.6 negative tests |
-| M1-WP9 Journal and timeline | `ShareExpired`, `ShareInvalidated`, `ShareScopeUpdated` journal events and allowlisted timeline kinds; record-scoped history query (Authority side) | Envelopes allowlisted; pending commands visible as pending; archive receipts |
+| M1-WP9 Journal and timeline | `ShareExpired`, `ShareInvalidated`, `ShareScopeUpdated` journal events (and `ShareDocumentBoundaryExtended`, §10.5) and allowlisted timeline kinds; record-scoped history query (Authority side) | Envelopes allowlisted; pending commands visible as pending; archive receipts |
 | M1-WP10 Legacy lineage dry-run tool | Read-only report of §5.1 (operator CLI inside the Authority deployment, like the existing recovery commands) | Read-only on disposable stacks with seeded legacy shares; covers every class; redaction verified; no write path exists |
 | M1-WP11 Business adapters | Minimal: pass `parentRecordShareId`, expiry and step-up evidence through the existing share and transfer handlers; map the new refusals; `RECORD_OWNERSHIP_TRANSFERRED` projection keyed by `security_command_id`; OpenAPI and clients regenerated | Existing flows pass with step-up in Development/Testing; contract tests for the new refusals |
 | M1-WP12 SRC-1 | Page-id comment corrections: `UploadCenterPage.tsx` (PG-010), `FormsPage.tsx` (PG-012), `NewRecordPage.tsx` (PG-014), `DesignerPage.tsx` and `DesignerCanvas.tsx` (PG-029), `ChildRecordList.tsx` (PG-018), `RecordAccessPanel.tsx` (PG-022, the sharing manager embedded in PG-016) | Comment-only diff |
@@ -515,7 +520,7 @@ been relaxed to "above the accepted version", which contradicted C-196 and let a
 number; it is restored to exactly the next version. History readers are authorized only through Effective grants. The overlay's
 descendant read is set-based (N-1). F1 comment wording corrected.
 
-**Not corrected — owner decision required:**
+**Not corrected — owner decision required** (decided 2026-11-27; dispositions in §10.5):
 
 - **Replacement after an unaccepted upload (functional, fail closed; found during correction):** the business assigns
   `max(every version row) + 1`, so after any upload that was never accepted the next number skips one and replacement through a share
@@ -556,3 +561,35 @@ rollback after the boundary change; business upload admission and document handl
 continuation rule (F-8); §4 tests 8, 9 and 13. §4 test 16 and the generic-bypass rule are now asserted statically
 (`ExpireShareInventoryTests`: no published contract or route names `ExpireShare`; only `ShareExpiryConvergenceService` records it
 and only `ShareExpiryLoop` drives it).
+
+### 10.5 Final bounded corrections (owner decisions of 2026-11-27; Development/Test, not acceptance)
+
+Owner decisions 1–5 on §10.4. Implemented in `3d1406da` and `1de30596` on `coord/c10-m1-candidate-r2`; re-examined by the same three
+reviewer agents (fresh context, read-only; Claude Code subagents, not a human or external review), limited to the corrected areas.
+No CARV increment, content-acceptance floor migration or deployment-fencing change.
+
+| Finding | Disposition |
+| --- | --- |
+| D-1 (decision 1) | **Corrected.** Content identity = SHA-256 over the attachment row's own Content-class canonical column frames (name length, name, framed value: the bytes the row signature covers; no key, signature or exchanged format). Prepare compares each attachment with the verified current snapshot; Commit recomputes the candidate values from the verified staged rows and takes the accepted ones from the accepted leaf (`record_manifest_leaves.attachment_content_fingerprint`) or, for a head accepted before the evidence existed, from what this operation's Prepare verified (`content_candidate_leaves.accepted_attachment_*`). Same version: content must be equal; lower or skipped number: refused; no evidence or disagreeing evidence: refused. Evidence is written with the accepted commit. Migration `AuthorityC10AttachmentContentEvidence` (three nullable columns, two checks). Reviewers: resolved for every C10 build on owner and share paths; no CARV increment (Commit re-derives or refuses) |
+| Version gaps (decision 2) | **Corrected.** A replacement is numbered from the attachment's accepted version (`file_attachments.current_version_number`); commit refuses a stale number before anything is staged (`DOCUMENT_VERSION_SUPERSEDED`) and corrects the local projection from the verified record. Processed copies may share a number (partial unique index, `BusinessC10ProcessedVersionNumbers`); object keys name the upload session, so uploads never share an object. Exactly one version is accepted per number (exactly-next, content rule, item identity rules, head compare-and-set). Version history and historic download use the copy whose operation the Authority's accepted history names (newest revision first, at most 8 revisions; otherwise no copy, fail closed). No historical version renumbered |
+| D-5 (decision 3) | **Corrected.** In the content commit transaction: the binding boundary, the share revision (checked increment; the share ETag) and one `ShareDocumentBoundaryExtended` entry on the hash-chained, archived audit stream (identifiers, revisions and version numbers; no document id or scope; catalogued for the Security Auditor timeline). Aborted commits and replays change nothing; a stale `If-Match` is refused by the existing `STALE_SHARE_REVISION` rule. **Replay rule:** a recovery that re-applies accepted content heads must re-apply each archived `ShareDocumentBoundaryExtended` (binding id, shared-through version, share revision) after its `ContentHeadCommitted`; until then the recipient lacks the new version (fail closed). Recorded for G14; not implemented as a recovery step |
+| F-6 (decision 4) | **Corrected.** A caller without full read resolves field keys only against the value items it can read itself (one Authority-verified read, the same whatever keys are asked), before any field is inspected: unknown, empty, repeating and unreadable fields all give `FIELD_NOT_IN_SHAREABLE_SCOPE` (403); rows outside that set are not sent. The Authority still caps a delegated scope by its named parent share. (A first version used the parent share's effective scope, which the Authority does not serve to that share's own recipient; found by the re-review and replaced.) |
+| F4 | **Corrected.** The transfer page replays a pending transfer under the same idempotency key (bounded); one still pending keeps its key, and "Check again" replays the same command. The handler records `RECORD_OWNERSHIP_TRANSFERRED` once, when Effective. A transfer abandoned while pending (page closed) still has no business projection: the Authority journal and ownership history remain complete (accepted limitation) |
+| F6 | **Corrected (display).** The share list shows the Authority's lifecycle state of each locally Active share it can read there; otherwise, or on any Authority error, the local status. One Authority read per locally Active share (cost noted) |
+| N-2 | **Corrected.** The ownership view reads the commands of the record's owner edges; both views filter before truncating, and a capped share view stops at the oldest command read |
+| Read audit (N-3) | **Corrected as required by CLAUDE.md §4D** (read operations captured; access to audit audited): `RECORD_OWNERSHIP_HISTORY_VIEWED` and `MEMBER_OWNED_RECORDS_VIEWED` (identifiers and counts), written after the Authority allowed the read; a failed audit write fails the read. The AC-8 audit-read contract defers PG-053 and is unchanged |
+| Child-record transfer (pre-existing) | **Not corrected — reported (owner instruction).** It conflicts with mandatory requirements: §2 invariant 6, §3.4.1 and §3.7 ("former owner loses owner-derived rights"), CLAUDE.md §4B (one owner at every committed state) and §4S (child ownership derives from the parent). It is exploitable for insider retention: the parent owner transfers the child to themself (or to their team; the self-transfer refusal applies to administrators only), then transfers the parent, and keeps full owner rights on the child. An administrator's transfer of a child does not remove the parent owner. **Minimum correction:** `TransferOwnership` refuses a record that has a parent (owner and administrator paths) with a clear code (transfer the parent, or unlink first); the business maps it and the UI hides transfer for child records; tests for both paths and for a parent transfer moving the child. Optional hardening: ignore direct owner edges on records with a parent edge, and check Development/Test data for existing ones |
+
+**Existing-record compatibility limitations.**
+- A head accepted before the content evidence works through the Prepare-observed fallback; the first such commit writes evidence onto every attachment leaf.
+- An operation prepared by a pre-C10 Authority build that carries a legacy-head attachment is refused at Commit (422).
+- A pre-C10 Authority build serving writes at the same CARV can still accept new bytes under an accepted number and erase evidence (no fencing, by decision). Before D-1 is claimed in a shared environment, the deployment inventory must show that no pre-C10 Authority build serves content writes (deferred obligation).
+- A stale local `current_version_number` (crash between the Authority commit and the projection update) makes the next upload superseded; the user uploads again. The version is bound into the encryption AAD, so it cannot be renumbered.
+- Production backfill of evidence remains deferred.
+
+**Missing evidence (Stage B or staging):**
+- real PostgreSQL proof of the new checks, the partial index, NULL behaviour of older EF models and commit rollback after the boundary change;
+- business handler tests of concurrent uploads and of the stale-number refusal against real stores;
+- an end-to-end test of delegated share creation and update against the real Authority (the F-6 regression would have been caught there);
+- an end-to-end test that an ETag read before an extension is refused after it.
+
