@@ -111,6 +111,8 @@ public sealed class C10DatabaseVerificationTests(StageBFixture fixture)
             {
                 await fixture.Authority.WaitReadyAsync(TimeSpan.FromSeconds(180));
                 await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/fault-injection", new { fault_name = "None" });
+                // The crash restarted the Authority process, which drops the in-memory Testing contributor-writes override; re-arm it.
+                Assert.True((await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/testing/contributor-writes", new { enabled = (bool?)true })).IsSuccess);
             }
 
             Assert.False(failed.IsSuccess, failed.Body);

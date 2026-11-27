@@ -176,7 +176,7 @@ public sealed class C10ShareLifecycleTests(StageBFixture fixture)
         await s.WaitGateReadyAsync(Settle);
         Assert.Equal(revision + 1, await ShareRevisionAsync(s, record, share));
         var stale = await UpdateShareAsync(s, s.Clerk, record, share, revision, "Reader", ["family_name"]);
-        Assert.Equal((HttpStatusCode.PreconditionFailed, "STALE_SHARE_REVISION"), (stale.Status, stale.ErrorCode));
+        Assert.Equal((HttpStatusCode.PreconditionFailed, "PRECONDITION_FAILED"), (stale.Status, stale.ErrorCode)); // the Authority's STALE_SHARE_REVISION is the PB-06 precondition failure
         var reader = await UntilAsync(() => s.ProjectionAsync(s.Reader, record), r => r.IsSuccess && VisibleKeys(r).SequenceEqual(["given_name"]), Settle);
         Assert.Equal(["given_name"], VisibleKeys(reader));
 
@@ -401,12 +401,9 @@ public sealed class C10ShareLifecycleTests(StageBFixture fixture)
             // The owner's next version lies outside the boundary: neither visible nor replaceable through the share.
             await s.UploadAsync(s.Clerk, record, "c10-doc-v3.txt", "text/plain", StageBScenario.SyntheticBytes(2048, 13), replacesFileAttachmentId: attachment);
             Assert.Equal(HttpStatusCode.NotFound, (await fixture.DownloadAsync(DownloadPath(record, attachment), s.Token(s.Reader))).Status);
-            var outside = await s.TransferAsync(s.Reader, record, "c10-doc-v4.txt", "text/plain", StageBScenario.SyntheticBytes(512, 14), replacesFileAttachmentId: attachment);
-            if (outside.GetProperty("sessionState").GetString() == "Processed")
-            {
-                var commit = await fixture.Api.PostAsync($"/api/v1/upload-sessions/{outside.GetProperty("uploadSessionId").GetGuid():D}/commit", s.Token(s.Reader), new { });
-                Assert.False(commit.IsSuccess, commit.Body);
-            }
+            // Admission refuses it at begin: the current version is no longer one the Authority lists as replaceable for the recipient.
+            var outside = await fixture.Api.PostAsync("/api/v1/upload-sessions", s.Token(s.Reader), new { formRecordId = record, fieldDefinitionId = s.AccusedFields["case_documents"], originalFileName = "c10-doc-v4.txt", contentType = "text/plain", sizeBytes = 512L, replacesFileAttachmentId = attachment });
+            Assert.False(outside.IsSuccess, outside.Body);
 
             Assert.Equal(1, JournalEvents("ShareDocumentBoundaryExtended", record));
 
