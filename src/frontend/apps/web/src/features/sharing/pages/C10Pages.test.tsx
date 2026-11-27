@@ -13,7 +13,7 @@ const recordId = "0199a2b3-c4d5-7e6f-8123-456789abcdef";
 const shareId = "0199a2b3-c4d5-7e6f-8123-456789abcd01";
 
 const api = {
-  shares: { get: vi.fn(), effectiveScope: vi.fn(), ownershipHistory: vi.fn(), transferOwnership: vi.fn(), mine: vi.fn() },
+  shares: { get: vi.fn(), effectiveScope: vi.fn(), ownershipHistory: vi.fn(), transferOwnership: vi.fn(), mine: vi.fn(), memberOwnedRecords: vi.fn(), reassignRecords: vi.fn() },
   records: { projection: vi.fn() },
   organization: { users: vi.fn() },
 };
@@ -24,13 +24,14 @@ vi.mock("@enterpriseforms/app-runtime", async (importOriginal) => ({
 }));
 
 vi.mock("@tanstack/react-router", () => ({
-  useParams: () => ({ formRecordId: recordId, recordShareId: shareId }),
+  useParams: () => ({ formRecordId: recordId, recordShareId: shareId, memberUserId: "member-1" }),
   Link: ({ children, className }: { children: ReactNode; className?: string }) => <a className={className}>{children}</a>,
 }));
 
 const { ShareDetailsPage } = await import("./ShareDetailsPage");
 const { OwnershipTransferPage } = await import("./OwnershipTransferPage");
 const { MyAccessPage } = await import("./MyAccessPage");
+const { MemberReassignPage } = await import("./MemberReassignPage");
 
 const renderWith = (node: ReactNode) =>
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })}>{node}</QueryClientProvider>);
@@ -115,5 +116,21 @@ describe("C10 M3 pages", () => {
     await waitFor(() => expect(screen.getByText("No records yet")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(api.shares.mine).toHaveBeenCalledTimes(2));
+  });
+
+  it("PG-053 reassignment shows each record's own outcome and conceals the listing from non-administrators", async () => {
+    api.shares.memberOwnedRecords.mockResolvedValue({ result: { memberUserId: "member-1", formRecordIds: ["r1", "r2"], truncated: false, authorizationRevision: 9 } });
+    api.organization.users.mockResolvedValue({ result: [{ userId: "member-1", displayName: "Dana" }, { userId: "carol", displayName: "Carol" }] });
+    api.shares.reassignRecords.mockResolvedValue({ result: { memberUserId: "member-1", truncated: false, records: [{ formRecordId: "r1", commandStatus: "Effective", effective: true, refusalCode: null }, { formRecordId: "r2", commandStatus: "Refused", effective: false, refusalCode: "FORBIDDEN" }] } });
+    const view = renderWith(<MemberReassignPage />);
+
+    expect(await screen.findByText("Records Dana owns directly: 2")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Reassign 2 record(s)" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(api.shares.reassignRecords).not.toHaveBeenCalled();
+    view.unmount();
+
+    api.shares.memberOwnedRecords.mockRejectedValue(new OperationError({ type: "failed", operationId: "op", status: 404, errorCode: "MEMBER_NOT_FOUND", retryable: false }));
+    renderWith(<MemberReassignPage />);
+    expect(await screen.findByText("Reassignment is not available")).toBeTruthy();
   });
 });

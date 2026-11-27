@@ -2,6 +2,7 @@ import type { MemberCommandRequest, OrganizationMemberResponse, OwnerProposalRes
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
 import { Button, Checkbox, Dialog, FieldShell, StatusMessage, TextArea, TextInput, getActiveFormatter, inputClass, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
 import { MEMBER_ACTION_LABELS, memberName, type MemberAction } from "./MemberTable";
@@ -47,7 +48,7 @@ function describe(change: MemberChange): { title: string; description: string; c
       return {
         title: `Disable ${name}'s membership`,
         description:
-          "They are signed out everywhere at once and cannot use the organization. Their roles, teams and shares are kept but unusable, and come back if you re-enable them. People who still own records must have those records transferred first.",
+          "They are signed out everywhere at once and cannot use the organization. Their roles, teams and the shares they hold are kept but unusable, and come back if you re-enable them. Shares they delegated to other people end permanently and do not come back. People who still own records must have those records reassigned first.",
         confirm: "Disable membership",
         danger: true,
       };
@@ -259,6 +260,13 @@ export function MemberChangeDialog({
           onChange={(event) => setReason(event.target.value)}
         />
       )}
+      {change?.kind === "member" && change.action === "DisableMembership" ? (
+        <p className="text-sm">
+          <Link to="/app/members/$memberUserId/reassign" params={{ memberUserId: change.member.userId }}>
+            Reassign {memberName(change.member)}'s records
+          </Link>
+        </p>
+      ) : null}
       {operational ? (
         <Checkbox
           label="Confirm with the development-only step-up"

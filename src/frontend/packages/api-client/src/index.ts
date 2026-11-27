@@ -197,6 +197,9 @@ export type ShareEffectiveScopeResponse = S["ShareEffectiveScopeResponse"];
 export type MyAccessResponse = S["MyAccessResponse"];
 export type MyAccessEntryResponse = S["MyAccessEntryResponse"];
 export type TransferOwnershipRequest = S["TransferOwnershipRequest"];
+export type MemberOwnedRecordsResponse = S["MemberOwnedRecordsResponse"];
+export type ReassignRecordsRequest = S["ReassignRecordsRequest"];
+export type ReassignRecordsResponse = S["ReassignRecordsResponse"];
 export type RecordSecurityHistoryItemResponse = S["RecordSecurityHistoryItemResponse"];
 export type UpdateShareRequest = S["UpdateShareRequest"];
 export type UpdateShareResponse = S["UpdateShareResponse"];
@@ -432,6 +435,10 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       /** C10 M2 (PG-066): the caller's own access sources. */
       mine: (signal?: AbortSignal) => read<MyAccessResponse>("shares.mine", undefined, undefined, "interactive-read", signal),
       /** C10 M3 (PG-053): an ownership transfer is an Authority command with reason and step-up; the result says whether it is Effective yet. */
+      /** C10 M2 (D8-4, PG-053): the records a member directly owns (administrators only). */
+      memberOwnedRecords: (memberUserId: string, signal?: AbortSignal) => read<MemberOwnedRecordsResponse>("members.ownedRecords", { memberUserId }, undefined, "interactive-read", signal),
+      /** C10 M2: one ownership transfer per owned record; per-record outcome. */
+      reassignRecords: (memberUserId: string, request: ReassignRecordsRequest) => write<ReassignRecordsResponse>("POST", "members.reassignRecords", { memberUserId }, request, { idempotent: true, resourceKey: `member:${memberUserId}` }),
       transferOwnership: (formRecordId: string, request: TransferOwnershipRequest) => write<CommandStatusResponse>("POST", "records.transferOwnership", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}` }),
       /** C10 M2: replaces the share's scope. If-Match carries the ETag "{recordShareId}:{shareRevision}" read from `get` (412 when stale). */
       update: (formRecordId: string, recordShareId: string, shareRevision: number | string, request: UpdateShareRequest) =>

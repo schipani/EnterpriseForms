@@ -105,6 +105,8 @@ export const ENDPOINTS = {
   "shares.ownershipHistory": { method: "GET", path: "/api/v1/form-records/{formRecordId}/ownership-history" },
   "shares.effectiveScope": { method: "GET", path: "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/effective-scope" },
   "shares.mine": { method: "GET", path: "/api/v1/me/access" },
+  "members.ownedRecords": { method: "GET", path: "/api/v1/members/{memberUserId}/owned-records" },
+  "members.reassignRecords": { method: "POST", path: "/api/v1/members/{memberUserId}/reassign-records" },
   "shares.update": { method: "PATCH", path: "/api/v1/form-records/{formRecordId}/shares/{recordShareId}" },
   "uploads.begin": { method: "POST", path: "/api/v1/upload-sessions" },
   "uploads.chunk": { method: "PUT", path: "/api/v1/upload-sessions/{uploadSessionId}/chunks/{chunkIndex}" },
