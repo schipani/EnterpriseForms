@@ -88,7 +88,7 @@ test.describe("Phase C10 sharing and ownership pages (automated accessibility)",
   });
 
   const pages: { name: string; persona: Persona; path: () => string; ready: RegExp }[] = [
-    { name: "PG-022 Access tab", persona: "clerk", path: () => `/app/records/${recordId}?tab=sharing`, ready: /Who has access|Access/ },
+    { name: "PG-022 Access tab", persona: "clerk", path: () => `/app/records/${recordId}?tab=sharing`, ready: /Shares \(\d+ active\)/ },
     { name: "PG-023 Share details", persona: "clerk", path: () => `/app/records/${recordId}/sharing/${shareId}`, ready: /Share|Reader/ },
     { name: "PG-053 Ownership transfer", persona: "clerk", path: () => `/app/records/${recordId}/ownership`, ready: /Transfer ownership/ },
     { name: "PG-053 Member reassignment", persona: "security", path: () => `/app/members/${readerId}/reassign`, ready: /Reassign|records/ },

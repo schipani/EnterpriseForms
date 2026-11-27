@@ -105,6 +105,7 @@ test.describe("Phase C5 collaboration and contributor writes", () => {
     await dialog.getByRole("checkbox", { name: "Subject" }).check();
     await dialog.getByRole("checkbox", { name: "Status" }).check();
     await expect(dialog.getByText(/^View only:/)).toHaveCount(0); // neither field is read-only, restricted, multi-choice or rule-dependent
+    await dialog.getByRole("checkbox", { name: "Confirm with the development-only step-up" }).check(); // G27: share commands need step-up
     await dialog.getByRole("button", { name: "Share", exact: true }).click();
     await expect(dialog).toBeHidden();
     const row = page.getByRole("row", { name: /Riley Reader/ });
@@ -162,6 +163,7 @@ test.describe("Phase C5 collaboration and contributor writes", () => {
     await page.getByRole("row", { name: /Riley Reader/ }).getByRole("button", { name: "Revoke" }).click();
     const revokeDialog = page.getByRole("dialog", { name: "Revoke this share?" });
     await expect(revokeDialog).toContainText("Changes they already saved stay in the record history.");
+    await revokeDialog.getByRole("checkbox", { name: "Confirm with the development-only step-up" }).check(); // G27
     await revokeDialog.getByRole("button", { name: "Revoke share" }).click();
     await expect(revokeDialog).toBeHidden();
     await expect(page.getByText("Access revoked for Riley Reader")).toBeVisible();
