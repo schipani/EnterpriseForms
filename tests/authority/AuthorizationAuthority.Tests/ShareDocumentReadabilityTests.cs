@@ -88,7 +88,7 @@ public sealed class ShareDocumentReadabilityTests
     {
         await using var scope = await store.BeginScopeAsync(Ct);
         var pin = await verifier.PinAsync(scope, (await scope.ReadOrganizationAsync(org, Ct))!, organizationLocked: false, Guid.CreateVersion7(), Ct);
-        var (view, download) = await ShareDocumentReadability.EvaluateAsync(verifier, pin, scope, org, record, user, leaves, Ct);
+        var (view, download) = await ShareDocumentReadability.EvaluateAsync(checks => verifier.CheckBulkAsync(pin, checks, Ct), pin.DecisionInstant, scope, org, record, user, leaves, Ct);
         return (view.Select(i => i.ItemId).ToList(), download.Select(i => i.ItemId).ToList());
     }
 

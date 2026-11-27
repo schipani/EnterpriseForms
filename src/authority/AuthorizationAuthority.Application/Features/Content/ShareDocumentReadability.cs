@@ -17,8 +17,10 @@ namespace AuthorizationAuthority.Application.Features.Content;
 /// </summary>
 internal static class ShareDocumentReadability
 {
+    /// <param name="decide">The pinned decision of the caller's verification (ContentService pins and completes it; this helper never reads SpiceDB).</param>
+    /// <param name="decisionInstant">The instant of that pinned decision (lineage expiry is evaluated at it).</param>
     public static async Task<(List<VerifiedProjectionItem> Viewable, List<VerifiedProjectionItem> Downloadable)> EvaluateAsync(
-        ProjectionIntegrityVerifier verifier, VerifiedProjectionSnapshot snapshot, IAuthorityScope scope, Guid organizationId, Guid formRecordId, Guid userId,
+        Func<IReadOnlyList<SpiceDbCheck>, Task<IReadOnlyList<SpiceDbCheckOutcome>>> decide, DateTimeOffset decisionInstant, IAuthorityScope scope, Guid organizationId, Guid formRecordId, Guid userId,
         IReadOnlyList<RecordManifestLeaf> expected, CancellationToken cancellationToken)
     {
         var attachments = expected.Where(l => l.ManifestItemKindCode == (byte)ManifestItemKind.Attachment && l.AttachmentVersionNumber is > 0).ToList();
@@ -29,7 +31,7 @@ internal static class ShareDocumentReadability
 
         var subject = userId.ToString("D");
         var checks = attachments.Select(l => new SpiceDbCheck(ResourceTypeNames.DocumentItem, l.ManifestItemId.ToString("D"), "read", ResourceTypeNames.User, subject)).ToList();
-        var outcomes = await verifier.CheckBulkAsync(snapshot, checks, cancellationToken).ConfigureAwait(false);
+        var outcomes = await decide(checks).ConfigureAwait(false);
         var allowed = attachments.Where((_, i) => outcomes[i] == SpiceDbCheckOutcome.Allowed).ToList();
         if (allowed.Count == 0)
         {
@@ -52,7 +54,7 @@ internal static class ShareDocumentReadability
         var live = new HashSet<Guid>();
         foreach (var shareId in held)
         {
-            if (ShareLineageExpiry.Evaluate(await LineageAsync(scope, organizationId, shareId, cancellationToken).ConfigureAwait(false), organizationId, formRecordId, shareId, snapshot.DecisionInstant).Status == ShareLineageStatus.Active)
+            if (ShareLineageExpiry.Evaluate(await LineageAsync(scope, organizationId, shareId, cancellationToken).ConfigureAwait(false), organizationId, formRecordId, shareId, decisionInstant).Status == ShareLineageStatus.Active)
             {
                 live.Add(shareId);
             }

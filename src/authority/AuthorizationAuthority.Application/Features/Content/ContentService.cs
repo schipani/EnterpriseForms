@@ -1212,7 +1212,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             readable = await CheckFieldLeavesAsync(snapshot, fieldLeaves, "read", subject, cancellationToken).ConfigureAwait(false);
             editable = includeEditable ? await CheckFieldLeavesAsync(snapshot, fieldLeaves, "edit", subject, cancellationToken).ConfigureAwait(false) : [];
             // C10 WP8-A: attachments covered by a live document binding at their verified version (view), and those also downloadable.
-            var (documentsViewable, documentsDownloadable) = await ShareDocumentReadability.EvaluateAsync(verifier, snapshot, scope, state.OrganizationId, formRecordId, bound.AuthorityUserId, expected, cancellationToken).ConfigureAwait(false);
+            var (documentsViewable, documentsDownloadable) = await ShareDocumentReadability.EvaluateAsync(
+                checks => verifier.CheckBulkAsync(snapshot, checks, cancellationToken), snapshot.DecisionInstant, scope, state.OrganizationId, formRecordId, bound.AuthorityUserId, expected, cancellationToken).ConfigureAwait(false);
             readable.AddRange(documentsViewable);
             downloadable = documentsDownloadable;
             authorized = requestedAction == RequestedAction.Edit ? editable : readable;
