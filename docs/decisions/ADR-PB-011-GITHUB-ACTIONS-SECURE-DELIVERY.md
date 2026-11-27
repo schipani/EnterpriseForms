@@ -52,6 +52,26 @@ The binding decision's "private GitHub repository" is amended as follows:
    this amendment lowers them. Public visibility raises the bar on control 6: no customer data, production
    configuration, signing keys or real credentials may appear in commits, workflow logs or artifacts.
 
+## Amendment A-24 (2026-11-27, approved by the product owner, decision C-199): sole-owner Development/Test review
+
+The public development repository has one collaborator, so the A-21 rule "pull request with one approval, last-push approval"
+cannot be met by anyone but its author. For Development/Test integration only:
+
+1. A pull request into `main` is integrated on the owner's explicit, recorded authorization (decision log); that authorization is
+   the Development/Test integration decision.
+2. Review by AI reviewer agents (fresh context, read-only, recorded with their findings and dispositions) is technical review
+   evidence. It is never described as independent human review or as a GitHub approval, and it satisfies no production review
+   requirement.
+3. The `main` ruleset requires zero human approvals, no last-push approval and no code-owner review (code-owner review was already
+   unenforceable, A-21 point 3). Every other control stays enforced: strict required status checks, signed commits, linear history,
+   no deletion or force-push, no bypass actors, stale-review dismissal, thread resolution, secret scanning and push protection,
+   Dependabot, CodeQL, the release-tag ruleset and the Stage B release-only policy (C-131).
+4. Production review requirements are unchanged: independent human approval of the last push and enforceable CODEOWNERS
+   security-owner review remain production prerequisites, delivered by the private Azure DevOps migration (A-21, A-23).
+5. The amendment ends at that migration or when a second eligible reviewer exists, whichever comes first; the ruleset then returns
+   to one approval with last-push approval, and `scripts/governance/verify_repository_protection.py` (`A24_SOLE_OWNER_DEVELOPMENT_REVIEW`)
+   back to requiring it.
+
 ## References
 
 - [Microsoft: GitHub Actions sign-in with OIDC](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure-openid-connect)
