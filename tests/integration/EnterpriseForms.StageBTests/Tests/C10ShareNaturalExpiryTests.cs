@@ -25,7 +25,9 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
 
     private sealed record InheritedShares(StageBScenario S, Guid Record, Guid Manager, Guid Delegated, Guid Independent, string DelegatedStateAtInstant, string[] DesignerKeysAtInstant);
 
-    private sealed record Timeline(DateTimeOffset ExpiresOn, RaceShares Race, InheritedShares Inherited);
+    private sealed record ExpiringDownload(StageBScenario S, Guid Record, long DocumentBytes, long ReceivedAtExpiry, long Received, bool Completed, string? Failure, TimeSpan EndedAfterExpiry, string[] FailureReasons);
+
+    private sealed record Timeline(DateTimeOffset ExpiresOn, RaceShares Race, InheritedShares Inherited, ExpiringDownload Download);
 
     private static string Path(Guid record, string suffix = "") => $"/api/v1/form-records/{record:D}/shares{suffix}";
 
@@ -120,9 +122,27 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
         Assert.True(earlier.IsSuccess, earlier.Body);
         await inherited.WaitGateReadyAsync(Settle);
         Assert.Equal(["family_name", "given_name"], VisibleKeys(await inherited.WaitProjectionAsync(inherited.DesignerOnly, inheritedRecord, Settle)));
+
+        // CONS-23 with natural expiry: a share recipient's large download is opened before the instant and paused (the server's writes
+        // block on full transport buffers); resumed after the instant, it must stop at the next re-check, audited.
+        var (dl, dlRecord) = await AccusedAsync("c10-natural-expiry-download");
+        const int documentBytes = 40 * 1024 * 1024;
+        var document = await dl.UploadAsync(dl.Clerk, dlRecord, "cons23-expiry.bin", "application/octet-stream", StageBScenario.SyntheticBytes(documentBytes, 241), timeout: TimeSpan.FromMinutes(5));
+        var attachment = document.GetProperty("fileAttachmentId").GetGuid();
+        var dlShare = await dl.Fixture.Api.PostAsync(Path(dlRecord), dl.Token(dl.Clerk), new
+        {
+            useDevelopmentStepUp = true, recipientUserId = dl.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" },
+            documents = new[] { new { fileAttachmentId = attachment, canDownloadDocument = true, canReplaceDocument = false } }, shareExpiresOn = expiresOn,
+        });
+        Assert.True(dlShare.IsSuccess, dlShare.Body);
+        await dl.WaitGateReadyAsync(Settle);
+        await dl.WaitProjectionAsync(dl.Reader, dlRecord, Settle);
         Assert.True(expiresOn - DateTimeOffset.UtcNow > TimeSpan.FromMinutes(1), "setup took too long: the expiry instant is too close");
 
-        // The natural wait.
+        // The natural wait (the download opens 15 s before the instant).
+        await Task.Delay(expiresOn.AddSeconds(-15) - DateTimeOffset.UtcNow);
+        using var download = await fixture.StartPausedDownloadAsync($"/api/v1/form-records/{dlRecord:D}/documents/{attachment:D}/download", dl.Token(dl.Reader), 1024 * 1024);
+        Assert.Equal(HttpStatusCode.OK, download.Status);
         await Task.Delay(expiresOn.AddMilliseconds(300) - DateTimeOffset.UtcNow);
 
         // At the instant: test 10 first observes the inherited denial, then test 8 races the loop.
@@ -135,9 +155,16 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
             new { useDevelopmentStepUp = true, newOwnerUserId = race.Reader.AuthorityUserId, newOwnerTeamId = (Guid?)null, transferReason = "C10 Stage B natural-expiry transfer" });
         await race.WaitGateReadyAsync(Settle);
 
+        var receivedAtExpiry = download.Received;
+        await download.ReadRestAsync();
+        var endedAfterExpiry = DateTimeOffset.UtcNow - expiresOn;
+        var reasons = fixture.Stack.AttackerSql($"SELECT event_metadata_json->>'reasonCode' FROM audit_events WHERE tenant_id = '{dl.OrganizationId:D}' AND form_record_id = '{dlRecord:D}' AND event_action = 'DOCUMENT_DOWNLOAD_FAILED' ORDER BY audit_sequence;")
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
         return new Timeline(expiresOn,
             new RaceShares(race, raceRecord, revoked, updated, transferred, revokedBefore, revoke, update, transfer),
-            new InheritedShares(inherited, inheritedRecord, manager, delegated, independent, delegatedAtInstant, designerKeys));
+            new InheritedShares(inherited, inheritedRecord, manager, delegated, independent, delegatedAtInstant, designerKeys),
+            new ExpiringDownload(dl, dlRecord, documentBytes, receivedAtExpiry, download.Received, download.Completed, download.Failure, endedAfterExpiry, reasons));
     }
 
     [Fact]
@@ -192,5 +219,22 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
         Assert.Equal(0, JournalEvents("ShareExpired", i.Delegated));
         Assert.Equal(["family_name"], VisibleKeys(await i.S.WaitProjectionAsync(i.S.DesignerOnly, i.Record, Settle)));
         Assert.True(Denied(await i.S.ProjectionAsync(i.S.Reader, i.Record)));
+    }
+
+    [Fact]
+    public async Task ADownloadInProgressStopsAtTheNextRecheckAfterItsSharesNaturalExpiry()
+    {
+        // CONS-23 with real elapsed time: the recipient's download, opened before the expiry instant, stops within the re-check bound
+        // (5 s) plus the time to drain the transport buffers after the instant, with one audited DOCUMENT_DOWNLOAD_FAILED.
+        var t = await TimelineAsync();
+        var d = t.Download;
+        var observed = $"received {d.Received} of {d.DocumentBytes} bytes ({d.Received - d.ReceivedAtExpiry} after the instant), ended {d.EndedAfterExpiry.TotalSeconds:F1} s after the instant, failure '{d.Failure}', reasons [{string.Join(", ", d.FailureReasons)}]";
+        TestContext.Current.SendDiagnosticMessage("CONS-23 natural expiry: " + observed);
+        Assert.False(d.Completed, "CONS-23: the download continued past the share's expiry. " + observed);
+        Assert.True(d.Received < d.DocumentBytes, observed);
+        Assert.True(d.EndedAfterExpiry <= TimeSpan.FromSeconds(45), observed); // the race steps above run first (about 10 s), then 5 s + drain
+        Assert.Single(d.FailureReasons);
+        Assert.NotEqual("AUTHORITY_UNAVAILABLE", d.FailureReasons[0]);
+        Assert.True(Denied(await d.S.ProjectionAsync(d.S.Reader, d.Record)));
     }
 }

@@ -82,10 +82,93 @@ public sealed class StageBFixture : IAsyncLifetime
         var body = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
         return (response.StatusCode, body, response.Content.Headers.ContentDisposition?.ToString(), response.Headers.CacheControl?.ToString(), response.Content.Headers.ContentType?.ToString(), response.Headers.TryGetValues("X-Content-Type-Options", out var values) ? string.Join(",", values) : null);
     }
+
+    /// <summary>
+    /// CONS-23 (C-201): opens a download and reads only its first <paramref name="initialBytes"/>, then stops reading, so the server's
+    /// writes block once the transport buffers are full; <see cref="PausedDownload.ReadRestAsync"/> resumes it.
+    /// </summary>
+    public async Task<PausedDownload> StartPausedDownloadAsync(string path, string token, int initialBytes)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var response = await raw.SendAsync(request, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+        var download = new PausedDownload(request, response, await response.Content.ReadAsStreamAsync().ConfigureAwait(false));
+        await download.ReadAsync(initialBytes, bytesPerSecond: null).ConfigureAwait(false);
+        return download;
+    }
 }
 
 [CollectionDefinition(Name, DisableParallelization = true)]
 public sealed class StageBStackCollectionDefinition : ICollectionFixture<StageBFixture>
 {
     public const string Name = "stage-b-stack";
+}
+
+/// <summary>CONS-23 (C-201): a download read under the test's control; it records how many bytes arrived and how the body ended.</summary>
+public sealed class PausedDownload(HttpRequestMessage request, HttpResponseMessage response, Stream body) : IDisposable
+{
+    private readonly System.Security.Cryptography.IncrementalHash hash = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+
+    public System.Net.HttpStatusCode Status => response.StatusCode;
+
+    public long? DeclaredLength => response.Content.Headers.ContentLength;
+
+    public long Received { get; private set; }
+
+    /// <summary>True when the body ended with all declared bytes; false when the server stopped it early.</summary>
+    public bool Completed { get; private set; }
+
+    public string? Failure { get; private set; }
+
+    public byte[] Sha256 => hash.GetCurrentHash();
+
+    /// <summary>Reads up to <paramref name="limit"/> bytes (all when null), optionally throttled; returns false when the body ended.</summary>
+    public async Task<bool> ReadAsync(long? limit, int? bytesPerSecond)
+    {
+        var buffer = new byte[16 * 1024];
+        var target = limit is { } l ? Received + l : long.MaxValue;
+        var started = DateTime.UtcNow;
+        var startedAt = Received;
+        try
+        {
+            while (Received < target)
+            {
+                var read = await body.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, target - Received))).ConfigureAwait(false);
+                if (read == 0)
+                {
+                    Completed = DeclaredLength is { } declared && Received == declared;
+                    return false;
+                }
+
+                hash.AppendData(buffer, 0, read);
+                Received += read;
+                if (bytesPerSecond is { } rate)
+                {
+                    var due = TimeSpan.FromSeconds((double)(Received - startedAt) / rate) - (DateTime.UtcNow - started);
+                    if (due > TimeSpan.Zero)
+                    {
+                        await Task.Delay(due).ConfigureAwait(false);
+                    }
+                }
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or HttpRequestException)
+        {
+            Failure = ex.GetType().Name + ": " + ex.Message;
+            return false;
+        }
+    }
+
+    /// <summary>Resumes reading to the end of the body (throttled when <paramref name="bytesPerSecond"/> is set).</summary>
+    public Task ReadRestAsync(int? bytesPerSecond = null) => ReadAsync(null, bytesPerSecond);
+
+    public void Dispose()
+    {
+        body.Dispose();
+        response.Dispose();
+        request.Dispose();
+        hash.Dispose();
+    }
 }

@@ -122,6 +122,10 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<ISecurityIncidentRecorder, SecurityIncidentRecorder>();
         services.AddSingleton<IDecryptionFailureRecorder, EnterpriseForms.Infrastructure.Features.Audit.DecryptionFailureRecorder>(); // E0-4
         services.AddSingleton<UploadSessionHandlers>();
+        // CONS-23: the documented maximum interval between Authority re-checks of a streaming download (1 to 5 s; refuses to start otherwise).
+        var documentStream = configuration.GetSection(DocumentStreamOptions.SectionName).Get<DocumentStreamOptions>() ?? new DocumentStreamOptions();
+        documentStream.Validate();
+        services.AddSingleton(documentStream);
         services.AddSingleton<DocumentHandlers>();
         services.AddSingleton<DocumentProcessingService>();
         services.AddSingleton<EnterpriseForms.Application.Features.FormDesigner.ProtectionMigration.FieldProtectionMigrationService>();

@@ -16,7 +16,7 @@
     {
       "name": "records-lifecycle",
       "title": "Records, Sharing and Lifecycle",
-      "classes": ["RecordCreationIdempotencyTests", "RecordLifecycleTests", "RecordRestoreTests", "RecordHistoryTests", "RecordLookupTests", "RecordWorkspaceTests", "SharingTests", "ContributorWriteTests", "Ix6RecordListStackTests", "SharingWorkloadMeasurementTests", "C10ShareLifecycleTests", "C10DatabaseVerificationTests"]
+      "classes": ["RecordCreationIdempotencyTests", "RecordLifecycleTests", "RecordRestoreTests", "RecordHistoryTests", "RecordLookupTests", "RecordWorkspaceTests", "SharingTests", "ContributorWriteTests", "Ix6RecordListStackTests", "SharingWorkloadMeasurementTests", "C10ShareLifecycleTests", "C10DatabaseVerificationTests", "C10DownloadRecheckTests"]
     },
     {
       "name": "administration-membership",

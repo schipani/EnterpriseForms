@@ -363,6 +363,8 @@ public static partial class AuditEventCatalog
             [Code("verdict", "Verdict"), Code("scanner", "Scanner"), Code("signature", "Detection"), Count("receivedBytes", "Bytes received")], [Reason]);
         Add(AuditActions.DocumentReady, "Document added", "A document version was committed into the record manifest.", [Count("versionNumber", "Version"), ContentRevision]);
         Add(AuditActions.DocumentDownloaded, "Document downloaded", "An authorized document download was released.", [Id("fileAttachmentId", "Document"), Count("versionNumber", "Version")]);
+        Add(AuditActions.DocumentDownloadFailed, "Document download stopped", "A streaming download was stopped because the Authority re-check no longer released the document (CONS-23).",
+            [Id("fileAttachmentId", "Document"), Count("versionNumber", "Version"), Code("reasonCode", "Reason code")]);
         Add(AuditActions.DocumentRemoved, "Document removed", "A document was removed from the accepted content; its bytes are retained.", [ContentRevision], [Reason]);
 
         // Governance and membership

@@ -43,6 +43,7 @@ public static class AuditActions
     public const string DocumentRejected = "DOCUMENT_REJECTED";
     public const string DocumentReady = "DOCUMENT_READY";
     public const string DocumentDownloaded = "DOCUMENT_DOWNLOADED";
+    public const string DocumentDownloadFailed = "DOCUMENT_DOWNLOAD_FAILED";
     public const string DocumentRemoved = "DOCUMENT_REMOVED";
     public const string RecordAccessGranted = "RECORD_ACCESS_GRANTED";
     public const string RecordAccessRevoked = "RECORD_ACCESS_REVOKED";

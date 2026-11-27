@@ -16,7 +16,7 @@ using EnterpriseForms.Domain.Features.SecurityOperations;
 namespace EnterpriseForms.Application.Features.Documents.Documents;
 
 /// <summary>Authorized document projection, version history, download (server-side decrypt) and removal (new content revision without the leaf).</summary>
-public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider storage, IFileEncryptionService encryption, VerifiedRecordReader reader, RecordCandidateStager stager, IAuthorizationAuthorityClient authority, TimeProvider clock, ISecurityIncidentRecorder incidents, IDecryptionFailureRecorder decryptionFailures)
+public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider storage, IFileEncryptionService encryption, VerifiedRecordReader reader, RecordCandidateStager stager, IAuthorizationAuthorityClient authority, TimeProvider clock, ISecurityIncidentRecorder incidents, IDecryptionFailureRecorder decryptionFailures, DocumentStreamOptions streamOptions)
 {
     public async Task<IReadOnlyList<DocumentSummaryResponse>> ListAsync(RequestContext context, Guid formRecordId, CancellationToken cancellationToken)
     {
@@ -66,10 +66,16 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
 
     public sealed record DownloadContent(string FileName, string ContentType, long Length, Func<Stream, CancellationToken, Task> WriteTo);
 
-    /// <summary>Download of the accepted current version (or an earlier committed version): verified projection → fetch ciphertext → decrypt stream → audit.</summary>
+    /// <summary>
+    /// Download of the accepted current version (or an earlier committed version): verified projection → fetch ciphertext → decrypt
+    /// stream → audit. CONS-23: while the plaintext streams, the same verified read is repeated at most every
+    /// <see cref="DocumentStreamOptions.RecheckInterval"/> before more plaintext is written (<see cref="RecheckedDownloadStream"/>), and
+    /// the stream stops, audited, as soon as the document is no longer released (<see cref="DocumentStreamAdmission.Evaluate"/>).
+    /// </summary>
     public async Task<DownloadContent> DownloadAsync(RequestContext context, Guid formRecordId, Guid fileAttachmentId, int? versionNumber, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
+        var admittedAt = clock.GetTimestamp(); // the admission check below is the stream's first check
         var verified = await reader.ReadAsync(context, formRecordId, ProtectedAction.Read, cancellationToken).ConfigureAwait(false);
         // B-05: a document that is not in the accepted current content (removed, or not released to this caller) releases no version at
         // all, current or historic (Stage B C-200: the C10 nullable form let a full reader download an earlier version of a removed one).
@@ -103,12 +109,21 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
         var aad = new FileEncryptionContext(target.TenantId, target.FormRecordId, target.FileAttachmentId, target.VersionNumber);
         await AuditRecorder.RecordAsync(store, context, clock, AuditCategories.Document, AuditActions.DocumentDownloaded, "authorized document download released", formRecordId, "Success", new { fileAttachmentId, versionNumber = target.VersionNumber }, cancellationToken).ConfigureAwait(false);
         var captured = target;
+        var admission = DocumentStreamAdmission.Of(verified, target, historic: !ReferenceEquals(target, current));
         return new DownloadContent(captured.OriginalFileName, captured.DetectedContentType, captured.PlaintextSizeBytes, async (output, ct) =>
         {
             await using var ciphertext = await storage.OpenReadAsync(StorageArea.Documents, captured.StorageObjectKey, ct).ConfigureAwait(false);
+            await using var rechecked = new RecheckedDownloadStream(output, recheckCt => RecheckAsync(context, formRecordId, admission, recheckCt), streamOptions.RecheckInterval, clock, admittedAt);
             try
             {
-                await encryption.DecryptVerifiedAsync(ciphertext, output, envelope, aad, ct).ConfigureAwait(false);
+                await encryption.DecryptVerifiedAsync(ciphertext, rechecked, envelope, aad, ct).ConfigureAwait(false);
+            }
+            catch (DocumentStreamInterruptedException interrupted)
+            {
+                // CONS-23: no further plaintext is written; the response is aborted (incomplete body) and the stop is audited.
+                await AuditRecorder.RecordAsync(store, context, clock, AuditCategories.Document, AuditActions.DocumentDownloadFailed, "document download stopped by the Authority re-check", formRecordId, "Denied",
+                    new { fileAttachmentId, versionNumber = captured.VersionNumber, reasonCode = interrupted.ReasonCode }, CancellationToken.None).ConfigureAwait(false);
+                throw;
             }
             catch (Exception ex) when (FormRecords.Encryption.DecryptionFailure.Find(ex) is not null)
             {
@@ -118,6 +133,41 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
                 throw;
             }
         });
+    }
+
+    /// <summary>
+    /// CONS-23: one re-check of a streaming download. A fresh verified read (Authority permission, accepted head, integrity, share
+    /// scope and expiry at access time) must still release the admitted document version; a denial, an Authority or verification
+    /// failure and any other error stop the stream. A cancelled request is a client disconnect, not an interruption.
+    /// </summary>
+    private async Task RecheckAsync(RequestContext context, Guid formRecordId, DocumentStreamAdmission admission, CancellationToken cancellationToken)
+    {
+        VerifiedRecord fresh;
+        try
+        {
+            fresh = await reader.ReadAsync(context, formRecordId, ProtectedAction.Read, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (BusinessException ex)
+        {
+            throw new DocumentStreamInterruptedException(ex.ErrorCode, ex);
+        }
+        catch (AuthorityClientException ex)
+        {
+            throw new DocumentStreamInterruptedException(ex.ErrorCode, ex);
+        }
+        catch (Exception ex)
+        {
+            throw new DocumentStreamInterruptedException("AUTHORITY_UNAVAILABLE", ex);
+        }
+
+        if (admission.Evaluate(fresh) is { } reason)
+        {
+            throw new DocumentStreamInterruptedException(reason);
+        }
     }
 
     /// <summary>
