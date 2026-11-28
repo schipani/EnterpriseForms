@@ -149,8 +149,8 @@
     },
     {
       "path": "docs/architecture/FORWARD_ROADMAP_PROPOSAL.md",
-      "sha256": "b86cb5d3fa38c84b926cfbae153e708f178905e036841377f49caeb047abecbe",
-      "bytes": 18642
+      "sha256": "691750db5c66ade9e42da1a969e5284b37dc300803a8cf38abd665e739e9517b",
+      "bytes": 18990
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_C149_EVIDENCE.md",
@@ -291,6 +291,11 @@
       "path": "docs/architecture/PHASE_C10_WP0_SHARING_OWNERSHIP_PROPOSAL.md",
       "sha256": "94cb2a78acec1d8155df675412d4525d1969ebe97ea4cd679954d4ea95022cc3",
       "bytes": 109012
+    },
+    {
+      "path": "docs/architecture/PHASE_C11_WP0_NOTIFICATIONS_ACCESS_REQUESTS_PROPOSAL.md",
+      "sha256": "baae0fca23d413e406fe8a16dc88d3366d2fdea4c7eadb4589ed713b1af4749f",
+      "bytes": 36869
     },
     {
       "path": "docs/architecture/PHASE_C3_REPEATING_GROUPS_AND_DEPENDENT_DROPDOWNS.md",
@@ -489,8 +494,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "69325835dc666005c69b9bd56c059ee9ea28e2d1f3d5858ece0f6230144cc95c",
-      "bytes": 374112
+      "sha256": "4714528cba2ba0fb3cda7fa7a6254deccf84aa7712401c30e4fee076e25caefc",
+      "bytes": 376303
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -564,8 +569,8 @@
     },
     {
       "path": "docs/governance/WORK_PACKAGE_REGISTER.md",
-      "sha256": "fc6fd749c775da2fa93d6ad7061f6f6b07e8526af77e92c63e9f615e0fa240d2",
-      "bytes": 43280
+      "sha256": "e6cf0f33f244629b7106e1e84b5fa963fdb0014734b331660d3c44e87e644882",
+      "bytes": 44215
     },
     {
       "path": "docs/identity/PB08_IDENTITY_ASSURANCE_STANDARD.md",
@@ -909,8 +914,8 @@
     },
     {
       "path": "docs/testing/CLAUDE_MD_S11_REQUIREMENTS_REGISTER.csv",
-      "sha256": "93836a32778718d8f9cba42ea08e9a32d12879df3f9e359e30d920d244d2b26b",
-      "bytes": 56763
+      "sha256": "f5f9d1442f17b16af7d4680c0dd74722a69ad18da6b19086d5614b6e89caf171",
+      "bytes": 67329
     },
     {
       "path": "docs/testing/CLAUDE_MD_S11_REQUIREMENTS_REGISTER.md",

@@ -220,3 +220,13 @@ PR #88 squash-merged into `main` as `5cc4efe3` under the owner's code-integratio
 - **Not done:** formal acceptance, production or Azure change, capability activation, Stage B, C11.
 
 **Next permitted step:** the owner's formal C10 Development/Test acceptance decision, and separately the authorization of C11 WP-0 design work.
+
+## Direct development checkpoint 12 — 2026-11-28 (C10 final records and C11 WP-0 design, C-203)
+
+- **PR #89 integrated:** squash `a929ed91` on `main` (head `450cb1fe`, signature verified, 9/9 checks, tree identical); post-merge `ci` passed.
+- **§11 register:** the 15 Phase C10 rows re-mapped to C10 evidence (one status change: #61 to DEV-EVIDENCE; none accepted; gaps kept).
+- **Roadmap:** Phase C10 row corrected (implementation complete and integrated; formal acceptance pending).
+- **C11 WP-0:** proposed for owner approval with OD-C11-1 and OD-C11-2; implementation not authorized.
+- **Not done:** C10 formal acceptance, C11 implementation, Stage B, production or Azure change, capability activation.
+
+**Next permitted step:** owner decisions OD-C11-1 and OD-C11-2 and approval of the C11 WP-0 design, then a separate C11 implementation authorization; separately, the owner's formal C10 Development/Test acceptance decision.
