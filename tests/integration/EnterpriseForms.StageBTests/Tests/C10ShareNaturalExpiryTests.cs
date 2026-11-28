@@ -229,7 +229,7 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
         var afterReplay = await restore.ProjectionAsync(restore.Reader, restoreRecord);
         var gate = await fixture.Authority.GateAsync(restore.OrganizationId);
         var restoredShare = new RestoredShare(restoreConverged, expiredBeforeRestore, stateAfterRestore, afterRestore.Status, afterRestore.ErrorCode,
-            stateAfterReplay, afterReplay.Status, afterReplay.ErrorCode, JournalEvents("ShareExpired", restoreShare), gate?.ToString() ?? string.Empty);
+            stateAfterReplay, afterReplay.Status, afterReplay.ErrorCode, JournalEvents("ShareExpired", restoreShare), gate.ToString());
 
         return new Timeline(expiresOn, raceShares, inheritedShares, expiringDownload, restoredShare);
     }
