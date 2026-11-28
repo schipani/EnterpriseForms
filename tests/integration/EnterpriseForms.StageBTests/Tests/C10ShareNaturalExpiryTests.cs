@@ -31,13 +31,16 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
         bool DesignerDenied, bool AdministratorDenied);
 
     private sealed record InheritedShares(string DelegatedStateAtInstant, string[] DesignerKeysAtInstant,
-        string ManagerFinal, string DelegatedFinal, string IndependentFinal, int ManagerExpired, int DelegatedExpired, string[] DesignerKeysAfter, bool ReaderDenied);
+        string ManagerFinal, string DelegatedFinal, string IndependentFinal, int ManagerExpired, int DelegatedExpired, int DelegatedInvalidated, int ManagerExpiryListsDelegated, string[] DesignerKeysAfter, bool ReaderDenied);
 
     private sealed record ExpiringDownload(long DocumentBytes, long ReceivedAtExpiry, long Received, bool Completed, string? Failure, TimeSpan EndedAfterExpiry, string[] FailureReasons, bool ReaderDenied);
 
-    /// <summary>§4 test 13: the share's state in the restored backup, the access then, and whether replay converged it again.</summary>
+    /// <summary>
+    /// §4 test 13: the share's state in the restored backup, the access then and after a wait, and the organization's quarantine
+    /// (the Authority's detection of the rolled-back AuthorityDb).
+    /// </summary>
     private sealed record RestoredShare(string ConvergedBeforeRestore, int ExpiredBeforeRestore, string StateAfterRestore, HttpStatusCode StatusAfterRestore, string? ErrorAfterRestore,
-        string StateAfterReplay, HttpStatusCode StatusAfterReplay, string? ErrorAfterReplay, int ExpiredAfterReplay, string Gate);
+        string StateAfterWait, HttpStatusCode StatusAfterWait, string? ErrorAfterWait, int ExpiredAfterWait, string QuarantineReason, string Gate);
 
     private sealed record Timeline(DateTimeOffset ExpiresOn, RaceShares Race, InheritedShares Inherited, ExpiringDownload Download, RestoredShare Restore);
 
@@ -77,8 +80,13 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
     private string State(Guid share) =>
         fixture.Stack.AuthorityObserverSql($"SELECT resource_lifecycle_state FROM authority_resources WHERE resource_type_name = 'record_share' AND resource_entity_id = '{share:D}';").Trim();
 
+    /// <summary>Journal events of this kind about the share itself (its own <c>record_share_id</c>, not a share listed in the body).</summary>
     private int JournalEvents(string kind, Guid id) =>
-        int.Parse(fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE journal_event_kind = '{kind}' AND journal_event_body_json LIKE '%{id:D}%';").Trim(), CultureInfo.InvariantCulture);
+        int.Parse(fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE journal_event_kind = '{kind}' AND journal_event_body_json::jsonb ->> 'record_share_id' = '{id:D}';").Trim(), CultureInfo.InvariantCulture);
+
+    /// <summary>ShareExpired events of <paramref name="parent"/> that list <paramref name="descendant"/> as invalidated by the expiry.</summary>
+    private int ExpiryInvalidations(Guid parent, Guid descendant) =>
+        int.Parse(fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE journal_event_kind = 'ShareExpired' AND journal_event_body_json::jsonb ->> 'record_share_id' = '{parent:D}' AND journal_event_body_json::jsonb -> 'invalidated_descendant_share_ids' ? '{descendant:D}';").Trim(), CultureInfo.InvariantCulture);
 
     private async Task<string> WaitStateAsync(Guid share, Func<string, bool> done, TimeSpan? timeout = null)
     {
@@ -209,6 +217,7 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
             Denied(await race.ProjectionAsync(race.DesignerOnly, raceRecord)), Denied(await race.ProjectionAsync(race.Administrator, raceRecord)));
         var inheritedShares = new InheritedShares(delegatedAtInstant, designerKeys,
             managerFinal, delegatedFinal, State(independent), JournalEvents("ShareExpired", manager), JournalEvents("ShareExpired", delegated),
+            JournalEvents("ShareInvalidated", delegated), ExpiryInvalidations(manager, delegated),
             VisibleKeys(await inherited.WaitProjectionAsync(inherited.DesignerOnly, inheritedRecord, Settle)), Denied(await inherited.ProjectionAsync(inherited.Reader, inheritedRecord)));
         var expiredBeforeRestore = JournalEvents("ShareExpired", restoreShare);
 
@@ -226,11 +235,13 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
 
         var stateAfterRestore = State(restoreShare);
         var afterRestore = await restore.ProjectionAsync(restore.Reader, restoreRecord);
-        var stateAfterReplay = await WaitStateAsync(restoreShare, x => x == "Expired", TimeSpan.FromSeconds(180));
-        var afterReplay = await restore.ProjectionAsync(restore.Reader, restoreRecord);
+        var stateAfterWait = await WaitStateAsync(restoreShare, x => x == "Expired", TimeSpan.FromSeconds(180));
+        var afterWait = await restore.ProjectionAsync(restore.Reader, restoreRecord);
         var gate = await fixture.Authority.GateAsync(restore.OrganizationId);
+        var quarantineReason = fixture.Stack.AuthorityObserverSql(
+            $"SELECT coalesce(integrity_quarantine_reason_code, '') FROM organization_authorization_states WHERE organization_id = '{restore.OrganizationId:D}' AND integrity_quarantine_enabled;").Trim();
         var restoredShare = new RestoredShare(restoreConverged, expiredBeforeRestore, stateAfterRestore, afterRestore.Status, afterRestore.ErrorCode,
-            stateAfterReplay, afterReplay.Status, afterReplay.ErrorCode, JournalEvents("ShareExpired", restoreShare), gate.ToString());
+            stateAfterWait, afterWait.Status, afterWait.ErrorCode, JournalEvents("ShareExpired", restoreShare), quarantineReason, gate.ToString());
 
         return new Timeline(expiresOn, raceShares, inheritedShares, expiringDownload, restoredShare);
     }
@@ -279,24 +290,31 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
         Assert.Equal("Invalidated", i.DelegatedFinal);
         Assert.Equal("Active", i.IndependentFinal);
         Assert.Equal(1, i.ManagerExpired);
-        Assert.Equal(0, i.DelegatedExpired);
+        Assert.Equal(0, i.DelegatedExpired); // the delegated share did not expire itself (its own expiry is an hour later)
+        Assert.Equal(1, i.DelegatedInvalidated); // it was invalidated once, through its lineage
+        Assert.Equal(1, i.ManagerExpiryListsDelegated); // by the parent's expiry
         Assert.Equal(["family_name"], i.DesignerKeysAfter);
         Assert.True(i.ReaderDenied);
     }
 
     [Fact]
-    public async Task ARestoreFromBeforeConvergenceLeavesTheShareDeniedAndReplayConvergesIt()
+    public async Task ARestoreFromBeforeConvergenceLeavesTheShareDeniedAndTheRollbackIsQuarantined()
     {
         // §4 test 13: "Restore an AuthorityDb backup taken before convergence => the share stays denied; replay converges it."
+        // C-201 owner decision: this asserts what the product guarantees without the G14 recovery plane. The restored share is denied;
+        // the Authority detects the rolled-back AuthorityDb (SpiceDB holds markers for revisions the restored store no longer has) and
+        // quarantines the organization; and access is not revived after a wait. "Replay converges it" is UNMET and blocked on G14
+        // (journal replay from the independent archive, SpiceDB rebuild and the reviewed quarantine lift); it is not asserted here.
         var t = (await TimelineAsync()).Restore;
-        var observed = $"converged {t.ConvergedBeforeRestore} ({t.ExpiredBeforeRestore} ShareExpired); after restore {t.StateAfterRestore}, access {(int)t.StatusAfterRestore} {t.ErrorAfterRestore}; after the replay wait {t.StateAfterReplay}, access {(int)t.StatusAfterReplay} {t.ErrorAfterReplay}, ShareExpired {t.ExpiredAfterReplay}; gate {t.Gate}";
+        var observed = $"converged {t.ConvergedBeforeRestore} ({t.ExpiredBeforeRestore} ShareExpired); after restore {t.StateAfterRestore}, access {(int)t.StatusAfterRestore} {t.ErrorAfterRestore}; after a 180 s wait {t.StateAfterWait}, access {(int)t.StatusAfterWait} {t.ErrorAfterWait}, ShareExpired {t.ExpiredAfterWait}; quarantine '{t.QuarantineReason}'; gate {t.Gate}";
         TestContext.Current.SendDiagnosticMessage("§4 test 13: " + observed);
         Assert.Equal("Expired", t.ConvergedBeforeRestore);
         Assert.Equal(1, t.ExpiredBeforeRestore);
         Assert.Equal("Active", t.StateAfterRestore); // the backup's pre-convergence state
         Assert.True(DeniedOrFailClosed(t.StatusAfterRestore), "the restored share released access: " + observed);
-        Assert.True(DeniedOrFailClosed(t.StatusAfterReplay), "access after the restore: " + observed);
-        Assert.True(t.StateAfterReplay == "Expired", "§4 test 13: replay did not converge the restored share. " + observed);
+        Assert.True(DeniedOrFailClosed(t.StatusAfterWait), "access after the restore: " + observed);
+        Assert.Equal("PROJECTION_MARKER_AHEAD", t.QuarantineReason); // the rollback was detected, not trusted
+        Assert.Contains("\"projection_gate_state\":\"Quarantined\"", t.Gate.Replace(" ", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
     }
 
     [Fact]
