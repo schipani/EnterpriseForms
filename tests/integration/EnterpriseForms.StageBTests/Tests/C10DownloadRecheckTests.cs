@@ -72,7 +72,10 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
             await Task.Delay(250);
         }
 
-        await Task.Delay(TimeSpan.FromSeconds(3));
+        // Longer than the re-check interval: the access change then falls after the admission's interval, so the next slice must be
+        // re-checked. (Run 20261127-194256-ceeb8b79: with a 3 s pause the revoke landed inside the first interval and the rest of the
+        // document was correctly sent within it at network speed; the protocol's window is the interval at full throughput.)
+        await Task.Delay(RecheckBound + TimeSpan.FromSeconds(2));
         return download;
     }
 
