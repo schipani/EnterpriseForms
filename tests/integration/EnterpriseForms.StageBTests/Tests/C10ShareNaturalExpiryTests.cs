@@ -174,8 +174,8 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
 
         // The natural wait (the download opens 15 s before the instant).
         await Task.Delay(expiresOn.AddSeconds(-15) - DateTimeOffset.UtcNow);
-        using var download = await fixture.StartPausedDownloadAsync($"/api/v1/form-records/{dlRecord:D}/documents/{attachment:D}/download", dl.Token(dl.Reader), 1024 * 1024);
-        Assert.Equal(HttpStatusCode.OK, download.Status);
+        // In the Docker network: from the Windows host, Docker Desktop's port forwarder reads ahead by many megabytes (C10DownloadRecheckTests).
+        var download = InNetworkDownload.Start(fixture.Stack, $"/api/v1/form-records/{dlRecord:D}/documents/{attachment:D}/download", dl.Token(dl.Reader), pauseAfterBytes: 1024 * 1024, secondsPer64KiB: null);
         await Task.Delay(expiresOn.AddMilliseconds(300) - DateTimeOffset.UtcNow);
 
         // At the instant: test 10 first observes the inherited denial, then test 8 races the loop.
@@ -189,10 +189,11 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
         await race.WaitGateReadyAsync(Settle);
 
         // CONS-23: resume the paused download.
-        var receivedAtExpiry = download.Received;
-        await download.ReadRestAsync();
+        var receivedAtExpiry = download.Received();
+        await download.ResumeAsync();
+        var total = await download.TotalAsync();
         var endedAfterExpiry = DateTimeOffset.UtcNow - expiresOn;
-        var expiringDownload = new ExpiringDownload(documentBytes, receivedAtExpiry, download.Received, download.Completed, download.Failure, endedAfterExpiry,
+        var expiringDownload = new ExpiringDownload(documentBytes, receivedAtExpiry, total, total == documentBytes, null, endedAfterExpiry,
             DownloadFailures(dl, dlRecord), Denied(await dl.ProjectionAsync(dl.Reader, dlRecord)));
 
         // Real-loop convergence of every share; the test 8 and 10 observations are captured before the restore rewrites AuthorityDb.

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using EnterpriseForms.SecurityTests.Harness;
@@ -9,12 +10,13 @@ namespace EnterpriseForms.StageBTests.Tests;
 
 /// <summary>
 /// CONS-23 on the real stack (owner decision 1, C-201; trust_authority/CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md "Long streams and strict
-/// revocation"): "Stream terminates within documented baseline recheck bound". A large encrypted document is downloaded; the client
-/// reads its first megabyte and stops reading, so the server's writes block on full transport buffers; the access is then changed and
-/// the client resumes. The server re-checks at the Authority (at most every 5 s, before the next slice of plaintext) and stops the
-/// stream, audited as DOCUMENT_DOWNLOAD_FAILED, on a revocation, a replacement of the document (a change of its accepted version) or an
-/// unavailable Authority. An undisturbed slow download completes byte for byte through its re-checks. Bytes already in the transport
-/// buffers when access ends are the protocol's acknowledged finite exposure window and are reported, not denied.
+/// revocation"): "Stream terminates within documented baseline recheck bound". A 19 MiB encrypted document is downloaded from inside
+/// the Docker network (<see cref="InNetworkDownload"/>: only socket buffers between Kestrel and the client; from the Windows host,
+/// Docker Desktop's port forwarder reads ahead by many megabytes). The server re-checks at the Authority, at most every 5 s and before
+/// the next slice of plaintext, and stops the stream, audited as DOCUMENT_DOWNLOAD_FAILED, on a revocation, a replacement of the
+/// document (a change of its accepted version) or an unavailable Authority; the server-side stop instant is the audit event's time.
+/// An undisturbed slow download completes byte for byte through its re-checks. Bytes already in the socket buffers when access ends
+/// are the protocol's acknowledged finite exposure window and are reported.
 /// </summary>
 [Collection(StageBStackCollectionDefinition.Name)]
 public sealed class C10DownloadRecheckTests(StageBFixture fixture)
@@ -22,7 +24,7 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
     private const int DocumentBytes = 19 * 1024 * 1024; // the Accused documents field accepts up to 20 MiB
     private static readonly TimeSpan Settle = TimeSpan.FromSeconds(40);
     private static readonly TimeSpan RecheckBound = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan DrainAllowance = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan CheckAndClockAllowance = TimeSpan.FromSeconds(5); // one re-check's own duration plus host/VM clock skew
 
     private sealed record Workspace(StageBScenario S, Guid Record, Guid Attachment, byte[] Bytes);
 
@@ -52,34 +54,51 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
         return created.Root.GetProperty("recordShareId").GetGuid();
     }
 
-    private string[] DownloadFailures(Workspace w) =>
-        fixture.Stack.AttackerSql($"SELECT event_metadata_json->>'reasonCode' FROM audit_events WHERE tenant_id = '{w.S.OrganizationId:D}' AND form_record_id = '{w.Record:D}' AND event_action = 'DOCUMENT_DOWNLOAD_FAILED' ORDER BY audit_sequence;")
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    /// <summary>The DOCUMENT_DOWNLOAD_FAILED events of the record: reason code and server time.</summary>
+    private (string Reason, DateTimeOffset At)[] DownloadFailures(Workspace w) =>
+        [.. fixture.Stack.AttackerSql($"SELECT (event_metadata_json->>'reasonCode') || '|' || to_char(event_occurred_on AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') FROM audit_events WHERE tenant_id = '{w.S.OrganizationId:D}' AND form_record_id = '{w.Record:D}' AND event_action = 'DOCUMENT_DOWNLOAD_FAILED' ORDER BY audit_sequence;")
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(line => line.Split('|'))
+            .Select(parts => (parts[0], DateTimeOffset.Parse(parts[1], CultureInfo.InvariantCulture)))];
 
-    /// <summary>Opens the download, reads 1 MiB, then stops reading long enough for the server's writes to block.</summary>
-    private async Task<PausedDownload> PausedAsync(Workspace w, TestUser user)
+    /// <summary>Opens the download in the network, reads 1 MiB, then stops reading long enough for the server's writes to block.</summary>
+    private async Task<InNetworkDownload> PausedAsync(Workspace w, TestUser user)
     {
-        var download = await fixture.StartPausedDownloadAsync(DownloadPath(w.Record, w.Attachment), w.S.Token(user), 1024 * 1024);
-        Assert.Equal(HttpStatusCode.OK, download.Status);
-        Assert.Equal(DocumentBytes, download.DeclaredLength);
-        await Task.Delay(TimeSpan.FromSeconds(2));
+        var download = InNetworkDownload.Start(fixture.Stack, DownloadPath(w.Record, w.Attachment), w.S.Token(user), pauseAfterBytes: 1024 * 1024, secondsPer64KiB: null);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (download.Received() < 1024 * 1024)
+        {
+            Assert.True(DateTime.UtcNow < deadline, "the in-network download did not start");
+            await Task.Delay(250);
+        }
+
+        await Task.Delay(TimeSpan.FromSeconds(3));
         return download;
     }
 
-    /// <summary>Resumes after the access change and asserts the stream stopped early, within the bound, audited with an expected reason.</summary>
-    private async Task AssertStoppedAsync(Workspace w, PausedDownload download, Stopwatch sinceChange, string context, Func<string, bool> expectedReason)
+    /// <summary>
+    /// After the access change: the body ends short, exactly one DOCUMENT_DOWNLOAD_FAILED with the expected reason is audited, and the
+    /// server stopped within the re-check bound of the later of the change and the client resuming (a blocked write releases nothing).
+    /// </summary>
+    private async Task AssertStoppedAsync(Workspace w, InNetworkDownload download, DateTimeOffset changedAt, long receivedAtChange, string context, Func<string, bool> expectedReason, bool resume = true)
     {
-        var receivedAtChange = download.Received;
-        await download.ReadRestAsync();
-        var ended = sinceChange.Elapsed;
-        var observed = $"{context}: received {download.Received} of {DocumentBytes} bytes ({download.Received - receivedAtChange} after the change), ended {ended.TotalSeconds:F1} s after the change, failure '{download.Failure}'";
-        Assert.False(download.Completed, "CONS-23: the stream was not stopped. " + observed);
-        Assert.True(download.Received < DocumentBytes, observed);
-        Assert.True(ended <= RecheckBound + DrainAllowance, "CONS-23: the stream did not stop within the re-check bound. " + observed);
+        var resumedAt = DateTimeOffset.UtcNow;
+        if (resume)
+        {
+            await download.ResumeAsync();
+        }
+
+        var total = await download.TotalAsync();
         var failures = DownloadFailures(w);
-        Assert.True(failures.Length == 1 && expectedReason(failures[0]), $"expected one DOCUMENT_DOWNLOAD_FAILED with the {context} reason, found [{string.Join(", ", failures)}]. {observed}");
-        TestContext.Current.SendDiagnosticMessage("CONS-23 " + observed + "; reason " + failures[0]);
+        var observed = $"{context}: received {total} of {DocumentBytes} bytes ({total - receivedAtChange} after the change); failures [{string.Join(", ", failures.Select(f => $"{f.Reason} at +{(f.At - changedAt).TotalSeconds:F1} s"))}]";
+        TestContext.Current.SendDiagnosticMessage("CONS-23 " + observed);
+        Assert.True(total < DocumentBytes, "CONS-23: the stream was not stopped. " + observed);
+        Assert.True(failures.Length == 1 && expectedReason(failures[0].Reason), $"expected one DOCUMENT_DOWNLOAD_FAILED with the {context} reason. {observed}");
+        var reference = resume ? (resumedAt > changedAt ? resumedAt : changedAt) : changedAt;
+        Assert.True(failures[0].At - reference <= RecheckBound + CheckAndClockAllowance, "CONS-23: the server did not stop within the re-check bound. " + observed);
     }
+
+    private static bool DenialReason(string reason) => reason.Length > 0 && reason is not ("AUTHORITY_UNAVAILABLE" or "INTEGRITY_VERIFICATION_FAILED");
 
     [Fact]
     public async Task AnUndisturbedSlowDownloadCompletesByteForByteThroughItsRechecks()
@@ -91,9 +110,9 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
         await download.ReadRestAsync(bytesPerSecond: 3 * 1024 * 1024 / 2); // about 12 s: two or more re-checks at the 5 s interval
 
         Assert.True(download.Completed, $"received {download.Received} of {DocumentBytes}, failure '{download.Failure}'");
-        Assert.Equal("no", download.Header("X-Accel-Buffering")); // a buffering proxy must not read ahead of the re-checks
         Assert.True(started.Elapsed > TimeSpan.FromSeconds(10), "the download was not slow enough to cross a re-check");
         Assert.Equal(SHA256.HashData(w.Bytes), download.Sha256);
+        Assert.Equal("no", download.Header("X-Accel-Buffering")); // a buffering proxy must not read ahead of the re-checks
         Assert.Empty(DownloadFailures(w));
     }
 
@@ -102,43 +121,37 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
     {
         var w = await WorkspaceAsync("cons23-revocation", 232);
         var share = await ShareDocumentAsync(w);
-        using var download = await PausedAsync(w, w.S.Reader);
+        var download = await PausedAsync(w, w.S.Reader);
+        var receivedAtChange = download.Received();
 
         var revoked = await fixture.Api.PostAsync($"/api/v1/form-records/{w.Record:D}/shares/{share:D}/revoke?useDevelopmentStepUp=true", w.S.Token(w.S.Clerk), new { });
         Assert.True(revoked.IsSuccess, revoked.Body);
+        var changedAt = DateTimeOffset.UtcNow;
         await w.S.WaitGateReadyAsync(Settle);
-        var sinceChange = Stopwatch.StartNew();
 
-        await AssertStoppedAsync(w, download, sinceChange, "revocation", reason => reason.Length > 0 && reason is not ("AUTHORITY_UNAVAILABLE" or "INTEGRITY_VERIFICATION_FAILED")); // the Authority's denial code
+        await AssertStoppedAsync(w, download, changedAt, receivedAtChange, "revocation", DenialReason);
     }
 
     [Fact]
     public async Task ARevocationWhileTheClientIsReadingStopsTheStreamWithinABoundedAmountOfPlaintext()
     {
         // Independent review finding 8a/8c: the client keeps reading (512 KiB/s) through the revocation, so the stop comes from the
-        // periodic re-check, not from a check on resume; the plaintext received after the revocation took effect is bounded by the
-        // interval plus the check and transport buffers (asserted at 8 MiB of the 19 MiB document, reported exactly).
+        // periodic re-check, not from a check on resume. The server must stop within the re-check bound of the revocation, and the
+        // plaintext read after it is bounded by that interval at the read rate plus the socket buffers (asserted at 8 MiB of 19 MiB).
         var w = await WorkspaceAsync("cons23-revocation-active", 236);
         var share = await ShareDocumentAsync(w);
-        using var download = await fixture.StartPausedDownloadAsync(DownloadPath(w.Record, w.Attachment), w.S.Token(w.S.Reader), 64 * 1024);
-        var reading = download.ReadRestAsync(bytesPerSecond: 512 * 1024); // about 38 s for the whole document
-        await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+        var download = InNetworkDownload.Start(fixture.Stack, DownloadPath(w.Record, w.Attachment), w.S.Token(w.S.Reader), pauseAfterBytes: null, secondsPer64KiB: 0.125);
+        await Task.Delay(TimeSpan.FromSeconds(4), TestContext.Current.CancellationToken);
 
         var revoked = await fixture.Api.PostAsync($"/api/v1/form-records/{w.Record:D}/shares/{share:D}/revoke?useDevelopmentStepUp=true", w.S.Token(w.S.Clerk), new { });
         Assert.True(revoked.IsSuccess, revoked.Body);
-        var receivedAtChange = download.Received; // measured from the revoke's return, not from the gate reopening (re-review)
-        var sinceChange = Stopwatch.StartNew();
+        var changedAt = DateTimeOffset.UtcNow;
+        var receivedAtChange = download.Received();
         await w.S.WaitGateReadyAsync(Settle);
-        await reading;
 
-        var after = download.Received - receivedAtChange;
-        var observed = $"active revocation: received {download.Received} of {DocumentBytes} bytes ({after} after the change), ended {sinceChange.Elapsed.TotalSeconds:F1} s after the change, failure '{download.Failure}', reasons [{string.Join(", ", DownloadFailures(w))}]";
-        TestContext.Current.SendDiagnosticMessage("CONS-23 " + observed);
-        Assert.False(download.Completed, "CONS-23: the stream was not stopped. " + observed);
-        Assert.True(after <= 8L * 1024 * 1024, "CONS-23: too much plaintext after the revocation. " + observed);
-        Assert.True(sinceChange.Elapsed <= RecheckBound + DrainAllowance, observed);
-        var failures = DownloadFailures(w);
-        Assert.True(failures.Length == 1 && failures[0] is not ("AUTHORITY_UNAVAILABLE" or "INTEGRITY_VERIFICATION_FAILED"), observed);
+        await AssertStoppedAsync(w, download, changedAt, receivedAtChange, "active revocation", DenialReason, resume: false);
+        var total = await download.TotalAsync();
+        Assert.True(total - receivedAtChange <= 8L * 1024 * 1024, $"CONS-23: {total - receivedAtChange} bytes of plaintext after the revocation");
     }
 
     [Fact]
@@ -146,25 +159,26 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
     {
         // The relevant revision: the streamed version is no longer the document's accepted current version.
         var w = await WorkspaceAsync("cons23-replacement", 233);
-        using var download = await PausedAsync(w, w.S.Clerk);
+        var download = await PausedAsync(w, w.S.Clerk);
+        var receivedAtChange = download.Received();
 
         await w.S.UploadAsync(w.S.Clerk, w.Record, "cons23-replacement.bin", "application/octet-stream", StageBScenario.SyntheticBytes(10_000, 234), replacesFileAttachmentId: w.Attachment);
-        var sinceChange = Stopwatch.StartNew();
+        var changedAt = DateTimeOffset.UtcNow;
 
-        await AssertStoppedAsync(w, download, sinceChange, "replacement", reason => reason == "DOCUMENT_VERSION_CHANGED");
+        await AssertStoppedAsync(w, download, changedAt, receivedAtChange, "replacement", reason => reason == "DOCUMENT_VERSION_CHANGED");
     }
 
     [Fact]
     public async Task AnUnavailableAuthorityDuringTheDownloadStopsTheStream()
     {
         var w = await WorkspaceAsync("cons23-authority-unavailable", 235);
-        using var download = await PausedAsync(w, w.S.Clerk);
-        Stopwatch sinceChange;
+        var download = await PausedAsync(w, w.S.Clerk);
+        var receivedAtChange = download.Received();
         try
         {
             fixture.Stack.Stop("authority");
-            sinceChange = Stopwatch.StartNew();
-            await AssertStoppedAsync(w, download, sinceChange, "authority unavailable", reason => reason == "AUTHORITY_UNAVAILABLE");
+            var changedAt = DateTimeOffset.UtcNow;
+            await AssertStoppedAsync(w, download, changedAt, receivedAtChange, "authority unavailable", reason => reason == "AUTHORITY_UNAVAILABLE");
         }
         finally
         {
