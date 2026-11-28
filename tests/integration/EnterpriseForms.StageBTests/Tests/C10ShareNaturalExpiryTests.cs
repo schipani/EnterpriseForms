@@ -82,11 +82,11 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
 
     /// <summary>Journal events of this kind about the share itself (its own <c>record_share_id</c>, not a share listed in the body).</summary>
     private int JournalEvents(string kind, Guid id) =>
-        int.Parse(fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE journal_event_kind = '{kind}' AND journal_event_body_json::jsonb ->> 'record_share_id' = '{id:D}';").Trim(), CultureInfo.InvariantCulture);
+        int.Parse(fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE journal_event_kind = '{kind}' AND journal_event_body_json::jsonb -> 'body' ->> 'record_share_id' = '{id:D}';").Trim(), CultureInfo.InvariantCulture);
 
     /// <summary>ShareExpired events of <paramref name="parent"/> that list <paramref name="descendant"/> as invalidated by the expiry.</summary>
     private int ExpiryInvalidations(Guid parent, Guid descendant) =>
-        int.Parse(fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE journal_event_kind = 'ShareExpired' AND journal_event_body_json::jsonb ->> 'record_share_id' = '{parent:D}' AND journal_event_body_json::jsonb -> 'invalidated_descendant_share_ids' ? '{descendant:D}';").Trim(), CultureInfo.InvariantCulture);
+        int.Parse(fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE journal_event_kind = 'ShareExpired' AND journal_event_body_json::jsonb -> 'body' ->> 'record_share_id' = '{parent:D}' AND journal_event_body_json::jsonb -> 'body' -> 'invalidated_descendant_share_ids' ? '{descendant:D}';").Trim(), CultureInfo.InvariantCulture);
 
     private async Task<string> WaitStateAsync(Guid share, Func<string, bool> done, TimeSpan? timeout = null)
     {
@@ -254,7 +254,7 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
         // or Expired once with the revoke refused if the loop did; the update is refused and the share converges to Expired once; the
         // transfer neither revives nor blocks the durable share, which converges to Expired once.
         var r = (await TimelineAsync()).Race;
-        TestContext.Current.SendDiagnosticMessage($"§4 test 8: the revoked share was {r.RevokedStateBeforeRevoke} at the revoke, revoke {(int)r.Revoke.Status}, final {r.RevokedFinal}");
+        TestContext.Current.TestOutputHelper?.WriteLine($"§4 test 8: the revoked share was {r.RevokedStateBeforeRevoke} at the revoke, revoke {(int)r.Revoke.Status}, final {r.RevokedFinal}");
         Assert.False(r.Update.IsSuccess, r.Update.Body); // an expired share has no active lineage to update
         Assert.True(r.Transfer.IsSuccess, r.Transfer.Body);
         Assert.Equal("Expired", r.UpdatedFinal);
@@ -284,7 +284,7 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
         // §4 test 10: at the instant the delegated share is denied through its lineage (only the independent grant's field remains), on
         // real-loop convergence the parent is Expired once and the delegated share Invalidated, and the independent grant keeps access.
         var i = (await TimelineAsync()).Inherited;
-        TestContext.Current.SendDiagnosticMessage($"§4 test 10: the delegated share was {i.DelegatedStateAtInstant} at the instant");
+        TestContext.Current.TestOutputHelper?.WriteLine($"§4 test 10: the delegated share was {i.DelegatedStateAtInstant} at the instant");
         Assert.Equal(["family_name"], i.DesignerKeysAtInstant);
         Assert.Equal("Expired", i.ManagerFinal);
         Assert.Equal("Invalidated", i.DelegatedFinal);
@@ -307,7 +307,7 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
         // (journal replay from the independent archive, SpiceDB rebuild and the reviewed quarantine lift); it is not asserted here.
         var t = (await TimelineAsync()).Restore;
         var observed = $"converged {t.ConvergedBeforeRestore} ({t.ExpiredBeforeRestore} ShareExpired); after restore {t.StateAfterRestore}, access {(int)t.StatusAfterRestore} {t.ErrorAfterRestore}; after a 180 s wait {t.StateAfterWait}, access {(int)t.StatusAfterWait} {t.ErrorAfterWait}, ShareExpired {t.ExpiredAfterWait}; quarantine '{t.QuarantineReason}'; gate {t.Gate}";
-        TestContext.Current.SendDiagnosticMessage("§4 test 13: " + observed);
+        TestContext.Current.TestOutputHelper?.WriteLine("§4 test 13: " + observed);
         Assert.Equal("Expired", t.ConvergedBeforeRestore);
         Assert.Equal(1, t.ExpiredBeforeRestore);
         Assert.Equal("Active", t.StateAfterRestore); // the backup's pre-convergence state
@@ -324,7 +324,7 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
         // (5 s) plus the time to drain the transport buffers after the instant, with one audited DOCUMENT_DOWNLOAD_FAILED.
         var d = (await TimelineAsync()).Download;
         var observed = $"received {d.Received} of {d.DocumentBytes} bytes ({d.Received - d.ReceivedAtExpiry} after the instant), ended {d.EndedAfterExpiry.TotalSeconds:F1} s after the instant, failure '{d.Failure}', reasons [{string.Join(", ", d.FailureReasons)}]";
-        TestContext.Current.SendDiagnosticMessage("CONS-23 natural expiry: " + observed);
+        TestContext.Current.TestOutputHelper?.WriteLine("CONS-23 natural expiry: " + observed);
         Assert.False(d.Completed, "CONS-23: the download continued past the share's expiry. " + observed);
         Assert.True(d.Received < d.DocumentBytes, observed);
         Assert.True(d.EndedAfterExpiry <= TimeSpan.FromSeconds(45), observed); // the race steps above run first (about 10 s), then 5 s + drain
