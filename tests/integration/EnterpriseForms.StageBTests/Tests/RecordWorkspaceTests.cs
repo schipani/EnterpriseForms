@@ -154,7 +154,7 @@ public sealed class RecordWorkspaceTests(StageBFixture fixture)
         // reader now discovers exactly those two — without edit rights.
         foreach (var shared in new[] { created[3], created[30] })
         {
-            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{shared:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{shared:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
             Assert.True(share.IsSuccess, share.Body);
         }
 
@@ -190,7 +190,7 @@ public sealed class RecordWorkspaceTests(StageBFixture fixture)
         Assert.True(summary.GetProperty("createdByCurrentUser").GetBoolean());
         Assert.Equal(JsonValueKind.String, summary.GetProperty("createdOn").ValueKind);
 
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
         Assert.True(share.IsSuccess, share.Body);
         var shared = await s.WaitProjectionAsync(s.Reader, accused, TimeSpan.FromSeconds(40));
         var sharedSummary = shared.Root.GetProperty("summary");

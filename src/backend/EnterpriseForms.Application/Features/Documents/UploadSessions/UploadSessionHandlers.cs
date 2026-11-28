@@ -54,9 +54,20 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
         // Phase C9 (D9-5): the upload policy comes from the record's edit layout; the one the client showed must still be it.
         FormRecords.Projection.EditLayoutGuard.Require(verified, request.ExpectedLayoutVersionId);
         var edit = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, request.FormRecordId), ProtectedAction.Edit), cancellationToken).ConfigureAwait(false);
-        if (!edit.Allowed)
+        // C10 WP8-B: a share recipient may only replace the one attachment the Authority lists as replaceable for them.
+        var shareReplacement = !edit.Allowed && request.ReplacesFileAttachmentId is { } shared && Replaceable(verified, shared);
+        if (!edit.Allowed && !shareReplacement)
         {
             throw new BusinessException("FORBIDDEN", 403, "uploading documents requires edit permission on the record");
+        }
+
+        // C10 (independent review F-7): a share replacement is validated under the replaced attachment's own field and its upload policy;
+        // any other declared field gets the same answer as an attachment outside the record (no policy of another field is evaluated).
+        // Stage B (C-200): the replaced attachment is looked up among the verified rows; an edit read authorizes a share recipient's editable
+        // field items only, never documents, so AuthorizedAttachments never holds it. The Authority listed it as replaceable (viewable).
+        if (shareReplacement && verified.AllRows.OfType<FileAttachmentVersion>().FirstOrDefault(a => a.FileAttachmentId == request.ReplacesFileAttachmentId)?.FieldDefinitionId != request.FieldDefinitionId)
+        {
+            throw new BusinessException("NOT_FOUND", 404, "attachment to replace is not part of the accepted record content");
         }
 
         var element = verified.Layout.Elements.FirstOrDefault(e => e.Kind == LayoutElementKinds.DocumentCollection && e.FieldDefinitionId == request.FieldDefinitionId)
@@ -78,7 +89,7 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
             throw new BusinessException("FILE_COUNT_EXCEEDED", 422, $"this field accepts at most {policy.MaxFiles} documents");
         }
 
-        if (request.ReplacesFileAttachmentId is { } replaces && verified.AuthorizedAttachments.All(a => a.FileAttachmentId != replaces))
+        if (request.ReplacesFileAttachmentId is { } replaces && !shareReplacement && verified.AuthorizedAttachments.All(a => a.FileAttachmentId != replaces))
         {
             throw new BusinessException("NOT_FOUND", 404, "attachment to replace is not part of the accepted record content");
         }
@@ -133,16 +144,12 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
         }
 
         RequireUnexpired(session);
+        // Re-check live authorization per chunk (revocation mid-upload stops the transfer, CLAUDE-DESIGN §6.1), before any
+        // caller-supplied value is examined (CodeQL cs/user-controlled-bypass, alert 8 on PR #88).
+        await RequireUploadAuthorityAsync(context, session, cancellationToken).ConfigureAwait(false);
         if (chunkIndex < 0 || chunkIndex >= session.ExpectedChunkCount)
         {
             throw new BusinessException("INVALID_REQUEST", 422, "chunk index out of range");
-        }
-
-        // Re-check live authorization per chunk (revocation mid-upload stops the transfer, CLAUDE-DESIGN §6.1).
-        var edit = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, session.FormRecordId), ProtectedAction.Edit), cancellationToken).ConfigureAwait(false);
-        if (!edit.Allowed)
-        {
-            throw new BusinessException("FORBIDDEN", 403, "edit permission on the record was revoked");
         }
 
         var expectedLength = chunkIndex == session.ExpectedChunkCount - 1 ? session.DeclaredSizeBytes - (long)chunkIndex * session.ChunkSizeBytes : session.ChunkSizeBytes;
@@ -195,11 +202,7 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
             throw new BusinessException("UPLOAD_INCOMPLETE", 409, "not every chunk has been received");
         }
 
-        var edit = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, session.FormRecordId), ProtectedAction.Edit), cancellationToken).ConfigureAwait(false);
-        if (!edit.Allowed)
-        {
-            throw new BusinessException("FORBIDDEN", 403, "edit permission on the record was revoked");
-        }
+        await RequireUploadAuthorityAsync(context, session, cancellationToken).ConfigureAwait(false);
 
         await storage.CommitStagedChunksAsync(session.StagingObjectKey, session.ExpectedChunkCount, cancellationToken).ConfigureAwait(false);
         var now = clock.GetUtcNow();
@@ -266,9 +269,33 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
     }
 
     /// <summary>
+    /// The live re-check of every chunk and of completion (revocation mid-upload stops the transfer). Edit permission on the record, or,
+    /// for a C10 WP8-B share-replacement session, the Authority still listing the replaced attachment as replaceable for the caller
+    /// (Stage B C-200: the edit check alone refused every recipient's replacement after it had been admitted).
+    /// </summary>
+    private async Task RequireUploadAuthorityAsync(RequestContext context, UploadSession session, CancellationToken cancellationToken)
+    {
+        var edit = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, session.FormRecordId), ProtectedAction.Edit), cancellationToken).ConfigureAwait(false);
+        if (edit.Allowed)
+        {
+            return;
+        }
+
+        if (session.ReplacesFileAttachmentId is { } replaces && Replaceable(await reader.ReadAsync(context, session.FormRecordId, ProtectedAction.Edit, cancellationToken).ConfigureAwait(false), replaces))
+        {
+            return;
+        }
+
+        throw new BusinessException("FORBIDDEN", 403, "edit permission on the record was revoked");
+    }
+
+    /// <summary>
     /// Final step (B-05): binds the processed version into the record manifest through the caller's authenticated
     /// context (full candidate = current rows + the new attachment leaf, replacing a prior version of the same attachment).
     /// </summary>
+    private static bool Replaceable(FormRecords.Projection.VerifiedRecord verified, Guid fileAttachmentId) =>
+        verified.Verification.ReplaceableItems?.Any(i => i.ItemKind == ManifestItemKind.Attachment && i.ItemId == fileAttachmentId) == true;
+
     public async Task<UploadSessionResponse> CommitAsync(RequestContext context, Guid uploadSessionId, string idempotencyKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -297,12 +324,32 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
         }
 
         var verified = await reader.ReadAsync(context, session.FormRecordId, ProtectedAction.Edit, cancellationToken).ConfigureAwait(false);
-        if (!verified.IsComplete)
+        // C10 WP8-B: a share recipient commits only the replacement of the one attachment their owner-granted share allows replacing; the
+        // candidate is built exactly as for the owner, and the Authority re-derives every rule at Prepare and Commit.
+        if (!verified.IsComplete && !(session.ReplacesFileAttachmentId == processed.FileAttachmentId && Replaceable(verified, processed.FileAttachmentId)))
         {
             throw new BusinessException("FORBIDDEN", 403, "committing documents requires record ownership");
         }
 
         FormRecords.Lifecycle.RecordLifecycle.RequireContentEditable(verified);
+
+        // C10 owner decision 2: the processed version must be exactly the next version of the verified accepted one. A version accepted
+        // since this upload was processed (or a local projection that missed one) refuses it here, before anything is staged; the local
+        // projection is corrected from the verified record so the next upload is numbered correctly. The Authority enforces the same rule.
+        if (verified.AllRows.OfType<FileAttachmentVersion>().FirstOrDefault(a => a.FileAttachmentId == processed.FileAttachmentId)?.VersionNumber is { } acceptedVersion
+            && processed.VersionNumber != acceptedVersion + 1)
+        {
+            await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (await scope.FindAttachmentAsync(context.OrganizationId, processed.FileAttachmentId, cancellationToken).ConfigureAwait(false) is { } projected && projected.CurrentVersionNumber < acceptedVersion)
+                {
+                    projected.CurrentVersionNumber = acceptedVersion;
+                    await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            throw new BusinessException("DOCUMENT_VERSION_SUPERSEDED", 409, "another version of this document was accepted after this upload was processed; upload it again");
+        }
 
         var header = CandidateBuilder.CloneHeader(verified.Header);
         var rows = new List<ISignedContentRow>();

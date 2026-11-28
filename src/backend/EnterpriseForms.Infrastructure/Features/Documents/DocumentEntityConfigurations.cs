@@ -67,7 +67,10 @@ public sealed class FileAttachmentVersionConfiguration : IEntityTypeConfiguratio
         builder.Property(v => v.ScannerName).HasMaxLength(100);
         builder.Property(v => v.ScanSignatureName).HasMaxLength(200);
         builder.Property(v => v.VersionState).HasMaxLength(20);
-        builder.HasIndex(v => new { v.FileAttachmentId, v.VersionNumber, v.ContentChangeOperationId }).IsUnique().HasDatabaseName("uq_file_attachment_versions_number_operation");
+        // C10 owner decision 2: unique per operation-bound copy only. Processed (pre-commit) copies carry operation 00000000-… and may share a
+        // number when an earlier upload of that number was never accepted; the Authority accepts at most one version per number.
+        builder.HasIndex(v => new { v.FileAttachmentId, v.VersionNumber, v.ContentChangeOperationId }).IsUnique().HasDatabaseName("uq_file_attachment_versions_number_operation")
+            .HasFilter("content_change_operation_id <> '00000000-0000-0000-0000-000000000000'");
         builder.HasIndex(v => new { v.FormRecordId, v.ContentChangeOperationId }).HasDatabaseName("ix_file_attachment_versions_record_operation");
         builder.HasOne<Tenant>().WithMany().HasForeignKey(v => v.TenantId).HasConstraintName("fk_file_attachment_versions_tenant");
         builder.HasOne<FormRecord>().WithMany().HasForeignKey(v => v.FormRecordId).HasConstraintName("fk_file_attachment_versions_record");

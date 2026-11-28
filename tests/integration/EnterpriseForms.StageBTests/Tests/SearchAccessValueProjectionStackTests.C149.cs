@@ -237,7 +237,7 @@ public sealed partial class SearchAccessValueProjectionStackTests
             foreach (var (record, share) in shares)
             {
                 await EditAsync(w, w.S.Clerk, record, new() { ["exhibit_count"] = (count++).ToString(CultureInfo.InvariantCulture) }); // a content event
-                await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{share:D}/revoke", w.S.Token(w.S.Clerk), new { }), _ => true, "revoke");
+                await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{share:D}/revoke?useDevelopmentStepUp=true", w.S.Token(w.S.Clerk), new { }), _ => true, "revoke");
                 revoked[record] = true;
                 await EditAsync(w, w.S.Clerk, record, new() { ["exhibit_count"] = (count++).ToString(CultureInfo.InvariantCulture) });
             }

@@ -9,62 +9,23 @@ using EnterpriseForms.Domain.Features.Sharing;
 namespace EnterpriseForms.Application.Features.Sharing.CreateShare;
 
 /// <summary>Explicit item-scoped share (CLAUDE.md §4H): field keys map to the accepted manifest's item ids; the authority validates scope, delegation and recipient.</summary>
-public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock)
+public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock, FormRecords.Projection.VerifiedRecordReader? reader = null)
 {
     public async Task<ShareResponse> HandleAsync(RequestContext context, Guid formRecordId, CreateShareRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(request);
-        if ((request.RecipientUserId is null) == (request.RecipientTeamId is null) || request.FieldKeys.Count == 0 || request.RecipientRole is not ("Reader" or "Contributor" or "Manager"))
+        var fieldKeys = request.FieldKeys ?? [];
+        if ((request.RecipientUserId is null) == (request.RecipientTeamId is null) || fieldKeys.Count + (request.Documents?.Count ?? 0) == 0 || request.RecipientRole is not ("Reader" or "Contributor" or "Manager"))
         {
-            throw new BusinessException("INVALID_REQUEST", 422, "one recipient, a valid role and at least one field key are required");
+            throw new BusinessException("INVALID_REQUEST", 422, "one recipient, a valid role and at least one field key or document are required");
         }
 
         var user = context.ToDelegatedUser();
-        var head = await authority.GetCommittedContentRevisionAsync(user, context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
-        if (head.CommittedOperationId is null)
-        {
-            throw new BusinessException("NO_COMMITTED_CONTENT", 404, "record has no accepted content");
-        }
-
-        List<Domain.Features.FormRecords.FieldValueRowBase> values;
-        List<Domain.Features.FormDefinitions.FieldDefinition> fields;
-        await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
-        {
-            var header = await scope.FindStagedHeaderAsync(formRecordId, head.CommittedOperationId.Value, cancellationToken).ConfigureAwait(false)
-                         ?? throw new BusinessException("NO_COMMITTED_CONTENT", 404, "committed header missing");
-            values = (await scope.GetStagedRowsAsync(formRecordId, head.CommittedOperationId.Value, cancellationToken).ConfigureAwait(false)).OfType<Domain.Features.FormRecords.FieldValueRowBase>().ToList();
-            fields = await scope.GetFieldDefinitionsAsync(header.FormDefinitionId, cancellationToken).ConfigureAwait(false);
-        }
-
-        var fieldByKey = fields.ToDictionary(f => f.FieldKey, StringComparer.Ordinal);
-        var items = new List<(Guid FieldDefinitionId, Guid ItemId)>();
-        foreach (var key in request.FieldKeys.Distinct(StringComparer.Ordinal))
-        {
-            if (!fieldByKey.TryGetValue(key, out var field))
-            {
-                throw new BusinessException("INVALID_REQUEST", 422, $"unknown field key '{key}'");
-            }
-
-            // Repeating-section values are not field-shareable in V1 (C-17): a share would release values without the entry
-            // structure the authority does not authorize for partial reads. Extending shares to entries is an authority change.
-            if (field.GroupDefinitionId is not null || values.Any(v => v.FieldDefinitionId == field.FieldDefinitionId && v.FormRecordGroupId is not null))
-            {
-                throw new BusinessException("FIELD_IN_REPEATING_GROUP", 422, $"field '{key}' belongs to a repeating section and cannot be shared on its own");
-            }
-
-            // A multi-select dropdown holds one row (item) per selected option: sharing the field shares every current selection.
-            var fieldRows = values.Where(v => v.FieldDefinitionId == field.FieldDefinitionId).ToList();
-            if (fieldRows.Count == 0)
-            {
-                throw new BusinessException("INVALID_REQUEST", 422, $"field '{key}' has no persisted value to share");
-            }
-
-            items.AddRange(fieldRows.Select(r => (field.FieldDefinitionId, r.FieldValueItemId)));
-        }
+        var (head, items) = await ShareFieldItems.ResolveAsync(store, authority, ShareFieldItems.ReadableBy(reader, context, formRecordId), user, context.OrganizationId, formRecordId, fieldKeys, request.ParentRecordShareId, cancellationToken).ConfigureAwait(false);
 
         var recordShareId = CreateFormDefinitionHandler.DeterministicId(idempotencyKey, "share");
-        var payload = JsonSerializer.SerializeToElement(new
+        var commandFields = JsonSerializer.SerializeToNode(new
         {
             record_share_id = recordShareId,
             form_record_id = formRecordId,
@@ -72,7 +33,23 @@ public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAutho
             recipient_team_id = request.RecipientTeamId,
             recipient_role = request.RecipientRole,
             field_item_ids = items.Select(i => i.ItemId).ToList(),
-        });
+        })!.AsObject();
+        if (request.ParentRecordShareId is { } parent)
+        {
+            commandFields["parent_record_share_id"] = parent;
+        }
+
+        if (request.ShareExpiresOn is { } expiry)
+        {
+            commandFields["share_expires_on"] = expiry.ToUniversalTime();
+        }
+
+        if (ShareFieldItems.Documents(request.Documents) is { } documents)
+        {
+            commandFields["documents"] = documents;
+        }
+
+        var payload = HumanCommandPayload.Serialize(commandFields, request.UseDevelopmentStepUp == true);
         var command = await awaiter.SubmitAndAwaitAsync(user, new SecurityCommandRequest(context.OrganizationId, SecurityCommandKind.CreateShare, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), head.AuthorizationRevision, payload, "share"), "share:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
         var outcome = new CommandOutcome(command.CommandId, command.CommandStatus.ToString(), command.AuthorizationRevision, command.CommandStatus == SecurityCommandStatus.Effective);
         if (!outcome.Effective)

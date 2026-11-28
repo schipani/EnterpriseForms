@@ -17,7 +17,9 @@ const formatBytes = (bytes: number | string) => {
  * app-shell upload manager), listing, authorized download (browser-native, server-decrypted), version history, remove.
  * A document is only shown as Ready when the server committed its verified version.
  */
-export function DocumentCollection({ formRecordId, fieldDefinitionId, label, documents, policy, canEdit, contentRevision, editLayoutVersionId = null, onChanged }: { formRecordId: string; fieldDefinitionId: string; label: string; documents: readonly DocumentSummaryResponse[]; policy: LayoutUploadPolicy | undefined; canEdit: boolean; contentRevision: number; editLayoutVersionId?: string | null; onChanged: () => void }) {
+export function DocumentCollection({ formRecordId, fieldDefinitionId, label, documents, policy, canEdit, contentRevision, editLayoutVersionId = null, onChanged, replaceableIds = [] }: { formRecordId: string; fieldDefinitionId: string; label: string; documents: readonly DocumentSummaryResponse[]; policy: LayoutUploadPolicy | undefined; canEdit: boolean; contentRevision: number; editLayoutVersionId?: string | null; onChanged: () => void; replaceableIds?: readonly string[] }) {
+  // C10 WP8-B: a share recipient may replace only the documents the authority lists for them (advisory; the server decides).
+  const mayReplace = (fileAttachmentId: string) => canEdit || replaceableIds.includes(fileAttachmentId);
   useFormatter();
   const { uploads } = useRuntime();
   const api = useApi();
@@ -185,7 +187,7 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
               if (ready) {
                 overflow.push({ key: "versions", content: <button type="button" className="w-full text-left" onClick={() => setHistoryTarget(row)}>Versions</button> });
               }
-              if (canEdit && row.attachmentLifecycleState === "Ready") {
+              if (mayReplace(row.fileAttachmentId) && row.attachmentLifecycleState === "Ready") {
                 overflow.push({
                   key: "replace",
                   content: (
@@ -226,7 +228,7 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
           },
         ]}
       />
-      {canEdit ? (
+      {canEdit || replaceableIds.length > 0 ? (
         <input
           ref={replaceInput}
           type="file"

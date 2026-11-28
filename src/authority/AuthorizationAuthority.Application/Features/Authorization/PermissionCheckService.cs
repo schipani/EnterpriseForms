@@ -118,13 +118,25 @@ public sealed class PermissionCheckService(IAuthorityStore store, ProjectionInte
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
         var skip = 0;
+        long? expiryBoundTicks = null;
         if (!string.IsNullOrEmpty(request.ContinuationToken))
         {
+            // "{revision}:{skip}" or, when a share the enumeration used expires, "{revision}:{skip}:{expiry UTC ticks}" (C10 D10-10).
             var parts = request.ContinuationToken.Split(':');
-            if (parts.Length != 2 || !long.TryParse(parts[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var tokenRevision)
+            if (parts.Length is not (2 or 3) || !long.TryParse(parts[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var tokenRevision)
                 || !int.TryParse(parts[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out skip))
             {
                 throw AuthorityException.Invalid("continuation token malformed");
+            }
+
+            if (parts.Length == 3)
+            {
+                if (!long.TryParse(parts[2], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var ticks))
+                {
+                    throw AuthorityException.Invalid("continuation token malformed");
+                }
+
+                expiryBoundTicks = ticks;
             }
 
             if (tokenRevision != state.AuthorizationRevision)
@@ -135,6 +147,11 @@ public sealed class PermissionCheckService(IAuthorityStore store, ProjectionInte
 
         var registered = (await scope.GetActiveRecordIdsAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)).ToHashSet();
         var snapshot = await verifier.PinAsync(scope, state, organizationLocked: false, Guid.CreateVersion7(), cancellationToken).ConfigureAwait(false);
+        if (expiryBoundTicks is { } boundTicks && snapshot.DecisionInstant.UtcTicks >= boundTicks)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.ContinuationInvalidated, 409, true, "continuation token invalidated: a share the enumeration used has expired; restart from the first page");
+        }
+
         IReadOnlyList<string> lookedUp;
         try
         {
@@ -144,6 +161,12 @@ public sealed class PermissionCheckService(IAuthorityStore store, ProjectionInte
         {
             throw new AuthorityException(AuthorityErrorCodes.LimitExceeded, 422, false, $"more than {MaximumDiscoverableRecords} discoverable records; nothing partial is returned");
         }
+
+        // C10 M1-WP2 (D10-10): the earliest future expiry among the caller's live shares bounds the continuation.
+        var nextExpiry = (await ProjectionIntegrityVerifier.ShareExpiryAsync(snapshot, cancellationToken).ConfigureAwait(false)).NextExpiryFor(bound.AuthorityUserId);
+        var expiryBound = expiryBoundTicks is { } carried
+            ? nextExpiry is { } fresh && fresh.UtcTicks < carried ? fresh.UtcTicks : carried
+            : nextExpiry?.UtcTicks;
 
         // Verify: the lookup ran at the pinned snapshot of `state`; if the head marker or the authoritative state moved meanwhile, fail closed (retryable).
         if (!await verifier.CompleteAsync(snapshot, "discover", cancellationToken).ConfigureAwait(false))
@@ -162,7 +185,9 @@ public sealed class PermissionCheckService(IAuthorityStore store, ProjectionInte
 
         ids.Sort();
         var page = ids.Skip(skip).Take(request.PageSize).ToList();
-        var next = skip + page.Count < ids.Count ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{state.AuthorizationRevision}:{skip + page.Count}") : null;
+        var next = skip + page.Count >= ids.Count ? null
+            : expiryBound is { } boundAt ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{state.AuthorizationRevision}:{skip + page.Count}:{boundAt}")
+            : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{state.AuthorizationRevision}:{skip + page.Count}");
         return new DiscoverResponse(page, state.AuthorizationRevision, next);
     }
 

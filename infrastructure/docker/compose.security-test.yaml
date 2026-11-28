@@ -64,6 +64,9 @@ services:
       # with this outside Development/Testing or without the synthetic TestIdentityProvider; every other stack leaves it
       # unset (Unavailable), so approvals are refused there until PB-08 step-up exists.
       FieldSearch__ApprovalStepUp: SyntheticDevelopment
+      # C10 G27: human share and transfer commands (CreateShare, UpdateShareScope, RevokeShare, TransferOwnership) need step-up; the
+      # same development-only synthetic path, refused by the Authority outside Development/Testing or without the TestIdentityProvider.
+      HumanCommand__StepUp: SyntheticDevelopment
       # C-188 (D-H18): retained-field approvals are on in this disposable stack only (default Disabled everywhere else); a test
       # recreates the Authority with SECTEST_RETAINED_FIELD_APPROVALS=Disabled to rehearse the rollback.
       FieldSearch__RetainedFieldApprovals: ${SECTEST_RETAINED_FIELD_APPROVALS:-Enabled}

@@ -59,7 +59,7 @@ public sealed class RecordLookupTests(StageBFixture fixture)
         Assert.Equal(0, hiddenByReference.Root.GetProperty("totalCount").GetInt32());
 
         // After a share the same member finds it.
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
         Assert.True(share.IsSuccess, share.Body);
         await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
         Assert.Equal([record], MatchIds(await LookupAsync(s, s.Reader, Reference(record))));

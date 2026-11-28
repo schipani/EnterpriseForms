@@ -125,10 +125,23 @@ public sealed class BusinessSchemaGuardTests
     {
         using var authority = new WebApplicationFactory<AuthorizationAuthority.Api.Program>().WithWebHostBuilder(b => b.UseEnvironment("Development"));
         var authorityHandler = authority.Server.CreateHandler();
+
+        // The in-memory Authority starts on its first request. Start it here, so the API's readiness probe (bounded by its own
+        // timeout) measures the business schema under test rather than this test host's startup time on a loaded machine.
+        using (var warm = authority.CreateClient())
+        {
+            using var live = await warm.GetAsync(new Uri("/internal/v1/health/live", UriKind.Relative), TestContext.Current.CancellationToken);
+            Assert.True(live.IsSuccessStatusCode, $"authority test host not live: {(int)live.StatusCode}");
+        }
+
         using var api = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
             b.UseEnvironment("Development");
-            b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(new Dictionary<string, string?> { ["TrustAuthority:BaseAddress"] = "http://authority.test" }));
+            b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["TrustAuthority:BaseAddress"] = "http://authority.test",
+                ["TrustAuthority:ReadinessTimeoutSeconds"] = "60",
+            }));
             b.ConfigureServices(services =>
             {
                 services.AddHttpClient(Composition.TrustAuthorityReadinessProbe.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => authorityHandler);

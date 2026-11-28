@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    C10 D5 expiry-aware share-only candidate query real-PostgreSQL gate. Development/Testing only; not part of EnterpriseForms.All.slnx and
+    never built in place: scripts/dev/c10-d5-share-only-pg-gate.ps1 copies this folder to a temporary work directory (outside the
+    repository) and builds it against this tree's Authority Release binaries passed as C10D5Binaries. It references no repository
+    project; it seeds a disposable database and calls the real SearchQueryReader from those binaries.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>C10D5Harness</AssemblyName>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS1591;CA2007;CA1303</NoWarn>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="$(C10D5Binaries)\*.dll" Private="true" />
+  </ItemGroup>
+  <Target Name="RequireC10D5Binaries" BeforeTargets="ResolveAssemblyReferences" Condition="'$(C10D5Binaries)' == '' Or !Exists('$(C10D5Binaries)\AuthorizationAuthority.Api.dll')">
+    <Error Text="Build through scripts/dev/c10-d5-share-only-pg-gate.ps1 (C10D5Binaries must name a folder of Authority Release binaries)." />
+  </Target>
+</Project>

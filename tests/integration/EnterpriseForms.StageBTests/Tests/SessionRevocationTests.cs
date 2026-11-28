@@ -245,7 +245,7 @@ public sealed class SessionRevocationTests(StageBFixture fixture)
         // Revoked: never valid again, and the digest cannot be registered a second time to "renew" it.
         var other = Convert.ToBase64String(SHA256.HashData(RandomNumberGenerator.GetBytes(32)));
         Assert.True((await AuthorityAsync("/internal/v1/sessions", new { organization_id = s.OrganizationId, session_digest_base64 = other, absolute_expires_on = DateTimeOffset.UtcNow.AddHours(1) }, assertion)).IsSuccess);
-        Assert.True((await AuthorityAsync("/internal/v1/sessions/revoke", new { organization_id = s.OrganizationId, session_digest_base64 = other }, assertion)).IsSuccess);
+        Assert.True((await AuthorityAsync("/internal/v1/sessions/revoke?useDevelopmentStepUp=true", new { organization_id = s.OrganizationId, session_digest_base64 = other }, assertion)).IsSuccess);
         Assert.Equal("SESSION_REVOKED", (await ValidateAsync(s, other, assertion)).Root.GetProperty("invalid_reason").GetString());
         var renew = await AuthorityAsync("/internal/v1/sessions", new { organization_id = s.OrganizationId, session_digest_base64 = other, absolute_expires_on = DateTimeOffset.UtcNow.AddHours(1) }, assertion);
         Assert.False(renew.IsSuccess);

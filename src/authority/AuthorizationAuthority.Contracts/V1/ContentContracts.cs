@@ -135,4 +135,6 @@ public sealed record VerifyRecordProjectionResult(
     Guid CorrelationId,
     IReadOnlyList<VerifiedProjectionItem>? ReadableItems = null,
     IReadOnlyList<VerifiedProjectionItem>? EditableItems = null,
-    bool ContributorWritesEnabled = false);
+    bool ContributorWritesEnabled = false,
+    IReadOnlyList<VerifiedProjectionItem>? DownloadableItems = null,
+    IReadOnlyList<VerifiedProjectionItem>? ReplaceableItems = null);

@@ -1,0 +1,121 @@
+using EnterpriseForms.Application.Common;
+using EnterpriseForms.Application.Common.Authority;
+using EnterpriseForms.Application.Common.Persistence;
+
+namespace EnterpriseForms.Application.Features.Sharing;
+
+/// <summary>
+/// The item ids a share of the named fields covers, bound to the record's authority-accepted content (CLAUDE.md §4H): each field
+/// key resolves to the persisted value items of the committed operation the Authority reports as current. The Authority verifies
+/// every item against its accepted manifest again when it plans the command; nothing here grants access.
+/// </summary>
+internal static class ShareFieldItems
+{
+    public sealed record Resolved(AcceptedContentRevision Head, IReadOnlyList<(Guid FieldDefinitionId, Guid ItemId)> Items);
+
+    /// <summary>C10 WP8: the command form of the requested documents (view always; the Authority validates them against verified content).</summary>
+    public static System.Text.Json.Nodes.JsonArray? Documents(IReadOnlyList<EnterpriseForms.Contracts.Features.ShareDocumentRequest>? documents) =>
+        documents is not { Count: > 0 } ? null : new System.Text.Json.Nodes.JsonArray([.. documents.Select(d => (System.Text.Json.Nodes.JsonNode)new System.Text.Json.Nodes.JsonObject
+        {
+            ["file_attachment_id"] = d.FileAttachmentId,
+            ["can_view_document"] = true,
+            ["can_download_document"] = d.CanDownloadDocument,
+            ["can_replace_document"] = d.CanReplaceDocument == true,
+        })]);
+
+    /// <summary>C10 review F-6: the one answer for a requested field outside a delegating caller's own scope, whatever the field holds.</summary>
+    public const string FieldOutOfScope = "FIELD_NOT_IN_SHAREABLE_SCOPE";
+
+    /// <param name="parentRecordShareId">The share a caller without full read delegates from (the Authority requires it for such callers).</param>
+    /// <param name="readableItems">
+    /// The value items the caller can read now, from one Authority-verified read of the record (the same read whatever keys were asked
+    /// for); without it a caller without full read is refused.
+    /// </param>
+    public static async Task<Resolved> ResolveAsync(IBusinessStore store, IAuthorizationAuthorityClient authority, Func<CancellationToken, Task<IReadOnlyCollection<Guid>>>? readableItems,
+        DelegatedUserContext user, Guid organizationId, Guid formRecordId, IReadOnlyList<string> fieldKeys, Guid? parentRecordShareId, CancellationToken cancellationToken)
+    {
+        // C10 review F-6: a caller without full read (a delegating Manager) resolves keys only against the values it can itself read, before
+        // any field is inspected, so an unknown field, an empty one, one in a repeating section and one holding values the caller cannot read
+        // all give the same answer. The Authority still caps the delegated scope by the named parent share when it plans the command.
+        HashSet<Guid>? delegableItems = null;
+        if (fieldKeys.Count > 0 && !(await authority.CheckPermissionAsync(user, new PermissionCheckRequest(organizationId, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), ProtectedAction.Read),
+                cancellationToken).ConfigureAwait(false)).Allowed)
+        {
+            if (parentRecordShareId is null || readableItems is null)
+            {
+                throw OutOfScope();
+            }
+
+            try
+            {
+                delegableItems = [.. await readableItems(cancellationToken).ConfigureAwait(false)];
+            }
+            catch (BusinessException ex) when (ex.HttpStatusCode == 404)
+            {
+                throw OutOfScope();
+            }
+            catch (AuthorityClientException ex) when (ex.HttpStatusCode == 404)
+            {
+                throw OutOfScope();
+            }
+        }
+
+        var head = await authority.GetCommittedContentRevisionAsync(user, organizationId, formRecordId, cancellationToken).ConfigureAwait(false);
+        if (head.CommittedOperationId is null)
+        {
+            throw new BusinessException("NO_COMMITTED_CONTENT", 404, "record has no accepted content");
+        }
+
+        List<Domain.Features.FormRecords.FieldValueRowBase> values;
+        List<Domain.Features.FormDefinitions.FieldDefinition> fields;
+        await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var header = await scope.FindStagedHeaderAsync(formRecordId, head.CommittedOperationId.Value, cancellationToken).ConfigureAwait(false)
+                         ?? throw new BusinessException("NO_COMMITTED_CONTENT", 404, "committed header missing");
+            values = (await scope.GetStagedRowsAsync(formRecordId, head.CommittedOperationId.Value, cancellationToken).ConfigureAwait(false)).OfType<Domain.Features.FormRecords.FieldValueRowBase>().ToList();
+            fields = await scope.GetFieldDefinitionsAsync(header.FormDefinitionId, cancellationToken).ConfigureAwait(false);
+        }
+
+        var fieldByKey = fields.ToDictionary(f => f.FieldKey, StringComparer.Ordinal);
+        var delegableFields = delegableItems is null ? null : values.Where(v => delegableItems.Contains(v.FieldValueItemId)).Select(v => v.FieldDefinitionId).ToHashSet();
+        var items = new List<(Guid FieldDefinitionId, Guid ItemId)>();
+        foreach (var key in fieldKeys.Distinct(StringComparer.Ordinal))
+        {
+            if (delegableFields is not null && (!fieldByKey.TryGetValue(key, out var scoped) || !delegableFields.Contains(scoped.FieldDefinitionId)))
+            {
+                throw OutOfScope();
+            }
+
+            if (!fieldByKey.TryGetValue(key, out var field))
+            {
+                throw new BusinessException("INVALID_REQUEST", 422, $"unknown field key '{key}'");
+            }
+
+            // Repeating-section values are not field-shareable in V1 (C-17): a share would release values without the entry
+            // structure the authority does not authorize for partial reads. Extending shares to entries is an authority change.
+            if (field.GroupDefinitionId is not null || values.Any(v => v.FieldDefinitionId == field.FieldDefinitionId && v.FormRecordGroupId is not null))
+            {
+                throw new BusinessException("FIELD_IN_REPEATING_GROUP", 422, $"field '{key}' belongs to a repeating section and cannot be shared on its own");
+            }
+
+            // A multi-select dropdown holds one row (item) per selected option: sharing the field shares every current selection.
+            var fieldRows = values.Where(v => v.FieldDefinitionId == field.FieldDefinitionId).ToList();
+            if (fieldRows.Count == 0)
+            {
+                throw new BusinessException("INVALID_REQUEST", 422, $"field '{key}' has no persisted value to share");
+            }
+
+            // A delegating caller names only the rows it can read itself (for example not a selection added after its own share was granted).
+            items.AddRange(fieldRows.Where(r => delegableItems is null || delegableItems.Contains(r.FieldValueItemId)).Select(r => (field.FieldDefinitionId, r.FieldValueItemId)));
+        }
+
+        return new Resolved(head, items);
+    }
+
+    /// <summary>C10 review F-6: the caller's readable value items from one verified read (null without a reader: callers without full read are refused).</summary>
+    public static Func<CancellationToken, Task<IReadOnlyCollection<Guid>>>? ReadableBy(FormRecords.Projection.VerifiedRecordReader? reader, RequestContext context, Guid formRecordId) =>
+        reader is null ? null : async ct =>
+            (await reader.ReadAsync(context, formRecordId, ProtectedAction.Read, ct).ConfigureAwait(false)).AuthorizedValues.Select(v => v.FieldValueItemId).ToList();
+
+    private static BusinessException OutOfScope() => new(FieldOutOfScope, 403, "a requested field is not within the scope you can share");
+}

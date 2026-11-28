@@ -233,7 +233,7 @@ public sealed class FormVersionBehaviorTests(StageBFixture fixture)
         var record = await CreateRecordAsync(s, s.Clerk, form.FormId, new() { ["full_name"] = "Avery", ["phone_number"] = "555-0101" });
         var ownerEdit = await EditAsync(s, s.Clerk, record); // the owner opens the editor on v1 (Latest)
         Assert.Equal(form.V1, LayoutId(ownerEdit));
-        var shared = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "full_name" } });
+        var shared = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "full_name" } });
         Assert.True(shared.IsSuccess, shared.Body);
         await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
         var contributorWrites = await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/testing/contributor-writes", new { enabled = true });

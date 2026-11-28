@@ -24,6 +24,7 @@ using EnterpriseForms.Application.Features.RelatedForms;
 using EnterpriseForms.Application.Features.Sharing.CreateShare;
 using EnterpriseForms.Application.Features.Sharing.ListShares;
 using EnterpriseForms.Application.Features.Sharing.RevokeShare;
+using EnterpriseForms.Application.Features.Sharing.UpdateShare;
 using EnterpriseForms.Application.Features.Teams.ManageTeam;
 using EnterpriseForms.Infrastructure.Authority;
 using EnterpriseForms.Infrastructure.Features.Documents;
@@ -59,6 +60,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<IAuditAccessAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>()); // C8 M4-2 (AC-8.3)
         services.AddSingleton<ISecurityCommandTimelineAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>()); // C8 M4-3 (AC-8.2)
         services.AddSingleton<ISecurityOverviewAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>()); // C8 M4-4 (AC-8.4/8.5)
+        services.AddSingleton<IShareDetailsAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>()); // C10 M2 (WP-0 Section 3.5)
         services.AddSingleton<IOrganizationRosterAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IOwnerRecoveryNoticeAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<ITestStackIdentityAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
@@ -99,6 +101,11 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<ChildRecordHandlers>();
         services.AddSingleton<CreateShareHandler>();
         services.AddSingleton<RevokeShareHandler>();
+        services.AddSingleton<UpdateShareHandler>();
+        services.AddSingleton<EnterpriseForms.Application.Features.Sharing.GetShare.GetShareHandler>();
+        services.AddSingleton<EnterpriseForms.Application.Features.Sharing.ShareHistory.RecordSecurityHistoryHandler>();
+        services.AddSingleton<EnterpriseForms.Application.Features.Sharing.MyAccess.MyAccessHandlers>();
+        services.AddSingleton<EnterpriseForms.Application.Features.Sharing.MyAccess.ReassignRecordsHandler>();
         services.AddSingleton<ListSharesHandler>();
         services.AddSingleton<CreateTeamHandler>();
         services.AddSingleton<ChangeTeamMembershipHandler>();
@@ -115,6 +122,10 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<ISecurityIncidentRecorder, SecurityIncidentRecorder>();
         services.AddSingleton<IDecryptionFailureRecorder, EnterpriseForms.Infrastructure.Features.Audit.DecryptionFailureRecorder>(); // E0-4
         services.AddSingleton<UploadSessionHandlers>();
+        // CONS-23: the documented maximum interval between Authority re-checks of a streaming download (1 to 5 s; refuses to start otherwise).
+        var documentStream = configuration.GetSection(DocumentStreamOptions.SectionName).Get<DocumentStreamOptions>() ?? new DocumentStreamOptions();
+        documentStream.Validate();
+        services.AddSingleton(documentStream);
         services.AddSingleton<DocumentHandlers>();
         services.AddSingleton<DocumentProcessingService>();
         services.AddSingleton<EnterpriseForms.Application.Features.FormDesigner.ProtectionMigration.FieldProtectionMigrationService>();

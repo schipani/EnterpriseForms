@@ -119,14 +119,14 @@ public sealed class SearchAccessProjectionStackTests(StageBFixture fixture)
 
     private async Task<Guid> ShareAsync(StageBScenario s, TestUser owner, Guid record, Guid? user, Guid? team, params string[] fieldKeys)
     {
-        var id = await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(owner), new { recipientUserId = user, recipientTeamId = team, recipientRole = "Reader", fieldKeys }), r => r.Root.GetProperty("recordShareId").GetGuid(), "share");
+        var id = await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(owner), new { useDevelopmentStepUp = true, recipientUserId = user, recipientTeamId = team, recipientRole = "Reader", fieldKeys }), r => r.Root.GetProperty("recordShareId").GetGuid(), "share");
         await s.WaitGateReadyAsync();
         return id;
     }
 
     private async Task RevokeAsync(StageBScenario s, TestUser owner, Guid record, Guid share)
     {
-        await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{share:D}/revoke", s.Token(owner), new { }), _ => true, "revoke");
+        await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{share:D}/revoke?useDevelopmentStepUp=true", s.Token(owner), new { }), _ => true, "revoke");
         await s.WaitGateReadyAsync();
     }
 
@@ -152,7 +152,7 @@ public sealed class SearchAccessProjectionStackTests(StageBFixture fixture)
 
     private async Task TransferAsync(StageBScenario s, TestUser owner, Guid record, Guid? user, Guid? team)
     {
-        await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/transfer-ownership", s.Token(owner), new { newOwnerUserId = user, newOwnerTeamId = team, transferReason = "IX-5a transfer" }), _ => true, "transfer");
+        await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/transfer-ownership", s.Token(owner), new { useDevelopmentStepUp = true, newOwnerUserId = user, newOwnerTeamId = team, transferReason = "IX-5a transfer" }), _ => true, "transfer");
         await s.WaitGateReadyAsync();
     }
 

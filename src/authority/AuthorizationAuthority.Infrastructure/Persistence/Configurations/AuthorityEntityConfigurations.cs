@@ -126,10 +126,17 @@ public sealed class OrganizationProtectionPolicyConfiguration : IEntityTypeConfi
     {
         builder.MapSnakeCase("organization_protection_policies");
         builder.HasKey(e => e.OrganizationProtectionPolicyId);
+        builder.Property(e => e.MaximumDelegationDepth).HasDefaultValue(3);
         builder.Property(e => e.MinimumFieldClassification).HasMaxLength(20);
         builder.HasIndex(e => e.OrganizationId).IsUnique().HasDatabaseName("uq_protection_policy_org");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_protection_policy_org");
-        builder.ToTable(t => t.HasCheckConstraint("ck_protection_policy_classification", "minimum_field_classification IN ('Public','Internal','Confidential','Restricted')"));
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_protection_policy_classification", "minimum_field_classification IN ('Public','Internal','Confidential','Restricted')");
+
+            // C10 M1-WP1: delegation depth must be within platform maximum (1-3).
+            t.HasCheckConstraint("ck_protection_policy_max_depth", "maximum_delegation_depth BETWEEN 1 AND 3");
+        });
     }
 }
 
@@ -141,11 +148,12 @@ public sealed class AuthorityResourceConfiguration : IEntityTypeConfiguration<Au
         builder.HasKey(e => e.AuthorityResourceId);
         builder.Property(e => e.ResourceTypeName).HasMaxLength(40);
         builder.Property(e => e.ResourceLifecycleState).HasMaxLength(20);
-        builder.HasIndex(e => new { e.OrganizationId, e.ResourceTypeName, e.ResourceEntityId }).IsUnique().HasDatabaseName("uq_authority_resource");
+        builder.HasAlternateKey(e => new { e.OrganizationId, e.ResourceTypeName, e.ResourceEntityId }).HasName("uq_authority_resource");
         // Phase C7 AC-5: form-scoped catalogue enumeration without scanning the organization's registry.
         builder.HasIndex(e => new { e.OrganizationId, e.ResourceTypeName, e.ParentResourceEntityId, e.ResourceLifecycleState }).HasDatabaseName("ix_authority_resources_form_scope");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_resource_org");
-        builder.ToTable(t => t.HasCheckConstraint("ck_resource_lifecycle_state", "resource_lifecycle_state IN ('Registered','Active','Revoked','Quarantined')"));
+        // C10 M1-WP1: add Expired and Invalidated terminal states for record_share resources.
+        builder.ToTable(t => t.HasCheckConstraint("ck_resource_lifecycle_state", "resource_lifecycle_state IN ('Registered','Active','Revoked','Quarantined') OR (resource_type_name = 'record_share' AND resource_lifecycle_state IN ('Expired','Invalidated'))"));
     }
 }
 
@@ -155,6 +163,7 @@ public sealed class SecurityCommandConfiguration : IEntityTypeConfiguration<Secu
     {
         builder.MapSnakeCase("security_commands");
         builder.HasKey(e => e.SecurityCommandId);
+        builder.HasAlternateKey(e => new { e.OrganizationId, e.SecurityCommandId }).HasName("ak_security_command_organization_command");
         builder.Property(e => e.CommandKindName).HasMaxLength(60);
         builder.Property(e => e.CommandIdempotencyKey).HasMaxLength(128);
         builder.Property(e => e.CommandStateName).HasMaxLength(40);
@@ -165,6 +174,8 @@ public sealed class SecurityCommandConfiguration : IEntityTypeConfiguration<Secu
         builder.HasIndex(e => new { e.OrganizationId, e.CommittedAuthorizationRevision }).HasDatabaseName("ix_security_commands_org_revision");
         // C8 M4-3 (AC-8.2, C-165 R-4): the security-command timeline keyset (organization, time, id), read under the audit-access bounds.
         builder.HasIndex(e => new { e.OrganizationId, e.CommandCreatedOn, e.SecurityCommandId }).HasDatabaseName("ix_security_commands_org_created");
+        // C10 D6: record-scoped sharing and ownership history (every committed command that targeted the record).
+        builder.HasIndex(e => new { e.OrganizationId, e.TargetFormRecordId, e.CommandCreatedOn }).HasDatabaseName("ix_security_commands_target_record");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_security_command_org");
         builder.HasOne<IdentityBinding>().WithMany().HasForeignKey(e => e.ActorIdentityBindingId).HasConstraintName("fk_security_command_actor");
         builder.ToTable(t => t.HasCheckConstraint("ck_security_command_state", "command_state_name IN ('Pending','CommittedAwaitingProjection','Effective','Rejected','FailedReconciliation')"));
@@ -223,6 +234,8 @@ public sealed class SecurityJournalEntryConfiguration : IEntityTypeConfiguration
         builder.Property(e => e.LastArchiveErrorCode).HasMaxLength(100);
         builder.HasIndex(e => new { e.OrganizationId, e.JournalStreamName, e.JournalStreamRevision }).IsUnique().HasDatabaseName("uq_journal_stream_revision");
         builder.HasIndex(e => new { e.OrganizationId, e.ArchiveDeliveryState }).HasDatabaseName("ix_journal_pending_archive");
+        // C10 D6: the journal entries of given commands (history items are journal-backed only when their entry exists).
+        builder.HasIndex(e => new { e.OrganizationId, e.SecurityCommandId }).HasDatabaseName("ix_journal_security_command");
         // C8 M4-3 (AC-8.2, C-165 R-4): timeline audit-stream entries and bounded rejection-evidence lookups by (organization, time).
         builder.HasIndex(e => new { e.OrganizationId, e.JournalCreatedOn, e.JournalStreamName, e.JournalStreamRevision }).HasDatabaseName("ix_journal_org_created");
         // Phase C7 M1: a record's checkpoint entry is found by its operation in one indexed lookup (verification was O(content revisions) per record).
@@ -294,6 +307,8 @@ public sealed class ContentCandidateLeafConfiguration : IEntityTypeConfiguration
         {
             t.HasCheckConstraint("ck_candidate_leaf_key_length", "octet_length(manifest_item_key) = 17");
             t.HasCheckConstraint("ck_candidate_leaf_digest_lengths", "octet_length(canonical_payload_digest) = 32 AND octet_length(row_signature) = 32 AND octet_length(leaf_digest) = 32");
+            // C10 (review D-1): the accepted evidence Prepare observed, both or neither.
+            t.HasCheckConstraint("ck_candidate_leaf_accepted_attachment_evidence", "(accepted_attachment_version_number IS NULL AND accepted_attachment_content_fingerprint IS NULL) OR (accepted_attachment_version_number > 0 AND octet_length(accepted_attachment_content_fingerprint) = 32)");
         });
     }
 }
@@ -376,6 +391,8 @@ public sealed class RecordManifestLeafConfiguration : IEntityTypeConfiguration<R
         {
             t.HasCheckConstraint("ck_manifest_leaf_key_length", "octet_length(manifest_item_key) = 17");
             t.HasCheckConstraint("ck_manifest_leaf_digest_lengths", "octet_length(canonical_payload_digest) = 32 AND octet_length(row_signature) = 32 AND octet_length(manifest_leaf_digest) = 32");
+            // C10 (review D-1): attachment content evidence is a 32-byte fingerprint when present.
+            t.HasCheckConstraint("ck_manifest_leaf_attachment_fingerprint_length", "attachment_content_fingerprint IS NULL OR octet_length(attachment_content_fingerprint) = 32");
         });
     }
 }

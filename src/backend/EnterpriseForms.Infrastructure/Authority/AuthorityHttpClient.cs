@@ -34,7 +34,7 @@ public sealed class AuthorityClientOptions
 /// independently. Every non-2xx response maps to <see cref="AuthorityClientException"/>; transport failures map to
 /// AUTHORITY_UNAVAILABLE (fail closed). There is no method that can request an arbitrary signature.
 /// </summary>
-public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, IOrganizationRosterAuthority, IOwnerRecoveryNoticeAuthority, ITestStackIdentityAuthority, IAuditAccessAuthority, ISecurityCommandTimelineAuthority, ISecurityOverviewAuthority, ISearchIndexAdministrationAuthority, IIndexedSearchAuthority, IIndexedRecordListAuthority
+public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, IOrganizationRosterAuthority, IOwnerRecoveryNoticeAuthority, ITestStackIdentityAuthority, IAuditAccessAuthority, ISecurityCommandTimelineAuthority, ISecurityOverviewAuthority, ISearchIndexAdministrationAuthority, IIndexedSearchAuthority, IIndexedRecordListAuthority, IShareDetailsAuthority
 {
     public const string HttpClientName = "trust-authority";
 
@@ -52,6 +52,21 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
 
     public Task<FormAccessState> GetFormAccessAsync(DelegatedUserContext user, Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
         SendAsync<FormAccessState>(HttpMethod.Get, $"internal/v1/form-definitions/{organizationId:D}/{formDefinitionId:D}/access", user, null, null, cancellationToken);
+
+    public Task<AuthorityShareDetails> GetShareDetailsAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityShareDetails>(HttpMethod.Get, $"internal/v1/records/{organizationId:D}/{formRecordId:D}/shares/{recordShareId:D}", user, null, null, cancellationToken);
+
+    public Task<AuthorityRecordSecurityHistory> GetRecordSecurityHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, bool ownershipView, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityRecordSecurityHistory>(HttpMethod.Get, $"internal/v1/records/{organizationId:D}/{formRecordId:D}/security-history" + (ownershipView ? "?view=ownership" : string.Empty), user, null, null, cancellationToken);
+
+    public Task<AuthorityShareEffectiveScope> GetShareEffectiveScopeAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityShareEffectiveScope>(HttpMethod.Get, $"internal/v1/records/{organizationId:D}/{formRecordId:D}/shares/{recordShareId:D}/effective-scope", user, null, null, cancellationToken);
+
+    public Task<AuthorityMyAccess> GetMyAccessAsync(DelegatedUserContext user, Guid organizationId, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityMyAccess>(HttpMethod.Get, $"internal/v1/me/{organizationId:D}/access", user, null, null, cancellationToken);
+
+    public Task<AuthorityMemberOwnedRecords> GetMemberOwnedRecordsAsync(DelegatedUserContext user, Guid organizationId, Guid memberUserId, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityMemberOwnedRecords>(HttpMethod.Get, $"internal/v1/members/{organizationId:D}/{memberUserId:D}/owned-records", user, null, null, cancellationToken);
 
     /// <summary>Any number of checks: split into authority calls of at most 250 and recombined only at one revision (C-27).</summary>
     public Task<IReadOnlyList<PermissionDecision>> CheckPermissionsBatchAsync(DelegatedUserContext user, IReadOnlyList<PermissionCheckRequest> requests, CancellationToken cancellationToken) =>

@@ -104,13 +104,13 @@ public sealed class C150SearchWorkspace
         var requested = DateTimeOffset.UtcNow;
         if (shareOf.TryGetValue(record, out var share) && share is { } id)
         {
-            var revoked = await RetryingAsync(() => Fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{id:D}/revoke", S.Token(S.Clerk), new { }));
+            var revoked = await RetryingAsync(() => Fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{id:D}/revoke?useDevelopmentStepUp=true", S.Token(S.Clerk), new { }));
             Assert.True(revoked.IsSuccess, revoked.Body);
             shareOf[record] = null;
             return (false, requested, DateTimeOffset.UtcNow);
         }
 
-        var shared = await RetryingAsync(() => Fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", S.Token(S.Clerk), new { recipientUserId = S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "exhibit_count" } }));
+        var shared = await RetryingAsync(() => Fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", S.Token(S.Clerk), new { useDevelopmentStepUp = true, recipientUserId = S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "exhibit_count" } }));
         Assert.True(shared.IsSuccess, shared.Body);
         shareOf[record] = shared.Root.GetProperty("recordShareId").GetGuid();
         return (true, requested, DateTimeOffset.UtcNow);

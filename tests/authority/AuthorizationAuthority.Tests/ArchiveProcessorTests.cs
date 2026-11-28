@@ -8,6 +8,7 @@ using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
+using AuthorizationAuthority.Domain.Features.Sharing;
 using AuthorizationAuthority.Infrastructure.Archive;
 using Xunit;
 
@@ -316,6 +317,12 @@ public sealed class ArchiveProcessorTests
 
         public void AddResource(AuthorityResource resource) => throw new NotSupportedException();
 
+        public Task<ShareResourceMetadata?> FindShareMetadataAsync(Guid org, Guid recordShareId, CancellationToken ct) => throw new NotSupportedException();
+
+        public void AddShareMetadata(ShareResourceMetadata metadata) => throw new NotSupportedException();
+
+        public Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid org, Guid parentRecordShareId, CancellationToken ct) => throw new NotSupportedException();
+
         public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid org, Guid parent, IReadOnlyCollection<string> types, CancellationToken ct) => Task.FromResult(new List<AuthorityResource>());
 
         public Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid org, CancellationToken ct) => Task.FromResult<OrganizationProtectionPolicy?>(null);
@@ -323,6 +330,12 @@ public sealed class ArchiveProcessorTests
         public void AddProtectionPolicy(OrganizationProtectionPolicy policy) => throw new NotSupportedException();
 
         public Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<ShareResourceMetadata>> GetActiveShareMetadataWithExpiryAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<AuthorityRelationshipEdge>> GetActiveShareEdgesAsync(Guid org, IReadOnlyCollection<Guid> recordShareIds, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<AuthorityRelationshipEdge>> GetActiveTeamMemberEdgesAsync(Guid org, IReadOnlyCollection<Guid> teamIds, CancellationToken ct) => throw new NotSupportedException();
 
         public Task<List<AuthorityRelationshipEdge>> GetRelationshipEdgeHistoryAsync(Guid organizationId, string resourceTypeName, Guid resourceEntityId, string relationshipName, string subjectTypeName, Guid subjectEntityId, CancellationToken cancellationToken) => throw new NotSupportedException();
 

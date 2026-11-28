@@ -71,6 +71,8 @@ public sealed class DiscoveryCompletenessTests
                 });
             };
             scopeControl.Handlers["GetActiveRecordIdsAsync"] = _ => Task.FromResult(Registered.ToList());
+            // C10 M1-WP2: the access-time share expiry overlay (no share of this fixture carries an expiry).
+            scopeControl.Handlers["GetActiveShareMetadataWithExpiryAsync"] = _ => Task.FromResult(new List<AuthorizationAuthority.Domain.Features.Sharing.ShareResourceMetadata>());
             scopeControl.Handlers["DisposeAsync"] = _ => ValueTask.CompletedTask;
             // SEC-BL-01 E-6: the gate's archive conditions (this fake has no authorization journal: nothing pending, no head to verify).
             scopeControl.Handlers["CountPendingArchiveAsync"] = _ => Task.FromResult(0);

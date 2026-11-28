@@ -103,7 +103,7 @@ public sealed class SearchAccessItemIdentityTests(StageBFixture fixture)
     {
         for (var attempt = 0; ; attempt++)
         {
-            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", w.S.Token(owner), new { recipientUserId = user, recipientTeamId = team, recipientRole = "Reader", fieldKeys });
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", w.S.Token(owner), new { useDevelopmentStepUp = true, recipientUserId = user, recipientTeamId = team, recipientRole = "Reader", fieldKeys });
             if (share.IsSuccess)
             {
                 await w.S.WaitGateReadyAsync();
@@ -119,7 +119,7 @@ public sealed class SearchAccessItemIdentityTests(StageBFixture fixture)
     {
         for (var attempt = 0; ; attempt++)
         {
-            var revoked = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{share:D}/revoke", w.S.Token(w.S.Clerk), new { });
+            var revoked = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{share:D}/revoke?useDevelopmentStepUp=true", w.S.Token(w.S.Clerk), new { });
             if (revoked.IsSuccess)
             {
                 await w.S.WaitGateReadyAsync();
@@ -269,7 +269,7 @@ public sealed class SearchAccessItemIdentityTests(StageBFixture fixture)
         var edgesBefore = ShareItemEdges(record);
         for (var attempt = 0; ; attempt++)
         {
-            var transfer = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/transfer-ownership", s.Token(s.Clerk), new { newOwnerUserId = s.Designer.AuthorityUserId, newOwnerTeamId = (Guid?)null, transferReason = "TQ-6 transfer" });
+            var transfer = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/transfer-ownership", s.Token(s.Clerk), new { useDevelopmentStepUp = true, newOwnerUserId = s.Designer.AuthorityUserId, newOwnerTeamId = (Guid?)null, transferReason = "TQ-6 transfer" });
             if (transfer.IsSuccess)
             {
                 break;
@@ -287,7 +287,7 @@ public sealed class SearchAccessItemIdentityTests(StageBFixture fixture)
         Assert.True((await ItemsAsync(w, s.Administrator, record)).Select(i => i.ItemId).ToHashSet().SetEquals(expected));
 
         // Repeating-group fields cannot be shared on their own (only ownership reads them).
-        var refused = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Designer), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "person_role" } });
+        var refused = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Designer), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "person_role" } });
         Assert.Equal("FIELD_IN_REPEATING_GROUP", refused.ErrorCode);
     }
 }

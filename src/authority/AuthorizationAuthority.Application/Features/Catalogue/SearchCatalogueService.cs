@@ -96,6 +96,9 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ProjectionInte
             throw new AuthorityException(AuthorityErrorCodes.LimitExceeded, 422, false, "the discoverable set exceeds the lookup ceiling; nothing partial is returned");
         }
 
+        // C10 M1-WP2 (D10-10): the earliest future expiry among the caller's live shares bounds the snapshot (read at the decision instant).
+        var shareExpiryBound = (await ProjectionIntegrityVerifier.ShareExpiryAsync(projectionSnapshot, cancellationToken).ConfigureAwait(false)).NextExpiryFor(bound.AuthorityUserId);
+
         // Decisive marker re-read and state re-read before the lookup result is used (S1); LockUnchangedAsync re-checks again under the lock.
         if (!await verifier.CompleteAsync(projectionSnapshot, "catalogue", cancellationToken).ConfigureAwait(false))
         {
@@ -121,6 +124,12 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ProjectionInte
         var locked = await LockUnchangedAsync(scope, state, cancellationToken).ConfigureAwait(false);
         var now = clock.GetUtcNow();
         var snapshot = NewSnapshot(locked, CatalogueScopeKinds.UserSearch, request.FormDefinitionId, entries, now, settings.UserSnapshotLifetimeSeconds);
+        if (shareExpiryBound is { } expiry && expiry < snapshot.SnapshotExpiresOn)
+        {
+            // A share the enumeration used expires first: the snapshot (and every page and validation of it) ends then.
+            snapshot.SnapshotExpiresOn = expiry;
+        }
+
         snapshot.RequestingAuthorityUserId = bound.AuthorityUserId;
         Audit(scope, locked, "SearchCatalogueIssued", new CatalogueAuditBody(snapshot.SearchCatalogueSnapshotId, CatalogueScopeKinds.UserSearch, request.FormDefinitionId, bound.AuthorityUserId, null, null, entries.Count, Convert.ToHexStringLower(snapshot.CatalogueDigest), locked.AuthorizationRevision, locked.ContentIntegrityRevision, null, correlationId), now);
         scope.AddCatalogueSnapshot(snapshot, entries);

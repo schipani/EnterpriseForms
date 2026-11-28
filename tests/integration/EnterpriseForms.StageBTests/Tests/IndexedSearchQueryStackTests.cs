@@ -116,7 +116,7 @@ public sealed class IndexedSearchQueryStackTests(StageBFixture fixture)
     {
         for (var attempt = 0; ; attempt++)
         {
-            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", w.S.Token(w.S.Clerk), new { recipientUserId = recipient.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys });
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", w.S.Token(w.S.Clerk), new { useDevelopmentStepUp = true, recipientUserId = recipient.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys });
             if (share.IsSuccess || attempt >= 30 || share.ErrorCode is not ("AUTHORITY_NOT_READY" or "COMMAND_PENDING" or "STALE_AUTHORIZATION_REVISION"))
             {
                 return share;
@@ -636,7 +636,7 @@ public sealed class IndexedSearchQueryStackTests(StageBFixture fixture)
         var loggedOut = await SessionAsync(w, w.S.Clerk);
         var nonce = Nonce();
         var snapshot = SnapshotId(await IndexedAsync(w, loggedOut, nonce, query));
-        Assert.True((await fixture.Authority.SendAsync(HttpMethod.Post, "/internal/v1/sessions/revoke", TestIdentity.WorkloadToken(), new { organization_id = w.S.OrganizationId, session_digest_base64 = loggedOut.Digest }, w.S.Token(w.S.Clerk))).IsSuccess);
+        Assert.True((await fixture.Authority.SendAsync(HttpMethod.Post, "/internal/v1/sessions/revoke?useDevelopmentStepUp=true", TestIdentity.WorkloadToken(), new { organization_id = w.S.OrganizationId, session_digest_base64 = loggedOut.Digest }, w.S.Token(w.S.Clerk))).IsSuccess);
         Assert.Equal("0", Scalar($"SELECT count(*) FROM authority_search.search_result_snapshots WHERE search_result_snapshot_id = '{snapshot:D}';"));
         AssertNoPage(await PageAsync(w, loggedOut, nonce, query, snapshot, 10), "SEARCH_SESSION_INVALID");
 
@@ -819,7 +819,7 @@ public sealed class IndexedSearchQueryStackTests(StageBFixture fixture)
         try
         {
             fixture.Stack.AuthorityAdministratorSql($"REVOKE DELETE ON authority_search.search_result_snapshots FROM {runtime};");
-            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{a:D}/shares", w.S.Token(w.S.Clerk), new { recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" } });
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{a:D}/shares", w.S.Token(w.S.Clerk), new { useDevelopmentStepUp = true, recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" } });
             Assert.False(share.IsSuccess, share.Body);
             Assert.Equal(revisionBefore, Scalar($"SELECT authorization_revision FROM organization_authorization_states WHERE organization_id = '{w.S.OrganizationId:D}';"));
             Assert.Equal("1", Scalar($"SELECT count(*) FROM authority_search.search_result_snapshots WHERE search_result_snapshot_id = '{snapshot:D}';"));

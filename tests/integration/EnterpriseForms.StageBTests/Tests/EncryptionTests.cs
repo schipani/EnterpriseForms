@@ -118,7 +118,7 @@ public sealed class EncryptionTests(StageBFixture fixture)
         Assert.Contains((await fixture.Api.GetAsync($"/api/v1/form-records/{recordId:D}/projection", other.Token(other.Designer))).Status, Denied);
 
         // A field-scoped share releases exactly the shared encrypted value, decrypted, and nothing else.
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{recordId:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_notes" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{recordId:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_notes" } });
         Assert.True(share.IsSuccess, share.Body);
         var shared = await s.WaitProjectionAsync(s.Reader, recordId, TimeSpan.FromSeconds(40));
         var sharedValues = ValuesByKey(shared.Root);

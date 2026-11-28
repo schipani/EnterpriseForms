@@ -2,7 +2,7 @@
  * Generated contract types for the business API plus a typed client whose only transport is the app-shell request
  * coordinator (packages/work-queue, ADR-PB-006/007). No raw fetch lives here.
  */
-import type { IRequestCoordinator, OperationLane } from "@enterpriseforms/work-queue";
+import type { ApiOperation, IRequestCoordinator, OperationLane } from "@enterpriseforms/work-queue";
 import type { components } from "./generated/enterprise-forms-v1";
 
 export type { components as EnterpriseFormsV1Components, paths as EnterpriseFormsV1Paths } from "./generated/enterprise-forms-v1";
@@ -191,6 +191,18 @@ export type DirectoryUserResponse = S["DirectoryUserResponse"];
 export type CreateShareRequest = S["CreateShareRequest"];
 export type ShareResponse = S["ShareResponse"];
 export type RecordShareListResponse = S["RecordShareListResponse"];
+export type ShareDetailsResponse = S["ShareDetailsResponse"];
+export type RecordSecurityHistoryResponse = S["RecordSecurityHistoryResponse"];
+export type ShareEffectiveScopeResponse = S["ShareEffectiveScopeResponse"];
+export type MyAccessResponse = S["MyAccessResponse"];
+export type MyAccessEntryResponse = S["MyAccessEntryResponse"];
+export type TransferOwnershipRequest = S["TransferOwnershipRequest"];
+export type MemberOwnedRecordsResponse = S["MemberOwnedRecordsResponse"];
+export type ReassignRecordsRequest = S["ReassignRecordsRequest"];
+export type ReassignRecordsResponse = S["ReassignRecordsResponse"];
+export type RecordSecurityHistoryItemResponse = S["RecordSecurityHistoryItemResponse"];
+export type UpdateShareRequest = S["UpdateShareRequest"];
+export type UpdateShareResponse = S["UpdateShareResponse"];
 export type RecordShareSummaryResponse = S["RecordShareSummaryResponse"];
 
 export type ApiResult<T> = { result: T; etag?: string; status: number };
@@ -285,12 +297,13 @@ function idempotencyKey(): string {
 export function createApiClient(coordinator: IRequestCoordinator) {
   const read = <T>(endpointKey: string, pathParams?: Record<string, string>, query?: Record<string, string | number | boolean | undefined>, lane: OperationLane = "interactive-read", signal?: AbortSignal) =>
     coordinator.execute<T>({ lane, method: "GET", endpointKey, ...(pathParams ? { pathParams } : {}), ...(query ? { query } : {}) }, signal);
-  const write = <T>(method: "POST" | "PUT" | "PATCH" | "DELETE", endpointKey: string, pathParams: Record<string, string> | undefined, payload: unknown, options: { idempotent?: boolean; idempotencyKey?: string; resourceKey?: string; expectedRevision?: string; lane?: OperationLane; responseKind?: "json" | "none" } = {}) =>
+  const write = <T>(method: "POST" | "PUT" | "PATCH" | "DELETE", endpointKey: string, pathParams: Record<string, string> | undefined, payload: unknown, options: { idempotent?: boolean; idempotencyKey?: string; resourceKey?: string; expectedRevision?: string; lane?: OperationLane; responseKind?: "json" | "none"; query?: ApiOperation["query"] } = {}) =>
     coordinator.execute<T>({
       lane: options.lane ?? "interactive-write",
       method,
       endpointKey,
       ...(pathParams ? { pathParams } : {}),
+      ...(options.query ? { query: options.query } : {}),
       ...(payload !== undefined ? { payload } : {}),
       ...(options.idempotent ? { idempotencyKey: options.idempotencyKey ?? idempotencyKey() } : {}),
       ...(options.resourceKey ? { resourceKey: options.resourceKey } : {}),
@@ -412,7 +425,32 @@ export function createApiClient(coordinator: IRequestCoordinator) {
     shares: {
       list: (formRecordId: string, signal?: AbortSignal) => read<RecordShareListResponse>("shares.list", { formRecordId }, undefined, "interactive-read", signal),
       create: (formRecordId: string, request: CreateShareRequest) => write<ShareResponse>("POST", "shares.create", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}` }),
-      revoke: (formRecordId: string, recordShareId: string) => write<CommandStatusResponse>("POST", "shares.revoke", { formRecordId, recordShareId }, {}, { idempotent: true, resourceKey: `record:${formRecordId}` }),
+      /** C10 M2: the Authority's committed share; `shareRevision` is the authoritative revision behind the share ETag. */
+      get: (formRecordId: string, recordShareId: string, signal?: AbortSignal) => read<ShareDetailsResponse>("shares.get", { formRecordId, recordShareId }, undefined, "interactive-read", signal),
+      /** C10 M2: the record's sharing and ownership changes from the Authority, each with its own command state. */
+      history: (formRecordId: string, signal?: AbortSignal) => read<RecordSecurityHistoryResponse>("shares.history", { formRecordId }, undefined, "interactive-read", signal),
+      ownershipHistory: (formRecordId: string, signal?: AbortSignal) => read<RecordSecurityHistoryResponse>("shares.ownershipHistory", { formRecordId }, undefined, "interactive-read", signal),
+      /** C10 M2 (PG-023): what the recipient can do through the share now, as the Authority decides. */
+      effectiveScope: (formRecordId: string, recordShareId: string, signal?: AbortSignal) => read<ShareEffectiveScopeResponse>("shares.effectiveScope", { formRecordId, recordShareId }, undefined, "interactive-read", signal),
+      /** C10 M2 (PG-066): the caller's own access sources. */
+      mine: (signal?: AbortSignal) => read<MyAccessResponse>("shares.mine", undefined, undefined, "interactive-read", signal),
+      /** C10 M3 (PG-053): an ownership transfer is an Authority command with reason and step-up; the result says whether it is Effective yet. */
+      /** C10 M2 (D8-4, PG-053): the records a member directly owns (administrators only). */
+      memberOwnedRecords: (memberUserId: string, signal?: AbortSignal) => read<MemberOwnedRecordsResponse>("members.ownedRecords", { memberUserId }, undefined, "interactive-read", signal),
+      /** C10 M2: one ownership transfer per owned record; per-record outcome. */
+      reassignRecords: (memberUserId: string, request: ReassignRecordsRequest) => write<ReassignRecordsResponse>("POST", "members.reassignRecords", { memberUserId }, request, { idempotent: true, resourceKey: `member:${memberUserId}` }),
+      /** C10 review F4: pass the same idempotency key to replay a pending transfer (the handler records its projection once, when Effective). */
+      transferOwnership: (formRecordId: string, request: TransferOwnershipRequest, idempotencyKey?: string) =>
+        write<CommandStatusResponse>("POST", "records.transferOwnership", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, ...(idempotencyKey ? { idempotencyKey } : {}) }),
+      /** C10 M2: replaces the share's scope. If-Match carries the ETag "{recordShareId}:{shareRevision}" read from `get` (412 when stale). */
+      update: (formRecordId: string, recordShareId: string, shareRevision: number | string, request: UpdateShareRequest) =>
+        write<UpdateShareResponse>("PATCH", "shares.update", { formRecordId, recordShareId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: `${recordShareId}:${shareRevision}` }),
+      revoke: (formRecordId: string, recordShareId: string, useDevelopmentStepUp = false) =>
+        write<CommandStatusResponse>("POST", "shares.revoke", { formRecordId, recordShareId }, {}, {
+          idempotent: true,
+          resourceKey: `record:${formRecordId}`,
+          ...(useDevelopmentStepUp ? { query: { useDevelopmentStepUp: true } } : {}),
+        }),
     },
     uploads: {
       begin: (request: BeginUploadRequest) => write<UploadSessionResponse>("POST", "uploads.begin", undefined, request, { idempotent: true, lane: "file-transfer" }),

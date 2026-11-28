@@ -118,7 +118,7 @@ public sealed class IntegrityTamperingTests(StageAFixture fixture)
         {
             await s.BootstrapAsync();
             await s.CreateFormAndRecordAsync();
-            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Owner), new { recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "case_note" } });
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares", s.Token(s.Owner), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientRole = "Reader", fieldKeys = new[] { "case_note" } });
             Assert.Equal(HttpStatusCode.Created, share.Status);
             var shareId = share.Root.GetProperty("recordShareId").GetGuid();
             var readerBefore = await s.WaitReadableAsync(s.Reader);
@@ -128,7 +128,7 @@ public sealed class IntegrityTamperingTests(StageAFixture fixture)
             var dump = fixture.Stack.AttackerShell("pg_dump -Fc -T '\"__EFMigrationsHistory\"' -f /tmp/business-snapshot.dump && ls -l /tmp/business-snapshot.dump");
             s.Evidence.Observe("pg_dump BusinessDb snapshot", new { result = Evidence.Sanitize(dump.Trim()) });
 
-            var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares/{shareId:D}/revoke", s.Token(s.Owner), new { });
+            var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{s.FormRecordId:D}/shares/{shareId:D}/revoke?useDevelopmentStepUp=true", s.Token(s.Owner), new { });
             Assert.True(revoke.Root.GetProperty("command").GetProperty("effective").GetBoolean(), revoke.Body);
             var update = await fixture.Api.PatchAsync($"/api/v1/form-records/{s.FormRecordId:D}", s.Token(s.Owner), new { expectedContentRevision = 1, values = new Dictionary<string, string> { ["case_note"] = "post-snapshot note" } });
             Assert.Equal(HttpStatusCode.OK, update.Status);

@@ -138,6 +138,15 @@ public static class AuthorityErrorCodes
     public const string RoleNotHeld = "ROLE_NOT_HELD";
     public const string MembershipStateConflict = "MEMBERSHIP_STATE_CONFLICT";
     public const string OwnsRecords = "OWNS_RECORDS";
+
+    /// <summary>C10 WP8: the attachment has no Authority-verified version evidence yet (accepted before WP8); not shareable until its next commit.</summary>
+    public const string DocumentVersionEvidenceUnavailable = "DOCUMENT_VERSION_EVIDENCE_UNAVAILABLE";
+
+    /// <summary>C10 WP8-B (owner decision 2026-11-27): only a share the record owner grants directly may allow document replacement.</summary>
+    public const string DocumentReplaceRequiresOwnerGrant = "DOCUMENT_REPLACE_REQUIRES_OWNER_GRANT";
+
+    /// <summary>C10 WP8-B: more than one of the actor's shares could authorize the replacement; the share it extends must be unique.</summary>
+    public const string DocumentReplaceShareAmbiguous = "DOCUMENT_REPLACE_SHARE_AMBIGUOUS";
     public const string IdentityAlreadyBound = "IDENTITY_ALREADY_BOUND";
     public const string IdentityNotAllowed = "IDENTITY_NOT_ALLOWED";
     public const string MembershipRequestExists = "MEMBERSHIP_REQUEST_EXISTS";
@@ -212,6 +221,26 @@ public static class AuthorityErrorCodes
 
     /// <summary>IX-2: the search index is quarantined; only a SearchProjectionRebuild clears it (IX-D7). Never an organization quarantine.</summary>
     public const string SearchIndexQuarantined = "SEARCH_INDEX_QUARANTINED";
+
+    // C10 M1-WP3: share delegation lineage and depth enforcement.
+
+    /// <summary>C10 M1-WP3: a delegated share would exceed the platform maximum delegation depth (3) or organization policy.</summary>
+    public const string DelegationDepthExceeded = "DELEGATION_DEPTH_EXCEEDED";
+
+    /// <summary>C10 M1-WP3: a Manager share cannot be created at the maximum delegation depth (a Manager at depth 3 is refused).</summary>
+    public const string ManagerAtMaximumDepth = "MANAGER_AT_MAXIMUM_DEPTH";
+
+    /// <summary>C10 M1-WP4: the expected share revision does not match the current committed share revision (412, not retryable).</summary>
+    public const string StaleShareRevision = "STALE_SHARE_REVISION";
+
+    /// <summary>C10 M1-WP4: the share has active descendants; cascade invalidation (WP5) is required before updating parent scope (422, not retryable).</summary>
+    public const string ShareHasActiveDescendants = "SHARE_HAS_ACTIVE_DESCENDANTS";
+
+    /// <summary>
+    /// C10 (child-record ownership, owner decision 2026-11-27): a record with a parent is owned through its parent (CLAUDE.md §4B single
+    /// owner, §4S inheritance) and cannot be transferred on its own; transfer the parent, or unlink the child first (422, not retryable).
+    /// </summary>
+    public const string ChildRecordOwnershipFollowsParent = "CHILD_RECORD_OWNERSHIP_FOLLOWS_PARENT";
 
     // C8 M4-2 (AC-8.3): audit-access evidence.
 

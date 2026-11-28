@@ -340,7 +340,7 @@ public sealed class FormVersionAcceptanceTests(StageBFixture fixture)
         Assert.Equal([("Added", email), ("Removed", phone)], Changes(compared.Root.GetProperty("comparison")));
 
         // A partial share never exposes a field outside its scope, whatever the layout; history stays whole-record only.
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{r1:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "first_name", "email_address" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{r1:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "first_name", "email_address" } });
         Assert.True(share.IsSuccess, share.Body);
         await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
         var readerView = await ViewAsync(s, s.Reader, r1);
@@ -524,7 +524,7 @@ public sealed class FormVersionAcceptanceTests(StageBFixture fixture)
             Assert.Contains((await s.ProjectionAsync(s.Reader, form.Record)).Status, Denied);
             Assert.Contains((await other.ProjectionAsync(other.Clerk, form.Record)).Status, Denied);
             Assert.Contains((await EditProjectionAsync(s, s.Reader, form.Record)).Status, Denied);
-            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{form.Record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "first_name" } });
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{form.Record:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "first_name" } });
             Assert.True(share.IsSuccess, share.Body);
             await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
             var readerView = await ViewAsync(s, s.Reader, form.Record);

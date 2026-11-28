@@ -19,6 +19,9 @@ public sealed record RowCanonicalColumn(string Name, RowColumnType? Type, ReadOn
 
     public bool FramedValueEquals(RowCanonicalColumn other) => other is not null && FramedValue.Span.SequenceEqual(other.FramedValue.Span);
 
+    /// <summary>C10 WP8: the 32-bit integer value, or null when the column is NULL or not Int32 (decoding only; the format is unchanged).</summary>
+    public int? AsInt32() => Type == RowColumnType.Int32 ? BinaryPrimitives.ReadInt32BigEndian(FramedValue.Span[1..]) : null;
+
     /// <summary>IX-1: the 64-bit integer value, or null when the column is NULL or not Int64.</summary>
     public long? AsInt64() => Type == RowColumnType.Int64 ? BinaryPrimitives.ReadInt64BigEndian(FramedValue.Span[1..]) : null;
 

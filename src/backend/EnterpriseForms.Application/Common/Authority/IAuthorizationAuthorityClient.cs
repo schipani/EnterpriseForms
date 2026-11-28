@@ -136,7 +136,8 @@ public sealed record VerifiedProjectionItem(ManifestItemKind ItemKind, Guid Item
 
 /// <summary>Phase C5 (D7, additive): readable/editable subsets of a partial projection (advisory) and the Authority's contributor-write switch (D10).</summary>
 public sealed record VerifyRecordProjectionResult(bool Verified, string? FailureReasonCode, long CommittedContentRevision, Guid? CommittedOperationId, long AuthorizationRevision, IReadOnlyList<VerifiedProjectionItem> AuthorizedItems, bool IsCompleteProjection, Guid CorrelationId,
-    IReadOnlyList<VerifiedProjectionItem>? ReadableItems = null, IReadOnlyList<VerifiedProjectionItem>? EditableItems = null, bool ContributorWritesEnabled = false);
+    IReadOnlyList<VerifiedProjectionItem>? ReadableItems = null, IReadOnlyList<VerifiedProjectionItem>? EditableItems = null, bool ContributorWritesEnabled = false,
+    IReadOnlyList<VerifiedProjectionItem>? DownloadableItems = null, IReadOnlyList<VerifiedProjectionItem>? ReplaceableItems = null);
 
 public sealed record FormAccessSubjectState(string SubjectKind, Guid SubjectId);
 
@@ -445,3 +446,61 @@ public interface ITestStackIdentityAuthority
 {
     Task<AuthorityStackIdentity> GetTestStackIdentityAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>C10 M2: the Authority's committed state of one share (internal <c>GetShareDetails</c>), read behind the open gate.</summary>
+public sealed record AuthorityShareDetails(
+    Guid RecordShareId,
+    Guid FormRecordId,
+    string LifecycleState,
+    string? RecipientKind,
+    Guid? RecipientId,
+    string? RecipientRole,
+    IReadOnlyList<Guid> FieldItemIds,
+    DateTimeOffset? ShareExpiresOn,
+    DateTimeOffset? EffectiveExpiresOn,
+    long ShareRevision,
+    Guid? ParentRecordShareId,
+    int DelegationDepth,
+    bool LegacyLineageUnresolved,
+    string? InvalidationReasonCode,
+    Guid? GrantorUserId,
+    long AuthorizationRevision,
+    IReadOnlyList<AuthorityShareDocumentDetail>? Documents = null);
+
+public sealed record AuthorityShareDocumentDetail(Guid FileAttachmentId, bool CanViewDocument, bool CanDownloadDocument, bool CanReplaceDocument, int SharedThroughVersionNumber);
+
+/// <summary>C10 M2 (WP-0 Section 3.5): the authoritative share-details read; the Authority decides who may read it.</summary>
+public interface IShareDetailsAuthority
+{
+    Task<AuthorityShareDetails> GetShareDetailsAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken);
+
+    /// <summary>C10 M1-WP9: the record's sharing and ownership history from committed Authority edges (owner or ManageAccess).</summary>
+    Task<AuthorityRecordSecurityHistory> GetRecordSecurityHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, bool ownershipView, CancellationToken cancellationToken);
+
+    /// <summary>C10 M2: what a share's recipient can do through it now and why (same readers as the details).</summary>
+    Task<AuthorityShareEffectiveScope> GetShareEffectiveScopeAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, Guid recordShareId, CancellationToken cancellationToken);
+
+    /// <summary>C10 M2 (PG-066): the caller's own access sources.</summary>
+    Task<AuthorityMyAccess> GetMyAccessAsync(DelegatedUserContext user, Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>C10 M2 (D8-4, PG-053): the Active records a member directly owns, for administrator reassignment.</summary>
+    Task<AuthorityMemberOwnedRecords> GetMemberOwnedRecordsAsync(DelegatedUserContext user, Guid organizationId, Guid memberUserId, CancellationToken cancellationToken);
+}
+
+public sealed record AuthorityMemberOwnedRecords(Guid MemberUserId, IReadOnlyList<Guid> FormRecordIds, bool Truncated, long AuthorizationRevision);
+
+public sealed record AuthorityShareLineageStep(Guid RecordShareId, int DelegationDepth, DateTimeOffset? ShareExpiresOn);
+
+public sealed record AuthorityShareEffectiveScope(Guid RecordShareId, Guid FormRecordId, string Status, string? RecipientKind, string? RecipientRole, DateTimeOffset? EffectiveExpiresOn,
+    IReadOnlyList<Guid> FieldItemIds, IReadOnlyList<AuthorityShareDocumentDetail> Documents, bool CanDelegate, IReadOnlyList<AuthorityShareLineageStep> Lineage, long AuthorizationRevision);
+
+public sealed record AuthorityMyAccessEntry(Guid FormRecordId, string AccessSource, Guid? RecordShareId, Guid? TeamId, string? RecipientRole, DateTimeOffset? EffectiveExpiresOn, bool ExpiringSoon);
+
+public sealed record AuthorityMyAccess(IReadOnlyList<AuthorityMyAccessEntry> Entries, bool Truncated, int ExpiringWithinDays, long AuthorizationRevision);
+
+public sealed record AuthorityRecordSecurityChange(string ChangeKind, Guid? RecordShareId, string? ShareEndState, string? InvalidationReasonCode, string? SubjectKind, Guid? SubjectId, DateTimeOffset? ShareExpiresOn = null);
+
+public sealed record AuthorityRecordSecurityHistoryItem(Guid SecurityCommandId, string CommandKind, string CommandState, DateTimeOffset OccurredOn, DateTimeOffset? EffectiveOn,
+    long? CommittedAuthorizationRevision, Guid? ActorUserId, IReadOnlyList<AuthorityRecordSecurityChange> Changes, bool JournalBacked = false);
+
+public sealed record AuthorityRecordSecurityHistory(Guid FormRecordId, IReadOnlyList<AuthorityRecordSecurityHistoryItem> Items, bool Truncated, long AuthorizationRevision);

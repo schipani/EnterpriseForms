@@ -82,7 +82,7 @@ public sealed class ParentChildTests(StageBFixture fixture)
         Assert.True(readerCreate.Status is HttpStatusCode.Forbidden or HttpStatusCode.NotFound, readerCreate.Body);
 
         // Sharing the parent's fields does not expose the child (no automatic child access, CLAUDE.md §4S.4).
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name", "family_name" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name", "family_name" } });
         Assert.True(share.IsSuccess, share.Body);
         var parentForReader = await s.WaitProjectionAsync(s.Reader, accused, TimeSpan.FromSeconds(40));
         Assert.False(parentForReader.Root.GetProperty("permissions").GetProperty("isCompleteProjection").GetBoolean());

@@ -144,7 +144,7 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
         {
             for (var attempt = 0; ; attempt++)
             {
-                var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", w.S.Token(w.S.Clerk), new { recipientUserId = user, recipientTeamId = team, recipientRole = "Reader", fieldKeys });
+                var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", w.S.Token(w.S.Clerk), new { useDevelopmentStepUp = true, recipientUserId = user, recipientTeamId = team, recipientRole = "Reader", fieldKeys });
                 if (share.IsSuccess)
                 {
                     ids.Add(share.Root.GetProperty("recordShareId").GetGuid());
@@ -173,7 +173,7 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
     {
         for (var attempt = 0; ; attempt++)
         {
-            var revoked = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{share:D}/revoke", w.S.Token(w.S.Clerk), new { });
+            var revoked = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{share:D}/revoke?useDevelopmentStepUp=true", w.S.Token(w.S.Clerk), new { });
             if (revoked.IsSuccess)
             {
                 await w.S.WaitGateReadyAsync();

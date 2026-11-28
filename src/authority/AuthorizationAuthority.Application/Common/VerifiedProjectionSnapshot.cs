@@ -57,6 +57,12 @@ public sealed class VerifiedProjectionSnapshot
 
     internal Guid CorrelationId { get; }
 
+    /// <summary>C10 M1-WP2: the decision instant (the verifier's clock at the pin); share expiry is evaluated at it.</summary>
+    internal DateTimeOffset DecisionInstant { get; set; }
+
+    /// <summary>C10 M1-WP2: the access-time share expiry overlay of this decision, loaded on first use.</summary>
+    internal ShareExpiryOverlay? ShareExpiry { get; set; }
+
     /// <summary>Throws unless the snapshot is open: decision reads are only valid between pin and verify.</summary>
     public void RequireOpen()
     {

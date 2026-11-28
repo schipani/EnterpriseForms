@@ -215,9 +215,14 @@ public sealed class DocumentProcessingService(IBusinessStore store, IFileStorage
         {
             if (session.ReplacesFileAttachmentId is { } replaces)
             {
-                var versions = await scope.GetAttachmentVersionsAsync(replaces, cancellationToken).ConfigureAwait(false);
+                // C10 owner decision 2: numbered from the last accepted version (the attachment's committed version), never from processed,
+                // abandoned or refused uploads, so the next accepted version is exactly the next number. Two uploads processed from the same
+                // accepted version share a number; the Authority accepts at most one of them (exactly the next version, content-head
+                // compare-and-set) and the other is refused at Commit. The commit re-checks the number against the verified record.
+                var attachment = await scope.FindAttachmentAsync(session.TenantId, replaces, cancellationToken).ConfigureAwait(false)
+                                 ?? throw new InvalidOperationException("the replaced attachment is not registered");
                 attachmentId = replaces;
-                versionNumber = (versions.Count == 0 ? 0 : versions.Max(v => v.VersionNumber)) + 1;
+                versionNumber = attachment.CurrentVersionNumber + 1;
             }
             else
             {
@@ -226,7 +231,10 @@ public sealed class DocumentProcessingService(IBusinessStore store, IFileStorage
             }
         }
 
-        var objectKey = $"documents/{session.TenantId:N}/{session.FormRecordId:N}/{attachmentId:N}/v{versionNumber}";
+        // C10 owner decision 2: a version number can now be processed by more than one upload, so the object key also names the upload
+        // session, so uploads never share an object (a retry of the same session meets its own create-only key, as before). Existing
+        // objects keep their keys; the row records the key.
+        var objectKey = $"documents/{session.TenantId:N}/{session.FormRecordId:N}/{attachmentId:N}/v{versionNumber}-{session.UploadSessionId:N}";
         var context = new FileEncryptionContext(session.TenantId, session.FormRecordId, attachmentId, versionNumber);
         EncryptionOutcome outcome;
         var temp = Path.Combine(Path.GetTempPath(), "ef-doc-" + Guid.NewGuid().ToString("N"));

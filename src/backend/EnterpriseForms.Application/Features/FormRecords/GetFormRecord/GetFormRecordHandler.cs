@@ -50,6 +50,7 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
         Dictionary<Guid, string> formNames;
         List<FileAttachment> attachments;
         RecordProjectionSummaryResponse summary;
+        var linkedToParent = false;
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
             relationships = await scope.GetRelationshipDefinitionsAsync(context.OrganizationId, verified.Definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
@@ -57,6 +58,8 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
             formNames = definitions.ToDictionary(d => d.FormDefinitionId, d => d.FormDefinitionName);
             attachments = await scope.GetAttachmentsAsync(formRecordId, cancellationToken).ConfigureAwait(false);
             var row = await scope.FindFormRecordAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
+            // The current link (cleared by an unlink); the signed header keeps the parent the record was created under.
+            linkedToParent = row?.ParentFormRecordId is not null;
             var creator = (await scope.GetUsersAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false)).FirstOrDefault(u => u.UserId == verified.Header.CreatedByUserId);
             summary = new RecordProjectionSummaryResponse(ListRecords.RecordListQuery.ReferenceFor(formRecordId), row?.CreatedOn, row?.ModifiedOn, creator?.DisplayName, verified.Header.CreatedByUserId == context.LocalUserId);
             AuditRecorder.Record(scope, context, clock, AuditCategories.Record, AuditActions.RecordViewed, "verified record projection read", formRecordId, metadata: new { complete = verified.IsComplete, contentRevision = verified.Head.CommittedContentRevision });
@@ -101,7 +104,8 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
             fields,
             documents,
             relationships.Where(r => verified.IsComplete || visibleRelationshipIds.Contains(r.FormRelationshipDefinitionId)).Select(r => new RelationshipDefinitionResponse(r.FormRelationshipDefinitionId, r.ParentFormDefinitionId, r.ChildFormDefinitionId, formNames.GetValueOrDefault(r.ChildFormDefinitionId, string.Empty), r.RelationshipDefinitionKey, r.RelationshipDisplayName, r.MinimumChildCount, r.MaximumChildCount, r.LifecycleStatus)).ToList(),
-            new RecordPermissionsResponse(true, decisions[0].Allowed, decisions[1].Allowed, decisions[2].Allowed, verified.IsComplete, sharedAccess?.Any(a => a.Editable) == true && Lifecycle.RecordLifecycle.IsContentEditable(verified.Header.RecordStatus), verified.Verification.ContributorWritesEnabled),
+            // C10: a child record is owned through its parent and cannot be transferred on its own (the Authority refuses it).
+            new RecordPermissionsResponse(true, decisions[0].Allowed, decisions[1].Allowed, decisions[2].Allowed && !linkedToParent, verified.IsComplete, sharedAccess?.Any(a => a.Editable) == true && Lifecycle.RecordLifecycle.IsContentEditable(verified.Header.RecordStatus), verified.Verification.ContributorWritesEnabled),
             verified.Header.ParentFormRecordId,
             verified.Header.FormRelationshipDefinitionId,
             verified.ETag,
@@ -113,7 +117,9 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
             verified.LayoutPurpose.ToString(),
             verified.CreatedFormVersionNumber,
             verified.EditLayoutVersion?.FormVersionId,
-            verified.EditLayoutVersion?.VersionNumber);
+            verified.EditLayoutVersion?.VersionNumber,
+            // C10 WP8-B (advisory for the UI): documents the share recipient may replace; the Authority decides at Prepare and Commit.
+            verified.IsComplete || !Lifecycle.RecordLifecycle.IsContentEditable(verified.Header.RecordStatus) ? null : verified.Verification.ReplaceableItems?.Select(i => i.ItemId).ToList());
     }
 
     /// <summary>

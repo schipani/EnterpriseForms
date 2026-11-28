@@ -143,7 +143,7 @@ public sealed class SearchQueryReader(string? readerConnectionString, IndexedSea
                 x.Quarantined, x.Modified, x.EntryOperation, x.EntryVersion, x.EntryStatus, x.EntryParent, x.EntryCreator, false))).ToList();
         }).ConfigureAwait(false);
 
-        public async Task<IReadOnlyList<ShareReadableItem>> ReadShareReadableItemsAsync(Guid authorityUserId, IReadOnlyCollection<Guid> formRecordIds, IReadOnlyCollection<PredicateFieldApproval> predicateFields, int limit, CancellationToken cancellationToken) => await Guard(async () =>
+        public async Task<IReadOnlyList<ShareReadableItem>> ReadShareReadableItemsAsync(Guid authorityUserId, IReadOnlyCollection<Guid> formRecordIds, IReadOnlyCollection<PredicateFieldApproval> predicateFields, int limit, IReadOnlyCollection<Guid> excludedShareIds, CancellationToken cancellationToken) => await Guard(async () =>
         {
             var ids = formRecordIds.ToArray();
             var result = new List<ShareReadableItem>();
@@ -178,9 +178,12 @@ public sealed class SearchQueryReader(string? readerConnectionString, IndexedSea
                         JOIN authority.authority_relationship_edges r
                           ON r.organization_id = @org AND r.subject_type_name = 'team' AND r.subject_entity_id = t.team_id AND r.relationship_name = ANY(@roles)
                          AND r.resource_type_name = 'record_share' AND r.subject_relation_name = 'participant' AND r.removed_by_security_command_id IS NULL
+                    ), live_shares AS (
+                        -- C10 D5: a share that confers nothing at the pinned decision instant (expired, own or lineage) is never a candidate.
+                        SELECT c.record_share_id FROM caller_shares c WHERE NOT (c.record_share_id = ANY(@excluded))
                     ), scoped_shares AS (
                         SELECT DISTINCT s.record_share_id, f.resource_entity_id AS form_record_id
-                        FROM caller_shares s
+                        FROM live_shares s
                         JOIN authority.authority_relationship_edges f
                           ON f.organization_id = @org AND f.subject_type_name = 'record_share' AND f.subject_entity_id = s.record_share_id AND f.relationship_name = 'shared_via'
                          AND f.resource_type_name = 'form_record' AND f.subject_relation_name = '' AND f.removed_by_security_command_id IS NULL
@@ -210,6 +213,7 @@ public sealed class SearchQueryReader(string? readerConnectionString, IndexedSea
                 command.Parameters.AddWithValue("ids", ids);
                 command.Parameters.AddWithValue("fields", group.Select(f => f.FieldDefinitionId).ToArray());
                 command.Parameters.AddWithValue("limit", Math.Max(1, limit + 1));
+                command.Parameters.AddWithValue("excluded", excludedShareIds.ToArray());
                 await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 {

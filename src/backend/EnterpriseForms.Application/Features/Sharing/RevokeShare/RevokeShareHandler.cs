@@ -1,4 +1,3 @@
-using System.Text.Json;
 using EnterpriseForms.Application.Common;
 using EnterpriseForms.Application.Common.Authority;
 using EnterpriseForms.Application.Common.Persistence;
@@ -9,12 +8,13 @@ namespace EnterpriseForms.Application.Features.Sharing.RevokeShare;
 /// <summary>Revocation is effective at the authority revision barrier; the local projection is updated afterwards and is irrelevant to enforcement.</summary>
 public sealed class RevokeShareHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock)
 {
-    public async Task<CommandStatusResponse> HandleAsync(RequestContext context, Guid formRecordId, Guid recordShareId, string idempotencyKey, CancellationToken cancellationToken)
+    /// <param name="useDevelopmentStepUp">G27: request the synthetic marker, which the Authority accepts only in its synthetic Development/Test configuration.</param>
+    public async Task<CommandStatusResponse> HandleAsync(RequestContext context, Guid formRecordId, Guid recordShareId, string idempotencyKey, bool useDevelopmentStepUp, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         var user = context.ToDelegatedUser();
         var decision = await authority.CheckPermissionAsync(user, new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), ProtectedAction.ManageAccess), cancellationToken).ConfigureAwait(false);
-        var payload = JsonSerializer.SerializeToElement(new { record_share_id = recordShareId, form_record_id = formRecordId });
+        var payload = HumanCommandPayload.Serialize(new { record_share_id = recordShareId, form_record_id = formRecordId }, useDevelopmentStepUp);
         var command = await awaiter.SubmitAndAwaitAsync(user, new SecurityCommandRequest(context.OrganizationId, SecurityCommandKind.RevokeShare, new ResourceReference(ProtectedResourceKind.FormRecord, formRecordId), decision.AuthorizationRevision, payload, "revoke share"), "revoke:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
         var outcome = new CommandOutcome(command.CommandId, command.CommandStatus.ToString(), command.AuthorizationRevision, command.CommandStatus == SecurityCommandStatus.Effective);
         if (outcome.Effective)

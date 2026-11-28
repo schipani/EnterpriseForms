@@ -9,8 +9,11 @@ using AuthorizationAuthority.Domain.Features.SecurityCommands;
 namespace AuthorizationAuthority.Application.Features.SecurityCommands;
 
 /// <summary>Authoritative security-commit point (CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md §2 "Command sequence").</summary>
-public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock, FieldSearchApprovalGate approvalGate, AuthorizationAuthority.Application.Features.SearchIndex.SearchIndexWriter? searchIndex = null, IOperationTimingObserver? timing = null, FormPublicationAbandonmentVerifier? abandonmentVerifier = null)
+public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock, FieldSearchApprovalGate approvalGate, AuthorizationAuthority.Application.Features.SearchIndex.SearchIndexWriter? searchIndex = null, IOperationTimingObserver? timing = null, FormPublicationAbandonmentVerifier? abandonmentVerifier = null, HumanCommandStepUpGate? humanCommandGate = null)
 {
+    // G27: HumanCommandStepUpGate is optional and defaults to Unavailable, so existing callers and fixtures compile
+    // while the host registers the gate from configuration.
+    private readonly HumanCommandStepUpGate effectiveHumanGate = humanCommandGate ?? HumanCommandStepUpGate.Unavailable;
     public async Task<OperationStatus> SubmitAsync(VerifiedActor actor, SecurityCommandRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -54,12 +57,16 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             CommandIdempotencyKey = idempotencyKey,
             CommandRequestDigest = requestDigest,
             ExpectedAuthorizationRevision = request.ExpectedAuthorizationRevision,
-            CommandPayloadJson = request.CommandPayload.GetRawText(),
+            // G27: keep untrusted step-up evidence out of rejected commands, including refusals before planning.
+            CommandPayloadJson = request.CommandKind is SecurityCommandKind.CreateShare or SecurityCommandKind.UpdateShareScope or SecurityCommandKind.RevokeShare or SecurityCommandKind.TransferOwnership
+                ? "{}"
+                : request.CommandPayload.GetRawText(),
             CommandReasonText = request.ChangeReason,
             CorrelationIdentifier = correlationId,
             CommandCreatedOn = clock.GetUtcNow(),
             CommandModifiedOn = clock.GetUtcNow(),
             CommandStateName = SecurityCommandStates.Rejected,
+            TargetFormRecordId = request.Resource.ResourceKind == ResourceKind.FormRecord ? request.Resource.ResourceId : null,
         };
 
         try
@@ -80,7 +87,7 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             var graph = new DesiredStateGraph(edges);
             graphMs = timer.ElapsedMilliseconds - graphStarted;
             var planStarted = timer.ElapsedMilliseconds;
-            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate, command.CommandCreatedOn, abandonmentVerifier).ConfigureAwait(false);
+            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate, command.CommandCreatedOn, abandonmentVerifier, effectiveHumanGate).ConfigureAwait(false);
             command.CommandPayloadJson = plan.NormalizedPayloadJson;
             if (plan.CommandReasonOverride is { } reasonOverride)
             {
@@ -172,8 +179,11 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
         return status with { CorrelationId = correlationId };
     }
 
-    /// <summary>Applies the plan inside the locked organization transaction: desired state, immutable command, outbox and journal — one commit.</summary>
-    internal static void ApplyPlan(IAuthorityScope scope, OrganizationAuthorizationState state, SecurityCommand command, CommandPlan plan, BoundActor actor, SecurityCommandRequest request, CancellationToken cancellationToken)
+    /// <summary>
+    /// Applies the plan inside the locked organization transaction: desired state, immutable command, outbox and journal — one commit.
+    /// Authority-internal commands without a contract request (C10 M1-WP6 ExpireShare) call this directly; only the resource is journalled.
+    /// </summary>
+    internal static void ApplyPlan(IAuthorityScope scope, OrganizationAuthorizationState state, SecurityCommand command, CommandPlan plan, BoundActor actor, ResourceRef commandResource, CancellationToken cancellationToken)
     {
         _ = cancellationToken;
         if ((plan.NewApprovals.Count > 0 || plan.ChangedApprovals.Count > 0) && !plan.SearchIndexChangesAppliedByCaller)
@@ -237,6 +247,58 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             resource.ResourceLifecycleState = Domain.Features.Organizations.ResourceLifecycleStates.Active;
             resource.RegisteredBySecurityCommandId = command.SecurityCommandId;
             resource.ResourceRegisteredOn = now;
+        }
+
+        if (plan.ShareMetadata is { } shareMetadata)
+        {
+            if (shareMetadata.ShareExpiresOn is not null)
+            {
+                shareMetadata.ExpirySourceSecurityCommandId = command.SecurityCommandId;
+            }
+
+            scope.AddShareMetadata(shareMetadata);
+        }
+
+        foreach (var binding in plan.AddDocumentBindings)
+        {
+            binding.BoundBySecurityCommandId = command.SecurityCommandId;
+            binding.DocumentBoundOn = now;
+            scope.AddShareDocumentBinding(binding);
+        }
+
+        foreach (var (binding, entry, version) in plan.UpdatedDocumentBindings)
+        {
+            binding.CanViewDocument = entry.CanViewDocument;
+            binding.CanDownloadDocument = entry.CanDownloadDocument;
+            binding.CanReplaceDocument = entry.CanReplaceDocument;
+            binding.SharedThroughVersionNumber = version;
+            binding.BoundBySecurityCommandId = command.SecurityCommandId;
+            binding.DocumentBoundOn = now;
+        }
+
+        foreach (var binding in plan.RemovedDocumentBindings)
+        {
+            scope.RemoveShareDocumentBinding(binding);
+        }
+
+        if (plan.ShareMetadataUpdate is { } update)
+        {
+            // The planner checked the share revision while the organization row was locked.
+            if (update.Metadata.ShareExpiresOn != update.ExpiresOn)
+            {
+                update.Metadata.ExpirySourceSecurityCommandId = update.ExpiresOn is null ? null : command.SecurityCommandId;
+            }
+
+            update.Metadata.ShareRevision = update.Revision;
+            update.Metadata.ShareExpiresOn = update.ExpiresOn;
+            update.Metadata.ShareMetadataModifiedOn = now;
+        }
+
+        foreach (var (resource, metadata, reason) in plan.InvalidatedDescendantShares)
+        {
+            resource.ResourceLifecycleState = ResourceLifecycleStates.Invalidated;
+            metadata.ShareInvalidationReasonCode = reason;
+            metadata.ShareMetadataModifiedOn = now;
         }
 
         if (plan.ProtectionPolicy is { } policy)
@@ -330,8 +392,8 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             actor.AuthorityUserId,
             actor.Actor.IssuerUri,
             actor.Actor.SubjectIdentifier,
-            request.Resource.ResourceKind.ToString(),
-            request.Resource.ResourceId,
+            commandResource.ResourceKind.ToString(),
+            commandResource.ResourceId,
             command.ExpectedAuthorizationRevision,
             revision,
             Convert.ToHexStringLower(command.CommandRequestDigest),
@@ -342,6 +404,16 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             command.CommandReasonText,
             command.CorrelationIdentifier);
         scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Authorization, revision, "SecurityCommandCommitted", body, command.SecurityCommandId, null, TimeProvider.System));
+
+        // C10 M1-WP9: named record-scoped share evidence on the audit stream, in this same transaction (the body above is unchanged).
+        ShareLifecycleJournal.Append(scope, state, command, plan, revision);
+    }
+
+    /// <summary>As above, for a contract request: the journalled resource is the request's.</summary>
+    internal static void ApplyPlan(IAuthorityScope scope, OrganizationAuthorizationState state, SecurityCommand command, CommandPlan plan, BoundActor actor, SecurityCommandRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ApplyPlan(scope, state, command, plan, actor, request.Resource, cancellationToken);
     }
 
     /// <summary>C8 M2 (AC-7): proposals, membership state, revoked sessions and membership requests, in the command's transaction.</summary>
@@ -438,6 +510,12 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
         if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length is < 8 or > 128)
         {
             throw AuthorityException.Invalid("Idempotency-Key must be 8..128 characters");
+        }
+
+        // C10 M1-WP6: the deterministic keys of the internal ExpireShare command are reserved, so no caller can occupy one first.
+        if (idempotencyKey.StartsWith(ShareExpiryConvergenceService.IdempotencyKeyPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            throw AuthorityException.Invalid("Idempotency-Key uses a reserved prefix");
         }
     }
 

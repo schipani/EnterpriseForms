@@ -202,7 +202,7 @@ public sealed partial class SearchAccessValueProjectionStackTests(StageBFixture 
 
     private async Task<Guid> ShareAsync(Ws w, Guid record, Guid? user, Guid? team, params string[] fieldKeys)
     {
-        var id = await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", w.S.Token(w.S.Clerk), new { recipientUserId = user, recipientTeamId = team, recipientRole = "Reader", fieldKeys }), r => r.Root.GetProperty("recordShareId").GetGuid(), "share");
+        var id = await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", w.S.Token(w.S.Clerk), new { useDevelopmentStepUp = true, recipientUserId = user, recipientTeamId = team, recipientRole = "Reader", fieldKeys }), r => r.Root.GetProperty("recordShareId").GetGuid(), "share");
         await w.S.WaitGateReadyAsync();
         return id;
     }
@@ -260,7 +260,7 @@ public sealed partial class SearchAccessValueProjectionStackTests(StageBFixture 
         await PauseAsync(true);
         try
         {
-            await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{r1:D}/shares/{direct:D}/revoke", w.S.Token(w.S.Clerk), new { }), _ => true, "revoke");
+            await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{r1:D}/shares/{direct:D}/revoke?useDevelopmentStepUp=true", w.S.Token(w.S.Clerk), new { }), _ => true, "revoke");
             await w.S.WaitGateReadyAsync();
             Assert.Equal("Building", (await StatusAsync(org)).GetProperty("status_name").GetString());
             Assert.Contains(await ValuesAsync(org, r1), v => v.Id == w.S.Reader.AuthorityUserId); // present, but not servable
@@ -275,7 +275,7 @@ public sealed partial class SearchAccessValueProjectionStackTests(StageBFixture 
         Assert.Empty(await EvaluateAsync(w, w.S.Reader, CountBetween(w, 1, 10)));
 
         // Ownership transfer to the team: the owner's value rows move to the team principal.
-        await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{r1:D}/transfer-ownership", w.S.Token(w.S.Clerk), new { newOwnerUserId = (Guid?)null, newOwnerTeamId = w.Team, transferReason = "IX-5b transfer" }), _ => true, "transfer");
+        await RetryAsync(() => fixture.Api.PostAsync($"/api/v1/form-records/{r1:D}/transfer-ownership", w.S.Token(w.S.Clerk), new { useDevelopmentStepUp = true, newOwnerUserId = (Guid?)null, newOwnerTeamId = w.Team, transferReason = "IX-5b transfer" }), _ => true, "transfer");
         await w.S.WaitGateReadyAsync();
         var after = await ReadyAndVerifiedAsync(org);
         var r1Values = await ValuesAsync(org, r1);

@@ -10,6 +10,7 @@ using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
+using AuthorizationAuthority.Domain.Features.Sharing;
 
 namespace AuthorizationAuthority.Tests;
 
@@ -32,6 +33,7 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<OrganizationAuthorizationState> Organizations { get; } = [];
     public List<IdentityBinding> Bindings { get; } = [];
     public List<AuthorityResource> Resources { get; } = [];
+    public List<ShareResourceMetadata> ShareMetadata { get; } = [];
     public List<AuthorityRelationshipEdge> Edges { get; } = [];
     public List<ContentChangeOperation> Operations { get; } = [];
     public List<ContentCandidateLeaf> CandidateLeaves { get; } = [];
@@ -56,6 +58,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     /// <summary>E3-M2f-2 CAP-F5: when set, every binding-existence query throws this (a store failure).</summary>
     public Exception? DataKeyBindingExistenceFailure { get; set; }
     public List<SecurityJournalEntry> Journal { get; } = [];
+
+    /// <summary>C10 WP8: committed share document bindings.</summary>
+    public List<ShareDocumentBinding> DocumentBindings { get; } = [];
 
     /// <summary>E3-M2f-3b: whether the evidence index is reported usable (T2-8).</summary>
     public bool EvidenceIndexUsable { get; set; } = true;
@@ -307,6 +312,52 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
             Task.FromResult(s.Resources.FirstOrDefault(r => r.OrganizationId == organizationId && r.ResourceTypeName == resourceTypeName && r.ResourceEntityId == resourceEntityId));
 
         public void AddResource(AuthorityResource resource) => s.Resources.Add(resource);
+
+        public Task<ShareResourceMetadata?> FindShareMetadataAsync(Guid organizationId, Guid recordShareId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.ShareMetadata.SingleOrDefault(m => m.OrganizationId == organizationId && m.RecordShareId == recordShareId));
+
+        public void AddShareMetadata(ShareResourceMetadata metadata) => s.ShareMetadata.Add(metadata);
+
+        public Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid organizationId, Guid parentRecordShareId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.ShareMetadata.Where(m => m.OrganizationId == organizationId && m.ParentRecordShareId == parentRecordShareId).ToList());
+
+        public Task<List<ShareResourceMetadata>> GetActiveShareMetadataWithExpiryAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.ShareMetadata.Where(m => m.OrganizationId == organizationId && m.ShareExpiresOn is not null &&
+                s.Resources.Any(r => r.OrganizationId == organizationId && r.ResourceTypeName == ResourceTypeNames.RecordShare && r.ResourceEntityId == m.RecordShareId && r.ResourceLifecycleState == ResourceLifecycleStates.Active)).ToList());
+
+        public Task<List<AuthorityRelationshipEdge>> GetActiveShareEdgesAsync(Guid organizationId, IReadOnlyCollection<Guid> recordShareIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Edges.Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null &&
+                ((e.ResourceTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.ResourceEntityId)) ||
+                 (e.SubjectTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.SubjectEntityId)))).ToList());
+
+        public Task<List<ShareDocumentBinding>> GetShareDocumentBindingsAsync(Guid organizationId, IReadOnlyCollection<Guid> recordShareIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.DocumentBindings.Where(b => b.OrganizationId == organizationId && recordShareIds.Contains(b.RecordShareId)).ToList());
+
+        public void AddShareDocumentBinding(ShareDocumentBinding binding) => s.DocumentBindings.Add(binding);
+
+        public void RemoveShareDocumentBinding(ShareDocumentBinding binding) => s.DocumentBindings.Remove(binding);
+
+        public Task<List<SecurityCommand>> GetRecordTargetedCommandsAsync(Guid organizationId, Guid formRecordId, int limit, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Commands.Where(c => c.OrganizationId == organizationId && c.TargetFormRecordId == formRecordId && c.CommandStateName != SecurityCommandStates.Rejected)
+                .OrderByDescending(c => c.CommandCreatedOn).ThenByDescending(c => c.SecurityCommandId).Take(limit).ToList());
+
+        public Task<HashSet<Guid>> GetAuthorizationJournalCommandIdsAsync(Guid organizationId, IReadOnlyCollection<Guid> securityCommandIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Journal.Where(e => e.OrganizationId == organizationId && e.JournalStreamName == JournalStreamNames.Authorization && e.SecurityCommandId is { } id && securityCommandIds.Contains(id))
+                .Select(e => e.SecurityCommandId!.Value).ToHashSet());
+
+        public Task<List<AuthorityRelationshipEdge>> GetRecordSecurityEdgeHistoryAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken)
+        {
+            var recordEdges = s.Edges.Where(e => e.OrganizationId == organizationId && e.ResourceTypeName == ResourceTypeNames.FormRecord && e.ResourceEntityId == formRecordId &&
+                e.RelationshipName is "owner" or "shared_via").ToList();
+            var shareIds = recordEdges.Where(e => e.RelationshipName == "shared_via" && e.SubjectTypeName == ResourceTypeNames.RecordShare).Select(e => e.SubjectEntityId).ToHashSet();
+            return Task.FromResult(recordEdges.Concat(s.Edges.Where(e => e.OrganizationId == organizationId &&
+                ((e.ResourceTypeName == ResourceTypeNames.RecordShare && shareIds.Contains(e.ResourceEntityId)) ||
+                 (e.SubjectTypeName == ResourceTypeNames.RecordShare && shareIds.Contains(e.SubjectEntityId) && e.ResourceTypeName != ResourceTypeNames.FormRecord)))).ToList());
+        }
+
+        public Task<List<AuthorityRelationshipEdge>> GetActiveTeamMemberEdgesAsync(Guid organizationId, IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Edges.Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null && e.ResourceTypeName == ResourceTypeNames.Team &&
+                e.RelationshipName == "member" && teamIds.Contains(e.ResourceEntityId)).ToList());
 
         public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid organizationId, Guid parentResourceEntityId, IReadOnlyCollection<string> resourceTypeNames, CancellationToken cancellationToken) =>
             Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && r.ParentResourceEntityId == parentResourceEntityId && resourceTypeNames.Contains(r.ResourceTypeName) && r.ResourceLifecycleState == ResourceLifecycleStates.Active).ToList());

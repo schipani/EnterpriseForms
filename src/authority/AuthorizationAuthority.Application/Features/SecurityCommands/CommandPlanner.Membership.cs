@@ -17,7 +17,9 @@ namespace AuthorizationAuthority.Application.Features.SecurityCommands;
 /// current roles, membership state, expiry, record ownership or last-holder rules.</item>
 /// <item>The last enabled owner and the last enabled Security Administrator are never removed or disabled.</item>
 /// <item>Disabling keeps every edge (roles, teams, shares) and revokes the person's sessions; the binding is refused by
-/// ActorResolver and session validation. It is refused while the person directly owns active records (count only).</item>
+/// ActorResolver and session validation. C10 M1-WP5 (WP-0 Section 3.4): the shares the person granted under delegated
+/// authority (and their subtrees) lose their only path and are invalidated in the same command; shares the person holds, and
+/// the person's owner-granted and unresolved-legacy grants, are kept. It is refused while the person directly owns active records (count only).</item>
 /// <item>Membership requests grant nothing: only two operator approvals create the binding (MembershipProvisioningService).</item>
 /// <item>Fresh step-up is required (PB-08 gate: synthetic in Development/Testing, refused in staging and production).</item>
 /// </list>
@@ -209,6 +211,7 @@ public static partial class CommandPlanner
         }
 
         await RequireDisableAllowedAsync(scope, organizationId, graph, bindings, binding.AuthorityUserId, cancellationToken).ConfigureAwait(false);
+        await InvalidateDisabledGrantorDelegationsAsync(scope, organizationId, graph, binding, plan, cancellationToken).ConfigureAwait(false);
         plan.BindingToDisable = binding;
         plan.SessionsToRevoke.AddRange(await scope.GetUnrevokedSessionsAsync(binding.IdentityBindingId, cancellationToken).ConfigureAwait(false));
         return plan;

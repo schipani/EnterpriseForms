@@ -91,7 +91,58 @@ public sealed class CommandPlan
     /// commands record only their structured reason code there, whatever the caller sent as <c>change_reason</c>.
     /// </summary>
     public string? CommandReasonOverride { get; set; }
+
+    /// <summary>C10 M1-WP3: share metadata persisted alongside the resource registration (depth, parent, revision).</summary>
+    public Domain.Features.Sharing.ShareResourceMetadata? ShareMetadata { get; set; }
+
+    /// <summary>C10 WP8: document bindings staged with the command (attributed to it when applied).</summary>
+    internal List<Domain.Features.Sharing.ShareDocumentBinding> AddDocumentBindings { get; } = [];
+
+    /// <summary>C10 WP8: existing bindings whose flags or version boundary this command replaces (re-attributed when applied).</summary>
+    internal List<(Domain.Features.Sharing.ShareDocumentBinding Binding, ShareDocumentEntry Entry, int Version)> UpdatedDocumentBindings { get; } = [];
+
+    /// <summary>C10 WP8: bindings of documents this command removes from the share.</summary>
+    internal List<Domain.Features.Sharing.ShareDocumentBinding> RemovedDocumentBindings { get; } = [];
+
+    internal (Domain.Features.Sharing.ShareResourceMetadata Metadata, long Revision, DateTimeOffset? ExpiresOn)? ShareMetadataUpdate { get; set; }
+    /// <summary>C10 M1-WP5: descendant shares invalidated by this command (revoke, expiry, narrowing, path loss), with reason.</summary>
+    internal List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata, string Reason)> InvalidatedDescendantShares { get; } = [];
+
+    /// <summary>C10 M1-WP9: the share whose revocation, expiry or narrowing invalidated <see cref="InvalidatedDescendantShares"/>.</summary>
+    internal Guid? InvalidationSourceShareId { get; set; }
+
+    /// <summary>C10 M1-WP9: the accepted scope change of an UpdateShareScope command (journal evidence: counts and flags only).</summary>
+    internal ShareScopeChangeEvidence? ShareScopeChange { get; set; }
+
+    /// <summary>C10 M1-WP6/WP9: the share an ExpireShare command converged (journal evidence of the <c>ShareExpired</c> event).</summary>
+    internal ShareExpiryEvidence? ShareExpiry { get; set; }
 }
+
+/// <summary>C10 M1-WP6: what an ExpireShare command converged and under whose decision (WP-0 Section 4 "Journal attribution").</summary>
+internal sealed record ShareExpiryEvidence(
+    Guid RecordShareId,
+    Guid FormRecordId,
+    DateTimeOffset ShareExpiresOn,
+    DateTimeOffset EvaluatedOn,
+    long ShareRevision,
+    Guid ExpirySourceSecurityCommandId);
+
+/// <summary>
+/// C10 M1-WP9: what an accepted UpdateShareScope changed, without the scope itself: no field item ids, no expiry value, no step-up
+/// evidence and no reason.
+/// </summary>
+internal sealed record ShareScopeChangeEvidence(
+    Guid RecordShareId,
+    Guid FormRecordId,
+    long PreviousShareRevision,
+    long ShareRevision,
+    string RecipientRole,
+    bool RoleChanged,
+    int FieldItemCount,
+    int FieldItemsAdded,
+    int FieldItemsRemoved,
+    bool ExpiryChanged,
+    bool HasExpiry);
 
 /// <summary>
 /// Kind-specific validation of security commands against the authoritative desired state. Each kind enforces
@@ -109,11 +160,13 @@ public static partial class CommandPlanner
         CancellationToken cancellationToken,
         FieldSearchApprovalGate? approvalGate = null,
         DateTimeOffset? now = null,
-        FormPublicationAbandonmentVerifier? abandonmentVerifier = null)
+        FormPublicationAbandonmentVerifier? abandonmentVerifier = null,
+        HumanCommandStepUpGate? humanCommandGate = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         var at = now ?? DateTimeOffset.UtcNow;
         var gate = approvalGate ?? FieldSearchApprovalGate.Unavailable;
+        var humanGate = humanCommandGate ?? HumanCommandStepUpGate.Unavailable;
         var plan = request.CommandKind switch
         {
             SecurityCommandKind.RegisterTeam => await RegisterTeamAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
@@ -122,9 +175,10 @@ public static partial class CommandPlanner
             SecurityCommandKind.RegisterFormDefinition => await RegisterFormDefinitionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateFormUsers => await UpdateFormUsersAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RegisterRecord => await RegisterRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.TransferOwnership => await TransferOwnershipAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.CreateShare => await CreateShareAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.RevokeShare => await RevokeShareAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.TransferOwnership => await TransferOwnershipAsync(scope, organizationId, actor, request, graph, humanGate, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.CreateShare => await CreateShareAsync(scope, organizationId, actor, request, graph, humanGate, at, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.UpdateShareScope => await UpdateShareScopeAsync(scope, organizationId, actor, request, graph, humanGate, at, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.RevokeShare => await RevokeShareAsync(scope, organizationId, actor, request, graph, humanGate, at, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UnlinkChildRecord => await UnlinkChildRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.PublishFormSecurityRevision => await PublishFormSecurityRevisionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateMandatoryPolicy => await UpdateMandatoryPolicyAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
@@ -244,9 +298,127 @@ public static partial class CommandPlanner
             }
 
             plan.RemoveEdges.Add(existing);
+            await InvalidateLostGrantorPathsAsync(scope, organizationId, graph, payload, plan, cancellationToken).ConfigureAwait(false);
         }
 
         return plan;
+    }
+
+    /// <summary>
+    /// C10 M1-WP5 (WP-0 Section 3.4, "removes the delegator's path"): when the removed member held a Manager share only through this
+    /// team, every Active share the member delegated under it (and its subtree) is invalidated in the same command
+    /// (<see cref="Domain.Features.Sharing.ShareInvalidationReasons.GrantorPathLost"/>). A path that survives (a direct Manager edge or
+    /// another team) keeps them.
+    /// </summary>
+    private static async Task InvalidateLostGrantorPathsAsync(IAuthorityScope scope, Guid organizationId, DesiredStateGraph graph, TeamMemberPayload payload, CommandPlan plan, CancellationToken cancellationToken)
+    {
+        var member = payload.MemberUserId;
+        var binding = await scope.FindIdentityBindingByUserAsync(organizationId, member, cancellationToken).ConfigureAwait(false);
+        if (binding is null)
+        {
+            return;
+        }
+
+        var lost = new List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata)>();
+        var seen = new HashSet<Guid>();
+        foreach (var held in graph.EdgesWithSubject(ResourceTypeNames.Team, payload.TeamId)
+                     .Where(e => e.ResourceTypeName == ResourceTypeNames.RecordShare && e.RelationshipName == "manager" && e.SubjectRelationName == "participant"))
+        {
+            var parent = held.ResourceEntityId;
+            var stillHeld = graph.EdgesOf(ResourceTypeNames.RecordShare, parent, "manager").Any(e =>
+                (e.SubjectTypeName == ResourceTypeNames.User && e.SubjectEntityId == member && e.SubjectRelationName.Length == 0) ||
+                (e.SubjectTypeName == ResourceTypeNames.Team && e.SubjectEntityId != payload.TeamId && e.SubjectRelationName == "participant" && graph.IsTeamMember(member, e.SubjectEntityId)));
+            if (stillHeld)
+            {
+                continue;
+            }
+
+            foreach (var child in await scope.FindShareMetadataByParentAsync(organizationId, parent, cancellationToken).ConfigureAwait(false))
+            {
+                var resource = await scope.FindResourceAsync(organizationId, ResourceTypeNames.RecordShare, child.RecordShareId, cancellationToken).ConfigureAwait(false);
+                if (resource is null || resource.ResourceLifecycleState != ResourceLifecycleStates.Active || resource.ParentResourceEntityId is not { } record ||
+                    (await scope.FindCommandAsync(resource.RegisteredBySecurityCommandId, cancellationToken).ConfigureAwait(false))?.ActorIdentityBindingId != binding.IdentityBindingId ||
+                    !seen.Add(child.RecordShareId))
+                {
+                    continue; // another grantor's delegation, or not Active: unaffected by this member's removal
+                }
+
+                lost.Add((resource, child));
+                foreach (var below in await ReadRevokedShareDescendantsAsync(scope, organizationId, record, child.RecordShareId, cancellationToken).ConfigureAwait(false))
+                {
+                    if (seen.Add(below.Metadata.RecordShareId))
+                    {
+                        lost.Add(below);
+                    }
+                }
+            }
+        }
+
+        if (lost.Count == 0)
+        {
+            return;
+        }
+
+        plan.RemoveEdges.AddRange(lost.SelectMany(d => graph.EdgesWithSubject(ResourceTypeNames.RecordShare, d.Metadata.RecordShareId)
+            .Concat(graph.EdgesOf(ResourceTypeNames.RecordShare, d.Metadata.RecordShareId))).Distinct());
+        plan.InvalidatedDescendantShares.AddRange(lost.Select(d => (d.Resource, d.Metadata, Domain.Features.Sharing.ShareInvalidationReasons.GrantorPathLost)));
+        // The normalized payload stays {team_id, member_user_id}: membership reconciliation reads it strictly. The invalidations are
+        // journalled as the removed edges of this command and as one ShareInvalidated audit entry per share.
+    }
+
+    /// <summary>
+    /// C10 M1-WP5 (WP-0 Section 3.4, "member deactivation"; ownership decision 2026-11-26): a delegated share depends on its grantor
+    /// continuing to hold the committed parent Manager share. A disabled member holds no usable authority, so every Active share the
+    /// member registered under a Manager share they hold (directly or through a team) — and its subtree — is invalidated in the same
+    /// command (<see cref="Domain.Features.Sharing.ShareInvalidationReasons.GrantorPathLost"/>). Owner-granted (depth-1) shares were
+    /// authorized once under owner rights and survive; unresolved legacy shares name no parent, so nothing is claimed for them; the
+    /// shares the member holds are kept (re-enabling restores the member's own access, never an invalidated share). The
+    /// normalized payload is unchanged; the invalidations are journalled as removed edges and ShareInvalidated audit entries.
+    /// </summary>
+    private static async Task InvalidateDisabledGrantorDelegationsAsync(IAuthorityScope scope, Guid organizationId, DesiredStateGraph graph, IdentityBinding binding, CommandPlan plan, CancellationToken cancellationToken)
+    {
+        var member = binding.AuthorityUserId;
+        var heldParents = graph.Edges.Where(e => e.ResourceTypeName == ResourceTypeNames.RecordShare && e.RelationshipName == "manager" && graph.SubjectIncludesUser(e, member))
+            .Select(e => e.ResourceEntityId).Distinct().Order().ToList();
+        var lost = new List<(AuthorityResource Resource, Domain.Features.Sharing.ShareResourceMetadata Metadata)>();
+        var seen = new HashSet<Guid>();
+        foreach (var parent in heldParents)
+        {
+            foreach (var child in (await scope.FindShareMetadataByParentAsync(organizationId, parent, cancellationToken).ConfigureAwait(false)).OrderBy(c => c.RecordShareId))
+            {
+                if (child.OrganizationId != organizationId || child.LegacyLineageUnresolved || child.DelegationDepth < 2 || seen.Contains(child.RecordShareId))
+                {
+                    continue;
+                }
+
+                var resource = await scope.FindResourceAsync(organizationId, ResourceTypeNames.RecordShare, child.RecordShareId, cancellationToken).ConfigureAwait(false);
+                if (resource is null || resource.ResourceLifecycleState != ResourceLifecycleStates.Active || resource.ParentResourceEntityId is not { } record ||
+                    (await scope.FindCommandAsync(resource.RegisteredBySecurityCommandId, cancellationToken).ConfigureAwait(false)) is not { } creator ||
+                    creator.OrganizationId != organizationId || creator.ActorIdentityBindingId != binding.IdentityBindingId)
+                {
+                    continue; // another grantor's delegation under the same parent, or not Active
+                }
+
+                seen.Add(child.RecordShareId);
+                lost.Add((resource, child));
+                foreach (var below in await ReadRevokedShareDescendantsAsync(scope, organizationId, record, child.RecordShareId, cancellationToken).ConfigureAwait(false))
+                {
+                    if (seen.Add(below.Metadata.RecordShareId))
+                    {
+                        lost.Add(below);
+                    }
+                }
+            }
+        }
+
+        if (lost.Count == 0)
+        {
+            return;
+        }
+
+        plan.RemoveEdges.AddRange(lost.SelectMany(d => graph.EdgesWithSubject(ResourceTypeNames.RecordShare, d.Metadata.RecordShareId)
+            .Concat(graph.EdgesOf(ResourceTypeNames.RecordShare, d.Metadata.RecordShareId))).Distinct());
+        plan.InvalidatedDescendantShares.AddRange(lost.Select(d => (d.Resource, d.Metadata, Domain.Features.Sharing.ShareInvalidationReasons.GrantorPathLost)));
     }
 
     private static async Task<CommandPlan> RegisterFormDefinitionAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
@@ -728,10 +900,14 @@ public static partial class CommandPlanner
         return plan;
     }
 
-    private static async Task<CommandPlan> TransferOwnershipAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
+    private static async Task<CommandPlan> TransferOwnershipAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, HumanCommandStepUpGate humanGate, CancellationToken cancellationToken)
     {
         var payload = CanonicalJson.Deserialize<TransferOwnershipPayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.FormRecord, payload.FormRecordId);
+
+        // G27: TransferOwnership is a human command requiring step-up assurance.
+        humanGate.RequireStepUp(payload.StepUpEvidence);
+
         await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.FormRecord, payload.FormRecordId, cancellationToken).ConfigureAwait(false);
         if ((payload.NewOwnerUserId is null) == (payload.NewOwnerTeamId is null))
         {
@@ -745,6 +921,14 @@ public static partial class CommandPlanner
             throw AuthorityException.Forbidden("ownership transfer requires the current owner or an audited system administrator override");
         }
 
+        // C10 (child-record ownership, owner decision 2026-11-27): a child record is owned only through its parent (§4B single owner, §4S
+        // inheritance), so it is never transferred on its own, on the owner and the administrator paths alike. A direct owner edge would
+        // give it a second effective owner that outlives a transfer of the parent. Transferring the parent moves the child with it.
+        if (graph.ParentRecordOf(payload.FormRecordId) is not null)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.ChildRecordOwnershipFollowsParent, 422, false, "a child record is owned through its parent; transfer the parent record, or unlink the child first");
+        }
+
         if (!isOwner && (payload.NewOwnerUserId == actor.AuthorityUserId
                          || (payload.NewOwnerTeamId is { } teamId && graph.EdgesOf(ResourceTypeNames.Team, teamId, "member").Any(e => e.SubjectTypeName == ResourceTypeNames.User && e.SubjectEntityId == actor.AuthorityUserId))))
         {
@@ -752,7 +936,8 @@ public static partial class CommandPlanner
             throw AuthorityException.Forbidden("an administrator override cannot transfer a record to the administrator or a team they belong to");
         }
 
-        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
+        // Strip step-up evidence from the journaled payload.
+        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload with { StepUpEvidence = null }) };
         plan.RemoveEdges.AddRange(graph.EdgesOf(ResourceTypeNames.FormRecord, payload.FormRecordId, "owner"));
         if (payload.NewOwnerUserId is { } userId)
         {
@@ -768,10 +953,14 @@ public static partial class CommandPlanner
         return plan;
     }
 
-    private static async Task<CommandPlan> CreateShareAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
+    private static async Task<CommandPlan> CreateShareAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, HumanCommandStepUpGate humanGate, DateTimeOffset at, CancellationToken cancellationToken)
     {
         var payload = CanonicalJson.Deserialize<CreateSharePayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.FormRecord, payload.FormRecordId);
+
+        // G27: CreateShare is a human command requiring step-up assurance.
+        humanGate.RequireStepUp(payload.StepUpEvidence);
+
         await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.FormRecord, payload.FormRecordId, cancellationToken).ConfigureAwait(false);
         if ((payload.RecipientUserId is null) == (payload.RecipientTeamId is null))
         {
@@ -786,9 +975,12 @@ public static partial class CommandPlanner
             _ => throw AuthorityException.Invalid("unknown recipient role"),
         };
 
-        if (payload.FieldItemIds.Count == 0 || payload.FieldItemIds.Count > 500 || payload.FieldItemIds.Distinct().Count() != payload.FieldItemIds.Count)
+        // C10 WP8: a share names fields, documents or both (document-only shares are allowed); an empty scope is refused.
+        var fieldItemIds = payload.FieldItemIds ?? [];
+        var documents = payload.Documents ?? [];
+        if (fieldItemIds.Count + documents.Count == 0 || fieldItemIds.Count > 500 || fieldItemIds.Distinct().Count() != fieldItemIds.Count)
         {
-            throw AuthorityException.Invalid("field_item_ids must be a non-empty distinct list (explicit allow-list, no wildcard)");
+            throw AuthorityException.Invalid("a share needs a distinct explicit allow-list of field items or documents (no wildcard)");
         }
 
         if (await scope.FindResourceAsync(organizationId, ResourceTypeNames.RecordShare, payload.RecordShareId, cancellationToken).ConfigureAwait(false) is not null)
@@ -806,26 +998,35 @@ public static partial class CommandPlanner
         var leaves = await scope.GetManifestLeavesAsync(head.CurrentRecordManifestCommitId.Value, cancellationToken).ConfigureAwait(false);
         // A field's committed items are its value leaves and — for plaintext dropdowns / multi-selects — its selection leaves (one per selected option).
         var committedFieldItems = leaves.Where(l => l.ManifestItemKindCode is (byte)MerkleItemKind.FieldValue or (byte)MerkleItemKind.FieldSelection).Select(l => l.ManifestItemId).ToHashSet();
-        var unknown = payload.FieldItemIds.Where(id => !committedFieldItems.Contains(id)).ToList();
+        var unknown = fieldItemIds.Where(id => !committedFieldItems.Contains(id)).ToList();
         if (unknown.Count > 0)
         {
             throw AuthorityException.Invalid("field_item_ids must reference items in the accepted manifest");
         }
 
-        var isOwner = graph.IsRecordOwner(actor.AuthorityUserId, payload.FormRecordId);
-        if (!isOwner)
-        {
-            // Bounded delegation: a manager may share only items currently delegable to them, and may not create further managers.
-            var delegable = graph.DelegableFieldItems(actor.AuthorityUserId, payload.FormRecordId);
-            if (delegable.Count == 0)
-            {
-                throw AuthorityException.Forbidden("sharing requires record ownership or a manager share");
-            }
+        var documentVersions = ShareDocuments.Resolve(documents, leaves, ownerGranted: graph.IsRecordOwner(actor.AuthorityUserId, payload.FormRecordId) && payload.ParentRecordShareId is null, role);
 
-            if (role == "manager" || payload.FieldItemIds.Any(id => !delegable.Contains(id)))
+        var isOwner = graph.IsRecordOwner(actor.AuthorityUserId, payload.FormRecordId);
+
+        var expiresOn = payload.ShareExpiresOn?.ToUniversalTime();
+        if (expiresOn is { } expiry && (expiry - at < TimeSpan.FromHours(1) || expiry - at > TimeSpan.FromDays(365)))
+        {
+            throw AuthorityException.Invalid("share expiry must be between one hour and 365 days from the Authority clock");
+        }
+
+        var delegationDepth = 1;
+        if (isOwner)
+        {
+            if (payload.ParentRecordShareId is not null)
             {
-                throw new AuthorityException(AuthorityErrorCodes.InvalidCommand, 422, false, "delegation exceeds the actor's delegable scope");
+                throw AuthorityException.Invalid("owner-granted shares cannot have a parent share");
             }
+        }
+        else
+        {
+            delegationDepth = await RequireShareDelegationAsync(scope, graph, organizationId, actor.AuthorityUserId,
+                payload, expiresOn, at, cancellationToken).ConfigureAwait(false);
+            await ShareDocuments.RequireWithinParentAsync(scope, organizationId, payload.ParentRecordShareId!.Value, documents, documentVersions, cancellationToken).ConfigureAwait(false);
         }
 
         if (payload.RecipientUserId is { } userId)
@@ -837,7 +1038,45 @@ public static partial class CommandPlanner
             await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.Team, payload.RecipientTeamId!.Value, cancellationToken).ConfigureAwait(false);
         }
 
-        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
+        // The committed share payload includes the effective grant parameters and no step-up evidence.
+        var plan = new CommandPlan
+        {
+            // C10 WP8: documents (with the Authority-derived version boundary) are journalled only when present, so a field-only
+            // share's committed payload is unchanged.
+            NormalizedPayloadJson = documents.Count == 0
+                ? CanonicalJson.Serialize(new
+                {
+                    payload.RecordShareId,
+                    payload.FormRecordId,
+                    payload.RecipientUserId,
+                    payload.RecipientTeamId,
+                    payload.RecipientRole,
+                    FieldItemIds = fieldItemIds,
+                    payload.ParentRecordShareId,
+                    DelegationDepth = delegationDepth,
+                    ShareExpiresOn = expiresOn,
+                })
+                : CanonicalJson.Serialize(new
+                {
+                    payload.RecordShareId,
+                    payload.FormRecordId,
+                    payload.RecipientUserId,
+                    payload.RecipientTeamId,
+                    payload.RecipientRole,
+                    FieldItemIds = fieldItemIds,
+                    payload.ParentRecordShareId,
+                    DelegationDepth = delegationDepth,
+                    ShareExpiresOn = expiresOn,
+                    Documents = documents.OrderBy(d => d.FileAttachmentId).Select(d => new
+                    {
+                        d.FileAttachmentId,
+                        d.CanViewDocument,
+                        d.CanDownloadDocument,
+                        d.CanReplaceDocument,
+                        SharedThroughVersionNumber = documentVersions[d.FileAttachmentId],
+                    }).ToArray(),
+                }),
+        };
         plan.RegisterResources.Add(NewResource(organizationId, ResourceTypeNames.RecordShare, payload.RecordShareId, payload.FormRecordId));
         plan.AddEdges.Add((ResourceTypeNames.FormRecord, payload.FormRecordId, "shared_via", ResourceTypeNames.RecordShare, payload.RecordShareId, string.Empty));
         if (payload.RecipientUserId is { } recipientUser)
@@ -849,18 +1088,52 @@ public static partial class CommandPlanner
             plan.AddEdges.Add((ResourceTypeNames.RecordShare, payload.RecordShareId, role, ResourceTypeNames.Team, payload.RecipientTeamId!.Value, "participant"));
         }
 
-        foreach (var fieldItemId in payload.FieldItemIds)
+        foreach (var fieldItemId in fieldItemIds)
         {
             plan.AddEdges.Add((ResourceTypeNames.FieldItem, fieldItemId, "shared_via", ResourceTypeNames.RecordShare, payload.RecordShareId, string.Empty));
         }
 
+        foreach (var document in documents)
+        {
+            plan.AddEdges.Add((ResourceTypeNames.DocumentItem, document.FileAttachmentId, "shared_via", ResourceTypeNames.RecordShare, payload.RecordShareId, string.Empty));
+            plan.AddDocumentBindings.Add(new Domain.Features.Sharing.ShareDocumentBinding
+            {
+                ShareDocumentBindingId = Guid.CreateVersion7(),
+                OrganizationId = organizationId,
+                RecordShareId = payload.RecordShareId,
+                FileAttachmentId = document.FileAttachmentId,
+                CanViewDocument = document.CanViewDocument,
+                CanDownloadDocument = document.CanDownloadDocument,
+                CanReplaceDocument = document.CanReplaceDocument,
+                SharedThroughVersionNumber = documentVersions[document.FileAttachmentId],
+            });
+        }
+
+        // C10 M1-WP3: persist share metadata in the same command transaction.
+        plan.ShareMetadata = new Domain.Features.Sharing.ShareResourceMetadata
+        {
+            ShareResourceMetadataId = Guid.CreateVersion7(),
+            OrganizationId = organizationId,
+            RecordShareId = payload.RecordShareId,
+            ResourceTypeName = ResourceTypeNames.RecordShare,
+            ParentRecordShareId = payload.ParentRecordShareId,
+            DelegationDepth = delegationDepth,
+            ShareExpiresOn = expiresOn,
+            ShareMetadataCreatedOn = at,
+            ShareMetadataModifiedOn = at,
+        };
+
         return plan;
     }
 
-    private static async Task<CommandPlan> RevokeShareAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
+    private static async Task<CommandPlan> RevokeShareAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, HumanCommandStepUpGate humanGate, DateTimeOffset at, CancellationToken cancellationToken)
     {
         var payload = CanonicalJson.Deserialize<RevokeSharePayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.FormRecord, payload.FormRecordId);
+
+        // G27: RevokeShare is a human command requiring step-up assurance.
+        humanGate.RequireStepUp(payload.StepUpEvidence);
+
         var share = await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.RecordShare, payload.RecordShareId, cancellationToken).ConfigureAwait(false);
         if (share.ParentResourceEntityId != payload.FormRecordId)
         {
@@ -868,21 +1141,62 @@ public static partial class CommandPlanner
         }
 
         var isOwner = graph.IsRecordOwner(actor.AuthorityUserId, payload.FormRecordId);
-        if (!isOwner)
+        if (!isOwner && !await GrantorStillHoldsDelegatedAuthorityAsync(scope, graph, organizationId, actor, payload.FormRecordId, share, at, cancellationToken).ConfigureAwait(false))
         {
-            var creator = await scope.FindCommandAsync(share.RegisteredBySecurityCommandId, cancellationToken).ConfigureAwait(false);
-            if (creator is null || creator.ActorIdentityBindingId != actor.Binding.IdentityBindingId)
-            {
-                throw AuthorityException.Forbidden("only the owner or the share's grantor may revoke it");
-            }
+            throw AuthorityException.Forbidden("only the owner or the share's grantor may revoke it");
         }
 
-        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
-        plan.RemoveEdges.AddRange(graph.EdgesWithSubject(ResourceTypeNames.RecordShare, payload.RecordShareId));
-        plan.RemoveEdges.AddRange(graph.EdgesOf(ResourceTypeNames.RecordShare, payload.RecordShareId));
+        var descendants = await ReadRevokedShareDescendantsAsync(scope, organizationId, payload.FormRecordId,
+            payload.RecordShareId, cancellationToken).ConfigureAwait(false);
+        var reason = Domain.Features.Sharing.ShareInvalidationReasons.UpstreamRevoked;
+        var plan = new CommandPlan
+        {
+            NormalizedPayloadJson = CanonicalJson.Serialize(new
+            {
+                payload.RecordShareId,
+                payload.FormRecordId,
+                InvalidatedDescendantShareIds = descendants.Select(child => child.Metadata.RecordShareId).Order().ToArray(),
+                InvalidationReasonCode = descendants.Count == 0 ? null : reason,
+            }),
+        };
+
+        var affectedShares = descendants.Select(child => child.Metadata.RecordShareId).Append(payload.RecordShareId);
+        plan.RemoveEdges.AddRange(affectedShares.SelectMany(id => graph.EdgesWithSubject(ResourceTypeNames.RecordShare, id)
+            .Concat(graph.EdgesOf(ResourceTypeNames.RecordShare, id))).Distinct());
+        plan.InvalidatedDescendantShares.AddRange(descendants.Select(child => (child.Resource, child.Metadata, reason)));
+        plan.InvalidationSourceShareId = payload.RecordShareId;
         share.ResourceLifecycleState = ResourceLifecycleStates.Revoked;
         plan.RevokeResources.Add(share);
         return plan;
+    }
+
+    /// <summary>
+    /// C10 ownership decision (2026-11-26): a non-owner may revoke a share only while they still hold the authority under which
+    /// they granted it — they registered it, it has committed delegated lineage (a parent; depth 2 or 3), and they still hold an
+    /// Active Manager role on that committed parent, whose own lineage is Active now. An owner-granted (depth-1) share was granted
+    /// under owner rights, so after an ownership transfer its former-owner grantor holds nothing it can be revoked under; a share
+    /// with unresolved legacy lineage names no parent the grantor could be shown to hold, so only the current owner revokes it
+    /// (no parent is inferred, WP-0 Section 5.1).
+    /// </summary>
+    private static async Task<bool> GrantorStillHoldsDelegatedAuthorityAsync(
+        IAuthorityScope scope, DesiredStateGraph graph, Guid organizationId, BoundActor actor, Guid formRecordId, AuthorityResource share, DateTimeOffset at, CancellationToken cancellationToken)
+    {
+        var creator = await scope.FindCommandAsync(share.RegisteredBySecurityCommandId, cancellationToken).ConfigureAwait(false);
+        if (creator is null || creator.OrganizationId != organizationId || creator.ActorIdentityBindingId != actor.Binding.IdentityBindingId)
+        {
+            return false;
+        }
+
+        var metadata = await scope.FindShareMetadataAsync(organizationId, share.ResourceEntityId, cancellationToken).ConfigureAwait(false);
+        if (metadata is not { LegacyLineageUnresolved: false, DelegationDepth: >= 2, ParentRecordShareId: { } parent } ||
+            !await HoldsActiveManagerShareAsync(scope, graph, organizationId, actor.AuthorityUserId, parent, cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        var sharesOnRecord = graph.ShareIdsOfRecord(formRecordId).ToHashSet();
+        var lineage = await ReadShareLineageAsync(scope, organizationId, sharesOnRecord, parent, cancellationToken).ConfigureAwait(false);
+        return Authorization.ShareLineageExpiry.Evaluate(lineage, organizationId, formRecordId, parent, at).Status == Authorization.ShareLineageStatus.Active;
     }
 
     private static void RequireResource(SecurityCommandRequest request, ResourceKind kind, Guid id)

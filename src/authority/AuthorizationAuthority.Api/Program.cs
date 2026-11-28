@@ -38,6 +38,13 @@ public sealed class Program
             return evidenceIndexExitCode;
         }
 
+        // C10 M1-WP10: read-only legacy lineage dry-run report (Development/Testing; one verified REPEATABLE READ, READ ONLY
+        // transaction on its own connection; no write path). It accepts no other command or host argument alongside it.
+        if (LegacyLineageDryRunCommand.TryRun(args, out var lineageExitCode))
+        {
+            return lineageExitCode;
+        }
+
         // E3-M2b-1F: Release B only, an explicit operator action; ordinary --migrate never applies the floor, and the two are
         // never combined in one invocation (the command refuses --migrate alongside it).
         if (ContentAcceptanceFloorCommand.TryRun(args, out var floorExitCode))
@@ -114,6 +121,12 @@ public sealed class Program
             builder.Configuration["Identity:UserAssertion:ProviderKind"])
             // C-188 (D-H18): retained-field approvals are off unless FieldSearch:RetainedFieldApprovals=Enabled; an unknown value refuses startup.
             .WithRetainedFieldApprovals(builder.Configuration[AuthorizationAuthority.Application.Features.SecurityCommands.FieldSearchApprovalGate.RetainedFieldApprovalsKey]));
+        // G27: Human commands (CreateShare, RevokeShare, TransferOwnership) require step-up assurance (PB-08), which is not available.
+        // The synthetic path is accepted only in Development/Testing with the synthetic TestIdentityProvider.
+        builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.SecurityCommands.HumanCommandStepUpGate.Create(
+            builder.Configuration[AuthorizationAuthority.Application.Features.SecurityCommands.HumanCommandStepUpGate.ConfigurationKey],
+            builder.Environment.EnvironmentName,
+            builder.Configuration["Identity:UserAssertion:ProviderKind"]));
         // C-191: an Abandoned resolution of a pending form publication needs the business publication coordinator's attestation, signed with
         // this dedicated key (distinct from every other credential; absent => no abandonment is ever accepted and the publication stays pending).
         builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.SecurityCommands.FormPublicationAbandonmentVerifier.Create(
@@ -157,6 +170,12 @@ public sealed class Program
         builder.Services.AddHostedService<ProjectionIntegrityMonitorLoop>();
         // SEC-BL-01 WP-3/WP-4: baseline and alert-only scheduled journal verifier; Development/Testing only, off unless configured.
         builder.Services.AddJournalVerification(builder.Configuration, builder.Environment);
+        if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"))
+        {
+            // C10 M1-WP6: expiry convergence is enabled only in Development/Testing in M1 (access-time enforcement does not depend on it).
+            builder.Services.AddSingleton<ShareExpiryLoop>();
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<ShareExpiryLoop>());
+        }
 
         var app = builder.Build();
         if (measureSeal)
@@ -213,6 +232,7 @@ public sealed class Program
 
         app.MapAuthorizationEndpoints();
         app.MapFormAccessEndpoints();
+        app.MapShareDetailsEndpoints();
         app.MapSecurityCommandEndpoints();
         app.MapSecurityCommandOutcomeEndpoints();
         AuthorizationAuthority.Api.Features.Audit.AuditAccessEndpoints.MapAuditAccessEndpoints(app);

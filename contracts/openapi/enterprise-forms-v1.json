@@ -3580,12 +3580,45 @@
         }
       }
     },
-    "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/revoke": {
-      "post": {
+    "/api/v1/form-records/{formRecordId}/shares/history": {
+      "get": {
         "tags": [
           "Sharing"
         ],
-        "operationId": "RevokeRecordShare",
+        "summary": "Sharing and ownership changes of a record from the authority's committed state, newest first, each with its command state (owner or access manager; others 404).",
+        "operationId": "GetRecordSharingHistory",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordSecurityHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/effective-scope": {
+      "get": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "What the share's recipient can do through it now (Active only while the share and its lineage are), with its lineage; same readers as the share details.",
+        "operationId": "GetRecordShareEffectiveScope",
         "parameters": [
           {
             "name": "formRecordId",
@@ -3612,7 +3645,273 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "$ref": "#/components/schemas/ShareEffectiveScopeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/shares/{recordShareId}": {
+      "get": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "One share's committed state from the authority (owner, or a Manager on its committed lineage; others 404). The ETag carries the authoritative share revision for PATCH If-Match.",
+        "operationId": "GetRecordShare",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "recordShareId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareDetailsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "Replaces a share's role, field items and expiry via the authority's UpdateShareScope command. Requires If-Match with the share ETag and an Idempotency-Key; returns the new ETag. Exactly one of share_expires_on or no_expiry is required.",
+        "operationId": "UpdateRecordShare",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "recordShareId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateShareResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/revoke": {
+      "post": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "Revokes a share via authority command; effective immediately at the authority barrier. G27: useDevelopmentStepUp (bool query, default false) for the synthetic test path only.",
+        "operationId": "RevokeRecordShare",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "recordShareId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "useDevelopmentStepUp",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
                   "$ref": "#/components/schemas/CommandStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/ownership-history": {
+      "get": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "Ownership changes of a record from the authority's committed state, newest first, each with its command state.",
+        "operationId": "GetRecordOwnershipHistory",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordSecurityHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/access": {
+      "get": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "The caller's own owned, team-owned, direct-share and team-share access (expired shares omitted, expiring soon flagged), from the authority.",
+        "operationId": "GetMyAccess",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/members/{memberUserId}/owned-records": {
+      "get": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "Active records a member directly owns (ids only), for Security Administrators and organization owners.",
+        "operationId": "GetMemberOwnedRecords",
+        "parameters": [
+          {
+            "name": "memberUserId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberOwnedRecordsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/members/{memberUserId}/reassign-records": {
+      "post": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "Transfers each record the member directly owns with its own TransferOwnership command (reason and step-up; administrator override rules apply); reports each record's outcome.",
+        "operationId": "ReassignMemberRecords",
+        "parameters": [
+          {
+            "name": "memberUserId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReassignRecordsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReassignRecordsResponse"
                 }
               }
             }
@@ -7652,6 +7951,35 @@
             "items": {
               "type": "string"
             }
+          },
+          "useDevelopmentStepUp": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "parentRecordShareId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "shareExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "documents": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ShareDocumentRequest"
+            }
           }
         }
       },
@@ -10677,6 +11005,39 @@
           }
         }
       },
+      "MemberOwnedRecordsResponse": {
+        "required": [
+          "memberUserId",
+          "formRecordIds",
+          "truncated",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "memberUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formRecordIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "MemberRoleChangeRequest": {
         "required": [
           "roleName",
@@ -10855,6 +11216,100 @@
           "canChange": {
             "type": "boolean",
             "default": false
+          }
+        }
+      },
+      "MyAccessEntryResponse": {
+        "required": [
+          "formRecordId",
+          "formDefinitionName",
+          "accessSource",
+          "recordShareId",
+          "teamId",
+          "recipientRole",
+          "effectiveExpiresOn",
+          "expiringSoon"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formDefinitionName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "accessSource": {
+            "type": "string"
+          },
+          "recordShareId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "teamId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recipientRole": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "effectiveExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "expiringSoon": {
+            "type": "boolean"
+          }
+        }
+      },
+      "MyAccessResponse": {
+        "required": [
+          "entries",
+          "truncated",
+          "expiringWithinDays",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyAccessEntryResponse"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "expiringWithinDays": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           }
         }
       },
@@ -12122,6 +12577,89 @@
           }
         }
       },
+      "ReassignedRecordResponse": {
+        "required": [
+          "formRecordId",
+          "commandStatus",
+          "effective",
+          "refusalCode"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "commandStatus": {
+            "type": "string"
+          },
+          "effective": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ReassignRecordsRequest": {
+        "required": [
+          "newOwnerUserId",
+          "newOwnerTeamId",
+          "transferReason"
+        ],
+        "type": "object",
+        "properties": {
+          "newOwnerUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "newOwnerTeamId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "transferReason": {
+            "type": "string"
+          },
+          "useDevelopmentStepUp": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "ReassignRecordsResponse": {
+        "required": [
+          "memberUserId",
+          "records",
+          "truncated"
+        ],
+        "type": "object",
+        "properties": {
+          "memberUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReassignedRecordResponse"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        }
+      },
       "ReclassifyFieldRequest": {
         "required": [
           "targetClassification",
@@ -12749,6 +13287,16 @@
               "string"
             ],
             "format": "int32"
+          },
+          "replaceableDocumentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },
@@ -12882,6 +13430,170 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "RecordSecurityChangeResponse": {
+        "required": [
+          "changeKind",
+          "recordShareId",
+          "shareEndState",
+          "invalidationReasonCode",
+          "subjectKind",
+          "subjectId",
+          "subjectDisplayName",
+          "shareExpiresOn"
+        ],
+        "type": "object",
+        "properties": {
+          "changeKind": {
+            "type": "string"
+          },
+          "recordShareId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "shareEndState": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "invalidationReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subjectKind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "subjectDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "shareExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "RecordSecurityHistoryItemResponse": {
+        "required": [
+          "securityCommandId",
+          "commandKind",
+          "commandState",
+          "occurredOn",
+          "effectiveOn",
+          "committedAuthorizationRevision",
+          "actorUserId",
+          "actorDisplayName",
+          "changes",
+          "journalBacked"
+        ],
+        "type": "object",
+        "properties": {
+          "securityCommandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "commandKind": {
+            "type": "string"
+          },
+          "commandState": {
+            "type": "string"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effectiveOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "committedAuthorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "actorUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "actorDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordSecurityChangeResponse"
+            }
+          },
+          "journalBacked": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RecordSecurityHistoryResponse": {
+        "required": [
+          "formRecordId",
+          "items",
+          "truncated",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordSecurityHistoryItemResponse"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           }
         }
       },
@@ -15114,6 +15826,156 @@
           }
         }
       },
+      "ShareDetailsResponse": {
+        "required": [
+          "recordShareId",
+          "formRecordId",
+          "shareStatus",
+          "recipientUserId",
+          "recipientTeamId",
+          "recipientDisplayName",
+          "recipientRole",
+          "fieldValueItemIds",
+          "fieldKeys",
+          "shareExpiresOn",
+          "effectiveExpiresOn",
+          "shareRevision",
+          "parentRecordShareId",
+          "delegationDepth",
+          "legacyLineageUnresolved",
+          "invalidationReasonCode",
+          "grantorUserId",
+          "grantorDisplayName",
+          "authorizationRevision",
+          "documents"
+        ],
+        "type": "object",
+        "properties": {
+          "recordShareId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "shareStatus": {
+            "type": "string"
+          },
+          "recipientUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recipientTeamId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recipientDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "recipientRole": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fieldValueItemIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "fieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "shareExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "effectiveExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "shareRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "parentRecordShareId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "delegationDepth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "legacyLineageUnresolved": {
+            "type": "boolean"
+          },
+          "invalidationReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "grantorUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "grantorDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShareDocumentDetailResponse"
+            }
+          }
+        }
+      },
       "SharedFieldAccessResponse": {
         "required": [
           "fieldKey",
@@ -15133,6 +15995,161 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "ShareDocumentDetailResponse": {
+        "required": [
+          "fileAttachmentId",
+          "canViewDocument",
+          "canDownloadDocument",
+          "canReplaceDocument",
+          "sharedThroughVersionNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "fileAttachmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "canViewDocument": {
+            "type": "boolean"
+          },
+          "canDownloadDocument": {
+            "type": "boolean"
+          },
+          "canReplaceDocument": {
+            "type": "boolean"
+          },
+          "sharedThroughVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "ShareDocumentRequest": {
+        "required": [
+          "fileAttachmentId",
+          "canDownloadDocument"
+        ],
+        "type": "object",
+        "properties": {
+          "fileAttachmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "canDownloadDocument": {
+            "type": "boolean"
+          },
+          "canReplaceDocument": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "ShareEffectiveScopeResponse": {
+        "required": [
+          "recordShareId",
+          "formRecordId",
+          "status",
+          "recipientRole",
+          "effectiveExpiresOn",
+          "fieldValueItemIds",
+          "documents",
+          "canDelegate",
+          "lineage",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "recordShareId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "recipientRole": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "effectiveExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "fieldValueItemIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShareDocumentDetailResponse"
+            }
+          },
+          "canDelegate": {
+            "type": "boolean"
+          },
+          "lineage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShareLineageStepResponse"
+            }
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "ShareLineageStepResponse": {
+        "required": [
+          "recordShareId",
+          "delegationDepth",
+          "shareExpiresOn"
+        ],
+        "type": "object",
+        "properties": {
+          "recordShareId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "delegationDepth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "shareExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -15596,6 +16613,12 @@
           },
           "transferReason": {
             "type": "string"
+          },
+          "useDevelopmentStepUp": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },
@@ -16031,6 +17054,105 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "UpdateShareRequest": {
+        "required": [
+          "recipientRole",
+          "fieldKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "recipientRole": {
+            "type": "string"
+          },
+          "fieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "shareExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "noExpiry": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "parentRecordShareId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "useDevelopmentStepUp": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "documents": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ShareDocumentRequest"
+            }
+          }
+        }
+      },
+      "UpdateShareResponse": {
+        "required": [
+          "recordShareId",
+          "formRecordId",
+          "recipientRole",
+          "fieldValueItemIds",
+          "shareRevision",
+          "shareStatus",
+          "command"
+        ],
+        "type": "object",
+        "properties": {
+          "recordShareId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipientRole": {
+            "type": "string"
+          },
+          "fieldValueItemIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "shareRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "shareStatus": {
+            "type": "string"
+          },
+          "command": {
+            "$ref": "#/components/schemas/CommandOutcome"
           }
         }
       },

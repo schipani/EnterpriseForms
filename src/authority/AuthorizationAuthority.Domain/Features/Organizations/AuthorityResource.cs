@@ -27,6 +27,15 @@ public static class ResourceLifecycleStates
     public const string Active = "Active";
     public const string Revoked = "Revoked";
     public const string Quarantined = "Quarantined";
+
+    /// <summary>C10 M1-WP1: a share that has passed its expiry time. Terminal state; cannot return to Active.</summary>
+    public const string Expired = "Expired";
+
+    /// <summary>C10 M1-WP1: a share invalidated due to upstream revocation, narrowing, path loss or migration. Terminal state.</summary>
+    public const string Invalidated = "Invalidated";
+
+    /// <summary>C10 M1-WP1: terminal states for shares that cannot transition back to Active.</summary>
+    public static readonly IReadOnlySet<string> TerminalShareStates = new HashSet<string> { Expired, Invalidated };
 }
 
 /// <summary>SpiceDB object type names (spicedb.schema.zed) doubling as registry type names.</summary>

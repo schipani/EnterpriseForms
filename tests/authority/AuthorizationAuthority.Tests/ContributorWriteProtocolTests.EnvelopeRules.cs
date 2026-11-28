@@ -92,16 +92,17 @@ public sealed partial class ContributorWriteProtocolTests
 
         // Each reference form arrives with a fresh field envelope (as a re-seal does): a changed reference on the same wrapped key
         // would be data-key reuse (E3-M2a remediation), and the business never relabels a carried envelope.
-        List<Row> Scoped(string fieldFamily, string documentFamily, byte seed) =>
+        // A document under another reference is new content, so it arrives as the next version (review D-1: never under the same number).
+        List<Row> Scoped(string fieldFamily, string documentFamily, byte seed, int documentVersion) =>
         [
             .. Change(Change(h.Rows(), h.SealedItem, _ => Sealed(h.Org, h.Record, h.SealedField, h.SealedItem, seed).With("encryption_key_reference", RowValue.Text($"{fieldFamily}:{h.Org:D}:field-value:3"))),
-                h.Document, r => r.With("encryption_key_reference", RowValue.Text($"{documentFamily}:{h.Org:D}:document:1"))),
+                h.Document, r => r.With("encryption_key_reference", RowValue.Text($"{documentFamily}:{h.Org:D}:document:1")).With("version_number", RowValue.Int32(documentVersion))),
         ];
 
-        Assert.Equal(1, (await h.WriteAsync(h.Owner, Scoped("localdev", "vault-transit", 110), withCurrent: true)).CommittedContentRevision);
-        Assert.Equal(2, (await h.WriteAsync(h.Owner, Scoped("localdev", "vault-transit", 110), withCurrent: true)).CommittedContentRevision); // carried
-        Assert.Equal(3, (await h.WriteAsync(h.Owner, Scoped("vault-transit", "localdev", 120), withCurrent: true)).CommittedContentRevision);
-        Assert.Equal(4, (await h.WriteAsync(h.Owner, h.Rows(), withCurrent: true)).CommittedContentRevision); // legacy literal, fresh envelope (seed 10)
+        Assert.Equal(1, (await h.WriteAsync(h.Owner, Scoped("localdev", "vault-transit", 110, 1), withCurrent: true)).CommittedContentRevision);
+        Assert.Equal(2, (await h.WriteAsync(h.Owner, Scoped("localdev", "vault-transit", 110, 1), withCurrent: true)).CommittedContentRevision); // carried
+        Assert.Equal(3, (await h.WriteAsync(h.Owner, Scoped("vault-transit", "localdev", 120, 2), withCurrent: true)).CommittedContentRevision);
+        Assert.Equal(4, (await h.WriteAsync(h.Owner, Change(h.Rows(), h.Document, r => r.With("version_number", RowValue.Int32(3))), withCurrent: true)).CommittedContentRevision); // legacy literal, fresh envelope (seed 10)
 
         // Relabelling a carried envelope with another reference keeps its data key: refused.
         var relabelled = Change(h.Rows(), h.SealedItem, r => r.With("encryption_key_reference", RowValue.Text($"localdev:{h.Org:D}:field-value:4")));

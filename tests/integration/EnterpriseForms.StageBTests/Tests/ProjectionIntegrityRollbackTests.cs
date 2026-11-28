@@ -72,7 +72,7 @@ public sealed class ProjectionIntegrityRollbackTests(StageBFixture fixture)
         var added = await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members", s.Token(s.Designer), new { userId = s.Reader.AuthorityUserId }, "rb04-add-" + Guid.NewGuid().ToString("N"));
         Assert.True(added.IsSuccess, added.Body);
         await s.WaitGateReadyAsync();
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Clerk), new { recipientUserId = (Guid?)null, recipientTeamId = teamId, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = (Guid?)null, recipientTeamId = teamId, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
         Assert.True(share.IsSuccess, share.Body);
         Assert.True((await s.WaitProjectionAsync(s.Reader, accused, TimeSpan.FromSeconds(40))).IsSuccess);
 
@@ -386,7 +386,7 @@ public sealed class ProjectionIntegrityRollbackTests(StageBFixture fixture)
         await s.BootstrapAsync();
         await s.BuildAccusedWorkspaceAsync();
         var accused = await s.CreateAccusedAsync(s.Clerk);
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name", "family_name" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name", "family_name" } });
         Assert.True(share.IsSuccess, share.Body);
         Assert.True((await s.WaitProjectionAsync(s.Reader, accused, TimeSpan.FromSeconds(40))).IsSuccess);
         return (s, accused, share.Root.GetProperty("recordShareId").GetGuid());
@@ -394,7 +394,7 @@ public sealed class ProjectionIntegrityRollbackTests(StageBFixture fixture)
 
     private async Task RevokeShareAsync(StageBScenario s, Guid accused, Guid shareId)
     {
-        var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares/{shareId:D}/revoke", s.Token(s.Clerk), new { });
+        var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{accused:D}/shares/{shareId:D}/revoke?useDevelopmentStepUp=true", s.Token(s.Clerk), new { });
         Assert.True(revoke.IsSuccess, revoke.Body);
         await WaitUntilAsync(async () => !Allowed(await CheckAsync(s, s.Reader, "FormRecord", accused, "Discover")), "share revoke effective");
     }

@@ -16,7 +16,7 @@
     {
       "name": "records-lifecycle",
       "title": "Records, Sharing and Lifecycle",
-      "classes": ["RecordCreationIdempotencyTests", "RecordLifecycleTests", "RecordRestoreTests", "RecordHistoryTests", "RecordLookupTests", "RecordWorkspaceTests", "SharingTests", "ContributorWriteTests", "Ix6RecordListStackTests", "SharingWorkloadMeasurementTests"]
+      "classes": ["RecordCreationIdempotencyTests", "RecordLifecycleTests", "RecordRestoreTests", "RecordHistoryTests", "RecordLookupTests", "RecordWorkspaceTests", "SharingTests", "ContributorWriteTests", "Ix6RecordListStackTests", "SharingWorkloadMeasurementTests", "C10ShareLifecycleTests", "C10DatabaseVerificationTests", "C10DownloadRecheckTests"]
     },
     {
       "name": "administration-membership",
@@ -43,6 +43,11 @@
       "name": "projection-integrity-restore",
       "title": "SpiceDB Datastore Restore and Replacement (RB-12, RB-13)",
       "classes": ["ProjectionIntegrityRollbackTests"]
+    },
+    {
+      "name": "share-expiry-convergence",
+      "title": "Share Expiry Convergence and Restore with Real Elapsed Time (C10 WP-0 §4 tests 8, 10 and 13; CONS-23 on expiry)",
+      "classes": ["C10ShareNaturalExpiryTests"]
     },
     {
       "name": "search-benchmark-indexed",

@@ -63,6 +63,8 @@ public sealed partial class IndexedSearchService
         }
 
         var pin = await verifier.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
+        // C10 (review F-8): a page after the first is a continuation whether or not the client states the revision it started at.
+        await RequireNoExpiredShareForContinuationAsync(pin, bound.AuthorityUserId, request.ExpectedAuthorizationRevision is not null || request.Offset > 0, cancellationToken).ConfigureAwait(false);
         var subject = bound.AuthorityUserId.ToString("D");
         IReadOnlyList<string> discoverable;
         try

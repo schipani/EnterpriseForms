@@ -7,4 +7,7 @@
     <ProjectReference Include="../AuthorizationAuthority.Contracts/AuthorizationAuthority.Contracts.csproj" />
     <ProjectReference Include="../../shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AuthorizationAuthority.Tests" />
+  </ItemGroup>
 </Project>

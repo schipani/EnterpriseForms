@@ -175,8 +175,11 @@ public sealed class DocumentEncryptionAuditTests(StageBFixture fixture)
         var historicOperation = fixture.Stack.AttackerSql($"SELECT content_change_operation_id FROM file_attachment_versions WHERE file_attachment_id = '{attachmentId:D}' AND version_number = 1 AND content_change_operation_id <> '{NoOperation}' ORDER BY content_revision ASC LIMIT 1;").Trim();
         fixture.Stack.AttackerSql($"UPDATE file_attachment_versions SET content_change_operation_id = '{historicOperation}', content_revision = 99, row_signature = (SELECT row_signature FROM file_attachment_versions WHERE file_attachment_id = '{attachmentId:D}' AND version_number = 1 AND content_change_operation_id = '{historicOperation}'), version_state = 'Superseded' WHERE file_attachment_id = '{attachmentId:D}' AND version_number = 2 AND content_change_operation_id = '{NoOperation}';");
 
+        // C10 owner decision 2 (C-197): a copy is used only when the Authority's accepted history names its operation for its revision, so
+        // the forged copy (revision 99) is never consulted and the version is not found; it is never released. Detection of the unexpected
+        // row is the reconciliation sweep's (CLAUDE.md 4O), no longer the download's (it used to be refused with 423 here).
         var promoted = await fixture.DownloadAsync(path + "?versionNumber=2", s.Token(s.Clerk));
-        Assert.Equal(HttpStatusCode.Locked, promoted.Status);
+        Assert.Contains(promoted.Status, new[] { HttpStatusCode.NotFound, HttpStatusCode.Locked });
         Assert.False(Contains(promoted.Body, pending.AsSpan(0, 64).ToArray()));
     }
 

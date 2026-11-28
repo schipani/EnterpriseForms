@@ -7,6 +7,7 @@ using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
+using AuthorizationAuthority.Domain.Features.Sharing;
 
 namespace AuthorizationAuthority.Application.Common.Ports;
 
@@ -107,6 +108,66 @@ public interface IAuthorityScope : IAsyncDisposable
 
     /// <summary>Active resources of the given types whose parent is the given entity (e.g. the protection requirements/releases of a form's fields).</summary>
     Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid organizationId, Guid parentResourceEntityId, IReadOnlyCollection<string> resourceTypeNames, CancellationToken cancellationToken);
+
+    // C10 M1-WP1: share-specific metadata stored alongside the generic AuthorityResource.
+
+    /// <summary>C10 M1-WP1: finds the share metadata by organization and share id (unique key).</summary>
+    Task<ShareResourceMetadata?> FindShareMetadataAsync(Guid organizationId, Guid recordShareId, CancellationToken cancellationToken);
+
+    /// <summary>C10 M1-WP1: adds share metadata for a new share (must be unique per organization/share).</summary>
+    void AddShareMetadata(ShareResourceMetadata metadata);
+
+    /// <summary>C10 M1-WP5: finds all share metadata records where parent_record_share_id matches the given parent share id.</summary>
+    Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid organizationId, Guid parentRecordShareId, CancellationToken cancellationToken);
+
+    /// <summary>C10 re-review (N-1): the metadata of every share whose parent is one of <paramref name="parentRecordShareIds"/>, in one read.</summary>
+    async Task<List<ShareResourceMetadata>> FindShareMetadataByParentsAsync(Guid organizationId, IReadOnlyCollection<Guid> parentRecordShareIds, CancellationToken cancellationToken)
+    {
+        var result = new List<ShareResourceMetadata>();
+        foreach (var parent in parentRecordShareIds)
+        {
+            result.AddRange(await FindShareMetadataByParentAsync(organizationId, parent, cancellationToken).ConfigureAwait(false));
+        }
+
+        return result;
+    }
+
+    /// <summary>C10 M1-WP2: the metadata of the organization's Active shares that carry an expiry (access-time expiry overlay).</summary>
+    Task<List<ShareResourceMetadata>> GetActiveShareMetadataWithExpiryAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>C10 M1-WP2: the active role edges of the given shares and the active <c>shared_via</c> edges whose subject is one of them.</summary>
+    Task<List<AuthorityRelationshipEdge>> GetActiveShareEdgesAsync(Guid organizationId, IReadOnlyCollection<Guid> recordShareIds, CancellationToken cancellationToken);
+
+    /// <summary>C10 M1-WP2: the active <c>team#member</c> edges of the given teams.</summary>
+    Task<List<AuthorityRelationshipEdge>> GetActiveTeamMemberEdgesAsync(Guid organizationId, IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// C10 M1-WP9 (WP-0 Section 3.5): every edge, active or removed, that ever gave the record an owner or a share: the record's
+    /// <c>owner</c> and <c>shared_via</c> edges, and the role and item edges of every share that was ever <c>shared_via</c> the record.
+    /// </summary>
+    Task<List<AuthorityRelationshipEdge>> GetRecordSecurityEdgeHistoryAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("record security edge history is not available from this store");
+
+    /// <summary>
+    /// C10 WP8: the document bindings of the given shares. A store without bindings answers none, which grants no document access (fail
+    /// closed); adding or removing a binding on such a store throws.
+    /// </summary>
+    Task<List<ShareDocumentBinding>> GetShareDocumentBindingsAsync(Guid organizationId, IReadOnlyCollection<Guid> recordShareIds, CancellationToken cancellationToken) =>
+        Task.FromResult(new List<ShareDocumentBinding>());
+
+    /// <summary>C10 WP8: stages a new document binding in the command transaction.</summary>
+    void AddShareDocumentBinding(ShareDocumentBinding binding) => throw new NotSupportedException("share document bindings are not available from this store");
+
+    /// <summary>C10 WP8: removes a document binding dropped by a scope update (its document edge records the removal).</summary>
+    void RemoveShareDocumentBinding(ShareDocumentBinding binding) => throw new NotSupportedException("share document bindings are not available from this store");
+
+    /// <summary>C10 D6: the committed (not Rejected) commands that targeted the record, newest first, at most <paramref name="limit"/>.</summary>
+    Task<List<SecurityCommand>> GetRecordTargetedCommandsAsync(Guid organizationId, Guid formRecordId, int limit, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("record-targeted commands are not available from this store");
+
+    /// <summary>C10 D6: which of the given commands have an entry on the organization's authorization journal stream.</summary>
+    Task<HashSet<Guid>> GetAuthorizationJournalCommandIdsAsync(Guid organizationId, IReadOnlyCollection<Guid> securityCommandIds, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("journal command lookup is not available from this store");
 
     Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken);
 

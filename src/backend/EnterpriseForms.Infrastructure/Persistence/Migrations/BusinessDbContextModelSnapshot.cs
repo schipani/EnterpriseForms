@@ -455,7 +455,8 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("FileAttachmentId", "VersionNumber", "ContentChangeOperationId")
                         .IsUnique()
-                        .HasDatabaseName("uq_file_attachment_versions_number_operation");
+                        .HasDatabaseName("uq_file_attachment_versions_number_operation")
+                        .HasFilter("content_change_operation_id <> '00000000-0000-0000-0000-000000000000'");
 
                     b.ToTable("file_attachment_versions", null, t =>
                         {

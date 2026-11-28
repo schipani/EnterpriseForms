@@ -229,10 +229,10 @@ public sealed class RepeatingGroupsTests(StageBFixture fixture)
 
         // Fields of repeating sections are refused for field shares (V1); record-level fields still share normally.
         var shareable = await NewRecordAsync();
-        var refused = await fixture.Api.PostAsync($"/api/v1/form-records/{shareable:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "person_role" } });
+        var refused = await fixture.Api.PostAsync($"/api/v1/form-records/{shareable:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "person_role" } });
         Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.Status);
         Assert.Equal("FIELD_IN_REPEATING_GROUP", refused.ErrorCode);
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{shareable:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "country" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{shareable:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "country" } });
         Assert.True(share.IsSuccess, share.Body);
         var shared = await s.WaitProjectionAsync(s.Reader, shareable, TimeSpan.FromSeconds(40));
         Assert.Equal(["country"], shared.Root.GetProperty("record").GetProperty("values").EnumerateArray().Select(v => v.GetProperty("fieldKey").GetString()).ToArray());

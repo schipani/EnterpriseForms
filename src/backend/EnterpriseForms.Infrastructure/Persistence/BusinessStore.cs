@@ -456,6 +456,13 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
         public Task<List<RecordShareField>> GetShareFieldsOfRecordAsync(Guid tenantId, Guid formRecordId, CancellationToken cancellationToken) =>
             context.RecordShareFields.AsNoTracking().Where(f => f.TenantId == tenantId && context.RecordShares.Any(s => s.RecordShareId == f.RecordShareId && s.FormRecordId == formRecordId)).ToListAsync(cancellationToken);
 
+        public Task<List<RecordShareField>> GetShareFieldsOfShareAsync(Guid tenantId, Guid recordShareId, CancellationToken cancellationToken) =>
+            context.RecordShareFields.Where(f => f.TenantId == tenantId && f.RecordShareId == recordShareId).ToListAsync(cancellationToken);
+
+        public void AddShareFields(IEnumerable<RecordShareField> fields) => context.RecordShareFields.AddRange(fields);
+
+        public void RemoveShareFields(IEnumerable<RecordShareField> fields) => context.RecordShareFields.RemoveRange(fields);
+
         public void AddTeamProjection(Team team) => context.Teams.Add(team);
 
         public Task<Team?> FindTeamProjectionAsync(Guid tenantId, Guid teamId, CancellationToken cancellationToken) =>

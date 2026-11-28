@@ -82,10 +82,149 @@ public sealed class StageBFixture : IAsyncLifetime
         var body = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
         return (response.StatusCode, body, response.Content.Headers.ContentDisposition?.ToString(), response.Headers.CacheControl?.ToString(), response.Content.Headers.ContentType?.ToString(), response.Headers.TryGetValues("X-Content-Type-Options", out var values) ? string.Join(",", values) : null);
     }
+
+    /// <summary>
+    /// CONS-23 (C-201): opens a download and reads only its first <paramref name="initialBytes"/>, then stops reading, so the server's
+    /// writes block once the transport buffers are full; <see cref="PausedDownload.ReadRestAsync"/> resumes it.
+    /// </summary>
+    public async Task<PausedDownload> StartPausedDownloadAsync(string path, string token, int initialBytes)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var response = await raw.SendAsync(request, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+        var download = new PausedDownload(request, response, await response.Content.ReadAsStreamAsync().ConfigureAwait(false));
+        await download.ReadAsync(initialBytes, bytesPerSecond: null).ConfigureAwait(false);
+        return download;
+    }
 }
 
 [CollectionDefinition(Name, DisableParallelization = true)]
 public sealed class StageBStackCollectionDefinition : ICollectionFixture<StageBFixture>
 {
     public const string Name = "stage-b-stack";
+}
+
+/// <summary>CONS-23 (C-201): a download read under the test's control; it records how many bytes arrived and how the body ended.</summary>
+public sealed class PausedDownload(HttpRequestMessage request, HttpResponseMessage response, Stream body) : IDisposable
+{
+    private readonly System.Security.Cryptography.IncrementalHash hash = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+
+    public System.Net.HttpStatusCode Status => response.StatusCode;
+
+    public long? DeclaredLength => response.Content.Headers.ContentLength;
+
+    public string? Header(string name) => response.Headers.TryGetValues(name, out var values) ? string.Join(",", values) : null;
+
+    public long Received { get; private set; }
+
+    /// <summary>True when the body ended with all declared bytes; false when the server stopped it early.</summary>
+    public bool Completed { get; private set; }
+
+    public string? Failure { get; private set; }
+
+    public byte[] Sha256 => hash.GetCurrentHash();
+
+    /// <summary>Reads up to <paramref name="limit"/> bytes (all when null), optionally throttled; returns false when the body ended.</summary>
+    public async Task<bool> ReadAsync(long? limit, int? bytesPerSecond)
+    {
+        var buffer = new byte[16 * 1024];
+        var target = limit is { } l ? Received + l : long.MaxValue;
+        var started = DateTime.UtcNow;
+        var startedAt = Received;
+        try
+        {
+            while (Received < target)
+            {
+                var read = await body.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, target - Received))).ConfigureAwait(false);
+                if (read == 0)
+                {
+                    Completed = DeclaredLength is { } declared && Received == declared;
+                    return false;
+                }
+
+                hash.AppendData(buffer, 0, read);
+                Received += read;
+                if (bytesPerSecond is { } rate)
+                {
+                    var due = TimeSpan.FromSeconds((double)(Received - startedAt) / rate) - (DateTime.UtcNow - started);
+                    if (due > TimeSpan.Zero)
+                    {
+                        await Task.Delay(due).ConfigureAwait(false);
+                    }
+                }
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or HttpRequestException)
+        {
+            Failure = ex.GetType().Name + ": " + ex.Message;
+            return false;
+        }
+    }
+
+    /// <summary>Resumes reading to the end of the body (throttled when <paramref name="bytesPerSecond"/> is set).</summary>
+    public Task ReadRestAsync(int? bytesPerSecond = null) => ReadAsync(null, bytesPerSecond);
+
+    public void Dispose()
+    {
+        body.Dispose();
+        response.Dispose();
+        request.Dispose();
+        hash.Dispose();
+    }
+}
+
+/// <summary>
+/// CONS-23 (C-201): a download run from inside the Docker network (busybox wget in the azurite container on business-net, straight to
+/// the API), so that only real socket buffers sit between Kestrel and the client. From the Windows host, Docker Desktop's port
+/// forwarder reads ahead by many megabytes and so measures itself, not the server (run 20261127-193803-9a0fcaef). The reader can
+/// stop reading after <c>pauseAfterBytes</c> until <see cref="ResumeAsync"/>, or read throttled; it records the running byte count.
+/// Security-test stack only; never product code.
+/// </summary>
+public sealed class InNetworkDownload
+{
+    private readonly ComposeStack stack;
+    private readonly string id = Guid.NewGuid().ToString("N");
+    private Task<string>? run;
+
+    private InNetworkDownload(ComposeStack stack) => this.stack = stack;
+
+    public static InNetworkDownload Start(ComposeStack stack, string path, string token, long? pauseAfterBytes, double? secondsPer64KiB)
+    {
+        var download = new InNetworkDownload(stack);
+        var id = download.id;
+        var script = $$"""
+            rm -f /tmp/r-{{id}} /tmp/p-{{id}}
+            wget -q -O - --header "Authorization: Bearer {{token}}" "http://api:8080{{path}}" 2>/dev/null | {
+              total=0
+              while n=$(dd bs=65536 count=1 2>/dev/null | wc -c) && [ "$n" -gt 0 ]; do
+                total=$((total + n)); echo $total > /tmp/p-{{id}}
+                if [ -n "{{pauseAfterBytes}}" ] && [ $total -ge 0{{pauseAfterBytes}} ]; then while [ ! -f /tmp/r-{{id}} ]; do sleep 0.2; done; fi
+                if [ -n "{{secondsPer64KiB?.ToString(System.Globalization.CultureInfo.InvariantCulture)}}" ]; then sleep {{secondsPer64KiB?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "0"}}; fi
+              done
+              echo TOTAL $total
+            }
+            """;
+        var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(script));
+        download.run = Task.Run(() => stack.Compose($"exec -T azurite sh -c \"echo {encoded} | base64 -d | sh\"", 600));
+        return download;
+    }
+
+    /// <summary>Bytes the in-network client has read so far.</summary>
+    public long Received()
+    {
+        var text = stack.Compose($"exec -T azurite sh -c \"cat /tmp/p-{id} 2>/dev/null || echo 0\"", 30).Trim();
+        return long.TryParse(text.Split('\n')[^1].Trim(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : 0;
+    }
+
+    public Task ResumeAsync() => Task.Run(() => stack.Compose($"exec -T azurite sh -c \"touch /tmp/r-{id}\"", 30));
+
+    /// <summary>Waits for the body to end and returns the total bytes read.</summary>
+    public async Task<long> TotalAsync()
+    {
+        var output = await run!.ConfigureAwait(false);
+        var line = output.Split('\n').Select(l => l.Trim()).LastOrDefault(l => l.StartsWith("TOTAL ", StringComparison.Ordinal)) ?? throw new InvalidOperationException("in-network download printed no total: " + output);
+        return long.Parse(line["TOTAL ".Length..], System.Globalization.CultureInfo.InvariantCulture);
+    }
 }

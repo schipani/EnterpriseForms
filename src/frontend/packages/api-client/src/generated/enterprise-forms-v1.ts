@@ -1335,6 +1335,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-records/{formRecordId}/shares/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sharing and ownership changes of a record from the authority's committed state, newest first, each with its command state (owner or access manager; others 404). */
+        get: operations["GetRecordSharingHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/effective-scope": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the share's recipient can do through it now (Active only while the share and its lineage are), with its lineage; same readers as the share details. */
+        get: operations["GetRecordShareEffectiveScope"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/shares/{recordShareId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One share's committed state from the authority (owner, or a Manager on its committed lineage; others 404). The ETag carries the authoritative share revision for PATCH If-Match. */
+        get: operations["GetRecordShare"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Replaces a share's role, field items and expiry via the authority's UpdateShareScope command. Requires If-Match with the share ETag and an Idempotency-Key; returns the new ETag. Exactly one of share_expires_on or no_expiry is required. */
+        patch: operations["UpdateRecordShare"];
+        trace?: never;
+    };
     "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/revoke": {
         parameters: {
             query?: never;
@@ -1344,7 +1396,76 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Revokes a share via authority command; effective immediately at the authority barrier. G27: useDevelopmentStepUp (bool query, default false) for the synthetic test path only. */
         post: operations["RevokeRecordShare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/ownership-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ownership changes of a record from the authority's committed state, newest first, each with its command state. */
+        get: operations["GetRecordOwnershipHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's own owned, team-owned, direct-share and team-share access (expired shares omitted, expiring soon flagged), from the authority. */
+        get: operations["GetMyAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/members/{memberUserId}/owned-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Active records a member directly owns (ids only), for Security Administrators and organization owners. */
+        get: operations["GetMemberOwnedRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/members/{memberUserId}/reassign-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transfers each record the member directly owns with its own TransferOwnership command (reason and step-up; administrator override rules apply); reports each record's outcome. */
+        post: operations["ReassignMemberRecords"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2601,6 +2722,12 @@ export interface components {
             recipientTeamId: null | string;
             recipientRole: string;
             fieldKeys: string[];
+            useDevelopmentStepUp?: null | boolean;
+            /** Format: uuid */
+            parentRecordShareId?: null | string;
+            /** Format: date-time */
+            shareExpiresOn?: null | string;
+            documents?: null | components["schemas"]["ShareDocumentRequest"][];
         };
         CreateTeamRequest: {
             teamName: string;
@@ -3364,6 +3491,14 @@ export interface components {
             /** Format: date-time */
             expiresOn?: null | string;
         };
+        MemberOwnedRecordsResponse: {
+            /** Format: uuid */
+            memberUserId: string;
+            formRecordIds: string[];
+            truncated: boolean;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+        };
         MemberRoleChangeRequest: {
             roleName: string;
             reason: string;
@@ -3412,6 +3547,28 @@ export interface components {
             cancelledOn?: null | string;
             /** @default false */
             canChange: boolean;
+        };
+        MyAccessEntryResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            formDefinitionName: null | string;
+            accessSource: string;
+            /** Format: uuid */
+            recordShareId: null | string;
+            /** Format: uuid */
+            teamId: null | string;
+            recipientRole: null | string;
+            /** Format: date-time */
+            effectiveExpiresOn: null | string;
+            expiringSoon: boolean;
+        };
+        MyAccessResponse: {
+            entries: components["schemas"]["MyAccessEntryResponse"][];
+            truncated: boolean;
+            /** Format: int32 */
+            expiringWithinDays: number | string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
         };
         NumberFormatCatalogResponse: {
             catalogVersion: string;
@@ -3738,6 +3895,27 @@ export interface components {
             countsAreApproximate: boolean;
             scopeStatement: string;
         };
+        ReassignedRecordResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            commandStatus: string;
+            effective: boolean;
+            refusalCode: null | string;
+        };
+        ReassignRecordsRequest: {
+            /** Format: uuid */
+            newOwnerUserId: null | string;
+            /** Format: uuid */
+            newOwnerTeamId: null | string;
+            transferReason: string;
+            useDevelopmentStepUp?: null | boolean;
+        };
+        ReassignRecordsResponse: {
+            /** Format: uuid */
+            memberUserId: string;
+            records: components["schemas"]["ReassignedRecordResponse"][];
+            truncated: boolean;
+        };
         ReclassifyFieldRequest: {
             targetClassification: string;
             approvalReference: string;
@@ -3908,6 +4086,7 @@ export interface components {
             editLayoutVersionId?: null | string;
             /** Format: int32 */
             editLayoutVersionNumber?: null | number | string;
+            replaceableDocumentIds?: null | string[];
         };
         RecordProjectionSummaryResponse: {
             recordReference: string;
@@ -3941,6 +4120,44 @@ export interface components {
             eTag: string;
             changedFieldKeys: string[];
             clearedFieldKeys: string[];
+        };
+        RecordSecurityChangeResponse: {
+            changeKind: string;
+            /** Format: uuid */
+            recordShareId: null | string;
+            shareEndState: null | string;
+            invalidationReasonCode: null | string;
+            subjectKind: null | string;
+            /** Format: uuid */
+            subjectId: null | string;
+            subjectDisplayName: null | string;
+            /** Format: date-time */
+            shareExpiresOn: null | string;
+        };
+        RecordSecurityHistoryItemResponse: {
+            /** Format: uuid */
+            securityCommandId: string;
+            commandKind: string;
+            commandState: string;
+            /** Format: date-time */
+            occurredOn: string;
+            /** Format: date-time */
+            effectiveOn: null | string;
+            /** Format: int64 */
+            committedAuthorizationRevision: null | number | string;
+            /** Format: uuid */
+            actorUserId: null | string;
+            actorDisplayName: null | string;
+            changes: components["schemas"]["RecordSecurityChangeResponse"][];
+            journalBacked: boolean;
+        };
+        RecordSecurityHistoryResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            items: components["schemas"]["RecordSecurityHistoryItemResponse"][];
+            truncated: boolean;
+            /** Format: int64 */
+            authorizationRevision: number | string;
         };
         RecordShareListResponse: {
             items: components["schemas"]["RecordShareSummaryResponse"][];
@@ -4466,10 +4683,82 @@ export interface components {
             expiresOn: null | string;
             identityProviderKind: string;
         };
+        ShareDetailsResponse: {
+            /** Format: uuid */
+            recordShareId: string;
+            /** Format: uuid */
+            formRecordId: string;
+            shareStatus: string;
+            /** Format: uuid */
+            recipientUserId: null | string;
+            /** Format: uuid */
+            recipientTeamId: null | string;
+            recipientDisplayName: null | string;
+            recipientRole: null | string;
+            fieldValueItemIds: string[];
+            fieldKeys: string[];
+            /** Format: date-time */
+            shareExpiresOn: null | string;
+            /** Format: date-time */
+            effectiveExpiresOn: null | string;
+            /** Format: int64 */
+            shareRevision: number | string;
+            /** Format: uuid */
+            parentRecordShareId: null | string;
+            /** Format: int32 */
+            delegationDepth: number | string;
+            legacyLineageUnresolved: boolean;
+            invalidationReasonCode: null | string;
+            /** Format: uuid */
+            grantorUserId: null | string;
+            grantorDisplayName: null | string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            documents: components["schemas"]["ShareDocumentDetailResponse"][];
+        };
         SharedFieldAccessResponse: {
             fieldKey: string;
             editable: boolean;
             notEditableReason: null | string;
+        };
+        ShareDocumentDetailResponse: {
+            /** Format: uuid */
+            fileAttachmentId: string;
+            canViewDocument: boolean;
+            canDownloadDocument: boolean;
+            canReplaceDocument: boolean;
+            /** Format: int32 */
+            sharedThroughVersionNumber: number | string;
+        };
+        ShareDocumentRequest: {
+            /** Format: uuid */
+            fileAttachmentId: string;
+            canDownloadDocument: boolean;
+            canReplaceDocument?: null | boolean;
+        };
+        ShareEffectiveScopeResponse: {
+            /** Format: uuid */
+            recordShareId: string;
+            /** Format: uuid */
+            formRecordId: string;
+            status: string;
+            recipientRole: null | string;
+            /** Format: date-time */
+            effectiveExpiresOn: null | string;
+            fieldValueItemIds: string[];
+            documents: components["schemas"]["ShareDocumentDetailResponse"][];
+            canDelegate: boolean;
+            lineage: components["schemas"]["ShareLineageStepResponse"][];
+            /** Format: int64 */
+            authorizationRevision: number | string;
+        };
+        ShareLineageStepResponse: {
+            /** Format: uuid */
+            recordShareId: string;
+            /** Format: int32 */
+            delegationDepth: number | string;
+            /** Format: date-time */
+            shareExpiresOn: null | string;
         };
         ShareResponse: {
             /** Format: uuid */
@@ -4591,6 +4880,7 @@ export interface components {
             /** Format: uuid */
             newOwnerTeamId: null | string;
             transferReason: string;
+            useDevelopmentStepUp?: null | boolean;
         };
         UiPreferenceResponse: {
             textScalePreferenceMode: string;
@@ -4686,6 +4976,29 @@ export interface components {
             /** @default false */
             clearAssignment: boolean;
             resolutionExplanation?: null | string;
+        };
+        UpdateShareRequest: {
+            recipientRole: string;
+            fieldKeys: string[];
+            /** Format: date-time */
+            shareExpiresOn?: null | string;
+            noExpiry?: null | boolean;
+            /** Format: uuid */
+            parentRecordShareId?: null | string;
+            useDevelopmentStepUp?: null | boolean;
+            documents?: null | components["schemas"]["ShareDocumentRequest"][];
+        };
+        UpdateShareResponse: {
+            /** Format: uuid */
+            recordShareId: string;
+            /** Format: uuid */
+            formRecordId: string;
+            recipientRole: string;
+            fieldValueItemIds: string[];
+            /** Format: int64 */
+            shareRevision: number | string;
+            shareStatus: string;
+            command: components["schemas"]["CommandOutcome"];
         };
         UpdateUiPreferenceRequest: {
             textScalePreferenceMode: string;
@@ -7076,7 +7389,29 @@ export interface operations {
             };
         };
     };
-    RevokeRecordShare: {
+    GetRecordSharingHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordSecurityHistoryResponse"];
+                };
+            };
+        };
+    };
+    GetRecordShareEffectiveScope: {
         parameters: {
             query?: never;
             header?: never;
@@ -7094,7 +7429,172 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    "application/json": components["schemas"]["ShareEffectiveScopeResponse"];
+                };
+            };
+        };
+    };
+    GetRecordShare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+                recordShareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareDetailsResponse"];
+                };
+            };
+        };
+    };
+    UpdateRecordShare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+                recordShareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateShareRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateShareResponse"];
+                };
+            };
+        };
+    };
+    RevokeRecordShare: {
+        parameters: {
+            query?: {
+                useDevelopmentStepUp?: boolean;
+            };
+            header?: never;
+            path: {
+                formRecordId: string;
+                recordShareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
                     "application/json": components["schemas"]["CommandStatusResponse"];
+                };
+            };
+        };
+    };
+    GetRecordOwnershipHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordSecurityHistoryResponse"];
+                };
+            };
+        };
+    };
+    GetMyAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyAccessResponse"];
+                };
+            };
+        };
+    };
+    GetMemberOwnedRecords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memberUserId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberOwnedRecordsResponse"];
+                };
+            };
+        };
+    };
+    ReassignMemberRecords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memberUserId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReassignRecordsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReassignRecordsResponse"];
                 };
             };
         };

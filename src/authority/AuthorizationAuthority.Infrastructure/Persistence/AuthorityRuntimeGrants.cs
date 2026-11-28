@@ -28,7 +28,7 @@ public static class AuthorityRuntimeGrants
         "platform_operators", "platform_operator_change_proposals", "platform_operator_approvals", "platform_journal_heads",
         "organization_onboarding_requests", "organization_onboarding_owners", "organization_onboarding_approvals",
         "organization_owner_recovery_cases", "organization_owner_recovery_subjects", "organization_owner_recovery_approvals", "organization_recovered_owner_probations",
-        "form_version_publications",
+        "form_version_publications", "share_resource_metadata", "share_document_bindings",
     ];
 
     /// <summary>

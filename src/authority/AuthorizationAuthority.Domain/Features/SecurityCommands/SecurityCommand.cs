@@ -35,6 +35,12 @@ public sealed class SecurityCommand
     public DateTimeOffset CommandModifiedOn { get; set; }
 
     public DateTimeOffset? CommandEffectiveOn { get; set; }
+
+    /// <summary>
+    /// C10 D6: the form record the command targets (its request resource), set when the row is created and never changed; null for
+    /// commands that target no record. Indexes the record-scoped sharing and ownership history.
+    /// </summary>
+    public Guid? TargetFormRecordId { get; set; }
 }
 
 public static class SecurityCommandStates
@@ -56,9 +62,16 @@ public static class SecurityCommandKinds
     public const string RegisterRecord = "RegisterRecord";
     public const string TransferOwnership = "TransferOwnership";
     public const string CreateShare = "CreateShare";
+    public const string UpdateShareScope = "UpdateShareScope";
     public const string RevokeShare = "RevokeShare";
     public const string UpdateFormUsers = "UpdateFormUsers";
     public const string PublishFormSecurityRevision = "PublishFormSecurityRevision";
     public const string UpdateMandatoryPolicy = "UpdateMandatoryPolicy";
     public const string ReclassifyField = "ReclassifyField";
+
+    /// <summary>
+    /// C10 M1-WP6 (WP-0 Section 4): the Authority-internal expiry convergence command. Not a contract kind: no endpoint, route or
+    /// external caller can submit it; only ShareExpiryConvergenceService (driven by ShareExpiryLoop) records it.
+    /// </summary>
+    public const string ExpireShare = "ExpireShare";
 }

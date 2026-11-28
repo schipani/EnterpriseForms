@@ -407,6 +407,18 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("content_candidate_leaf_id");
 
+                    b.Property<byte[]>("AcceptedAttachmentContentFingerprint")
+                        .HasColumnType("bytea")
+                        .HasColumnName("accepted_attachment_content_fingerprint");
+
+                    b.Property<int?>("AcceptedAttachmentVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("accepted_attachment_version_number");
+
+                    b.Property<int?>("AttachmentVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("attachment_version_number");
+
                     b.Property<byte[]>("CanonicalPayloadDigest")
                         .IsRequired()
                         .HasColumnType("bytea")
@@ -453,6 +465,8 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.ToTable("content_candidate_leaves", "authority", t =>
                         {
+                            t.HasCheckConstraint("ck_candidate_leaf_accepted_attachment_evidence", "(accepted_attachment_version_number IS NULL AND accepted_attachment_content_fingerprint IS NULL) OR (accepted_attachment_version_number > 0 AND octet_length(accepted_attachment_content_fingerprint) = 32)");
+
                             t.HasCheckConstraint("ck_candidate_leaf_digest_lengths", "octet_length(canonical_payload_digest) = 32 AND octet_length(row_signature) = 32 AND octet_length(leaf_digest) = 32");
 
                             t.HasCheckConstraint("ck_candidate_leaf_key_length", "octet_length(manifest_item_key) = 17");
@@ -915,6 +929,14 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("record_manifest_leaf_id");
 
+                    b.Property<byte[]>("AttachmentContentFingerprint")
+                        .HasColumnType("bytea")
+                        .HasColumnName("attachment_content_fingerprint");
+
+                    b.Property<int?>("AttachmentVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("attachment_version_number");
+
                     b.Property<byte[]>("CanonicalPayloadDigest")
                         .IsRequired()
                         .HasColumnType("bytea")
@@ -966,6 +988,8 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.ToTable("record_manifest_leaves", "authority", t =>
                         {
+                            t.HasCheckConstraint("ck_manifest_leaf_attachment_fingerprint_length", "attachment_content_fingerprint IS NULL OR octet_length(attachment_content_fingerprint) = 32");
+
                             t.HasCheckConstraint("ck_manifest_leaf_digest_lengths", "octet_length(canonical_payload_digest) = 32 AND octet_length(row_signature) = 32 AND octet_length(manifest_leaf_digest) = 32");
 
                             t.HasCheckConstraint("ck_manifest_leaf_key_length", "octet_length(manifest_item_key) = 17");
@@ -1387,6 +1411,9 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "ArchiveDeliveryState")
                         .HasDatabaseName("ix_journal_pending_archive");
 
+                    b.HasIndex("OrganizationId", "SecurityCommandId")
+                        .HasDatabaseName("ix_journal_security_command");
+
                     b.HasIndex("OrganizationId", "JournalStreamName", "ContentChangeOperationId")
                         .HasDatabaseName("ix_journal_content_operation");
 
@@ -1504,16 +1531,15 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.HasKey("AuthorityResourceId");
 
-                    b.HasIndex("OrganizationId", "ResourceTypeName", "ResourceEntityId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_authority_resource");
+                    b.HasAlternateKey("OrganizationId", "ResourceTypeName", "ResourceEntityId")
+                        .HasName("uq_authority_resource");
 
                     b.HasIndex("OrganizationId", "ResourceTypeName", "ParentResourceEntityId", "ResourceLifecycleState")
                         .HasDatabaseName("ix_authority_resources_form_scope");
 
                     b.ToTable("authority_resources", "authority", t =>
                         {
-                            t.HasCheckConstraint("ck_resource_lifecycle_state", "resource_lifecycle_state IN ('Registered','Active','Revoked','Quarantined')");
+                            t.HasCheckConstraint("ck_resource_lifecycle_state", "resource_lifecycle_state IN ('Registered','Active','Revoked','Quarantined') OR (resource_type_name = 'record_share' AND resource_lifecycle_state IN ('Expired','Invalidated'))");
                         });
                 });
 
@@ -1846,6 +1872,12 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_protection_policy_id");
 
+                    b.Property<int>("MaximumDelegationDepth")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3)
+                        .HasColumnName("maximum_delegation_depth");
+
                     b.Property<string>("MinimumFieldClassification")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -1893,6 +1925,8 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     b.ToTable("organization_protection_policies", "authority", t =>
                         {
                             t.HasCheckConstraint("ck_protection_policy_classification", "minimum_field_classification IN ('Public','Internal','Confidential','Restricted')");
+
+                            t.HasCheckConstraint("ck_protection_policy_max_depth", "maximum_delegation_depth BETWEEN 1 AND 3");
                         });
                 });
 
@@ -5012,7 +5046,14 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("rejection_reason_code");
 
+                    b.Property<Guid?>("TargetFormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_form_record_id");
+
                     b.HasKey("SecurityCommandId");
+
+                    b.HasAlternateKey("OrganizationId", "SecurityCommandId")
+                        .HasName("ak_security_command_organization_command");
 
                     b.HasIndex("ActorIdentityBindingId");
 
@@ -5025,6 +5066,9 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganizationId", "CommandCreatedOn", "SecurityCommandId")
                         .HasDatabaseName("ix_security_commands_org_created");
+
+                    b.HasIndex("OrganizationId", "TargetFormRecordId", "CommandCreatedOn")
+                        .HasDatabaseName("ix_security_commands_target_record");
 
                     b.ToTable("security_commands", "authority", t =>
                         {
@@ -5100,6 +5144,165 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_session_expiry_order", "session_expires_on > session_created_on AND session_idle_timeout_seconds > 0");
 
                             t.HasCheckConstraint("ck_session_revocation", "(session_revoked_on IS NULL AND session_revocation_reason IS NULL) OR (session_revoked_on IS NOT NULL AND session_revocation_reason IN ('LOGOUT','REPLACED_BY_NEW_SIGN_IN','MEMBERSHIP_DISABLED'))");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Sharing.ShareDocumentBinding", b =>
+                {
+                    b.Property<Guid>("ShareDocumentBindingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("share_document_binding_id");
+
+                    b.Property<Guid>("BoundBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bound_by_security_command_id");
+
+                    b.Property<bool>("CanDownloadDocument")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_download_document");
+
+                    b.Property<bool>("CanReplaceDocument")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_replace_document");
+
+                    b.Property<bool>("CanViewDocument")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_view_document");
+
+                    b.Property<DateTimeOffset>("DocumentBoundOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("document_bound_on");
+
+                    b.Property<Guid>("FileAttachmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_attachment_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid>("RecordShareId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("record_share_id");
+
+                    b.Property<int>("SharedThroughVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("shared_through_version_number");
+
+                    b.HasKey("ShareDocumentBindingId");
+
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("ix_share_document_bindings_org");
+
+                    b.HasIndex("OrganizationId", "BoundBySecurityCommandId");
+
+                    b.HasIndex("OrganizationId", "RecordShareId", "FileAttachmentId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_share_document_binding");
+
+                    b.ToTable("share_document_bindings", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_share_document_version_positive", "shared_through_version_number >= 1");
+
+                            t.HasCheckConstraint("ck_share_document_view_implied", "(NOT can_download_document OR can_view_document) AND (NOT can_replace_document OR can_view_document)");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Sharing.ShareResourceMetadata", b =>
+                {
+                    b.Property<Guid>("ShareResourceMetadataId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("share_resource_metadata_id");
+
+                    b.Property<int>("DelegationDepth")
+                        .HasColumnType("integer")
+                        .HasColumnName("delegation_depth");
+
+                    b.Property<Guid?>("ExpirySourceSecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("expiry_source_security_command_id");
+
+                    b.Property<bool>("LegacyLineageUnresolved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("legacy_lineage_unresolved");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid?>("ParentRecordShareId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_record_share_id");
+
+                    b.Property<Guid>("RecordShareId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("record_share_id");
+
+                    b.Property<string>("ResourceTypeName")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasDefaultValue("record_share")
+                        .HasColumnName("resource_type_name");
+
+                    b.Property<DateTimeOffset?>("ShareExpiresOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("share_expires_on");
+
+                    b.Property<string>("ShareInvalidationReasonCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("share_invalidation_reason_code");
+
+                    b.Property<DateTimeOffset>("ShareMetadataCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("share_metadata_created_on");
+
+                    b.Property<DateTimeOffset>("ShareMetadataModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("share_metadata_modified_on");
+
+                    b.Property<long>("ShareRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("share_revision");
+
+                    b.HasKey("ShareResourceMetadataId");
+
+                    b.HasAlternateKey("OrganizationId", "RecordShareId")
+                        .HasName("ak_share_resource_metadata_organization_share");
+
+                    b.HasIndex("OrganizationId", "ExpirySourceSecurityCommandId");
+
+                    b.HasIndex("OrganizationId", "LegacyLineageUnresolved")
+                        .HasDatabaseName("ix_share_resource_metadata_legacy_unresolved")
+                        .HasFilter("legacy_lineage_unresolved");
+
+                    b.HasIndex("OrganizationId", "ParentRecordShareId")
+                        .HasDatabaseName("ix_share_resource_metadata_parent")
+                        .HasFilter("parent_record_share_id IS NOT NULL");
+
+                    b.HasIndex("OrganizationId", "ShareExpiresOn")
+                        .HasDatabaseName("ix_share_resource_metadata_expiry")
+                        .HasFilter("share_expires_on IS NOT NULL");
+
+                    b.HasIndex("OrganizationId", "ResourceTypeName", "RecordShareId");
+
+                    b.ToTable("share_resource_metadata", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_share_delegation_depth", "delegation_depth BETWEEN 1 AND 3");
+
+                            t.HasCheckConstraint("ck_share_depth_parent_coherence", "(delegation_depth = 1 AND parent_record_share_id IS NULL) OR (delegation_depth > 1 AND parent_record_share_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_share_expiry_source_coherence", "(share_expires_on IS NULL) = (expiry_source_security_command_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_share_invalidation_reason", "share_invalidation_reason_code IS NULL OR share_invalidation_reason_code IN ('UpstreamExpired','UpstreamRevoked','UpstreamNarrowed','GrantorPathLost','OwnershipTransferred','LineageUnresolvable','DelegationDepthExceeded')");
+
+                            t.HasCheckConstraint("ck_share_metadata_registry_type", "resource_type_name = 'record_share'");
+
+                            t.HasCheckConstraint("ck_share_revision_positive", "share_revision >= 1");
                         });
                 });
 
@@ -5966,6 +6169,66 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_session_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Sharing.ShareDocumentBinding", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_share_document_binding_org");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SecurityCommands.SecurityCommand", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "BoundBySecurityCommandId")
+                        .HasPrincipalKey("OrganizationId", "SecurityCommandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_share_document_binding_command");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Sharing.ShareResourceMetadata", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "RecordShareId")
+                        .HasPrincipalKey("OrganizationId", "RecordShareId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_share_document_binding_share");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Sharing.ShareResourceMetadata", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_share_resource_metadata_org");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SecurityCommands.SecurityCommand", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "ExpirySourceSecurityCommandId")
+                        .HasPrincipalKey("OrganizationId", "SecurityCommandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_share_resource_metadata_expiry_source");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Sharing.ShareResourceMetadata", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "ParentRecordShareId")
+                        .HasPrincipalKey("OrganizationId", "RecordShareId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_share_resource_metadata_parent");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.AuthorityResource", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "ResourceTypeName", "RecordShareId")
+                        .HasPrincipalKey("OrganizationId", "ResourceTypeName", "ResourceEntityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_share_resource_metadata_registry");
                 });
 #pragma warning restore 612, 618
         }

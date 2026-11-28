@@ -70,6 +70,10 @@ public sealed class DesiredStateGraph(IReadOnlyList<AuthorityRelationshipEdge> a
     public bool CanCreateForm(Guid organizationId, Guid userId) =>
         HasOrganizationRole(organizationId, userId, OrganizationRoleNames.Designer);
 
+    /// <summary>The shares of the record on which the user holds an editing role (contributor or manager), directly or through a team.</summary>
+    public IEnumerable<Guid> EditorSharesOf(Guid userId, Guid formRecordId) =>
+        ShareIdsOfRecord(formRecordId).Where(id => ShareRolesOf(userId, id) is var roles && (roles.Contains("contributor") || roles.Contains("manager")));
+
     public IEnumerable<Guid> ShareIdsOfRecord(Guid formRecordId) =>
         EdgesOf(ResourceTypeNames.FormRecord, formRecordId, "shared_via").Where(e => e.SubjectTypeName == ResourceTypeNames.RecordShare).Select(e => e.SubjectEntityId);
 
@@ -80,12 +84,20 @@ public sealed class DesiredStateGraph(IReadOnlyList<AuthorityRelationshipEdge> a
     public IReadOnlySet<Guid> FieldItemsOfShare(Guid recordShareId) =>
         EdgesWithSubject(ResourceTypeNames.RecordShare, recordShareId).Where(e => e.ResourceTypeName == ResourceTypeNames.FieldItem && e.RelationshipName == "shared_via").Select(e => e.ResourceEntityId).ToHashSet();
 
-    /// <summary>Field items the user may edit through shares (contributor/manager), excluding ownership.</summary>
-    public IReadOnlySet<Guid> EditableFieldItemsViaShares(Guid userId, Guid formRecordId)
+    /// <summary>
+    /// Field items the user may edit through shares (contributor/manager), excluding ownership. C10 (review F1): shares in
+    /// <paramref name="excludedShareIds"/> (expired at the decision instant: their own or an ancestor's expiry) confer nothing.
+    /// </summary>
+    public IReadOnlySet<Guid> EditableFieldItemsViaShares(Guid userId, Guid formRecordId, IReadOnlySet<Guid>? excludedShareIds = null)
     {
         var items = new HashSet<Guid>();
         foreach (var shareId in ShareIdsOfRecord(formRecordId))
         {
+            if (excludedShareIds?.Contains(shareId) == true)
+            {
+                continue;
+            }
+
             var roles = ShareRolesOf(userId, shareId);
             if (roles.Contains("contributor") || roles.Contains("manager"))
             {
@@ -96,17 +108,4 @@ public sealed class DesiredStateGraph(IReadOnlyList<AuthorityRelationshipEdge> a
         return items;
     }
 
-    public IReadOnlySet<Guid> DelegableFieldItems(Guid userId, Guid formRecordId)
-    {
-        var items = new HashSet<Guid>();
-        foreach (var shareId in ShareIdsOfRecord(formRecordId))
-        {
-            if (ShareRolesOf(userId, shareId).Contains("manager"))
-            {
-                items.UnionWith(FieldItemsOfShare(shareId));
-            }
-        }
-
-        return items;
-    }
 }

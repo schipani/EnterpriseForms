@@ -289,8 +289,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C10_WP0_SHARING_OWNERSHIP_PROPOSAL.md",
-      "sha256": "b7f44baac370b036938d3fd47c564b6236a134db77b36096e206f13f5502d1eb",
-      "bytes": 39106
+      "sha256": "420407a8c71d285666003e79d3490df12473dc896be96887ba7926b85a52b011",
+      "bytes": 103371
     },
     {
       "path": "docs/architecture/PHASE_C3_REPEATING_GROUPS_AND_DEPENDENT_DROPDOWNS.md",
@@ -489,8 +489,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "1d5fbb8b0401bffc7cfe717744d0ea76266fc67a3a21d06ad415749997eb6a4b",
-      "bytes": 362443
+      "sha256": "14941f68da953216df62e2bc193429a2792b7dd664fd1b60862a220f8688ee27",
+      "bytes": 372301
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -561,6 +561,11 @@
       "path": "docs/governance/REVIEW_AND_AUTHORIZATION_WORKFLOW.md",
       "sha256": "bbd3f7c7e22dd1b244d13d7a67b416b65937a4b621b8f4ff7af0274510e73cb1",
       "bytes": 3944
+    },
+    {
+      "path": "docs/governance/WORK_PACKAGE_REGISTER.md",
+      "sha256": "2f4c2bc3999e59dbb51da7f452c1a93f74ab0d414b25c4380e671da69f88dab1",
+      "bytes": 41641
     },
     {
       "path": "docs/identity/PB08_IDENTITY_ASSURANCE_STANDARD.md",
@@ -1116,6 +1121,16 @@
       "path": "scripts/ci/test_test_results.py",
       "sha256": "81baccb7269b344c817888d0df8a00ab77b07468e8fd4d10ae1a9a25496e33e2",
       "bytes": 15916
+    },
+    {
+      "path": "scripts/dev/c10-d5-share-only-pg-gate.ps1",
+      "sha256": "55a3fd1a31071c6498e3f9009ee52e4fbc44f59ee5f88d8e34602cf3e63e7231",
+      "bytes": 4003
+    },
+    {
+      "path": "scripts/dev/c10-wp10-lineage-pg-gate.ps1",
+      "sha256": "eae803a917b509823e4105e17ecc72168169ef499cbe1982fdd8ad85425af576",
+      "bytes": 6879
     },
     {
       "path": "scripts/dev/check-journal-store-coupling.py",

@@ -102,7 +102,7 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
         Assert.Equal(0, reader.Root.GetProperty("catalogueEntryCount").GetInt32());
 
         // A field-level share brings exactly that record into the reader's scope, as a partial projection.
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{records[0]:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{records[0]:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
         Assert.True(share.IsSuccess, share.Body);
         await s.WaitGateReadyAsync();
         var shared = await VerifyAsync(s, s.Reader);
@@ -217,14 +217,14 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
         var readerBeforeSnapshot = readerBefore.Root.GetProperty("search_catalogue_snapshot_id").GetGuid();
 
         // … and a revocation invalidates the recipient's snapshot; the record leaves the next catalogue.
-        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{records[0]:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
+        var share = await fixture.Api.PostAsync($"/api/v1/form-records/{records[0]:D}/shares", s.Token(s.Clerk), new { useDevelopmentStepUp = true, recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
         Assert.True(share.IsSuccess, share.Body);
         await s.WaitGateReadyAsync();
         Assert.Equal("AUTHORIZATION_REVISION_CHANGED", (await ValidateAsync(s, s.Reader, readerBeforeSnapshot)).Root.GetProperty("invalidation_reason").GetString());
         var readerCatalogue = await CatalogueAsync(s, s.Reader);
         Assert.Equal([records[0]], Ids(readerCatalogue, "entries"));
         var readerSnapshot = readerCatalogue.Root.GetProperty("search_catalogue_snapshot_id").GetGuid();
-        var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{records[0]:D}/shares/{share.Root.GetProperty("recordShareId").GetGuid():D}/revoke", s.Token(s.Clerk), new { });
+        var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{records[0]:D}/shares/{share.Root.GetProperty("recordShareId").GetGuid():D}/revoke?useDevelopmentStepUp=true", s.Token(s.Clerk), new { });
         Assert.True(revoke.IsSuccess, revoke.Body);
         await s.WaitGateReadyAsync();
         Assert.Equal("AUTHORIZATION_REVISION_CHANGED", (await ValidateAsync(s, s.Reader, readerSnapshot)).Root.GetProperty("invalidation_reason").GetString());

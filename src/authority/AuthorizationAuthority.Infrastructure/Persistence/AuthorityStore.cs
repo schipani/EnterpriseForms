@@ -11,6 +11,7 @@ using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
+using AuthorizationAuthority.Domain.Features.Sharing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -449,6 +450,85 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid organizationId, Guid parentResourceEntityId, IReadOnlyCollection<string> resourceTypeNames, CancellationToken cancellationToken) =>
             context.Resources.AsNoTracking().Where(r => r.OrganizationId == organizationId && r.ParentResourceEntityId == parentResourceEntityId && resourceTypeNames.Contains(r.ResourceTypeName) && r.ResourceLifecycleState == ResourceLifecycleStates.Active).ToListAsync(cancellationToken);
+
+        // C10 M1-WP1: share-specific metadata stored alongside the generic AuthorityResource.
+
+        public Task<ShareResourceMetadata?> FindShareMetadataAsync(Guid organizationId, Guid recordShareId, CancellationToken cancellationToken) =>
+            context.ShareResourceMetadatas.FirstOrDefaultAsync(s => s.OrganizationId == organizationId && s.RecordShareId == recordShareId, cancellationToken);
+
+        public void AddShareMetadata(ShareResourceMetadata metadata) => context.ShareResourceMetadatas.Add(metadata);
+
+        // C10 M1-WP5: query descendants using the parent-lineage index for cascade invalidation.
+        public Task<List<ShareResourceMetadata>> FindShareMetadataByParentAsync(Guid organizationId, Guid parentRecordShareId, CancellationToken cancellationToken) =>
+            context.ShareResourceMetadatas.Where(s => s.OrganizationId == organizationId && s.ParentRecordShareId == parentRecordShareId).ToListAsync(cancellationToken);
+
+        // C10 re-review (N-1): the expiry overlay's descendant read, one query per lineage level (no tracking: a decision never changes them).
+        public Task<List<ShareResourceMetadata>> FindShareMetadataByParentsAsync(Guid organizationId, IReadOnlyCollection<Guid> parentRecordShareIds, CancellationToken cancellationToken) =>
+            parentRecordShareIds.Count == 0
+                ? Task.FromResult(new List<ShareResourceMetadata>())
+                : context.ShareResourceMetadatas.AsNoTracking()
+                    .Where(s => s.OrganizationId == organizationId && s.ParentRecordShareId != null && parentRecordShareIds.Contains(s.ParentRecordShareId.Value)).ToListAsync(cancellationToken);
+
+        // C10 M1-WP2: the access-time expiry overlay's reads (no tracking: a decision never changes them).
+        public Task<List<ShareResourceMetadata>> GetActiveShareMetadataWithExpiryAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            context.ShareResourceMetadatas.AsNoTracking()
+                .Where(m => m.OrganizationId == organizationId && m.ShareExpiresOn != null &&
+                            context.Resources.Any(r => r.OrganizationId == organizationId && r.ResourceTypeName == ResourceTypeNames.RecordShare &&
+                                                       r.ResourceEntityId == m.RecordShareId && r.ResourceLifecycleState == ResourceLifecycleStates.Active))
+                .ToListAsync(cancellationToken);
+
+        public Task<List<AuthorityRelationshipEdge>> GetActiveShareEdgesAsync(Guid organizationId, IReadOnlyCollection<Guid> recordShareIds, CancellationToken cancellationToken) =>
+            context.RelationshipEdges.AsNoTracking()
+                .Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId == null &&
+                            ((e.ResourceTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.ResourceEntityId)) ||
+                             (e.SubjectTypeName == ResourceTypeNames.RecordShare && recordShareIds.Contains(e.SubjectEntityId))))
+                .ToListAsync(cancellationToken);
+
+        public Task<List<ShareDocumentBinding>> GetShareDocumentBindingsAsync(Guid organizationId, IReadOnlyCollection<Guid> recordShareIds, CancellationToken cancellationToken) =>
+            context.ShareDocumentBindings.Where(b => b.OrganizationId == organizationId && recordShareIds.Contains(b.RecordShareId)).ToListAsync(cancellationToken);
+
+        public void AddShareDocumentBinding(ShareDocumentBinding binding) => context.ShareDocumentBindings.Add(binding);
+
+        public void RemoveShareDocumentBinding(ShareDocumentBinding binding) => context.ShareDocumentBindings.Remove(binding);
+
+        public Task<List<SecurityCommand>> GetRecordTargetedCommandsAsync(Guid organizationId, Guid formRecordId, int limit, CancellationToken cancellationToken) =>
+            context.SecurityCommands.AsNoTracking()
+                .Where(c => c.OrganizationId == organizationId && c.TargetFormRecordId == formRecordId && c.CommandStateName != SecurityCommandStates.Rejected)
+                .OrderByDescending(c => c.CommandCreatedOn).ThenByDescending(c => c.SecurityCommandId)
+                .Take(limit)
+                .ToListAsync(cancellationToken);
+
+        public async Task<HashSet<Guid>> GetAuthorizationJournalCommandIdsAsync(Guid organizationId, IReadOnlyCollection<Guid> securityCommandIds, CancellationToken cancellationToken) =>
+            (await context.JournalEntries.AsNoTracking()
+                .Where(e => e.OrganizationId == organizationId && e.JournalStreamName == JournalStreamNames.Authorization && e.SecurityCommandId != null && securityCommandIds.Contains(e.SecurityCommandId.Value))
+                .Select(e => e.SecurityCommandId!.Value)
+                .ToListAsync(cancellationToken).ConfigureAwait(false)).ToHashSet();
+
+        public async Task<List<AuthorityRelationshipEdge>> GetRecordSecurityEdgeHistoryAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken)
+        {
+            var recordEdges = await context.RelationshipEdges.AsNoTracking()
+                .Where(e => e.OrganizationId == organizationId && e.ResourceTypeName == ResourceTypeNames.FormRecord && e.ResourceEntityId == formRecordId &&
+                            (e.RelationshipName == "owner" || e.RelationshipName == "shared_via"))
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            var shareIds = recordEdges.Where(e => e.RelationshipName == "shared_via" && e.SubjectTypeName == ResourceTypeNames.RecordShare).Select(e => e.SubjectEntityId).Distinct().ToList();
+            if (shareIds.Count == 0)
+            {
+                return recordEdges;
+            }
+
+            var shareEdges = await context.RelationshipEdges.AsNoTracking()
+                .Where(e => e.OrganizationId == organizationId &&
+                            ((e.ResourceTypeName == ResourceTypeNames.RecordShare && shareIds.Contains(e.ResourceEntityId)) ||
+                             (e.SubjectTypeName == ResourceTypeNames.RecordShare && shareIds.Contains(e.SubjectEntityId) && e.ResourceTypeName != ResourceTypeNames.FormRecord)))
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            return [.. recordEdges, .. shareEdges];
+        }
+
+        public Task<List<AuthorityRelationshipEdge>> GetActiveTeamMemberEdgesAsync(Guid organizationId, IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken) =>
+            context.RelationshipEdges.AsNoTracking()
+                .Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId == null && e.ResourceTypeName == ResourceTypeNames.Team &&
+                            e.RelationshipName == "member" && teamIds.Contains(e.ResourceEntityId))
+                .ToListAsync(cancellationToken);
 
         public Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken) =>
             context.ProtectionPolicies.FirstOrDefaultAsync(p => p.OrganizationId == organizationId, cancellationToken);

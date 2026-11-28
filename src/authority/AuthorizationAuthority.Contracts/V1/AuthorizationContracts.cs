@@ -200,11 +200,40 @@ public sealed record RegisterRecordPayload(Guid FormRecordId, Guid FormDefinitio
 /// <summary>Removes the parent edge of a child record; the acting user becomes its owner (data preserved, no cascade delete).</summary>
 public sealed record UnlinkChildRecordPayload(Guid FormRecordId, Guid ParentFormRecordId);
 
-public sealed record TransferOwnershipPayload(Guid FormRecordId, Guid? NewOwnerUserId, Guid? NewOwnerTeamId);
+/// <summary>
+/// G27: Transfer ownership requires step-up assurance. <c>StepUpEvidence</c> is the development-only synthetic marker
+/// where the synthetic path is enabled; it is stripped from the journaled payload.
+/// </summary>
+public sealed record TransferOwnershipPayload(Guid FormRecordId, Guid? NewOwnerUserId, Guid? NewOwnerTeamId, string? StepUpEvidence = null);
 
-public sealed record CreateSharePayload(Guid RecordShareId, Guid FormRecordId, Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole, IReadOnlyList<Guid> FieldItemIds);
+/// <summary>
+/// Creates a share with required human step-up and optional expiry. A non-owner must specify a single active Manager
+/// parent. Only synthetic Development/Test accepts the development marker, which is excluded from committed evidence.
+/// </summary>
+public sealed record CreateSharePayload(Guid RecordShareId, Guid FormRecordId, Guid? RecipientUserId, Guid? RecipientTeamId,
+    string RecipientRole, IReadOnlyList<Guid> FieldItemIds, string? StepUpEvidence = null, Guid? ParentRecordShareId = null,
+    DateTimeOffset? ShareExpiresOn = null, IReadOnlyList<ShareDocumentEntry>? Documents = null);
 
-public sealed record RevokeSharePayload(Guid RecordShareId, Guid FormRecordId);
+/// <summary>
+/// C10 WP8 (WP-0 Section 3.6): one shared document. View is required; download and replace each imply view. The share covers the
+/// attachment's versions up to the one the Authority recorded as current when the share is granted.
+/// </summary>
+public sealed record ShareDocumentEntry(Guid FileAttachmentId, bool CanViewDocument, bool CanDownloadDocument, bool CanReplaceDocument);
+
+/// <summary>
+/// C10 M1-WP4: Updates the scope (fields, role, expiry) of an existing Active share with step-up and expected share
+/// revision. Owner may update root shares; a non-owner must name their current committed parent Manager share.
+/// Terminal/expired shares cannot be updated. StepUpEvidence is stripped from the journaled payload.
+/// </summary>
+public sealed record UpdateShareScopePayload(Guid RecordShareId, Guid FormRecordId, string RecipientRole,
+    IReadOnlyList<Guid> FieldItemIds, long ExpectedShareRevision, string? StepUpEvidence = null,
+    Guid? ParentRecordShareId = null, DateTimeOffset? ShareExpiresOn = null, IReadOnlyList<ShareDocumentEntry>? Documents = null);
+
+/// <summary>
+/// G27: Revoking a share requires step-up assurance. <c>StepUpEvidence</c> is the development-only synthetic marker
+/// where the synthetic path is enabled; it is stripped from the journaled payload.
+/// </summary>
+public sealed record RevokeSharePayload(Guid RecordShareId, Guid FormRecordId, string? StepUpEvidence = null);
 
 public static class RecipientRoles
 {

@@ -25,7 +25,7 @@ import { VersionComparePanel } from "../components/VersionComparePanel";
 type View = "design" | "fields" | "rules" | "preview" | "versions" | "settings" | "access" | "relationships";
 
 /**
- * PG-033/037 Form Designer (C1 designer rebuild, docs/ui/c1-designer-rebuild): a left designer navigation, a centre
+ * PG-029 Form Designer (C1 designer rebuild, docs/ui/c1-designer-rebuild): a left designer navigation, a centre
  * toolbar + canvas of titled sections with compact field previews, and a persistent right inspector. "+ Add Section"
  * creates a titled section (an existing layout-v2 `section`, not a line-break flag); "+ Add Row" adds an empty,
  * full-width cell at the end of the currently selected section so the next field placed there starts a fresh row
