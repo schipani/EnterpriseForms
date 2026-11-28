@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net;
 using System.Security.Cryptography;
 using EnterpriseForms.SecurityTests.Harness;
@@ -19,7 +19,7 @@ namespace EnterpriseForms.StageBTests.Tests;
 [Collection(StageBStackCollectionDefinition.Name)]
 public sealed class C10DownloadRecheckTests(StageBFixture fixture)
 {
-    private const int DocumentBytes = 40 * 1024 * 1024;
+    private const int DocumentBytes = 19 * 1024 * 1024; // the Accused documents field accepts up to 20 MiB
     private static readonly TimeSpan Settle = TimeSpan.FromSeconds(40);
     private static readonly TimeSpan RecheckBound = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan DrainAllowance = TimeSpan.FromSeconds(20);
@@ -88,7 +88,7 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
         await ShareDocumentAsync(w);
         var started = Stopwatch.StartNew();
         using var download = await fixture.StartPausedDownloadAsync(DownloadPath(w.Record, w.Attachment), w.S.Token(w.S.Reader), 1024 * 1024);
-        await download.ReadRestAsync(bytesPerSecond: 3 * 1024 * 1024); // about 13 s: two or more re-checks at the 5 s interval
+        await download.ReadRestAsync(bytesPerSecond: 3 * 1024 * 1024 / 2); // about 12 s: two or more re-checks at the 5 s interval
 
         Assert.True(download.Completed, $"received {download.Received} of {DocumentBytes}, failure '{download.Failure}'");
         Assert.Equal("no", download.Header("X-Accel-Buffering")); // a buffering proxy must not read ahead of the re-checks
@@ -115,13 +115,13 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
     [Fact]
     public async Task ARevocationWhileTheClientIsReadingStopsTheStreamWithinABoundedAmountOfPlaintext()
     {
-        // Independent review finding 8a/8c: the client keeps reading (1 MiB/s) through the revocation, so the stop comes from the
+        // Independent review finding 8a/8c: the client keeps reading (512 KiB/s) through the revocation, so the stop comes from the
         // periodic re-check, not from a check on resume; the plaintext received after the revocation took effect is bounded by the
-        // interval plus the check and transport buffers (asserted at 16 MiB, reported exactly).
+        // interval plus the check and transport buffers (asserted at 8 MiB of the 19 MiB document, reported exactly).
         var w = await WorkspaceAsync("cons23-revocation-active", 236);
         var share = await ShareDocumentAsync(w);
         using var download = await fixture.StartPausedDownloadAsync(DownloadPath(w.Record, w.Attachment), w.S.Token(w.S.Reader), 64 * 1024);
-        var reading = download.ReadRestAsync(bytesPerSecond: 1024 * 1024);
+        var reading = download.ReadRestAsync(bytesPerSecond: 512 * 1024); // about 38 s for the whole document
         await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
 
         var revoked = await fixture.Api.PostAsync($"/api/v1/form-records/{w.Record:D}/shares/{share:D}/revoke?useDevelopmentStepUp=true", w.S.Token(w.S.Clerk), new { });
@@ -135,7 +135,7 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
         var observed = $"active revocation: received {download.Received} of {DocumentBytes} bytes ({after} after the change), ended {sinceChange.Elapsed.TotalSeconds:F1} s after the change, failure '{download.Failure}', reasons [{string.Join(", ", DownloadFailures(w))}]";
         TestContext.Current.SendDiagnosticMessage("CONS-23 " + observed);
         Assert.False(download.Completed, "CONS-23: the stream was not stopped. " + observed);
-        Assert.True(after <= 16L * 1024 * 1024, "CONS-23: too much plaintext after the revocation. " + observed);
+        Assert.True(after <= 8L * 1024 * 1024, "CONS-23: too much plaintext after the revocation. " + observed);
         Assert.True(sinceChange.Elapsed <= RecheckBound + DrainAllowance, observed);
         var failures = DownloadFailures(w);
         Assert.True(failures.Length == 1 && failures[0] is not ("AUTHORITY_UNAVAILABLE" or "INTEGRITY_VERIFICATION_FAILED"), observed);

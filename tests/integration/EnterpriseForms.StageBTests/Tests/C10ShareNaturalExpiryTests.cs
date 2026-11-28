@@ -152,7 +152,7 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
         // CONS-23 with natural expiry: a share recipient's large download is opened before the instant and paused (the server's writes
         // block on full transport buffers); resumed after the instant, it must stop at the next re-check, audited.
         var (dl, dlRecord) = await AccusedAsync("c10-natural-expiry-download");
-        const int documentBytes = 40 * 1024 * 1024;
+        const int documentBytes = 19 * 1024 * 1024; // the Accused documents field accepts up to 20 MiB
         var document = await dl.UploadAsync(dl.Clerk, dlRecord, "cons23-expiry.bin", "application/octet-stream", StageBScenario.SyntheticBytes(documentBytes, 241), timeout: TimeSpan.FromMinutes(5));
         var attachment = document.GetProperty("fileAttachmentId").GetGuid();
         var dlShare = await dl.Fixture.Api.PostAsync(Path(dlRecord), dl.Token(dl.Clerk), new
