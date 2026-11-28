@@ -140,7 +140,9 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
     {
         // Independent review finding 8a/8c: the client keeps reading (512 KiB/s) through the revocation, so the stop comes from the
         // periodic re-check, not from a check on resume. The server must stop within the re-check bound of the revocation, and the
-        // plaintext read after it is bounded by that interval at the read rate plus the socket buffers (asserted at 8 MiB of 19 MiB).
+        // plaintext read after it is bounded by the bytes already in transit (the stack's TCP buffers: 6 MiB receive and 4 MiB send
+        // maximum, plus one 64 KiB slice and Kestrel's 64 KiB pipe) plus the read rate over the interval and allowance. Run
+        // 20261127-194606-f9ba23a7 measured 9.53 MiB, almost all of it the socket buffers (the provisional 8 MiB bound was a guess).
         var w = await WorkspaceAsync("cons23-revocation-active", 236);
         var share = await ShareDocumentAsync(w);
         var download = InNetworkDownload.Start(fixture.Stack, DownloadPath(w.Record, w.Attachment), w.S.Token(w.S.Reader), pauseAfterBytes: null, secondsPer64KiB: 0.125);
@@ -154,7 +156,9 @@ public sealed class C10DownloadRecheckTests(StageBFixture fixture)
 
         await AssertStoppedAsync(w, download, changedAt, receivedAtChange, "active revocation", DenialReason, resume: false);
         var total = await download.TotalAsync();
-        Assert.True(total - receivedAtChange <= 8L * 1024 * 1024, $"CONS-23: {total - receivedAtChange} bytes of plaintext after the revocation");
+        const long inTransit = (6L + 4L) * 1024 * 1024 + (2 * 64 * 1024);
+        var bound = inTransit + (long)(512 * 1024 * (RecheckBound + CheckAndClockAllowance).TotalSeconds);
+        Assert.True(total - receivedAtChange <= bound, $"CONS-23: {total - receivedAtChange} bytes of plaintext after the revocation (bound {bound})");
     }
 
     [Fact]
