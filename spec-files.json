@@ -289,8 +289,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C10_WP0_SHARING_OWNERSHIP_PROPOSAL.md",
-      "sha256": "3b75728fee754c38f4c5fd08ab2d315739d962b36dc933fc33a79ba21fb7a9c6",
-      "bytes": 87832
+      "sha256": "420407a8c71d285666003e79d3490df12473dc896be96887ba7926b85a52b011",
+      "bytes": 103371
     },
     {
       "path": "docs/architecture/PHASE_C3_REPEATING_GROUPS_AND_DEPENDENT_DROPDOWNS.md",
@@ -489,8 +489,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "1c61bb665392dc2a44f15c1ea6747a50e1358cdd44cc53f092e3cab41c76c2b2",
-      "bytes": 369874
+      "sha256": "14941f68da953216df62e2bc193429a2792b7dd664fd1b60862a220f8688ee27",
+      "bytes": 372301
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -564,8 +564,8 @@
     },
     {
       "path": "docs/governance/WORK_PACKAGE_REGISTER.md",
-      "sha256": "8c4d2b60f0d07aeecefcfb8e80af1f87a00a18cbf0979706fd990fa029773b37",
-      "bytes": 39672
+      "sha256": "2f4c2bc3999e59dbb51da7f452c1a93f74ab0d414b25c4380e671da69f88dab1",
+      "bytes": 41641
     },
     {
       "path": "docs/identity/PB08_IDENTITY_ASSURANCE_STANDARD.md",

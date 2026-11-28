@@ -676,8 +676,8 @@ Estimated run time: 2–3 h (worst case about 4 h with one fix cycle).
 - Production expiry processing (the convergence loop runs only in Development/Testing).
 - Manual NVDA and VoiceOver verification of the five C10 pages (PB14-44…48).
 - ~~The pre-correction child owner-edge inventory and, if needed, remediation (§10.6).~~ Closed by evidence (§10.10): 0 affected records in every Development/Test store.
-- CONS-23 long-download revocation re-check (mandatory, not implemented; minimum correction in §10.10).
-- Real-loop expiry convergence evidence (§4 tests 8, 10 and 13; §10.10).
+- ~~CONS-23 long-download revocation re-check (mandatory, not implemented; minimum correction in §10.10).~~ Implemented and tested in Development/Test (§10.11). Still open: sign-out during a download end to end, a download through the web nginx, Azure ingress buffering, and PB-09 measurement of re-check load and the gate-closed interruption rate.
+- ~~Real-loop expiry convergence evidence (§4 tests 8, 10 and 13; §10.10).~~ Recorded with real elapsed time (§10.11). Still open: §4 test 13 "replay converges it", blocked on G14 (journal replay, SpiceDB rebuild, reviewed quarantine lift).
 - Product reviewer sign-off.
 
 ### 10.10 Governance, consolidation and focused Stage B (owner authorization 2026-11-27, C-200; Development/Test, not acceptance)
@@ -786,3 +786,111 @@ No test was skipped in any run. `-ExcludeBenchmarks` left out only the benchmark
 - Widths: 320, 768 and 1440 px, plus 640 and 320 px (a 1280 px window at 200% and 400% zoom).
 
 Manual NVDA and VoiceOver review is outstanding (PB14-44…48).
+
+### 10.11 CONS-23 correction and real-elapsed-time expiry verification (owner decisions 1 and 2, 2026-11-27, C-201; Development/Test, not acceptance)
+
+**CONS-23 (owner decision 1).** Requirement: `trust_authority/CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md`, "Long streams and strict revocation".
+
+**Implementation** (`e41bf4f6`, review corrections `6a67eb7c` and `a1e8ee7f`):
+- The only document plaintext egress is `DocumentHandlers.DownloadAsync`. There are no exports and no other long streams. Its admission check is unchanged.
+- Plaintext is written through `RecheckedDownloadStream`. Every write is cut into slices of at most 64 KiB.
+- Before a slice is written, once `Documents:StreamRecheckIntervalSeconds` has passed since the last check began, the stream re-checks. The interval defaults to 5; only 1–5 is accepted, and anything else refuses to start. The interval is measured with a monotonic clock, starting before the admission read.
+- The re-check does two things:
+  - It re-validates the browser session at the Authority (G23). Bearer requests have no session.
+  - It repeats the verified read the admission used: Authority permission, accepted head, integrity, share scope and access-time expiry.
+- `DocumentStreamAdmission.Evaluate` releases only the admitted version of the admitted document. The stream stops when any of these happens:
+  - the Authority denies, or is unavailable;
+  - the session is no longer valid;
+  - the authorization revision goes backwards;
+  - the document is no longer in the accepted current content (B-05);
+  - the streamed version is no longer the accepted current version, because of a replacement (the relevant revision; see the decision below);
+  - for a share recipient, the document is no longer downloadable;
+  - for an earlier version, the caller no longer has full read.
+- A stop is audited as `DOCUMENT_DOWNLOAD_FAILED` with a reason code only. The outcome is `Failed` when the Authority could not decide and `Denied` when it refused. The response is aborted with an incomplete body; nothing is written after a failed check.
+- Downloads send `X-Accel-Buffering: no`, and the web nginx never spools API responses to disk (`proxy_max_temp_file_size 0`). A buffering proxy therefore cannot take the plaintext ahead of the re-checks, and no decrypted bytes land on its disk (4C.4).
+- Encryption, decryption-failure recording, `DOCUMENT_DOWNLOADED`, the headers and `Content-Length` are unchanged.
+
+**Documented exposure window (protocol baseline).**
+- Plaintext emitted after access ends is bounded by the throughput over the interval plus one check's duration, measured from the start of the last successful check.
+- In-transit bytes come on top of that: one 64 KiB slice, Kestrel's pipe (about 64 KiB), the TCP buffers, and any ingress buffer.
+- On the local stack the TCP buffers are at most 6 MiB receive and 4 MiB send. Stage B measured 9.53 MiB after a revocation for a client reading at 512 KiB/s, almost all of it the socket buffers.
+- A stalled Authority call holds the stream without emitting bytes until the Authority client's timeout ends it (`AUTHORITY_UNAVAILABLE`).
+- Bytes already delivered cannot be recalled. No strict-profile (gateway lease) guarantee is claimed.
+- Azure ingress (Container Apps / Envoy) buffering must be checked in staging.
+
+**Decisions recorded with the correction:**
+- *Relevant revision.* The protocol says "terminate when a revision changes". The implementation re-evaluates at the current revision: it continues when an authorization revision increase still releases the admitted version, and stops on regression, removal, replacement, a download binding that no longer allows download, or loss of full read for historic versions. This matches the owner brief's "relevant revision" and is no weaker than the wording for the admitted document.
+- *Gate-closed interruptions.* While an organization's gate is closed (§4N projection lag after any security command), a re-check fails closed and stops in-flight downloads of that organization. This is accepted as fail-closed. The interruption rate under realistic command rates needs measuring (PB-09).
+- *Cost.* Each re-check is a full verified read (head, staged rows, `VerifyRecordProjection`). This is correct; the Authority/HSM load under PB-09 concurrency needs measuring.
+- *Durability.* The stop audit is written to BusinessDb (the existing §4D gap for denial evidence).
+
+**Tests:**
+- `Cons23DownloadRecheckTests`, 16 contract tests: interval, slicing, slow-client backpressure, permanent stop, synchronous I/O refused, configuration bounds, the release rule, the session check, and failure classification.
+- Stage B `C10DownloadRecheckTests`, 5 tests: an undisturbed slow download completes byte for byte through its re-checks with the no-buffering header; revocation (paused and while reading); replacement; Authority unavailable.
+  - The stopping cases read from inside the Docker network, because Docker Desktop's Windows port forwarder reads ahead by many megabytes.
+  - Each asserts the server-side stop instant (the audit event time) within the re-check bound.
+- The natural-expiry download case is in `C10ShareNaturalExpiryTests`.
+- Not exercised end to end: sign-out during a download (contract-tested only), and a download through the web container (the security-test stack has none; the header is asserted).
+
+**Independent review.**
+- A Claude Code subagent with fresh context, read-only; not a human or external review. It found three blockers or important gaps: proxy read-ahead, no session re-check, and the window not documented. It also raised four minor or note findings.
+- Corrections: `6a67eb7c`. Re-review follow-ups: `a1e8ee7f`. The re-review confirmed findings 1, 2, 7 and 8 resolved and agreed that 3–6 are documentation or decisions (recorded above).
+
+**Real-elapsed-time expiry convergence (owner decision 2).**
+- No Testing clock. No expiry moved by SQL. No trigger suspended.
+- Shares are granted or updated through the supported commands with a genuine expiry one hour ahead. They expire naturally and converge through the real 30 s loop.
+
+**Product defect found (`41d28452`).**
+- Run `20261127-181441-3e96b665` (§4 test 13 on its own stack) showed a share with a genuine expiry denied at the instant but never converged: `PAYLOAD_EXPIRY_MISMATCH`, alert `SHARE_EXPIRY_NOT_CONVERGED`.
+- The journalled payload keeps the request's 100 ns ticks (`…05.6805932`), while AuthorityDb stores microseconds (`…05.680593`). The exact comparison in `ExpireShareAdmission` therefore refused every genuine expiry that was not microsecond-aligned.
+- The comparison is now at the stored precision. A change of one microsecond or more, such as an expiry moved by SQL, is still refused. Two unit tests cover this.
+- The earlier test-clock unit tests used whole-second values, so they could not see it.
+
+**One timeline.**
+- §4 tests 8, 10 and 13 and the CONS-23 natural-expiry download share one timeline in `C10ShareNaturalExpiryTests` (group `share-expiry-convergence`, its own stack).
+- Every outcome is captured before the last step. That step is test 13: AuthorityDb backed up with `pg_dump` before the instant, then restored over the whole database with `pg_restore --clean`, with the Authority stopped around it (the T16 technique).
+
+**Results.** All runs used the local `enterpriseforms-sectest` stack. CONS-23 and regression classes ran on a stack built at `41d28452` product code (later commits change tests only); each expiry run used a fresh stack. Each rerun is a new run id.
+
+| Run id | Head | Selection | Result |
+| --- | --- | --- | --- |
+| 20261127-181441-3e96b665 | bd669b16 | §4 test 13, own stack | failed: genuine expiry never converged (`PAYLOAD_EXPIRY_MISMATCH`); found the precision defect |
+| 20261127-192729 … -192827 (5 runs) | 41d28452 | regression classes | not executed: Release compile error in the test project (`ef0a2782`) |
+| 20261127-193000-af17b7ec | ef0a2782 | DocumentTests | 3/3 |
+| 20261127-193032-6ddfcaee | ef0a2782 | DocumentEncryptionAuditTests | 5/5 |
+| 20261127-193149-8a0cfea0 | ef0a2782 | C10ShareLifecycleTests | 9/9 |
+| 20261127-193640-c4ac8111 | ef0a2782 | SharingTests | 2/2 |
+| 20261127-192915-2512f41f | ef0a2782 | C10DownloadRecheckTests | 0/5: a 40 MiB document exceeds the 20 MiB field limit (resized, `eac7c179`) |
+| 20261127-193803-9a0fcaef | d51b1d0f | C10DownloadRecheckTests | 1/5: the Windows port forwarder read the whole document ahead (in-network client, `03431003`) |
+| 20261127-194256-ceeb8b79 | 03431003 | C10DownloadRecheckTests | 4/5: the paused revocation fell inside the first interval (pause past it, `5fd75357`) |
+| 20261127-194606-f9ba23a7 | 5fd75357 | C10DownloadRecheckTests | 4/5: 9.53 MiB after an active revocation, above a provisional 8 MiB bound; bound derived from the stack's TCP buffers (`1f480ba4`) |
+| 20261127-194855-229efb47 | 1f480ba4 | C10DownloadRecheckTests | 5/5 |
+| 20261127-195331-c635362e | 1f480ba4 | group share-expiry-convergence, fresh stack (73 min) | 2/4: test 8 and the CONS-23 natural-expiry download passed; test 10 (test count defect) and test 13 (see below) failed |
+| 20261128-003140-f1417291 | 529b53bb | group share-expiry-convergence, fresh stack (74 min) | 1/4: every share state converged as asserted and the CONS-23 natural-expiry download passed; the corrected journal counts read the wrong JSON path (top level instead of the envelope's `body`) and returned 0 for tests 8, 10 and 13 (path corrected, `6a824791`) |
+| 20261128-014838-1c42c802 | 6a824791 | group share-expiry-convergence, fresh stack (73 min) | **4/4** |
+
+**Expiry convergence evidence.**
+- §4 test 8 (race with the real loop): passed (run `20261128-014838-1c42c802`). The revoke reached the share first: it was still Active (expired by time, not yet converged), the revoke returned 200 and the share ended Revoked with no `ShareExpired`. The update was refused; the updated and transferred shares each converged to Expired with exactly one `ShareExpired`; two more loop passes recorded nothing further; the designer and administrator stayed denied. Only the "revoke wins" branch occurred in this run; the "loop wins" branch is asserted but was not exercised by real timing.
+- §4 test 10 (a parent's natural expiry): passed (run `20261128-014838-1c42c802`). At the instant the delegated share row was still Active, yet the designer saw only the independent grant's field (`family_name`): denied through the lineage before any convergence. On convergence the manager share was Expired with one `ShareExpired`, which lists the delegated share; the delegated share was Invalidated with one `ShareInvalidated` and no `ShareExpired` of its own; the independent grant stayed Active and its field visible; the parent recipient was denied.
+  - Run `20261127-195331-c635362e` failed one assertion only: `DelegatedExpired` was 1. The parent's `ShareExpired` event lists the delegated share in `invalidated_descendant_share_ids`, and the test counted any event containing the id. Every product assertion before it had passed (parent Expired, delegated Invalidated, independent grant Active). Counts now use the event's own `record_share_id`, and test 10 also asserts one `ShareInvalidated` for the delegated share, listed by the parent's expiry (`529b53bb`). Those counts first read the share id from the top of the journal row; it is inside the envelope's `body`. The next run (`20261128-003140-f1417291`) therefore counted 0 for every share, while all its state assertions passed. Corrected in `6a824791`; the path was checked against a surviving event on that run's stack.
+- §4 test 13 (restore of a pre-convergence AuthorityDb): passed as decided (run `20261128-014838-1c42c802`): converged to Expired with one `ShareExpired` before the restore; after the restore the share row was Active again and access returned 423 `INTEGRITY_QUARANTINE`; after a 180 s wait still Active, still 423, and no new `ShareExpired`; quarantine reason `PROJECTION_MARKER_AHEAD`; gate `Quarantined` at authorization revision 13 (projection applied 13).
+  - After the whole-database restore, SpiceDB (not restored) still held markers for revisions the restored AuthorityDb no longer had. The Authority detected this and quarantined every organization in the stack with `PROJECTION_MARKER_AHEAD` (alert `PROJECTION_INTEGRITY_QUARANTINE`). This is the §4R anti-rollback behaviour: an earlier snapshot never resets accepted security state.
+  - Quarantine is permanent under normal operation and lifted only by the separately reviewed G14 recovery process. **"Replay converges it" is therefore UNMET and blocked on G14** (journal replay from the independent archive, SpiceDB rebuild, reviewed quarantine lift).
+  - Owner decision (C-201): test 13 asserts the denial, the detected rollback (quarantine reason and gate state) and that access is not revived after a 180 s wait. It does not assert convergence.
+- CONS-23 on natural expiry: passed (run `20261128-014838-1c42c802`; also passed in `20261127-195331-c635362e`). The recipient received 8,454,144 of 19,922,944 bytes, 1,081,344 before the pause and 7,372,800 after it. The bytes after the pause were already in the transport buffers (TCP receive and send buffers and the Kestrel pipe) while the server was blocked; this is within the stack's socket-buffer bound (6 MiB receive + 4 MiB send). The server's first re-check after the instant stopped the stream, and the download ended 3.1 s after the instant, with one `DOCUMENT_DOWNLOAD_FAILED` (reason `NOT_FOUND`: the expired share no longer reveals the record).
+
+**Superseded evidence.**
+- C-200 runs of C10ShareLifecycleTests, DocumentTests and DocumentEncryptionAuditTests (download path changed): superseded by the runs at `ef0a2782` above.
+- C-200 SharingTests: superseded by `20261127-193640-c4ac8111`.
+- §10.10 "Limitation: real-loop expiry convergence": superseded by the expiry evidence above, except test 13's replay, which remains UNMET (G14).
+- §10.10 "CONS-23 (mandatory, not implemented)": superseded by this section.
+- Every other C-200 result stands unchanged; no other product path changed.
+
+**CI-equivalent gate (`1f480ba4`).** .NET 3,918 total: 3,695 passed, 0 failed, 223 authorized skips. Frontend lint, typecheck, build and 81 files / 665 tests. Strict specification validation passes; OpenAPI unchanged. Repeated at the final test head `6a824791` (only Stage B test files changed since `1f480ba4`): .NET 3,918 total, 3,695 passed, 0 failed, 223 authorized skips; Stage B project Release build 0 errors; strict specification validation passes. No frontend file changed, so the frontend result stands.
+
+**Not proven or not done.**
+- Sign-out during a download end to end (contract-tested only).
+- A download through the web container's nginx (header and configuration asserted; the security-test stack has no web service).
+- Azure ingress buffering, re-check load and the gate-closed interruption rate (staging, PB-09).
+- §4 test 13 replay convergence (G14).
+- Not done: merge, formal acceptance, production change, capability activation outside the disposable stack, C11.

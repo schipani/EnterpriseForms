@@ -191,3 +191,19 @@ Candidate `coord/c10-m1-candidate-r2`, pushed as `c10/consolidated` (PR #88, not
 - **Not done:** merge, formal acceptance, production change, capability activation outside the disposable stack, C11.
 
 **Next permitted step:** owner review of PR #88 and the WP-0 §10.10 report, then the owner's integration decision.
+
+## Direct development checkpoint 10 — 2026-11-27/28 (CONS-23 and real-elapsed-time expiry, C-201)
+
+Candidate `coord/c10-m1-candidate-r2`, pushed to `c10/consolidated` (PR #88, not merged). The records commit follows the last test commit `6a824791` (signed).
+- **CONS-23 (mandatory):** implemented on the document download path: bounded slices, an Authority and session re-check at most every 5 s, fail-closed audited stops, and no proxy read-ahead. The exposure window is documented (WP-0 §10.11). Reviewed by a Claude Code subagent (fresh context, read-only; not a human or external review); findings corrected and confirmed resolved.
+- **Product defect found and corrected:** genuine share expiries not aligned to the microsecond never converged (precision mismatch in `ExpireShareAdmission`).
+- **Real-elapsed-time expiry (no Testing clock):** §4 tests 8 and 10 pass. Test 13 asserts the denial and the detected rollback (`PROJECTION_MARKER_AHEAD`); "replay converges it" is UNMET, blocked on G14.
+- **Targeted Stage B (local fresh `enterpriseforms-sectest`):**
+  - C10DownloadRecheckTests 5/5;
+  - group share-expiry-convergence 4/4 (`20261128-014838-1c42c802`);
+  - regressions DocumentTests 3/3, DocumentEncryptionAuditTests 5/5, C10ShareLifecycleTests 9/9, SharingTests 2/2.
+- **CI-equivalent gate (`6a824791`):** .NET 3,918 total, 3,695 passed, 0 failed, 223 authorized skips; frontend lint, typecheck, build and 81 files / 665 tests (no frontend change since); strict specification validation; OpenAPI unchanged.
+- **Still open:** sign-out during a download end to end; a download through the web nginx; Azure ingress buffering; PB-09 re-check load and gate-closed interruption rate; test 13 replay (G14); every §10.9 obligation.
+- **Not done:** merge, formal acceptance, production change, capability activation outside the disposable stack, C11.
+
+**Next permitted step:** owner review of PR #88 and WP-0 §10.11, then the owner's integration decision.
