@@ -207,3 +207,16 @@ Candidate `coord/c10-m1-candidate-r2`, pushed to `c10/consolidated` (PR #88, not
 - **Not done:** merge, formal acceptance, production change, capability activation outside the disposable stack, C11.
 
 **Next permitted step:** owner review of PR #88 and WP-0 §10.11, then the owner's integration decision.
+
+## Direct development checkpoint 11 — 2026-11-28 (C10 code integration and development closeout, C-202)
+
+PR #88 squash-merged into `main` as `5cc4efe3` under the owner's code-integration authorization (exact head `5c40a489`); the integrated tree is identical to the authorized head's.
+- **Pre-merge:** head unchanged; all checks and CodeQL passed; every commit signature verified; clean and mergeable; A-24 verifier 17 PASS, 0 FAIL, 7 DEFERRED; 17 signed `archive/*` tags present; no unresolved finding.
+- **Preserved:** final head in the signed tag `archive/c10-final-head-5c40a489` (the merged branch was deleted by the repository setting).
+- **Post-merge:** the `ci` push workflow (specifications, .NET build with architecture and contract tests, frontend, Docker Compose) and CodeQL (actions, C#, JavaScript/TypeScript, Python) passed on `5cc4efe3`; 0 open code-scanning alerts on `main`.
+- **Status:** functional implementation complete; integrated; AI technical review done (Claude Code subagents, not a human or external review); focused Stage B evidence within its tested scope; formal Development/Test acceptance pending; production readiness not approved.
+- **Still open:** every WP-0 §10.9 and §10.12 obligation, including the §11 register re-mapping of the Phase C10 rows.
+- **C11:** approved scope PG-009, PG-065, PG-004; needs a WP-0 design and owner approval; not started.
+- **Not done:** formal acceptance, production or Azure change, capability activation, Stage B, C11.
+
+**Next permitted step:** the owner's formal C10 Development/Test acceptance decision, and separately the authorization of C11 WP-0 design work.

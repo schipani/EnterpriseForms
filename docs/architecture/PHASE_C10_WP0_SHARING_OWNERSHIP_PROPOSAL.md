@@ -1,5 +1,7 @@
 # Phase C10 WP-0 — Sharing, ownership and access completion
 
+**Status update (2026-11-28, C-202):** C10 functional implementation complete in Development/Test; code integrated into `main` at `5cc4efe3` (PR #88, squash of the authorized head `5c40a489`). Formal Development/Test acceptance is pending; production readiness is not approved. Outstanding obligations: §10.9 and §10.12. The status below is the original design-approval record and is kept unchanged.
+
 **Status (2026-11-25): WP-0 DESIGN APPROVED — C-193 (direction) and C-194 (C10-A…C10-D, final). Implementation NOT
 authorized.** Every design decision of this document is approved as a contract (§8). No C10 code, migration, endpoint or
 page may be written until the owner separately authorizes a C10 implementation package (C10 M1 first, §9). The legacy
@@ -679,6 +681,9 @@ Estimated run time: 2–3 h (worst case about 4 h with one fix cycle).
 - ~~CONS-23 long-download revocation re-check (mandatory, not implemented; minimum correction in §10.10).~~ Implemented and tested in Development/Test (§10.11). Still open: sign-out during a download end to end, a download through the web nginx, Azure ingress buffering, and PB-09 measurement of re-check load and the gate-closed interruption rate.
 - ~~Real-loop expiry convergence evidence (§4 tests 8, 10 and 13; §10.10).~~ Recorded with real elapsed time (§10.11). Still open: §4 test 13 "replay converges it", blocked on G14 (journal replay, SpiceDB rebuild, reviewed quarantine lift).
 - Product reviewer sign-off.
+- The post-revocation buffered-data exposure observed in Development/Test (§10.11: 9.53 MiB after an active revocation at 512 KiB/s, held in the transport buffers) remains a documented property, to be measured through the web nginx and Azure ingress (staging, PB-09).
+- §4 test 8: the "loop wins" race ordering is asserted but was not exercised by real timing (§10.11).
+- The CLAUDE.md §11 requirements register rows for Phase C10 (#6, #11, #12, #23–#26, #56–#62, #65) still carry their 2026-11-25 evidence and obligations. C-194 requires them to be re-mapped to the C10 evidence, with statuses decided only on reviewed evidence, before C10 development acceptance.
 
 ### 10.10 Governance, consolidation and focused Stage B (owner authorization 2026-11-27, C-200; Development/Test, not acceptance)
 
@@ -894,3 +899,39 @@ Manual NVDA and VoiceOver review is outstanding (PB14-44…48).
 - Azure ingress buffering, re-check load and the gate-closed interruption rate (staging, PB-09).
 - §4 test 13 replay convergence (G14).
 - Not done: merge, formal acceptance, production change, capability activation outside the disposable stack, C11.
+
+### 10.12 Code integration and development closeout (owner authorization 2026-11-28, C-202; Development/Test, not acceptance)
+
+**Authorization.** The owner authorized code integration of PR #88 into `main` for Development/Test at the exact head `5c40a4894d7821aa3114b7186f379d66c3ec36f4`. This is code integration only. It is not formal C10 acceptance, not production approval and not authorization to activate restricted capabilities.
+
+**Pre-merge verification (2026-11-28 06:10 EST).**
+- PR #88 was open at the authorized head, mergeable, merge state `CLEAN`, base `main` `3c463a24` (an ancestor of the head).
+- All ten checks on the head passed, including the four required status checks and CodeQL (actions, C#, JavaScript/TypeScript, Python).
+- All 102 PR commits carry a GitHub-verified signature. No unresolved review threads; 0 open code-scanning, Dependabot or secret-scanning alerts.
+- A-24 in effect: `scripts/governance/verify_repository_protection.py` reports 17 PASS, 0 FAIL, 7 DEFERRED; the live `main` ruleset matches `.github/rulesets/main-branch-protection.json` and has no bypass actors.
+- All 17 signed `archive/*` tags are on the remote and verify. (The C-201 report said 34; that counted each tag's peeled `^{}` line twice.)
+
+**Merge.**
+- Squash-merged through the normal protected path with `--match-head-commit`: `main` is now `5cc4efe3436288e6baca17ac475afa62eaa9c60f` (parent `3c463a24`), GitHub-verified signature.
+- The integrated tree `a28a65f4` is identical to the tree of the authorized head; the diff between them is empty.
+- The repository deletes merged branches, so `c10/consolidated` was removed. The final head and its history are preserved in the signed tag `archive/c10-final-head-5c40a489`, added beside the 17 existing tags (none changed).
+- Post-merge: the `ci` push workflow (specifications, .NET build with architecture and contract tests, frontend, Docker Compose) and CodeQL (actions, C#, JavaScript/TypeScript, Python) passed on `5cc4efe3`; 0 open code-scanning alerts on `main`.
+
+**C10 status (roadmap §2 levels, reported separately).**
+- Code-complete (Development/Test): **yes**, functional implementation complete.
+- Merged to `main`: **yes**, `5cc4efe3`.
+- AI technical review: completed by Claude Code subagents with fresh, read-only context (§10.4–§10.6, §10.11). They are independent of the writer's context but not a human or external review, and they do not reach the roadmap's "independently validated" level.
+- Focused Stage B evidence: recorded within its tested scope (§10.10, §10.11).
+- Owner development acceptance: **pending** (formal Development/Test acceptance not given).
+- Independently validated: **no**. Production-ready: **not approved**.
+
+**Obligations retained.** Every item in §10.9, unchanged in meaning, including the three added by this section (buffered-data exposure, the §4 test 8 alternative ordering, and the §11 register re-mapping), and the §10.11 "not proven" items: sign-out during a download end to end, a download through the web nginx, Azure ingress buffering, PB-09 re-check load and gate-closed interruption rate, and §4 test 13 replay convergence (G14). None is waived or marked complete.
+
+**C11 readiness (assessment only; no C11 work done).**
+- Approved scope (roadmap, C-193 RM-1): notifications and the task inbox (PG-009), access requests and invitations (PG-065), welcome and first use (PG-004). Exit evidence: a request flow without existence disclosure (PG-065 rule).
+- Stated dependencies: Phase C10, because requests act on shares (satisfied at code level by this integration); in-app invitations need PRD-1 (D8-3(b), deferred in C-78).
+- No C11 design exists. C10 followed design approval in WP-0 (C-193, C-194) before a separate implementation authorization, so C11 needs a WP-0 design and owner approval before any implementation authorization.
+- No contract makes C11 Development/Test work wait for C10 formal acceptance or for C10's production obligations. The roadmap's status levels are separate, and its dependency column names Phase C10 work, not its acceptance.
+- Genuine dependencies: Entra in-app invitations cannot be built until PRD-1 (Development/Test onboarding stays on the C8 operator-plane path); access requests must use the C10 share commands and the Authority unchanged, with contributor writes still off outside disposable stacks (ACT-5, G20); any step-up beyond development step-up (G27) needs PRD-1.
+
+**Not done.** Formal acceptance, production or Azure change, capability activation, Stage B, C10 implementation, C11 work.
