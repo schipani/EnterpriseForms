@@ -448,6 +448,29 @@ public sealed class ExpireShareAdmissionTests
         Assert.Equal("PAYLOAD_EXPIRY_MISMATCH", result.ReasonCode);
     }
 
+    [Fact]
+    public void EligibleWhenTheJournalledExpiryCarriesSubMicrosecondTicksTheStoreDropped()
+    {
+        // C-201 real-elapsed-time Stage B: the request's expiry keeps 100 ns ticks in the journalled payload, AuthorityDb stores microseconds.
+        var org = CreateOrganization();
+        var resource = CreateShareResource();
+        var journalled = ExpiryTime.AddTicks(6_805_932);
+        var stored = ExpiryTime.AddTicks(6_805_930);
+        var result = ExpireShareAdmission.Evaluate(org, resource, CreateShareMetadata(stored), 1L, CreateSourceCommand(journalled), BaseTime, true, BaseTime.AddMinutes(-5), hasDelegatedAssertion: false);
+
+        Assert.Equal(ExpireShareAdmission.Disposition.Eligible, result.Disposition);
+    }
+
+    [Fact]
+    public void IneligibleWhenTheCommittedExpiryMovedByOneMicrosecond()
+    {
+        var org = CreateOrganization();
+        var resource = CreateShareResource();
+        var result = ExpireShareAdmission.Evaluate(org, resource, CreateShareMetadata(ExpiryTime.AddMicroseconds(1)), 1L, CreateSourceCommand(ExpiryTime), BaseTime, true, BaseTime.AddMinutes(-5), hasDelegatedAssertion: false);
+
+        Assert.Equal("PAYLOAD_EXPIRY_MISMATCH", result.ReasonCode);
+    }
+
     private static OrganizationAuthorizationState CreateOrganization() => new()
     {
         OrganizationId = OrgId,

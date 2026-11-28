@@ -185,8 +185,12 @@ internal static class ExpireShareAdmission
             return Ineligible("PAYLOAD_RECORD_ID_MISMATCH");
         }
 
-        // Normalized JSON must have UTC expiry instant exactly matching committed expiry
-        if (payload.ShareExpiresOn != committedExpiry)
+        // Normalized JSON must have the UTC expiry instant matching the committed expiry at the precision AuthorityDb stores
+        // (PostgreSQL timestamptz: microseconds). C-201 real-elapsed-time Stage B: the journalled payload keeps the request's
+        // 100 ns ticks (…05.6805932) while the committed column holds …05.680593, so exact equality refused every genuine expiry
+        // that was not microsecond-aligned (PAYLOAD_EXPIRY_MISMATCH, alert, never converged). Any change of one microsecond or more,
+        // such as an expiry moved by SQL, is still refused.
+        if (!SameStoredInstant(payload.ShareExpiresOn, committedExpiry))
         {
             return Ineligible("PAYLOAD_EXPIRY_MISMATCH");
         }
@@ -199,6 +203,10 @@ internal static class ExpireShareAdmission
             expirySourceCommand.ActorIdentityBindingId,
             idempotencyKey);
     }
+
+    /// <summary>Equal at the microsecond precision of a PostgreSQL timestamptz (a stored value differs by less than one microsecond).</summary>
+    internal static bool SameStoredInstant(DateTimeOffset journalled, DateTimeOffset committed) =>
+        (journalled.UtcDateTime - committed.UtcDateTime).Duration() < TimeSpan.FromMicroseconds(1);
 
     private static AdmissionResult Ineligible(string reasonCode)
     {

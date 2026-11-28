@@ -7,11 +7,16 @@ using Xunit;
 namespace EnterpriseForms.StageBTests.Tests;
 
 /// <summary>
-/// Phase C10 WP-0 §4 tests 8 and 10 with real elapsed time (owner decision 2, C-201): every share is granted or updated through the
-/// supported commands with a genuine expiry one hour ahead (the Authority's minimum), expires naturally and converges through the real
-/// 30 s loop. No expiry value is written by SQL; no Testing clock exists. The time-critical steps of both tests (the actions at the
-/// expiry instant) run in one shared timeline, started by whichever test runs first, so the hour is waited once and the order in which
-/// xUnit runs the two tests cannot move an action after convergence. Each test then asserts its own outcome.
+/// Phase C10 WP-0 §4 tests 8, 10 and 13, and CONS-23 on a natural expiry, with real elapsed time (owner decisions 1 and 2, C-201).
+/// Every share is granted or updated through the supported commands with a genuine expiry one hour ahead (the Authority's minimum),
+/// expires naturally and converges through the real 30 s loop. No expiry value is written by SQL and no Testing clock exists.
+/// <para>
+/// Everything time-critical runs in one shared timeline, started by whichever test runs first, so the hour is waited once and the
+/// order in which xUnit runs the tests cannot move an action after convergence. The timeline observes every outcome and the tests
+/// assert what it captured. Its last step is §4 test 13: AuthorityDb is backed up with <c>pg_dump</c> before the instant and, after
+/// every other observation, restored over the whole database with <c>pg_restore --clean</c>, the Authority stopped around it (the T16
+/// restore technique). That rewrites AuthorityDb for every organization on the stack, so this class has a group and stack of its own.
+/// </para>
 /// </summary>
 [Collection(StageBStackCollectionDefinition.Name)]
 public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
@@ -21,13 +26,20 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
     private static readonly SemaphoreSlim Gate = new(1, 1);
     private static Task<Timeline>? timeline;
 
-    private sealed record RaceShares(StageBScenario S, Guid Record, Guid Revoked, Guid Updated, Guid Transferred, string RevokedStateBeforeRevoke, HttpResult Revoke, HttpResult Update, HttpResult Transfer);
+    private sealed record RaceShares(HttpResult Revoke, HttpResult Update, HttpResult Transfer, string RevokedStateBeforeRevoke,
+        string UpdatedFinal, string TransferredFinal, string RevokedFinal, int UpdatedExpired, int TransferredExpired, int RevokedExpired, string RevokedStateLater,
+        bool DesignerDenied, bool AdministratorDenied);
 
-    private sealed record InheritedShares(StageBScenario S, Guid Record, Guid Manager, Guid Delegated, Guid Independent, string DelegatedStateAtInstant, string[] DesignerKeysAtInstant);
+    private sealed record InheritedShares(string DelegatedStateAtInstant, string[] DesignerKeysAtInstant,
+        string ManagerFinal, string DelegatedFinal, string IndependentFinal, int ManagerExpired, int DelegatedExpired, string[] DesignerKeysAfter, bool ReaderDenied);
 
-    private sealed record ExpiringDownload(StageBScenario S, Guid Record, long DocumentBytes, long ReceivedAtExpiry, long Received, bool Completed, string? Failure, TimeSpan EndedAfterExpiry, string[] FailureReasons);
+    private sealed record ExpiringDownload(long DocumentBytes, long ReceivedAtExpiry, long Received, bool Completed, string? Failure, TimeSpan EndedAfterExpiry, string[] FailureReasons, bool ReaderDenied);
 
-    private sealed record Timeline(DateTimeOffset ExpiresOn, RaceShares Race, InheritedShares Inherited, ExpiringDownload Download);
+    /// <summary>§4 test 13: the share's state in the restored backup, the access then, and whether replay converged it again.</summary>
+    private sealed record RestoredShare(string ConvergedBeforeRestore, int ExpiredBeforeRestore, string StateAfterRestore, HttpStatusCode StatusAfterRestore, string? ErrorAfterRestore,
+        string StateAfterReplay, HttpStatusCode StatusAfterReplay, string? ErrorAfterReplay, int ExpiredAfterReplay, string Gate);
+
+    private sealed record Timeline(DateTimeOffset ExpiresOn, RaceShares Race, InheritedShares Inherited, ExpiringDownload Download, RestoredShare Restore);
 
     private static string Path(Guid record, string suffix = "") => $"/api/v1/form-records/{record:D}/shares{suffix}";
 
@@ -60,15 +72,17 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
 
     private static bool Denied(HttpResult result) => result.Status is HttpStatusCode.Forbidden or HttpStatusCode.NotFound;
 
+    private static bool DeniedOrFailClosed(HttpStatusCode status) => status is HttpStatusCode.Forbidden or HttpStatusCode.NotFound or HttpStatusCode.Locked or HttpStatusCode.ServiceUnavailable;
+
     private string State(Guid share) =>
         fixture.Stack.AuthorityObserverSql($"SELECT resource_lifecycle_state FROM authority_resources WHERE resource_type_name = 'record_share' AND resource_entity_id = '{share:D}';").Trim();
 
     private int JournalEvents(string kind, Guid id) =>
         int.Parse(fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE journal_event_kind = '{kind}' AND journal_event_body_json LIKE '%{id:D}%';").Trim(), CultureInfo.InvariantCulture);
 
-    private async Task<string> WaitStateAsync(Guid share, Func<string, bool> done)
+    private async Task<string> WaitStateAsync(Guid share, Func<string, bool> done, TimeSpan? timeout = null)
     {
-        var deadline = DateTime.UtcNow + Convergence;
+        var deadline = DateTime.UtcNow + (timeout ?? Convergence);
         string state;
         while (!done(state = State(share)) && DateTime.UtcNow < deadline)
         {
@@ -77,6 +91,18 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
 
         return state;
     }
+
+    /// <summary>Restore simulation only (test 13): a shell inside the authority-db container as the AuthorityDb administrator.</summary>
+    private string AuthorityDbShell(string shell, int timeoutSeconds = 180)
+    {
+        var prefixed = "export PGUSER=\"$POSTGRES_USER\" PGPASSWORD=\"$POSTGRES_PASSWORD\" PGDATABASE=\"$POSTGRES_DB\"; " + shell;
+        var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(prefixed));
+        return fixture.Stack.Compose($"exec -T authority-db sh -c \"echo {encoded} | base64 -d | sh\"", timeoutSeconds);
+    }
+
+    private string[] DownloadFailures(StageBScenario s, Guid record) =>
+        fixture.Stack.AttackerSql($"SELECT event_metadata_json->>'reasonCode' FROM audit_events WHERE tenant_id = '{s.OrganizationId:D}' AND form_record_id = '{record:D}' AND event_action = 'DOCUMENT_DOWNLOAD_FAILED' ORDER BY audit_sequence;")
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private async Task<(StageBScenario S, Guid Record)> AccusedAsync(string name)
     {
@@ -101,8 +127,8 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
 
     private async Task<Timeline> RunTimelineAsync()
     {
-        // One genuine expiry instant for both tests: one hour ahead plus the setup time, re-checked by the Authority on every command.
-        var expiresOn = DateTimeOffset.UtcNow.AddMinutes(66);
+        // One genuine expiry instant for every share: one hour ahead plus the setup time, re-checked by the Authority on every command.
+        var expiresOn = DateTimeOffset.UtcNow.AddMinutes(68);
 
         // §4 test 8 setup: three shares of one record, each expiring at the instant.
         var (race, raceRecord) = await AccusedAsync("c10-natural-expiry-races");
@@ -137,6 +163,13 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
         Assert.True(dlShare.IsSuccess, dlShare.Body);
         await dl.WaitGateReadyAsync(Settle);
         await dl.WaitProjectionAsync(dl.Reader, dlRecord, Settle);
+
+        // §4 test 13 setup: one more share expiring at the instant, then the AuthorityDb backup, taken before any convergence.
+        var (restore, restoreRecord) = await AccusedAsync("c10-natural-expiry-restore");
+        var restoreShare = await ShareAsync(restore, restore.Clerk, restoreRecord, restore.Reader, "Reader", ["given_name"], expiresOn);
+        await restore.WaitProjectionAsync(restore.Reader, restoreRecord, Settle);
+        var dumpFile = $"/tmp/c10-natural-expiry-{restoreShare:N}.dump";
+        Assert.Contains("DUMPED", AuthorityDbShell($"pg_dump -Fc -f {dumpFile} && echo DUMPED"), StringComparison.Ordinal);
         Assert.True(expiresOn - DateTimeOffset.UtcNow > TimeSpan.FromMinutes(1), "setup took too long: the expiry instant is too close");
 
         // The natural wait (the download opens 15 s before the instant).
@@ -155,16 +188,50 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
             new { useDevelopmentStepUp = true, newOwnerUserId = race.Reader.AuthorityUserId, newOwnerTeamId = (Guid?)null, transferReason = "C10 Stage B natural-expiry transfer" });
         await race.WaitGateReadyAsync(Settle);
 
+        // CONS-23: resume the paused download.
         var receivedAtExpiry = download.Received;
         await download.ReadRestAsync();
         var endedAfterExpiry = DateTimeOffset.UtcNow - expiresOn;
-        var reasons = fixture.Stack.AttackerSql($"SELECT event_metadata_json->>'reasonCode' FROM audit_events WHERE tenant_id = '{dl.OrganizationId:D}' AND form_record_id = '{dlRecord:D}' AND event_action = 'DOCUMENT_DOWNLOAD_FAILED' ORDER BY audit_sequence;")
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var expiringDownload = new ExpiringDownload(documentBytes, receivedAtExpiry, download.Received, download.Completed, download.Failure, endedAfterExpiry,
+            DownloadFailures(dl, dlRecord), Denied(await dl.ProjectionAsync(dl.Reader, dlRecord)));
 
-        return new Timeline(expiresOn,
-            new RaceShares(race, raceRecord, revoked, updated, transferred, revokedBefore, revoke, update, transfer),
-            new InheritedShares(inherited, inheritedRecord, manager, delegated, independent, delegatedAtInstant, designerKeys),
-            new ExpiringDownload(dl, dlRecord, documentBytes, receivedAtExpiry, download.Received, download.Completed, download.Failure, endedAfterExpiry, reasons));
+        // Real-loop convergence of every share; the test 8 and 10 observations are captured before the restore rewrites AuthorityDb.
+        var updatedFinal = await WaitStateAsync(updated, x => x == "Expired");
+        var transferredFinal = await WaitStateAsync(transferred, x => x == "Expired");
+        var revokedFinal = await WaitStateAsync(revoked, x => x is "Revoked" or "Expired");
+        var managerFinal = await WaitStateAsync(manager, x => x == "Expired");
+        var delegatedFinal = await WaitStateAsync(delegated, x => x != "Active");
+        var restoreConverged = await WaitStateAsync(restoreShare, x => x == "Expired");
+        await Task.Delay(TimeSpan.FromSeconds(65)); // two more passes: nothing is recorded twice
+        var raceShares = new RaceShares(revoke, update, transfer, revokedBefore,
+            updatedFinal, transferredFinal, revokedFinal, JournalEvents("ShareExpired", updated), JournalEvents("ShareExpired", transferred), JournalEvents("ShareExpired", revoked), State(revoked),
+            Denied(await race.ProjectionAsync(race.DesignerOnly, raceRecord)), Denied(await race.ProjectionAsync(race.Administrator, raceRecord)));
+        var inheritedShares = new InheritedShares(delegatedAtInstant, designerKeys,
+            managerFinal, delegatedFinal, State(independent), JournalEvents("ShareExpired", manager), JournalEvents("ShareExpired", delegated),
+            VisibleKeys(await inherited.WaitProjectionAsync(inherited.DesignerOnly, inheritedRecord, Settle)), Denied(await inherited.ProjectionAsync(inherited.Reader, inheritedRecord)));
+        var expiredBeforeRestore = JournalEvents("ShareExpired", restoreShare);
+
+        // §4 test 13: restore the pre-convergence backup over the whole AuthorityDb, the Authority stopped around it.
+        try
+        {
+            fixture.Stack.Stop("authority");
+            var restored = AuthorityDbShell($"pg_restore --clean --if-exists --no-owner -d \"$POSTGRES_DB\" {dumpFile} 2>&1; echo RESTORED; rm -f {dumpFile}", 300);
+            Assert.Contains("RESTORED", restored, StringComparison.Ordinal);
+        }
+        finally
+        {
+            fixture.Stack.Compose("up -d --wait authority", 240);
+        }
+
+        var stateAfterRestore = State(restoreShare);
+        var afterRestore = await restore.ProjectionAsync(restore.Reader, restoreRecord);
+        var stateAfterReplay = await WaitStateAsync(restoreShare, x => x == "Expired", TimeSpan.FromSeconds(180));
+        var afterReplay = await restore.ProjectionAsync(restore.Reader, restoreRecord);
+        var gate = await fixture.Authority.GateAsync(restore.OrganizationId);
+        var restoredShare = new RestoredShare(restoreConverged, expiredBeforeRestore, stateAfterRestore, afterRestore.Status, afterRestore.ErrorCode,
+            stateAfterReplay, afterReplay.Status, afterReplay.ErrorCode, JournalEvents("ShareExpired", restoreShare), gate?.ToString() ?? string.Empty);
+
+        return new Timeline(expiresOn, raceShares, inheritedShares, expiringDownload, restoredShare);
     }
 
     [Fact]
@@ -174,33 +241,29 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
         // in exactly one terminal state, recorded once: the revoked share is Revoked with no ShareExpired if the revoke reached it first,
         // or Expired once with the revoke refused if the loop did; the update is refused and the share converges to Expired once; the
         // transfer neither revives nor blocks the durable share, which converges to Expired once.
-        var t = await TimelineAsync();
-        var r = t.Race;
+        var r = (await TimelineAsync()).Race;
+        TestContext.Current.SendDiagnosticMessage($"§4 test 8: the revoked share was {r.RevokedStateBeforeRevoke} at the revoke, revoke {(int)r.Revoke.Status}, final {r.RevokedFinal}");
         Assert.False(r.Update.IsSuccess, r.Update.Body); // an expired share has no active lineage to update
         Assert.True(r.Transfer.IsSuccess, r.Transfer.Body);
-
-        Assert.Equal("Expired", await WaitStateAsync(r.Updated, x => x == "Expired"));
-        Assert.Equal("Expired", await WaitStateAsync(r.Transferred, x => x == "Expired"));
-        var revokedFinal = await WaitStateAsync(r.Revoked, x => x is "Revoked" or "Expired");
+        Assert.Equal("Expired", r.UpdatedFinal);
+        Assert.Equal("Expired", r.TransferredFinal);
         if (r.RevokedStateBeforeRevoke == "Active" && r.Revoke.IsSuccess)
         {
-            Assert.Equal("Revoked", revokedFinal); // the revoke won
-            Assert.Equal(0, JournalEvents("ShareExpired", r.Revoked));
+            Assert.Equal("Revoked", r.RevokedFinal); // the revoke won
+            Assert.Equal(0, r.RevokedExpired);
         }
         else
         {
-            Assert.Equal("Expired", revokedFinal); // the loop won; the revoke was refused
+            Assert.Equal("Expired", r.RevokedFinal); // the loop won; the revoke was refused
             Assert.False(r.Revoke.IsSuccess, r.Revoke.Body);
-            Assert.Equal(1, JournalEvents("ShareExpired", r.Revoked));
+            Assert.Equal(1, r.RevokedExpired);
         }
 
-        // A few more passes: nothing is recorded twice.
-        await Task.Delay(TimeSpan.FromSeconds(65), TestContext.Current.CancellationToken);
-        Assert.Equal(1, JournalEvents("ShareExpired", r.Updated));
-        Assert.Equal(1, JournalEvents("ShareExpired", r.Transferred));
-        Assert.Equal(revokedFinal, State(r.Revoked));
-        Assert.True(Denied(await r.S.ProjectionAsync(r.S.DesignerOnly, r.Record)));
-        Assert.True(Denied(await r.S.ProjectionAsync(r.S.Administrator, r.Record)));
+        Assert.Equal(1, r.UpdatedExpired);
+        Assert.Equal(1, r.TransferredExpired);
+        Assert.Equal(r.RevokedFinal, r.RevokedStateLater);
+        Assert.True(r.DesignerDenied);
+        Assert.True(r.AdministratorDenied);
     }
 
     [Fact]
@@ -208,17 +271,31 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
     {
         // §4 test 10: at the instant the delegated share is denied through its lineage (only the independent grant's field remains), on
         // real-loop convergence the parent is Expired once and the delegated share Invalidated, and the independent grant keeps access.
-        var t = await TimelineAsync();
-        var i = t.Inherited;
+        var i = (await TimelineAsync()).Inherited;
+        TestContext.Current.SendDiagnosticMessage($"§4 test 10: the delegated share was {i.DelegatedStateAtInstant} at the instant");
         Assert.Equal(["family_name"], i.DesignerKeysAtInstant);
+        Assert.Equal("Expired", i.ManagerFinal);
+        Assert.Equal("Invalidated", i.DelegatedFinal);
+        Assert.Equal("Active", i.IndependentFinal);
+        Assert.Equal(1, i.ManagerExpired);
+        Assert.Equal(0, i.DelegatedExpired);
+        Assert.Equal(["family_name"], i.DesignerKeysAfter);
+        Assert.True(i.ReaderDenied);
+    }
 
-        Assert.Equal("Expired", await WaitStateAsync(i.Manager, x => x == "Expired"));
-        Assert.Equal("Invalidated", await WaitStateAsync(i.Delegated, x => x != "Active"));
-        Assert.Equal("Active", State(i.Independent));
-        Assert.Equal(1, JournalEvents("ShareExpired", i.Manager));
-        Assert.Equal(0, JournalEvents("ShareExpired", i.Delegated));
-        Assert.Equal(["family_name"], VisibleKeys(await i.S.WaitProjectionAsync(i.S.DesignerOnly, i.Record, Settle)));
-        Assert.True(Denied(await i.S.ProjectionAsync(i.S.Reader, i.Record)));
+    [Fact]
+    public async Task ARestoreFromBeforeConvergenceLeavesTheShareDeniedAndReplayConvergesIt()
+    {
+        // §4 test 13: "Restore an AuthorityDb backup taken before convergence => the share stays denied; replay converges it."
+        var t = (await TimelineAsync()).Restore;
+        var observed = $"converged {t.ConvergedBeforeRestore} ({t.ExpiredBeforeRestore} ShareExpired); after restore {t.StateAfterRestore}, access {(int)t.StatusAfterRestore} {t.ErrorAfterRestore}; after the replay wait {t.StateAfterReplay}, access {(int)t.StatusAfterReplay} {t.ErrorAfterReplay}, ShareExpired {t.ExpiredAfterReplay}; gate {t.Gate}";
+        TestContext.Current.SendDiagnosticMessage("§4 test 13: " + observed);
+        Assert.Equal("Expired", t.ConvergedBeforeRestore);
+        Assert.Equal(1, t.ExpiredBeforeRestore);
+        Assert.Equal("Active", t.StateAfterRestore); // the backup's pre-convergence state
+        Assert.True(DeniedOrFailClosed(t.StatusAfterRestore), "the restored share released access: " + observed);
+        Assert.True(DeniedOrFailClosed(t.StatusAfterReplay), "access after the restore: " + observed);
+        Assert.True(t.StateAfterReplay == "Expired", "§4 test 13: replay did not converge the restored share. " + observed);
     }
 
     [Fact]
@@ -226,15 +303,14 @@ public sealed class C10ShareNaturalExpiryTests(StageBFixture fixture)
     {
         // CONS-23 with real elapsed time: the recipient's download, opened before the expiry instant, stops within the re-check bound
         // (5 s) plus the time to drain the transport buffers after the instant, with one audited DOCUMENT_DOWNLOAD_FAILED.
-        var t = await TimelineAsync();
-        var d = t.Download;
+        var d = (await TimelineAsync()).Download;
         var observed = $"received {d.Received} of {d.DocumentBytes} bytes ({d.Received - d.ReceivedAtExpiry} after the instant), ended {d.EndedAfterExpiry.TotalSeconds:F1} s after the instant, failure '{d.Failure}', reasons [{string.Join(", ", d.FailureReasons)}]";
         TestContext.Current.SendDiagnosticMessage("CONS-23 natural expiry: " + observed);
         Assert.False(d.Completed, "CONS-23: the download continued past the share's expiry. " + observed);
         Assert.True(d.Received < d.DocumentBytes, observed);
         Assert.True(d.EndedAfterExpiry <= TimeSpan.FromSeconds(45), observed); // the race steps above run first (about 10 s), then 5 s + drain
         Assert.Single(d.FailureReasons);
-        Assert.NotEqual("AUTHORITY_UNAVAILABLE", d.FailureReasons[0]);
-        Assert.True(Denied(await d.S.ProjectionAsync(d.S.Reader, d.Record)));
+        Assert.True(d.FailureReasons[0] is not ("AUTHORITY_UNAVAILABLE" or "INTEGRITY_VERIFICATION_FAILED"), observed);
+        Assert.True(d.ReaderDenied);
     }
 }
